@@ -45,12 +45,12 @@ jobs:
         ai-provider:
           - ollama
           - ollama-openai
-    services:
-      ollama:
-        image: ollama/ollama
-        ports:
-          - 11434:11434
-        options: --name ollama --rm
+#    services:
+#      ollama:
+#        image: ollama/ollama
+#        ports:
+#          - 11434:11434
+#        options: --name ollama --rm
     name: "jvm-build-test-${{ matrix.java }}-${{ matrix.ai-provider }}"
     steps:
       - uses: actions/checkout@v4
@@ -62,9 +62,9 @@ jobs:
           distribution: temurin
           cache: maven
 
-      - name: Pull Ollama models (if necessary)
-        if: matrix.ai-provider == 'ollama-openai'
-        run: docker exec ollama bash -c "ollama pull llama3.2 && ollama pull snowflake-arctic-embed && ollama ls"
+#      - name: Pull Ollama models (if necessary)
+#        if: matrix.ai-provider == 'ollama-openai'
+#        run: docker exec ollama bash -c "ollama pull llama3.2 && ollama pull snowflake-arctic-embed && ollama ls"
 
       - name: "build-test-jvm-java${{ matrix.java }}-${{ matrix.ai-provider }}"
         env:
