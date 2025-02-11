@@ -11,7 +11,7 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<quarkus.chappie.version>0.0.6</quarkus.chappie.version>
-		<quarkus.langchain4j.version>0.23.3</quarkus.langchain4j.version>
+		<quarkus.langchain4j.version>0.24.0</quarkus.langchain4j.version>
 		<quarkus.micrometer.otlp.version>3.2.4</quarkus.micrometer.otlp.version>
 		<quarkus.playwright.version>2.1.0</quarkus.playwright.version>
 		<quarkus.quinoa.version>2.5.1</quarkus.quinoa.version>
