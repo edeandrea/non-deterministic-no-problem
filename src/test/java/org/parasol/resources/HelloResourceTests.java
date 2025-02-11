@@ -20,6 +20,7 @@ import io.restassured.http.ContentType;
 @TestHTTPEndpoint(HelloResource.class)
 class HelloResourceTests {
 	@TestHTTPResource
+	@TestHTTPEndpoint(HelloResource.class)
 	URL url;
 
 	@BeforeAll
