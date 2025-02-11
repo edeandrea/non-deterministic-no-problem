@@ -1,4 +1,7 @@
 quarkus:
+  rest:
+    path: /api/v1
+
   # Default LangChain4j configuration
   langchain4j:
     parasol-chat:
