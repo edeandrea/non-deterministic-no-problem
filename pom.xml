@@ -11,8 +11,7 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<quarkus.chappie.version>0.0.6</quarkus.chappie.version>
-		<quarkus.langchain4j.version>0.25.0.CR1</quarkus.langchain4j.version>
-		<quarkus.micrometer.otlp.version>3.2.4</quarkus.micrometer.otlp.version>
+		<quarkus.langchain4j.version>0.25.0</quarkus.langchain4j.version>
 		<quarkus.playwright.version>2.1.1</quarkus.playwright.version>
 		<quarkus.quinoa.version>2.5.1</quarkus.quinoa.version>
 		<quarkus.wiremock.version>1.4.1</quarkus.wiremock.version>
@@ -105,9 +104,8 @@
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
-			<groupId>io.quarkiverse.micrometer.registry</groupId>
-			<artifactId>quarkus-micrometer-registry-otlp</artifactId>
-			<version>${quarkus.micrometer.otlp.version}</version>
+			<groupId>io.quarkus</groupId>
+			<artifactId>quarkus-micrometer-opentelemetry</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>io.quarkus</groupId>
