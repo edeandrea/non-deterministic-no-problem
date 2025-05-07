@@ -11,7 +11,7 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<quarkus.chappie.version>1.0.0</quarkus.chappie.version>
-		<quarkus.langchain4j.version>0.26.2</quarkus.langchain4j.version>
+		<quarkus.langchain4j.version>999-SNAPSHOT</quarkus.langchain4j.version>
 		<quarkus.playwright.version>2.1.1</quarkus.playwright.version>
 		<quarkus.quinoa.version>2.5.4</quarkus.quinoa.version>
 		<quarkus.wiremock.version>1.4.1</quarkus.wiremock.version>
@@ -119,6 +119,10 @@
 		<dependency>
 			<groupId>io.quarkus</groupId>
 			<artifactId>quarkus-config-yaml</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.quarkus</groupId>
+			<artifactId>quarkus-micrometer-registry-prometheus</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>io.quarkus</groupId>
