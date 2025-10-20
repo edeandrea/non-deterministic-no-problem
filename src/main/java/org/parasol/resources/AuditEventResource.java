@@ -14,7 +14,7 @@ import jakarta.ws.rs.core.MediaType;
 
 import org.parasol.model.audit.AuditEvent;
 import org.parasol.model.audit.AuditStats;
-import org.parasol.model.audit.LLMInteractions;
+import org.parasol.model.audit.Interactions;
 import org.parasol.repository.AuditEventRepository;
 
 import io.quarkus.panache.common.Sort;
@@ -47,7 +47,7 @@ public class AuditEventResource {
 
 	@GET
 	@Path("/interactions")
-	public LLMInteractions getLLMInteractions(@QueryParam("start") Optional<Instant> start, @QueryParam("end") Optional<Instant> end) {
+	public Interactions getLLMInteractions(@QueryParam("start") Optional<Instant> start, @QueryParam("end") Optional<Instant> end) {
 		return this.auditEventRepository.getLLMInteractions(start, end);
 	}
 }

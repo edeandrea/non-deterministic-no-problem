@@ -328,7 +328,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "parasol_llm_interaction_failed_failed_interactions_total or vector(0)",
+          "expr": "parasol_SERVICE_ERROR_failed_interactions_total or vector(0)",
           "instant": false,
           "legendFormat": "{{interfaceName}}.{{methodName}}",
           "range": true,

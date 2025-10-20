@@ -1,7 +1,7 @@
 package org.parasol.model.audit;
 
 
-import static org.parasol.model.audit.LLMInteractionCompleteAuditEvent.EVENT_TYPE;
+import static org.parasol.model.audit.ServiceCompleteAuditEvent.EVENT_TYPE;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.DiscriminatorValue;
@@ -9,24 +9,24 @@ import jakarta.persistence.Entity;
 
 @Entity
 @DiscriminatorValue(EVENT_TYPE)
-public class LLMInteractionCompleteAuditEvent extends AuditEvent {
-	public static final String EVENT_TYPE = "LLM_INTERACTION_COMPLETE";
+public class ServiceCompleteAuditEvent extends AuditEvent {
+	public static final String EVENT_TYPE = "SERVICE_COMPLETED";
 
 	@Column(updatable = false, columnDefinition = "TEXT")
 	private String result;
 
-	protected LLMInteractionCompleteAuditEvent() {
+	protected ServiceCompleteAuditEvent() {
 		super();
 	}
 
-	private LLMInteractionCompleteAuditEvent(Builder builder) {
+	private ServiceCompleteAuditEvent(Builder builder) {
 		super(builder);
 		this.result = builder.result;
 	}
 
 	@Override
 	public AuditEventType getEventType() {
-		return AuditEventType.LLM_INTERACTION_COMPLETE;
+		return AuditEventType.SERVICE_COMPLETED;
 	}
 
 	public String getResult() {
@@ -47,21 +47,21 @@ public class LLMInteractionCompleteAuditEvent extends AuditEvent {
 
 	@Override
 	public String toString() {
-		return "LLMInteractionCompleteAuditEvent{" +
+		return "ServiceCompleteAuditEvent{" +
 			"eventType='" + getEventType() + '\'' +
 			", result='" + getResult() + '\'' +
 			", id=" + getId() +
-			", sourceInfo=" + getSourceInfo() + '}';
+			", invocationContext=" + getInvocationContext() + '}';
 	}
 
-	public static final class Builder extends AuditEvent.Builder<Builder, LLMInteractionCompleteAuditEvent> {
+	public static final class Builder extends AuditEvent.Builder<Builder, ServiceCompleteAuditEvent> {
 		private String result;
 
 		private Builder() {
 			super();
 		}
 
-		private Builder(LLMInteractionCompleteAuditEvent source) {
+		private Builder(ServiceCompleteAuditEvent source) {
 			super(source);
 			this.result = source.result;
 		}
@@ -72,8 +72,8 @@ public class LLMInteractionCompleteAuditEvent extends AuditEvent {
 		}
 
 		@Override
-		public LLMInteractionCompleteAuditEvent build() {
-			return new LLMInteractionCompleteAuditEvent(this);
+		public ServiceCompleteAuditEvent build() {
+			return new ServiceCompleteAuditEvent(this);
 		}
 	}
 }

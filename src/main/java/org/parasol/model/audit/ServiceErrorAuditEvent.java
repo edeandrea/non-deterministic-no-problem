@@ -1,6 +1,6 @@
 package org.parasol.model.audit;
 
-import static org.parasol.model.audit.LLMInteractionFailedAuditEvent.EVENT_TYPE;
+import static org.parasol.model.audit.ServiceErrorAuditEvent.EVENT_TYPE;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.DiscriminatorValue;
@@ -8,8 +8,8 @@ import jakarta.persistence.Entity;
 
 @Entity
 @DiscriminatorValue(EVENT_TYPE)
-public class LLMInteractionFailedAuditEvent extends AuditEvent {
-	public static final String EVENT_TYPE = "LLM_INTERACTION_FAILED";
+public class ServiceErrorAuditEvent extends AuditEvent {
+	public static final String EVENT_TYPE = "SERVICE_ERROR";
 
 	@Column(updatable = false, columnDefinition = "TEXT")
 	private String errorMessage;
@@ -17,11 +17,11 @@ public class LLMInteractionFailedAuditEvent extends AuditEvent {
 	@Column(updatable = false, columnDefinition = "TEXT")
 	private String causeErrorMessage;
 
-	protected LLMInteractionFailedAuditEvent() {
+	protected ServiceErrorAuditEvent() {
 		// Required by JPA
 	}
 
-	private LLMInteractionFailedAuditEvent(Builder builder) {
+	private ServiceErrorAuditEvent(Builder builder) {
 		super(builder);
 		this.errorMessage = builder.errorMessage;
 		this.causeErrorMessage = builder.causeErrorMessage;
@@ -29,7 +29,7 @@ public class LLMInteractionFailedAuditEvent extends AuditEvent {
 
 	@Override
 	public AuditEventType getEventType() {
-		return AuditEventType.LLM_INTERACTION_FAILED;
+		return AuditEventType.SERVICE_ERROR;
 	}
 
 	public Builder toBuilder() {
@@ -58,16 +58,16 @@ public class LLMInteractionFailedAuditEvent extends AuditEvent {
 
 	@Override
 	public String toString() {
-		return "LLMInteractionFailedAuditEvent{" +
+		return "ServiceErrorAuditEvent{" +
 			"eventType='" + getEventType() + '\'' +
 			", causeErrorMessage='" + getCauseErrorMessage() + '\'' +
 			", errorMessage='" + getErrorMessage() + '\'' +
 			", id=" + getId() +
-			", sourceInfo=" + getSourceInfo() +
+			", invocationContext=" + getInvocationContext() +
 			'}';
 	}
 
-	public static final class Builder extends AuditEvent.Builder<Builder, LLMInteractionFailedAuditEvent> {
+	public static final class Builder extends AuditEvent.Builder<Builder, ServiceErrorAuditEvent> {
 		private String errorMessage;
 		private String causeErrorMessage;
 
@@ -75,7 +75,7 @@ public class LLMInteractionFailedAuditEvent extends AuditEvent {
 			super();
 		}
 
-		private Builder(LLMInteractionFailedAuditEvent source) {
+		private Builder(ServiceErrorAuditEvent source) {
 			super(source);
 			this.errorMessage = source.errorMessage;
 			this.causeErrorMessage = source.causeErrorMessage;
@@ -92,8 +92,8 @@ public class LLMInteractionFailedAuditEvent extends AuditEvent {
 		}
 
 		@Override
-		public LLMInteractionFailedAuditEvent build() {
-			return new LLMInteractionFailedAuditEvent(this);
+		public ServiceErrorAuditEvent build() {
+			return new ServiceErrorAuditEvent(this);
 		}
 	}
 }

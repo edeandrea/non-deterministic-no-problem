@@ -6,7 +6,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 
 @Embeddable
-public class AuditSource {
+public class InvocationContext {
 	@Column(updatable = false)
 	private String interfaceName;
 
@@ -16,11 +16,11 @@ public class AuditSource {
 	@Column(updatable = false)
 	private UUID interactionId;
 
-	public AuditSource() {
+	public InvocationContext() {
 		// Required by JPA
 	}
 
-	private AuditSource(Builder builder) {
+	private InvocationContext(Builder builder) {
 		this.interfaceName = builder.interfaceName;
 		this.methodName = builder.methodName;
 		this.interactionId = builder.interactionId;
@@ -60,7 +60,7 @@ public class AuditSource {
 
 	@Override
 	public String toString() {
-		return "AuditSource{" +
+		return "InvocationContext{" +
 			"interfaceName='" + interfaceName + '\'' +
 			", methodName='" + methodName + '\'' +
 			", interactionId=" + interactionId +
@@ -76,7 +76,7 @@ public class AuditSource {
 		private Builder() {
 		}
 
-		private Builder(AuditSource source) {
+		private Builder(InvocationContext source) {
 			this.interfaceName = source.interfaceName;
 			this.methodName = source.methodName;
 			this.interactionId = source.interactionId;
@@ -97,8 +97,8 @@ public class AuditSource {
 			return this;
 		}
 
-		public AuditSource build() {
-			return new AuditSource(this);
+		public InvocationContext build() {
+			return new InvocationContext(this);
 		}
 	}
 }

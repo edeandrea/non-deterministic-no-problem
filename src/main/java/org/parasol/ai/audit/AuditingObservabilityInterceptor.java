@@ -11,6 +11,9 @@ import jakarta.interceptor.InvocationContext;
 import io.quarkus.opentelemetry.runtime.config.build.OTelBuildConfig;
 
 import dev.langchain4j.model.chat.response.ChatResponseMetadata;
+import dev.langchain4j.observability.api.event.AiServiceEvent;
+import dev.langchain4j.observability.api.event.AiServiceResponseReceivedEvent;
+import dev.langchain4j.observability.api.event.ToolExecutedEvent;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.metrics.Meter;
@@ -18,9 +21,6 @@ import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Context;
-import io.quarkiverse.langchain4j.audit.LLMInteractionEvent;
-import io.quarkiverse.langchain4j.audit.ResponseFromLLMReceivedEvent;
-import io.quarkiverse.langchain4j.audit.ToolExecutedEvent;
 
 @AuditObserved
 @Interceptor
@@ -54,14 +54,14 @@ public class AuditingObservabilityInterceptor {
 	}
 
 	private Object wrap(InvocationContext context, AuditObserved auditObserved) throws Exception {
-		var interactionEvent = getInteractionEvent(context);
-		var sourceInfo = interactionEvent.map(LLMInteractionEvent::sourceInfo).orElseThrow();
+		var interactionEvent = getAiServiceEvent(context);
+		var invocationContext = interactionEvent.map(AiServiceEvent::invocationContext).orElseThrow();
 		var spanAttributes = Attributes.builder()
-		                               .put("arg.interfaceName", sourceInfo.interfaceName())
-		                               .put("arg.methodName", sourceInfo.methodName());
+		                               .put("arg.interfaceName", invocationContext.interfaceName())
+		                               .put("arg.methodName", invocationContext.methodName());
 		var metricAttributes = Attributes.builder()
-		                                 .put("interfaceName", sourceInfo.interfaceName())
-		                                 .put("methodName", sourceInfo.methodName());
+		                                 .put("interfaceName", invocationContext.interfaceName())
+		                                 .put("methodName", invocationContext.methodName());
 
 		interactionEvent.filter(event -> event instanceof ToolExecutedEvent)
 		                .map(ToolExecutedEvent.class::cast)
@@ -91,18 +91,18 @@ public class AuditingObservabilityInterceptor {
 					metricAttributes.build()
 				);
 
-				interactionEvent.filter(event -> event instanceof ResponseFromLLMReceivedEvent)
-				                .map(ResponseFromLLMReceivedEvent.class::cast)
+				interactionEvent.filter(event -> event instanceof AiServiceResponseReceivedEvent)
+				                .map(AiServiceResponseReceivedEvent.class::cast)
 				                .map(event -> event.response().metadata())
 				                .ifPresent(this::addToTotalTokenCount);
 			}
 		}
 	}
 
-	private Optional<LLMInteractionEvent> getInteractionEvent(InvocationContext context) {
+	private Optional<AiServiceEvent> getAiServiceEvent(InvocationContext context) {
 		return Arrays.stream(context.getParameters())
-		             .filter(param -> param instanceof LLMInteractionEvent)
-		             .map(LLMInteractionEvent.class::cast)
+		             .filter(param -> param instanceof AiServiceEvent)
+		             .map(AiServiceEvent.class::cast)
 		             .findFirst();
 	}
 

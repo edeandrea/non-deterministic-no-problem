@@ -11,11 +11,11 @@ import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.parasol.model.audit.AuditSource;
-import org.parasol.model.audit.LLMInitialMessagesCreatedAuditEvent;
-import org.parasol.model.audit.LLMInteractionCompleteAuditEvent;
-import org.parasol.model.audit.LLMInteractionFailedAuditEvent;
-import org.parasol.model.audit.LLMInteractions.LLMInteraction;
+import org.parasol.model.audit.Interactions.Interaction;
+import org.parasol.model.audit.InvocationContext;
+import org.parasol.model.audit.ServiceCompleteAuditEvent;
+import org.parasol.model.audit.ServiceErrorAuditEvent;
+import org.parasol.model.audit.ServiceStartedAuditEvent;
 
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;
@@ -26,7 +26,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @QuarkusTest
 @TestMethodOrder(OrderAnnotation.class)
 class AuditEventRepositoryTests {
-  private static final String EVENT_QUERY_TEMPLATE = "from AuditEvent e WHERE type(e) = %s AND sourceInfo.interactionId = ?1";
+  private static final String EVENT_QUERY_TEMPLATE = "from AuditEvent e WHERE type(e) = %s AND invocationContext.interactionId = ?1";
 
   @Inject
   AuditEventRepository repository;
@@ -57,14 +57,14 @@ class AuditEventRepositoryTests {
       .isNotNull()
       .hasSize(2)
       .containsExactlyInAnyOrder(
-            LLMInteraction.success(
-							first.getSourceInfo().getInteractionId(),
+            Interaction.success(
+							first.getInvocationContext().getInteractionId(),
               first.getCreatedOn(),
               first.getSystemMessage(),
               first.getUserMessage(),
               firstComplete.getResult()),
-            LLMInteraction.failure(
-							second.getSourceInfo().getInteractionId(),
+            Interaction.failure(
+							second.getInvocationContext().getInteractionId(),
               second.getCreatedOn(),
               second.getSystemMessage(),
               second.getUserMessage(),
@@ -93,17 +93,17 @@ class AuditEventRepositoryTests {
     interactionFailed(initialMessages());
   }
 
-  private LLMInteractionFailedAuditEvent interactionFailed(LLMInitialMessagesCreatedAuditEvent initialMessagesCreatedEvent) {
-    var interactionFailedEvent = LLMInteractionFailedAuditEvent.builder()
-           .errorMessage("Some error message")
-           .causeErrorMessage("Some cause error message")
-           .sourceInfo(initialMessagesCreatedEvent.getSourceInfo())
-           .build();
+  private ServiceErrorAuditEvent interactionFailed(ServiceStartedAuditEvent initialMessagesCreatedEvent) {
+    var interactionFailedEvent = ServiceErrorAuditEvent.builder()
+                                                       .errorMessage("Some error message")
+                                                       .causeErrorMessage("Some cause error message")
+                                                       .invocationContext(initialMessagesCreatedEvent.getInvocationContext())
+                                                       .build();
 
     this.repository.persist(interactionFailedEvent);
     var interactionFailedEvents = this.repository.find(
-						EVENT_QUERY_TEMPLATE.formatted(LLMInteractionFailedAuditEvent.class.getSimpleName()),
-            interactionFailedEvent.getSourceInfo().getInteractionId()
+						EVENT_QUERY_TEMPLATE.formatted(ServiceErrorAuditEvent.class.getSimpleName()),
+            interactionFailedEvent.getInvocationContext().getInteractionId()
           )
          .list();
 
@@ -115,17 +115,17 @@ class AuditEventRepositoryTests {
     return interactionFailedEvent;
   }
 
-  private LLMInteractionCompleteAuditEvent interactionComplete(LLMInitialMessagesCreatedAuditEvent initialMessagesCreatedEvent) throws JsonProcessingException {
+  private ServiceCompleteAuditEvent interactionComplete(ServiceStartedAuditEvent initialMessagesCreatedEvent) throws JsonProcessingException {
     var someObj = new SomeObject("field1", 1);
-    var interactionCompleteEvent = LLMInteractionCompleteAuditEvent.builder()
-            .result(this.objectMapper.writeValueAsString(someObj))
-            .sourceInfo(initialMessagesCreatedEvent.getSourceInfo())
-            .build();
+    var interactionCompleteEvent = ServiceCompleteAuditEvent.builder()
+                                                            .result(this.objectMapper.writeValueAsString(someObj))
+                                                            .invocationContext(initialMessagesCreatedEvent.getInvocationContext())
+                                                            .build();
 
     this.repository.persist(interactionCompleteEvent);
     var interactionCompleteEvents = this.repository.find(
-							EVENT_QUERY_TEMPLATE.formatted(LLMInteractionCompleteAuditEvent.class.getSimpleName()),
-              interactionCompleteEvent.getSourceInfo().getInteractionId()
+							EVENT_QUERY_TEMPLATE.formatted(ServiceCompleteAuditEvent.class.getSimpleName()),
+              interactionCompleteEvent.getInvocationContext().getInteractionId()
             )
             .list();
 
@@ -135,37 +135,37 @@ class AuditEventRepositoryTests {
       .isEqualTo(interactionCompleteEvent);
 
     assertThat(interactionCompleteEvents.getFirst())
-      .isNotNull()
-      .isInstanceOf(LLMInteractionCompleteAuditEvent.class).extracting(e -> {
+	    .isNotNull()
+	    .isInstanceOf(ServiceCompleteAuditEvent.class).extracting(e -> {
         try {
-	        return this.objectMapper.readValue(((LLMInteractionCompleteAuditEvent) e).getResult(), SomeObject.class);
+	        return this.objectMapper.readValue(((ServiceCompleteAuditEvent) e).getResult(), SomeObject.class);
         } catch (JsonProcessingException ex) {
 	        throw new RuntimeException(ex);
         }
       })
-      .usingRecursiveComparison()
-      .isEqualTo(someObj);
+	    .usingRecursiveComparison()
+	    .isEqualTo(someObj);
 
     return interactionCompleteEvent;
   }
 
-  private LLMInitialMessagesCreatedAuditEvent initialMessages() {
-    var initialMessagesCreatedEvent = LLMInitialMessagesCreatedAuditEvent.builder()
-             .systemMessage("System message")
-             .userMessage("User message")
-             .sourceInfo(
-							 AuditSource.builder()
+  private ServiceStartedAuditEvent initialMessages() {
+    var initialMessagesCreatedEvent = ServiceStartedAuditEvent.builder()
+                                                              .systemMessage("System message")
+                                                              .userMessage("User message")
+                                                              .invocationContext(
+							 InvocationContext.builder()
 							            .interactionId(UUID.randomUUID())
 							            .interfaceName("someInterface")
 							            .methodName("someMethod")
 							            .build()
              )
-            .build();
+                                                              .build();
 
     this.repository.persist(initialMessagesCreatedEvent);
     var initialMessagesCreatedEvents = this.repository.find(
-			              EVENT_QUERY_TEMPLATE.formatted(LLMInitialMessagesCreatedAuditEvent.class.getSimpleName()),
-                    initialMessagesCreatedEvent.getSourceInfo().getInteractionId()
+			              EVENT_QUERY_TEMPLATE.formatted(ServiceStartedAuditEvent.class.getSimpleName()),
+                    initialMessagesCreatedEvent.getInvocationContext().getInteractionId()
              )
             .list();
 

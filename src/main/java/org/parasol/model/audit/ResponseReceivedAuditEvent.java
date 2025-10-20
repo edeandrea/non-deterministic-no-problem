@@ -1,6 +1,6 @@
 package org.parasol.model.audit;
 
-import static org.parasol.model.audit.LLMResponseReceivedAuditEvent.EVENT_TYPE;
+import static org.parasol.model.audit.ResponseReceivedAuditEvent.EVENT_TYPE;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.DiscriminatorValue;
@@ -8,8 +8,8 @@ import jakarta.persistence.Entity;
 
 @Entity
 @DiscriminatorValue(EVENT_TYPE)
-public class LLMResponseReceivedAuditEvent extends AuditEvent {
-	public static final String EVENT_TYPE = "LLM_RESPONSE_RECEIVED";
+public class ResponseReceivedAuditEvent extends AuditEvent {
+	public static final String EVENT_TYPE = "RESPONSE_RECEIVED";
 
 	@Column(updatable = false, columnDefinition = "TEXT")
 	private String response;
@@ -24,11 +24,11 @@ public class LLMResponseReceivedAuditEvent extends AuditEvent {
 	private int outputTokenCount;
 
 	// JPA requires a no-arg constructor with at least protected visibility
-	protected LLMResponseReceivedAuditEvent() {
+	protected ResponseReceivedAuditEvent() {
 		super();
 	}
 
-	private LLMResponseReceivedAuditEvent(Builder builder) {
+	private ResponseReceivedAuditEvent(Builder builder) {
 		super(builder);
 		this.response = builder.response;
 		this.modelName = builder.modelName;
@@ -38,7 +38,7 @@ public class LLMResponseReceivedAuditEvent extends AuditEvent {
 
 	@Override
 	public AuditEventType getEventType() {
-		return AuditEventType.LLM_RESPONSE_RECEIVED;
+		return AuditEventType.RESPONSE_RECEIVED;
 	}
 
 	public Builder toBuilder() {
@@ -87,18 +87,18 @@ public class LLMResponseReceivedAuditEvent extends AuditEvent {
 
 	@Override
 	public String toString() {
-		return "LLMResponseReceivedAuditEvent{" +
+		return "ResponseReceivedAuditEvent{" +
 			"eventType='" + getEventType() + '\'' +
 			", inputTokenCount=" + getInputTokenCount() +
 			", response='" + getResponse() + '\'' +
 			", modelName='" + getModelName() + '\'' +
 			", outputTokenCount=" + getOutputTokenCount() +
 			", id=" + getId() +
-			", sourceInfo=" + getSourceInfo() +
+			", invocationContext=" + getInvocationContext() +
 			'}';
 	}
 
-	public static final class Builder extends AuditEvent.Builder<Builder, LLMResponseReceivedAuditEvent> {
+	public static final class Builder extends AuditEvent.Builder<Builder, ResponseReceivedAuditEvent> {
 		private String response;
 		private String modelName;
 		private int inputTokenCount;
@@ -108,7 +108,7 @@ public class LLMResponseReceivedAuditEvent extends AuditEvent {
 			super();
 		}
 
-		private Builder(LLMResponseReceivedAuditEvent source) {
+		private Builder(ResponseReceivedAuditEvent source) {
 			super(source);
 			this.response = source.response;
 			this.modelName = source.modelName;
@@ -137,8 +137,8 @@ public class LLMResponseReceivedAuditEvent extends AuditEvent {
 		}
 
 		@Override
-		public LLMResponseReceivedAuditEvent build() {
-			return new LLMResponseReceivedAuditEvent(this);
+		public ResponseReceivedAuditEvent build() {
+			return new ResponseReceivedAuditEvent(this);
 		}
 	}
 }

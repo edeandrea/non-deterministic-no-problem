@@ -75,7 +75,7 @@ public class ToolExecutedAuditEvent extends AuditEvent {
 			", toolName='" + getToolName() + '\'' +
 			", toolArgs='" + getToolArgs() + '\'' +
 			", id=" + getId() +
-			", sourceInfo=" + getSourceInfo() + '}';
+			", invocationContext=" + getInvocationContext() + '}';
 	}
 
 	public static final class Builder extends AuditEvent.Builder<Builder, ToolExecutedAuditEvent> {

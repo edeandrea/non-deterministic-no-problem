@@ -38,7 +38,7 @@ public abstract class AuditEvent {
 	 * Source information provided by the event (e.g., class/method or custom info).
 	 */
 	@Embedded
-	private AuditSource sourceInfo;
+	private InvocationContext invocationContext;
 
 	@CreationTimestamp(source = SourceType.DB)
 	@Column(updatable = false, nullable = false)
@@ -50,7 +50,7 @@ public abstract class AuditEvent {
 
 	protected AuditEvent(Builder builder) {
 		this.id = builder.id;
-		this.sourceInfo = builder.sourceInfo;
+		this.invocationContext = builder.invocationContext;
 	}
 
 	public Long getId() {
@@ -59,16 +59,16 @@ public abstract class AuditEvent {
 
 	public abstract AuditEventType getEventType();
 
-	public AuditSource getSourceInfo() {
-		return sourceInfo;
+	public InvocationContext getInvocationContext() {
+		return invocationContext;
 	}
 
 	public void setId(Long id) {
 		this.id = id;
 	}
 
-	public void setSourceInfo(AuditSource sourceInfo) {
-		this.sourceInfo = sourceInfo;
+	public void setInvocationContext(InvocationContext sourceInfo) {
+		this.invocationContext = sourceInfo;
 	}
 
 	public Instant getCreatedOn() {
@@ -96,7 +96,7 @@ public abstract class AuditEvent {
 	public static abstract class Builder<T extends Builder, A extends AuditEvent> {
 		private Long id;
 		private AuditEventType eventType;
-		private AuditSource sourceInfo;
+		private InvocationContext invocationContext;
 
 		protected Builder() {
 		}
@@ -104,7 +104,7 @@ public abstract class AuditEvent {
 		// Constructor to initialize builder from an existing AuditEvent
 		protected Builder(AuditEvent source) {
 			this.id = source.id;
-			this.sourceInfo = source.sourceInfo;
+			this.invocationContext = source.invocationContext;
 		}
 
 		public T id(Long id) {
@@ -112,8 +112,8 @@ public abstract class AuditEvent {
 			return (T) this;
 		}
 
-		public T sourceInfo(AuditSource sourceInfo) {
-			this.sourceInfo = sourceInfo;
+		public T invocationContext(InvocationContext sourceInfo) {
+			this.invocationContext = sourceInfo;
 			return (T) this;
 		}
 

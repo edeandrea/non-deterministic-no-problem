@@ -78,7 +78,7 @@ public class OutputGuardrailExecutedAuditEvent extends AuditEvent {
 			", response='" + getResponse() + '\'' +
 			", guardrailResult='" + getGuardrailResult() + '\'' +
 			", id=" + getId() +
-			", sourceInfo=" + getSourceInfo() +
+			", invocationContext=" + getInvocationContext() +
 			'}';
 	}
 

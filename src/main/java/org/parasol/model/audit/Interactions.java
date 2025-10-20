@@ -11,12 +11,12 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonProperty.Access;
 
 @RegisterForReflection
-public record LLMInteractions(AuditDates auditDates, List<LLMInteraction> interactions) {
-	public static LLMInteractions empty(AuditDates auditDates) {
-		return new LLMInteractions(auditDates, List.of());
+public record Interactions(AuditDates auditDates, List<Interaction> interactions) {
+	public static Interactions empty(AuditDates auditDates) {
+		return new Interactions(auditDates, List.of());
 	}
 
-	public record LLMInteraction(
+	public record Interaction(
 		UUID interactionId,
 		Instant interactionDate,
 		String systemMessage,
@@ -27,12 +27,12 @@ public record LLMInteractions(AuditDates auditDates, List<LLMInteraction> intera
 	) {
 		public enum InteractionStatus { SUCCESS, FAILURE, UNKNOWN }
 
-		public static LLMInteraction success(UUID interactionId, Instant interactionDate, String systemMessage, String userMessage, String result) {
-			return new LLMInteraction(interactionId, interactionDate, systemMessage, userMessage, result, null, null);
+		public static Interaction success(UUID interactionId, Instant interactionDate, String systemMessage, String userMessage, String result) {
+			return new Interaction(interactionId, interactionDate, systemMessage, userMessage, result, null, null);
 		}
 
-		public static LLMInteraction failure(UUID interactionId, Instant interactionDate, String systemMessage, String userMessage, String errorMessage, String causeErrorMessage) {
-			return new LLMInteraction(interactionId, interactionDate, systemMessage, userMessage, null, errorMessage, causeErrorMessage);
+		public static Interaction failure(UUID interactionId, Instant interactionDate, String systemMessage, String userMessage, String errorMessage, String causeErrorMessage) {
+			return new Interaction(interactionId, interactionDate, systemMessage, userMessage, null, errorMessage, causeErrorMessage);
 		}
 
 		@JsonProperty(value = "status", access = Access.READ_ONLY)

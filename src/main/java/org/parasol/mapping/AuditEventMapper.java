@@ -6,11 +6,13 @@ import java.util.stream.Stream;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
-import org.parasol.model.audit.AuditSource;
-import org.parasol.model.audit.LLMInitialMessagesCreatedAuditEvent;
-import org.parasol.model.audit.LLMInteractionCompleteAuditEvent;
-import org.parasol.model.audit.LLMInteractionFailedAuditEvent;
-import org.parasol.model.audit.LLMResponseReceivedAuditEvent;
+import org.parasol.model.audit.InputGuardrailExecutedAuditEvent;
+import org.parasol.model.audit.InvocationContext;
+import org.parasol.model.audit.OutputGuardrailExecutedAuditEvent;
+import org.parasol.model.audit.ResponseReceivedAuditEvent;
+import org.parasol.model.audit.ServiceCompleteAuditEvent;
+import org.parasol.model.audit.ServiceErrorAuditEvent;
+import org.parasol.model.audit.ServiceStartedAuditEvent;
 import org.parasol.model.audit.ToolExecutedAuditEvent;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -18,12 +20,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.response.ChatResponse;
-import io.quarkiverse.langchain4j.audit.AuditSourceInfo;
-import io.quarkiverse.langchain4j.audit.InitialMessagesCreatedEvent;
-import io.quarkiverse.langchain4j.audit.LLMInteractionCompleteEvent;
-import io.quarkiverse.langchain4j.audit.LLMInteractionFailureEvent;
-import io.quarkiverse.langchain4j.audit.ResponseFromLLMReceivedEvent;
-import io.quarkiverse.langchain4j.audit.ToolExecutedEvent;
+import dev.langchain4j.observability.api.event.AiServiceCompletedEvent;
+import dev.langchain4j.observability.api.event.AiServiceErrorEvent;
+import dev.langchain4j.observability.api.event.AiServiceResponseReceivedEvent;
+import dev.langchain4j.observability.api.event.AiServiceStartedEvent;
+import dev.langchain4j.observability.api.event.InputGuardrailExecutedEvent;
+import dev.langchain4j.observability.api.event.OutputGuardrailExecutedEvent;
+import dev.langchain4j.observability.api.event.ToolExecutedEvent;
 
 @ApplicationScoped
 public class AuditEventMapper {
@@ -33,73 +36,73 @@ public class AuditEventMapper {
 		this.objectMapper = objectMapper;
 	}
 
-	public LLMInitialMessagesCreatedAuditEvent toAuditEvent(InitialMessagesCreatedEvent initialMessagesCreatedEvent) {
-		return LLMInitialMessagesCreatedAuditEvent.builder()
-			.sourceInfo(toAuditSource(initialMessagesCreatedEvent.sourceInfo()))
-			.systemMessage(fromSystemMessage(initialMessagesCreatedEvent.systemMessage()))
-			.userMessage(fromUserMessage(initialMessagesCreatedEvent.userMessage()))
-			.build();
+	public ServiceStartedAuditEvent toAuditEvent(AiServiceStartedEvent serviceStartedEvent) {
+		return ServiceStartedAuditEvent.builder()
+		                               .invocationContext(toInvocationContext(serviceStartedEvent.invocationContext()))
+		                               .systemMessage(fromSystemMessage(serviceStartedEvent.systemMessage()))
+		                               .userMessage(fromUserMessage(serviceStartedEvent.userMessage()))
+		                               .build();
 	}
 
-	public LLMInteractionCompleteAuditEvent toAuditEvent(LLMInteractionCompleteEvent llmInteractionCompleteEvent) {
-		return LLMInteractionCompleteAuditEvent.builder()
-			.sourceInfo(toAuditSource(llmInteractionCompleteEvent.sourceInfo()))
-			.result(toJson(llmInteractionCompleteEvent.result()))
-			.build();
+	public ServiceCompleteAuditEvent toAuditEvent(AiServiceCompletedEvent interactionCompleteEvent) {
+		return ServiceCompleteAuditEvent.builder()
+		                                .invocationContext(toInvocationContext(interactionCompleteEvent.invocationContext()))
+		                                .result(toJson(interactionCompleteEvent.result()))
+		                                .build();
 	}
 
-	public LLMInteractionFailedAuditEvent toAuditEvent(LLMInteractionFailureEvent llmInteractionFailureEvent) {
-		return LLMInteractionFailedAuditEvent.builder()
-			.sourceInfo(toAuditSource(llmInteractionFailureEvent.sourceInfo()))
-			.errorMessage(getMessage(llmInteractionFailureEvent.error()))
-			.causeErrorMessage(getCauseMessage(llmInteractionFailureEvent.error()))
-			.build();
+	public ServiceErrorAuditEvent toAuditEvent(AiServiceErrorEvent errorEvent) {
+		return ServiceErrorAuditEvent.builder()
+		                             .invocationContext(toInvocationContext(errorEvent.invocationContext()))
+		                             .errorMessage(getMessage(errorEvent.error()))
+		                             .causeErrorMessage(getCauseMessage(errorEvent.error()))
+		                             .build();
 	}
 
-	public LLMResponseReceivedAuditEvent toAuditEvent(ResponseFromLLMReceivedEvent responseFromLLMReceivedEvent) {
-		return LLMResponseReceivedAuditEvent.builder()
-			.sourceInfo(toAuditSource(responseFromLLMReceivedEvent.sourceInfo()))
-			.response(fromResponse(responseFromLLMReceivedEvent.response()))
-			.modelName(responseFromLLMReceivedEvent.response().modelName())
-			.inputTokenCount(responseFromLLMReceivedEvent.response().tokenUsage().inputTokenCount())
-			.outputTokenCount(responseFromLLMReceivedEvent.response().tokenUsage().outputTokenCount())
-			.build();
+	public ResponseReceivedAuditEvent toAuditEvent(AiServiceResponseReceivedEvent responseReceivedEvent) {
+		return ResponseReceivedAuditEvent.builder()
+		                                 .invocationContext(toInvocationContext(responseReceivedEvent.invocationContext()))
+		                                 .response(fromResponse(responseReceivedEvent.response()))
+		                                 .modelName(responseReceivedEvent.response().modelName())
+		                                 .inputTokenCount(responseReceivedEvent.response().tokenUsage().inputTokenCount())
+		                                 .outputTokenCount(responseReceivedEvent.response().tokenUsage().outputTokenCount())
+		                                 .build();
 	}
 
 	public ToolExecutedAuditEvent toAuditEvent(ToolExecutedEvent toolExecutedEvent) {
 		return ToolExecutedAuditEvent.builder()
-			.sourceInfo(toAuditSource(toolExecutedEvent.sourceInfo()))
-			.result(toolExecutedEvent.result())
+			.invocationContext(toInvocationContext(toolExecutedEvent.invocationContext()))
+			.result(toolExecutedEvent.resultText())
 			.toolName(toolExecutedEvent.request().name())
 			.toolArgs(toolExecutedEvent.request().arguments())
 			.build();
 	}
 
-//	public InputGuardrailExecutedAuditEvent toAuditEvent(InputGuardrailExecutedEvent inputGuardrailExecutedEvent) {
-//		return InputGuardrailExecutedAuditEvent.builder()
-//			.sourceInfo(toAuditSource(inputGuardrailExecutedEvent.sourceInfo()))
-//			.userMessage(fromUserMessage(inputGuardrailExecutedEvent.params().userMessage()))
-//			.rewrittenUserMessage(fromUserMessage(inputGuardrailExecutedEvent.rewrittenUserMessage()))
-//			.result(inputGuardrailExecutedEvent.result().result().name())
-//			.guardrailClass(inputGuardrailExecutedEvent.guardrailClass().getName())
-//			.build();
-//	}
-//
-//	public OutputGuardrailExecutedAuditEvent toAuditEvent(OutputGuardrailExecutedEvent outputGuardrailExecutedEvent) {
-//		return OutputGuardrailExecutedAuditEvent.builder()
-//			.sourceInfo(toAuditSource(outputGuardrailExecutedEvent.sourceInfo()))
-//			.response(Optional.ofNullable(outputGuardrailExecutedEvent.params().responseFromLLM()).map(AiMessage::text).orElse(null))
-//			.result(outputGuardrailExecutedEvent.result().result().name())
-//			.guardrailClass(outputGuardrailExecutedEvent.guardrailClass().getName())
-//			.build();
-//	}
-
-	private AuditSource toAuditSource(AuditSourceInfo auditSourceInfo) {
-		return AuditSource.builder()
-			.interfaceName(auditSourceInfo.interfaceName())
-			.methodName(auditSourceInfo.methodName())
-			.interactionId(auditSourceInfo.interactionId())
+	public InputGuardrailExecutedAuditEvent toAuditEvent(InputGuardrailExecutedEvent inputGuardrailExecutedEvent) {
+		return InputGuardrailExecutedAuditEvent.builder()
+			.invocationContext(toInvocationContext(inputGuardrailExecutedEvent.invocationContext()))
+			.userMessage(fromUserMessage(inputGuardrailExecutedEvent.request().userMessage()))
+			.rewrittenUserMessage(fromUserMessage(inputGuardrailExecutedEvent.rewrittenUserMessage()))
+			.result(inputGuardrailExecutedEvent.result().result().name())
+			.guardrailClass(inputGuardrailExecutedEvent.guardrailClass().getName())
 			.build();
+	}
+
+	public OutputGuardrailExecutedAuditEvent toAuditEvent(OutputGuardrailExecutedEvent outputGuardrailExecutedEvent) {
+		return OutputGuardrailExecutedAuditEvent.builder()
+			.invocationContext(toInvocationContext(outputGuardrailExecutedEvent.invocationContext()))
+			.response(Optional.ofNullable(outputGuardrailExecutedEvent.request().responseFromLLM()).map(response -> response.aiMessage().text()).orElse(null))
+			.result(outputGuardrailExecutedEvent.result().result().name())
+			.guardrailClass(outputGuardrailExecutedEvent.guardrailClass().getName())
+			.build();
+	}
+
+	private InvocationContext toInvocationContext(dev.langchain4j.invocation.InvocationContext invocationContext) {
+		return InvocationContext.builder()
+		                        .interfaceName(invocationContext.interfaceName())
+		                        .methodName(invocationContext.methodName())
+		                        .interactionId(invocationContext.invocationId())
+		                        .build();
 	}
 
 	private static String fromResponse(ChatResponse response) {

@@ -91,7 +91,7 @@ public class InputGuardrailExecutedAuditEvent extends AuditEvent {
 			", rewrittenUserMessage='" + getRewrittenUserMessage() + '\'' +
 			", result='" + getResult() + '\'' +
 			", id=" + getId() +
-			", sourceInfo=" + getSourceInfo() +
+			", invocationContext=" + getInvocationContext() +
 			'}';
 	}
 

@@ -1,6 +1,6 @@
 package org.parasol.model.audit;
 
-import static org.parasol.model.audit.LLMInitialMessagesCreatedAuditEvent.EVENT_TYPE;
+import static org.parasol.model.audit.ServiceStartedAuditEvent.EVENT_TYPE;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.DiscriminatorValue;
@@ -8,8 +8,8 @@ import jakarta.persistence.Entity;
 
 @Entity
 @DiscriminatorValue(EVENT_TYPE)
-public class LLMInitialMessagesCreatedAuditEvent extends AuditEvent {
-	public static final String EVENT_TYPE = "INITIAL_MESSAGES_CREATED";
+public class ServiceStartedAuditEvent extends AuditEvent {
+	public static final String EVENT_TYPE = "SERVICE_STARTED";
 
 	@Column(updatable = false, columnDefinition = "TEXT")
 	private String systemMessage;
@@ -18,12 +18,12 @@ public class LLMInitialMessagesCreatedAuditEvent extends AuditEvent {
 	private String userMessage;
 
 	// JPA requires a no-arg constructor with at least protected visibility
-	protected LLMInitialMessagesCreatedAuditEvent() {
+	protected ServiceStartedAuditEvent() {
 		super();
 	}
 
 	// Private constructor used by the builder
-	private LLMInitialMessagesCreatedAuditEvent(Builder builder) {
+	private ServiceStartedAuditEvent(Builder builder) {
 		super(builder);
 		this.systemMessage = builder.systemMessage;
 		this.userMessage = builder.userMessage;
@@ -31,7 +31,7 @@ public class LLMInitialMessagesCreatedAuditEvent extends AuditEvent {
 	
 	@Override
 	public AuditEventType getEventType() {
-		return AuditEventType.INITIAL_MESSAGES_CREATED;
+		return AuditEventType.SERVICE_STARTED;
 	}
 
 	public String getSystemMessage() {
@@ -60,16 +60,16 @@ public class LLMInitialMessagesCreatedAuditEvent extends AuditEvent {
 
 	@Override
 	public String toString() {
-		return "LLMInitialMessagesCreatedAuditEvent{" +
+		return "ServiceStartedAuditEvent{" +
 			"eventType='" + getEventType() + '\'' +
 			", systemMessage='" + getSystemMessage() + '\'' +
 			", userMessage='" + getUserMessage() + '\'' +
 			", id=" + getId() +
-			", sourceInfo=" + getSourceInfo() +
+			", invocationContext=" + getInvocationContext() +
 			'}';
 	}
 
-	public static final class Builder extends AuditEvent.Builder<Builder, LLMInitialMessagesCreatedAuditEvent> {
+	public static final class Builder extends AuditEvent.Builder<Builder, ServiceStartedAuditEvent> {
 		private String systemMessage;
 		private String userMessage;
 
@@ -77,7 +77,7 @@ public class LLMInitialMessagesCreatedAuditEvent extends AuditEvent {
 			super();
 		}
 
-		private Builder(LLMInitialMessagesCreatedAuditEvent source) {
+		private Builder(ServiceStartedAuditEvent source) {
 			super(source);
 			this.systemMessage = source.systemMessage;
 			this.userMessage = source.userMessage;
@@ -94,8 +94,8 @@ public class LLMInitialMessagesCreatedAuditEvent extends AuditEvent {
 		}
 
 		@Override
-		public LLMInitialMessagesCreatedAuditEvent build() {
-			return new LLMInitialMessagesCreatedAuditEvent(this);
+		public ServiceStartedAuditEvent build() {
+			return new ServiceStartedAuditEvent(this);
 		}
 	}
 }
