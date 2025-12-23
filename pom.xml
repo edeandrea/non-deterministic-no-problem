@@ -14,7 +14,7 @@
 		<quarkus.langchain4j.version>1.4.2</quarkus.langchain4j.version>
 		<quarkus.playwright.version>2.3.1</quarkus.playwright.version>
 		<quarkus.quinoa.version>2.7.1</quarkus.quinoa.version>
-		<quarkus.wiremock.version>1.5.2</quarkus.wiremock.version>
+		<quarkus.wiremock.version>1.5.3</quarkus.wiremock.version>
 		<quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
 		<quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
 		<quarkus.platform.version>3.30.4</quarkus.platform.version>
