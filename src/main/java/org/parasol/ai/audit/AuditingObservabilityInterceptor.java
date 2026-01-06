@@ -14,9 +14,11 @@ import dev.langchain4j.model.chat.response.ChatResponseMetadata;
 import dev.langchain4j.observability.api.event.AiServiceEvent;
 import dev.langchain4j.observability.api.event.AiServiceResponseReceivedEvent;
 import dev.langchain4j.observability.api.event.ToolExecutedEvent;
-import io.opentelemetry.api.common.AttributeKey;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
 import io.opentelemetry.api.common.Attributes;
-import io.opentelemetry.api.metrics.Meter;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.Tracer;
@@ -27,12 +29,12 @@ import io.opentelemetry.context.Context;
 @Priority(Interceptor.Priority.APPLICATION + 200)
 public class AuditingObservabilityInterceptor {
 	private final OTelBuildConfig otelConfig;
-	private final Meter meter;
+	private final MeterRegistry meterRegistry;
 	private final Tracer tracer;
 
-	public AuditingObservabilityInterceptor(OTelBuildConfig otelConfig, Meter meter, Tracer tracer) {
+	public AuditingObservabilityInterceptor(OTelBuildConfig otelConfig, MeterRegistry meterRegistry, Tracer tracer) {
 		this.otelConfig = otelConfig;
-		this.meter = meter;
+		this.meterRegistry = meterRegistry;
 		this.tracer = tracer;
 	}
 
@@ -59,17 +61,22 @@ public class AuditingObservabilityInterceptor {
 		var spanAttributes = Attributes.builder()
 		                               .put("arg.interfaceName", invocationContext.interfaceName())
 		                               .put("arg.methodName", invocationContext.methodName());
-		var metricAttributes = Attributes.builder()
-		                                 .put("interfaceName", invocationContext.interfaceName())
-		                                 .put("methodName", invocationContext.methodName());
+		var metricTags = Tags.of(
+			Tag.of("interfaceName", invocationContext.interfaceName()),
+			Tag.of("methodName", invocationContext.methodName()));
 
-		interactionEvent.filter(event -> event instanceof ToolExecutedEvent)
-		                .map(ToolExecutedEvent.class::cast)
-		                .map(event -> event.request().name())
-		                .ifPresent(toolName -> {
-			                spanAttributes.put("arg.toolName", toolName);
-			                metricAttributes.put("toolName", toolName);
-		                });
+		var allTags = metricTags.and(
+			interactionEvent.filter(ToolExecutedEvent.class::isInstance)
+			                .map(ToolExecutedEvent.class::cast)
+			                .map(event -> event.request().name())
+			                .map(String::strip)
+			                .filter(toolName -> !toolName.isBlank())
+			                .map(toolName -> {
+												spanAttributes.put("arg.toolName", toolName);
+												return metricTags.and("toolName", toolName.strip());
+											})
+			                .orElseGet(Tags::empty)
+		);
 
 		var span = this.tracer.spanBuilder(auditObserved.name())
 		                      .setParent(Context.current().with(Span.current()))
@@ -88,7 +95,7 @@ public class AuditingObservabilityInterceptor {
 					auditObserved.name(),
 					auditObserved.description(),
 					auditObserved.unit(),
-					metricAttributes.build()
+					allTags
 				);
 
 				interactionEvent.filter(event -> event instanceof AiServiceResponseReceivedEvent)
@@ -114,38 +121,54 @@ public class AuditingObservabilityInterceptor {
 		              .findFirst();
 	}
 
-	private void addToCounter(String name, String description, String unit, Attributes metricAttributes) {
-		this.meter.counterBuilder(name)
-		          .setDescription(description)
-		          .setUnit(unit)
-		          .build()
-		          .add(1, metricAttributes);
+	private void addToCounter(String name, String description, String unit, Tags metricTags) {
+		Counter.builder(name)
+			.description(description)
+			.baseUnit(unit)
+			.tags(metricTags)
+			.register(this.meterRegistry)
+			.increment();
 	}
 
 	private void addToTotalTokenCount(ChatResponseMetadata metadata) {
-		var modelNameAttributes = Attributes.of(AttributeKey.stringKey("modelName"), metadata.modelName());
-		var inputTokenCounter = this.meter.counterBuilder("parasol.llm.token.input.count")
-		          .setDescription("Total input token count")
-		          .setUnit("tokens")
-		          .build();
+		var modelNameTags = Tags.of("modelName", metadata.modelName());
+		var inputTokenCounterBuilder = Counter.builder("parasol.llm.token.input.count")
+			.description("Total input token count")
+			.baseUnit("tokens");
 
-		inputTokenCounter.add(metadata.tokenUsage().inputTokenCount(), modelNameAttributes);
-		inputTokenCounter.add(metadata.tokenUsage().inputTokenCount());
+		inputTokenCounterBuilder
+			.tags(modelNameTags)
+			.register(this.meterRegistry)
+			.increment(metadata.tokenUsage().inputTokenCount());
 
-		var outputTokenCounter = this.meter.counterBuilder("parasol.llm.token.output.count")
-		          .setDescription("Total output token count")
-		          .setUnit("tokens")
-		          .build();
+		inputTokenCounterBuilder
+			.register(this.meterRegistry)
+			.increment(metadata.tokenUsage().inputTokenCount());
 
-		outputTokenCounter.add(metadata.tokenUsage().outputTokenCount(), modelNameAttributes);
-		outputTokenCounter.add(metadata.tokenUsage().outputTokenCount());
+		var outputTokenCounterBuilder = Counter.builder("parasol.llm.token.output.count")
+			.description("Total output token count")
+			.baseUnit("tokens");
 
-		var totalTokenCounter = this.meter.counterBuilder("parasol.llm.token.total.count")
-		          .setDescription("Total token count")
-		          .setUnit("tokens")
-		          .build();
+		outputTokenCounterBuilder
+			.tags(modelNameTags)
+			.register(this.meterRegistry)
+			.increment(metadata.tokenUsage().outputTokenCount());
 
-		totalTokenCounter.add(metadata.tokenUsage().totalTokenCount(), modelNameAttributes);
-		totalTokenCounter.add(metadata.tokenUsage().totalTokenCount());
+		outputTokenCounterBuilder
+			.register(this.meterRegistry)
+			.increment(metadata.tokenUsage().outputTokenCount());
+
+		var totalTokenCounterBuilder = Counter.builder("parasol.llm.token.total.count")
+			.description("Total token count")
+			.baseUnit("tokens");
+
+		totalTokenCounterBuilder
+			.tags(modelNameTags)
+			.register(this.meterRegistry)
+			.increment(metadata.tokenUsage().totalTokenCount());
+
+		totalTokenCounterBuilder
+			.register(this.meterRegistry)
+			.increment(metadata.tokenUsage().totalTokenCount());
 	}
 }
