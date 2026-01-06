@@ -42,9 +42,10 @@ class AuditEventRepositoryTests {
   @Order(0)
   void interactions() throws JsonProcessingException {
     // Set up some interactions
-    var first = initialMessages();
+	  this.repository.deleteAll();
+    var first = serviceStarted();
     var firstComplete = interactionComplete(first);
-    var second = initialMessages();
+    var second = serviceStarted();
     var secondFailed = interactionFailed(second);
     this.repository.flush();
 
@@ -75,29 +76,29 @@ class AuditEventRepositoryTests {
   @Test
   @TestTransaction
   @Order(1)
-  void initialMessagesCreated() {
-    initialMessages();
+  void serviceStartedCreated() {
+    serviceStarted();
   }
 
   @Test
   @TestTransaction
   @Order(1)
   void interactionComplete() throws JsonProcessingException {
-    interactionComplete(initialMessages());
+    interactionComplete(serviceStarted());
   }
 
   @Test
   @TestTransaction
   @Order(1)
   void interactionFailed() {
-    interactionFailed(initialMessages());
+    interactionFailed(serviceStarted());
   }
 
-  private ServiceErrorAuditEvent interactionFailed(ServiceStartedAuditEvent initialMessagesCreatedEvent) {
+  private ServiceErrorAuditEvent interactionFailed(ServiceStartedAuditEvent serviceStartedAuditEvent) {
     var interactionFailedEvent = ServiceErrorAuditEvent.builder()
                                                        .errorMessage("Some error message")
                                                        .causeErrorMessage("Some cause error message")
-                                                       .invocationContext(initialMessagesCreatedEvent.getInvocationContext())
+                                                       .invocationContext(serviceStartedAuditEvent.getInvocationContext())
                                                        .build();
 
     this.repository.persist(interactionFailedEvent);
@@ -115,11 +116,11 @@ class AuditEventRepositoryTests {
     return interactionFailedEvent;
   }
 
-  private ServiceCompleteAuditEvent interactionComplete(ServiceStartedAuditEvent initialMessagesCreatedEvent) throws JsonProcessingException {
+  private ServiceCompleteAuditEvent interactionComplete(ServiceStartedAuditEvent serviceStartedAuditEvent) throws JsonProcessingException {
     var someObj = new SomeObject("field1", 1);
     var interactionCompleteEvent = ServiceCompleteAuditEvent.builder()
                                                             .result(this.objectMapper.writeValueAsString(someObj))
-                                                            .invocationContext(initialMessagesCreatedEvent.getInvocationContext())
+                                                            .invocationContext(serviceStartedAuditEvent.getInvocationContext())
                                                             .build();
 
     this.repository.persist(interactionCompleteEvent);
@@ -149,8 +150,8 @@ class AuditEventRepositoryTests {
     return interactionCompleteEvent;
   }
 
-  private ServiceStartedAuditEvent initialMessages() {
-    var initialMessagesCreatedEvent = ServiceStartedAuditEvent.builder()
+  private ServiceStartedAuditEvent serviceStarted() {
+    var serviceStartedAuditEvent = ServiceStartedAuditEvent.builder()
                                                               .systemMessage("System message")
                                                               .userMessage("User message")
                                                               .invocationContext(
@@ -162,18 +163,18 @@ class AuditEventRepositoryTests {
              )
                                                               .build();
 
-    this.repository.persist(initialMessagesCreatedEvent);
-    var initialMessagesCreatedEvents = this.repository.find(
+    this.repository.persist(serviceStartedAuditEvent);
+    var serviceStartedEvents = this.repository.find(
 			              EVENT_QUERY_TEMPLATE.formatted(ServiceStartedAuditEvent.class.getSimpleName()),
-                    initialMessagesCreatedEvent.getInvocationContext().getInteractionId()
+                    serviceStartedAuditEvent.getInvocationContext().getInteractionId()
              )
             .list();
 
-    assertThat(initialMessagesCreatedEvents)
+    assertThat(serviceStartedEvents)
       .singleElement()
       .usingRecursiveComparison()
-      .isEqualTo(initialMessagesCreatedEvent);
+      .isEqualTo(serviceStartedAuditEvent);
 
-    return initialMessagesCreatedEvent;
+    return serviceStartedAuditEvent;
   }
 }

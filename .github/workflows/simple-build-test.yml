@@ -33,6 +33,7 @@ concurrency:
 defaults:
   run:
     shell: bash
+    working-directory: parasol-app
 
 jobs:
   jvm-build-test:

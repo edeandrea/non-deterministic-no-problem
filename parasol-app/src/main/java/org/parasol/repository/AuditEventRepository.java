@@ -114,7 +114,7 @@ public class AuditEventRepository implements PanacheRepository<AuditEvent> {
 	public Interactions getLLMInteractions(Optional<Instant> start, Optional<Instant> end) {
 		var auditDates = AuditDates.from(start, end);
 		var interactions = getEntityManager().createNativeQuery(INTERACTIONS_NATIVE_QUERY, Interaction.class)
-			.setParameter("start_date", auditDates.start())
+                         .setParameter("start_date", auditDates.start())
 			                  .setParameter("end_date", auditDates.end())
 			                  .getResultList();
 
