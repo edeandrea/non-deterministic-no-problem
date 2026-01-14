@@ -1,0 +1,147 @@
+---
+openapi: 3.1.0
+components:
+  schemas:
+    AuditDates:
+      type: object
+      properties:
+        start:
+          $ref: "#/components/schemas/Instant"
+        end:
+          $ref: "#/components/schemas/Instant"
+    AuditStats:
+      type: object
+      properties:
+        auditDates:
+          $ref: "#/components/schemas/AuditDates"
+        stats:
+          type: array
+          items:
+            $ref: "#/components/schemas/InteractionStats"
+    Instant:
+      type: string
+      format: date-time
+      examples:
+        - 2022-03-10T16:15:50Z
+    Interaction:
+      type: object
+      properties:
+        interactionId:
+          $ref: "#/components/schemas/UUID"
+        interactionDate:
+          $ref: "#/components/schemas/Instant"
+        systemMessage:
+          type: string
+        userMessage:
+          type: string
+        result:
+          type: string
+        errorMessage:
+          type: string
+        causeErrorMessage:
+          type: string
+        status:
+          $ref: "#/components/schemas/InteractionStatus"
+          type: string
+          readOnly: true
+        isFailure:
+          type: boolean
+          readOnly: true
+        isSuccess:
+          type: boolean
+          readOnly: true
+    InteractionStats:
+      type: object
+      properties:
+        interactionId:
+          $ref: "#/components/schemas/UUID"
+        interactionDate:
+          $ref: "#/components/schemas/Instant"
+        numberLlmFailures:
+          type: integer
+          format: int64
+        totalOutputGuardrailExecutions:
+          type: integer
+          format: int64
+        totalOutputGuardrailFailures:
+          type: integer
+          format: int64
+        avgOutputGuardrailExecutions:
+          type: number
+        avgOutputGuardrailFailures:
+          type: number
+    InteractionStatus:
+      type: string
+      enum:
+      - SUCCESS
+      - FAILURE
+      - UNKNOWN
+    Interactions:
+      type: object
+      properties:
+        auditDates:
+          $ref: "#/components/schemas/AuditDates"
+        interactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Interaction"
+    UUID:
+      type: string
+      format: uuid
+      pattern: "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
+paths:
+  /ai/interactions:
+    get:
+      parameters:
+      - name: end
+        in: query
+        schema:
+          $ref: "#/components/schemas/Instant"
+        required: false
+      - name: start
+        in: query
+        schema:
+          $ref: "#/components/schemas/Instant"
+        required: false
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Interactions"
+      summary: Get AI Interactions
+      operationId: getAIInteractions
+      tags:
+        - AI Interactions
+  /ai/interactions/stats:
+    get:
+      parameters:
+      - name: end
+        in: query
+        schema:
+          $ref: "#/components/schemas/Instant"
+        required: false
+      - name: start
+        in: query
+        schema:
+          $ref: "#/components/schemas/Instant"
+        required: false
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditStats"
+      summary: Get AI Interaction Stats
+      operationId: getAIInteractionStats
+      tags:
+        - AI Interactions
+info:
+  title: AI Interactions
+  version: "1.0"
+  description: Contract for getting AI interactions
+  contact:
+    name: Eric Deandrea
+    url: https://github.com/edeandrea

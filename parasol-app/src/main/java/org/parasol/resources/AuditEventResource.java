@@ -19,7 +19,7 @@ import org.parasol.repository.AuditEventRepository;
 
 import io.quarkus.panache.common.Sort;
 
-@Path("/auditEvents")
+@Path("/auditEvents/ai")
 @Produces(MediaType.APPLICATION_JSON)
 public class AuditEventResource {
 	private final AuditEventRepository auditEventRepository;
@@ -40,7 +40,7 @@ public class AuditEventResource {
 	}
 
 	@GET
-	@Path("/stats")
+	@Path("/interactions/stats")
 	public AuditStats getStats(@QueryParam("start") Optional<Instant> start, @QueryParam("end") Optional<Instant> end) {
 		return this.auditEventRepository.getAuditStats(start, end);
 	}
