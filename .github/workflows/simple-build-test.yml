@@ -8,22 +8,16 @@ on:
     paths-ignore:
       - '**/*.md'
       - '.github/dependabot.yml'
-      - '.github/workflows/container-build.yml'
       - '.github/workflows/simple-build-test.yml'
       - '.github/workflows/dependabot-automerge.yml'
-      - '.github/workflows/sync-main-to-other-branches.yml'
-      - '.github/workflows/sync-to-ai-llm-template.yml'
   pull_request:
     branches:
       - main
     paths-ignore:
       - '**/*.md'
       - '.github/dependabot.yml'
-      - '.github/workflows/container-build.yml'
       - '.github/workflows/simple-build-test.yml'
       - '.github/workflows/dependabot-automerge.yml'
-      - '.github/workflows/sync-main-to-other-branches.yml'
-      - '.github/workflows/sync-to-ai-llm-template.yml'
   workflow_dispatch:
 
 concurrency:
@@ -33,11 +27,40 @@ concurrency:
 defaults:
   run:
     shell: bash
-    working-directory: parasol-app
 
 jobs:
+  ai-tester:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: testing/ai-tester
+    strategy:
+      fail-fast: false
+      matrix:
+        java:
+          - '21'
+    name: ai-tester-jvm-java${{ matrix.java }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Java ${{ matrix.java }}
+        uses: actions/setup-java@v5
+        with:
+          java-version: ${{ matrix.java }}
+          distribution: temurin
+          cache: maven
+
+      - name: build-test-ai-tester-java${{ matrix.java }}
+        run: |
+          ./mvnw -B clean verify \
+            -Dquarkus.http.host=0.0.0.0 \
+            -Dmaven.compiler.release=${{ matrix.java }}
+
   jvm-build-test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: parasol-app
     strategy:
       fail-fast: false
       matrix:
