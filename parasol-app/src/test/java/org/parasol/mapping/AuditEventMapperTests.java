@@ -3,6 +3,7 @@ package org.parasol.mapping;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.entry;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 
@@ -18,11 +19,10 @@ import org.parasol.model.audit.ServiceCompleteAuditEvent;
 import org.parasol.model.audit.ServiceErrorAuditEvent;
 import org.parasol.model.audit.ToolExecutedAuditEvent;
 
-import io.quarkus.test.junit.QuarkusTest;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.UserMessage;
@@ -43,6 +43,8 @@ import dev.langchain4j.observability.api.event.OutputGuardrailExecutedEvent;
 import dev.langchain4j.observability.api.event.ToolExecutedEvent;
 import io.quarkiverse.langchain4j.guardrails.NoopChatExecutor;
 import io.quarkiverse.langchain4j.runtime.aiservice.NoopChatMemory;
+
+import io.quarkus.test.junit.QuarkusTest;
 
 @QuarkusTest
 class AuditEventMapperTests {
@@ -207,6 +209,7 @@ class AuditEventMapperTests {
 			.guardrailClass(guardrail.getClass())
 			.request(INPUT_GUARDRAIL_REQUEST)
 			.result(result)
+			.duration(Duration.ofSeconds(3))
 			.build();
 
 		var auditEvent = this.auditEventMapper.toAuditEvent(event);
@@ -218,14 +221,16 @@ class AuditEventMapperTests {
 				InputGuardrailExecutedAuditEvent::getUserMessage,
 				InputGuardrailExecutedAuditEvent::getRewrittenUserMessage,
 				InputGuardrailExecutedAuditEvent::getResult,
-				InputGuardrailExecutedAuditEvent::getGuardrailClass
+				InputGuardrailExecutedAuditEvent::getGuardrailClass,
+				InputGuardrailExecutedAuditEvent::getDuration
 			)
 			.containsExactly(
 				AuditEventType.INPUT_GUARDRAIL_EXECUTED,
 				INPUT_GUARDRAIL_REQUEST.userMessage().singleText(),
 				"new text",
 				result.result().name(),
-				guardrail.getClass().getName()
+				guardrail.getClass().getName(),
+				Duration.ofSeconds(3)
 			);
 
 		checkInvocationContext(auditEvent.getInvocationContext());
@@ -240,6 +245,7 @@ class AuditEventMapperTests {
 			.invocationContext(INVOCATION_CONTEXT)
 			.guardrailClass(guardrail.getClass())
 			.request(OUTPUT_GUARDRAIL_REQUEST)
+			.duration(Duration.ofSeconds(3))
 			.result(result)
 			.build();
 		var auditEvent = this.auditEventMapper.toAuditEvent(event);
@@ -250,13 +256,15 @@ class AuditEventMapperTests {
 				OutputGuardrailExecutedAuditEvent::getEventType,
 				OutputGuardrailExecutedAuditEvent::getResponse,
 				OutputGuardrailExecutedAuditEvent::getGuardrailResult,
-				OutputGuardrailExecutedAuditEvent::getGuardrailClass
+				OutputGuardrailExecutedAuditEvent::getGuardrailClass,
+				OutputGuardrailExecutedAuditEvent::getDuration
 			)
 			.containsExactly(
 				AuditEventType.OUTPUT_GUARDRAIL_EXECUTED,
 				OUTPUT_GUARDRAIL_REQUEST.responseFromLLM().aiMessage().text(),
 				result.result().name(),
-				guardrail.getClass().getName()
+				guardrail.getClass().getName(),
+				Duration.ofSeconds(3)
 			);
 
 		checkInvocationContext(auditEvent.getInvocationContext());

@@ -2,7 +2,10 @@ package org.parasol.model.audit;
 
 import static org.parasol.model.audit.OutputGuardrailExecutedAuditEvent.EVENT_TYPE;
 
+import java.time.Duration;
+
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
 
@@ -20,6 +23,10 @@ public class OutputGuardrailExecutedAuditEvent extends AuditEvent {
 	@Column(updatable = false)
 	private String guardrailClass;
 
+	@Column(updatable = false)
+	@Convert(converter = DurationConverter.class)
+	private Duration duration;
+
 	// JPA requires a public or protected no-arg constructor
 	protected OutputGuardrailExecutedAuditEvent() {
 		super();
@@ -31,6 +38,7 @@ public class OutputGuardrailExecutedAuditEvent extends AuditEvent {
 		this.response = builder.response;
 		this.guardrailResult = builder.result;
 		this.guardrailClass = builder.guardrailClass;
+		this.duration = builder.duration;
 	}
 
 	public static Builder builder() {
@@ -70,11 +78,20 @@ public class OutputGuardrailExecutedAuditEvent extends AuditEvent {
 		this.guardrailResult = result;
 	}
 
+	public Duration getDuration() {
+		return duration;
+	}
+
+	public void setDuration(Duration duration) {
+		this.duration = duration;
+	}
+
 	@Override
 	public String toString() {
 		return "OutputGuardrailExecutedAuditEvent{" +
 			"eventType='" + getEventType() + '\'' +
 			", guardrailClass='" + getGuardrailClass() + '\'' +
+			", duration=" + getDuration() +
 			", response='" + getResponse() + '\'' +
 			", guardrailResult='" + getGuardrailResult() + '\'' +
 			", id=" + getId() +
@@ -86,6 +103,7 @@ public class OutputGuardrailExecutedAuditEvent extends AuditEvent {
 		private String response;
 		private String result;
 		private String guardrailClass;
+		private Duration duration;
 
 		private Builder() {
 			super();
@@ -96,6 +114,12 @@ public class OutputGuardrailExecutedAuditEvent extends AuditEvent {
 			this.response = source.response;
 			this.result = source.guardrailResult;
 			this.guardrailClass = source.guardrailClass;
+			this.duration = source.duration;
+		}
+
+		public Builder duration(Duration duration) {
+			this.duration = duration;
+			return this;
 		}
 
 		public Builder response(String response) {

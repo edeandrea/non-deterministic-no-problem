@@ -17,6 +17,7 @@ import org.parasol.model.audit.ToolExecutedAuditEvent;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.response.ChatResponse;
@@ -85,6 +86,7 @@ public class AuditEventMapper {
 			.rewrittenUserMessage(fromUserMessage(inputGuardrailExecutedEvent.rewrittenUserMessage()))
 			.result(inputGuardrailExecutedEvent.result().result().name())
 			.guardrailClass(inputGuardrailExecutedEvent.guardrailClass().getName())
+			.duration(inputGuardrailExecutedEvent.duration())
 			.build();
 	}
 
@@ -94,6 +96,7 @@ public class AuditEventMapper {
 			.response(Optional.ofNullable(outputGuardrailExecutedEvent.request().responseFromLLM()).map(response -> response.aiMessage().text()).orElse(null))
 			.result(outputGuardrailExecutedEvent.result().result().name())
 			.guardrailClass(outputGuardrailExecutedEvent.guardrailClass().getName())
+			.duration(outputGuardrailExecutedEvent.duration())
 			.build();
 	}
 

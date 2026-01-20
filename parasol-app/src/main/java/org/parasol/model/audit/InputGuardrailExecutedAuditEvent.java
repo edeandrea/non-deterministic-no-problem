@@ -2,7 +2,10 @@ package org.parasol.model.audit;
 
 import static org.parasol.model.audit.InputGuardrailExecutedAuditEvent.EVENT_TYPE;
 
+import java.time.Duration;
+
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
 
@@ -22,6 +25,10 @@ public class InputGuardrailExecutedAuditEvent extends AuditEvent {
 
 	@Column(updatable = false)
 	private String guardrailClass;
+
+	@Column(updatable = false)
+	@Convert(converter = DurationConverter.class)
+	private Duration duration;
 	
 	// JPA requires a public or protected no-arg constructor
 	protected InputGuardrailExecutedAuditEvent() {
@@ -35,6 +42,7 @@ public class InputGuardrailExecutedAuditEvent extends AuditEvent {
 		this.rewrittenUserMessage = builder.rewrittenUserMessage;
 		this.result = builder.result;
 		this.guardrailClass = builder.guardrailClass;
+		this.duration = builder.duration;
 	}
 
 	public static Builder builder() {
@@ -82,11 +90,20 @@ public class InputGuardrailExecutedAuditEvent extends AuditEvent {
 		this.userMessage = userMessage;
 	}
 
+	public Duration getDuration() {
+		return duration;
+	}
+
+	public void setDuration(Duration duration) {
+		this.duration = duration;
+	}
+
 	@Override
 	public String toString() {
 		return "InputGuardrailExecutedAuditEvent{" +
 			"eventType='" + getEventType() + '\'' +
 			", guardrailClass='" + getGuardrailClass() + '\'' +
+			", duration=" + getDuration() +
 			", userMessage='" + getUserMessage() + '\'' +
 			", rewrittenUserMessage='" + getRewrittenUserMessage() + '\'' +
 			", result='" + getResult() + '\'' +
@@ -100,6 +117,7 @@ public class InputGuardrailExecutedAuditEvent extends AuditEvent {
 		private String rewrittenUserMessage;
 		private String result;
 		private String guardrailClass;
+		private Duration duration;
 
 		private Builder() {
 			super();
@@ -111,6 +129,12 @@ public class InputGuardrailExecutedAuditEvent extends AuditEvent {
 			this.rewrittenUserMessage = source.rewrittenUserMessage;
 			this.result = source.result;
 			this.guardrailClass = source.guardrailClass;
+			this.duration = source.duration;
+		}
+
+		public Builder duration(Duration duration) {
+			this.duration = duration;
+			return this;
 		}
 
 		public Builder userMessage(String userMessage) {

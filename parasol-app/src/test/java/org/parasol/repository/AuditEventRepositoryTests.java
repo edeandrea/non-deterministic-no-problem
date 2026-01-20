@@ -2,6 +2,7 @@ package org.parasol.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -11,17 +12,22 @@ import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.parasol.model.audit.InputGuardrailExecutedAuditEvent;
 import org.parasol.model.audit.Interactions.Interaction;
 import org.parasol.model.audit.InvocationContext;
+import org.parasol.model.audit.OutputGuardrailExecutedAuditEvent;
 import org.parasol.model.audit.ServiceCompleteAuditEvent;
 import org.parasol.model.audit.ServiceErrorAuditEvent;
 import org.parasol.model.audit.ServiceStartedAuditEvent;
 
-import io.quarkus.test.TestTransaction;
-import io.quarkus.test.junit.QuarkusTest;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import dev.langchain4j.guardrail.InputGuardrail;
+import dev.langchain4j.guardrail.OutputGuardrail;
+
+import io.quarkus.test.TestTransaction;
+import io.quarkus.test.junit.QuarkusTest;
 
 @QuarkusTest
 @TestMethodOrder(OrderAnnotation.class)
@@ -94,6 +100,20 @@ class AuditEventRepositoryTests {
     interactionFailed(serviceStarted());
   }
 
+	@Test
+	@TestTransaction
+	@Order(2)
+	void inputGuardrail() {
+		inputGuardrailExecuted();
+	}
+
+	@Test
+	@TestTransaction
+	@Order(2)
+	void outputGuardrail() {
+		outputGuardrailExecuted();
+	}
+
   private ServiceErrorAuditEvent interactionFailed(ServiceStartedAuditEvent serviceStartedAuditEvent) {
     var interactionFailedEvent = ServiceErrorAuditEvent.builder()
                                                        .errorMessage("Some error message")
@@ -101,7 +121,7 @@ class AuditEventRepositoryTests {
                                                        .invocationContext(serviceStartedAuditEvent.getInvocationContext())
                                                        .build();
 
-    this.repository.persist(interactionFailedEvent);
+    this.repository.persistAndFlush(interactionFailedEvent);
     var interactionFailedEvents = this.repository.find(
 						EVENT_QUERY_TEMPLATE.formatted(ServiceErrorAuditEvent.class.getSimpleName()),
             interactionFailedEvent.getInvocationContext().getInteractionId()
@@ -123,7 +143,7 @@ class AuditEventRepositoryTests {
                                                             .invocationContext(serviceStartedAuditEvent.getInvocationContext())
                                                             .build();
 
-    this.repository.persist(interactionCompleteEvent);
+    this.repository.persistAndFlush(interactionCompleteEvent);
     var interactionCompleteEvents = this.repository.find(
 							EVENT_QUERY_TEMPLATE.formatted(ServiceCompleteAuditEvent.class.getSimpleName()),
               interactionCompleteEvent.getInvocationContext().getInteractionId()
@@ -150,6 +170,66 @@ class AuditEventRepositoryTests {
     return interactionCompleteEvent;
   }
 
+	private InputGuardrailExecutedAuditEvent inputGuardrailExecuted() {
+		var inputGuardrailExecutedAuditEvent = InputGuardrailExecutedAuditEvent.builder()
+			.duration(Duration.ofSeconds(3))
+			.guardrailClass(IG.class.getName())
+			.invocationContext(InvocationContext.builder()
+							            .interactionId(UUID.randomUUID())
+							            .interfaceName("someInterface")
+							            .methodName("someMethod")
+							            .build()
+             )
+			.result("result")
+			.userMessage("user message")
+			.build();
+
+		this.repository.persistAndFlush(inputGuardrailExecutedAuditEvent);
+
+		var igEvents = this.repository.find(
+			EVENT_QUERY_TEMPLATE.formatted(InputGuardrailExecutedAuditEvent.class.getSimpleName()),
+			inputGuardrailExecutedAuditEvent.getInvocationContext().getInteractionId()
+		)
+			.list();
+
+		assertThat(igEvents)
+			.singleElement()
+			.usingRecursiveComparison()
+			.isEqualTo(inputGuardrailExecutedAuditEvent);
+
+		return inputGuardrailExecutedAuditEvent;
+	}
+
+	private OutputGuardrailExecutedAuditEvent outputGuardrailExecuted() {
+		var outputGuardrailExecutedAuditEvent = OutputGuardrailExecutedAuditEvent.builder()
+			.duration(Duration.ofSeconds(3))
+			.guardrailClass(OG.class.getName())
+			.invocationContext(InvocationContext.builder()
+							            .interactionId(UUID.randomUUID())
+							            .interfaceName("someInterface")
+							            .methodName("someMethod")
+							            .build()
+             )
+			.response("response")
+			.result("result")
+			.build();
+
+		this.repository.persistAndFlush(outputGuardrailExecutedAuditEvent);
+
+		var ogEvents = this.repository.find(
+			EVENT_QUERY_TEMPLATE.formatted(OutputGuardrailExecutedAuditEvent.class.getSimpleName()),
+			outputGuardrailExecutedAuditEvent.getInvocationContext().getInteractionId()
+		)
+			.list();
+
+		assertThat(ogEvents)
+			.singleElement()
+			.usingRecursiveComparison()
+			.isEqualTo(outputGuardrailExecutedAuditEvent);
+
+		return outputGuardrailExecutedAuditEvent;
+	}
+
   private ServiceStartedAuditEvent serviceStarted() {
     var serviceStartedAuditEvent = ServiceStartedAuditEvent.builder()
                                                               .systemMessage("System message")
@@ -163,7 +243,7 @@ class AuditEventRepositoryTests {
              )
                                                               .build();
 
-    this.repository.persist(serviceStartedAuditEvent);
+    this.repository.persistAndFlush(serviceStartedAuditEvent);
     var serviceStartedEvents = this.repository.find(
 			              EVENT_QUERY_TEMPLATE.formatted(ServiceStartedAuditEvent.class.getSimpleName()),
                     serviceStartedAuditEvent.getInvocationContext().getInteractionId()
@@ -177,4 +257,11 @@ class AuditEventRepositoryTests {
 
     return serviceStartedAuditEvent;
   }
+
+	private static class IG implements InputGuardrail {
+
+	}
+
+	private static class OG implements OutputGuardrail {
+	}
 }
