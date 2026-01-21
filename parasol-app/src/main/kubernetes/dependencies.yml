@@ -26,9 +26,9 @@ type: Opaque
 metadata:
   name: db-config
 data:
-  POSTGRESQL_DATABASE: bm9uX2RldGVybWluaXN0aWM=
-  POSTGRESQL_USERNAME: bm9uX2RldGVybWluaXN0aWM=
-  POSTGRESQL_PASSWORD: bm9uX2RldGVybWluaXN0aWM=
+  POSTGRES_DB: bm9uX2RldGVybWluaXN0aWM=
+  POSTGRES_USER: bm9uX2RldGVybWluaXN0aWM=
+  POSTGRES_PASSWORD: bm9uX2RldGVybWluaXN0aWM=
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -82,14 +82,14 @@ spec:
     spec:
       containers:
         - name: non-deterministic-db
-          image: bitnami/postgresql:17
+          image: postgres:18
           ports:
             - containerPort: 5432
           envFrom:
             - secretRef:
                 name: db-config
           volumeMounts:
-            - mountPath: /bitnami/postgresql
+            - mountPath: /var/lib/postgresql
               name: db-data
           resources:
             limits:

@@ -45,3 +45,4 @@ node_modules/
 
 easy-rag-embeddings.json
 .quinoa/
+/testing/ai-tester/ai-interactions.db

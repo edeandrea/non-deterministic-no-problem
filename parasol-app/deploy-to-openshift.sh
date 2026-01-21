@@ -3,6 +3,7 @@
 oc delete secret app-creds
 oc create secret generic app-creds --from-literal=OPENAI_API_KEY=${OPENAI_API_KEY}
 oc delete deployment non-deterministic
+oc apply -f src/main/kubernetes/dependencies.yml
 
 ./mvnw clean package -DskipTests \
   -Dquarkus.kubernetes.deploy=true \

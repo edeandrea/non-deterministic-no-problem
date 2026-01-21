@@ -13,10 +13,12 @@
 		<maven.compiler.release>21</maven.compiler.release>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+		<quarkus.langchain4j.version>1.5.0</quarkus.langchain4j.version>
 		<quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
 		<quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
 		<quarkus.platform.version>3.30.6</quarkus.platform.version>
 		<quarkus.openapi-generator.version>2.14.0-lts</quarkus.openapi-generator.version>
+		<quarkus.sqlite4j.version>0.0.8</quarkus.sqlite4j.version>
 		<surefire-plugin.version>3.5.4</surefire-plugin.version>
 	</properties>
 
@@ -29,10 +31,23 @@
 				<type>pom</type>
 				<scope>import</scope>
 			</dependency>
+			<dependency>
+				<groupId>io.quarkiverse.langchain4j</groupId>
+				<artifactId>quarkus-langchain4j-bom</artifactId>
+				<version>${quarkus.langchain4j.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
 		</dependencies>
 	</dependencyManagement>
 
 	<dependencies>
+		<!--	Only here so dev UI is here	-->
+		<dependency>
+			<groupId>io.quarkus</groupId>
+			<artifactId>quarkus-vertx-http</artifactId>
+			<scope>provided</scope>
+		</dependency>
 		<dependency>
 			<groupId>io.quarkus</groupId>
 			<artifactId>quarkus-rest-client-jackson</artifactId>
@@ -63,14 +78,49 @@
 			<artifactId>quarkus-hibernate-orm-panache</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>io.quarkus</groupId>
-			<artifactId>quarkus-jdbc-postgresql</artifactId>
+			<groupId>io.quarkiverse.jdbc</groupId>
+			<artifactId>quarkus-jdbc-sqlite4j</artifactId>
+			<version>${quarkus.sqlite4j.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.mapstruct</groupId>
 			<artifactId>mapstruct</artifactId>
 			<version>${mapstruct.version}</version>
 		</dependency>
+		<dependency>
+			<groupId>dev.langchain4j</groupId>
+			<artifactId>langchain4j-onnx-scoring</artifactId>
+			<version>1.10.0-beta18</version>
+			<scope>provided</scope>
+		</dependency>
+		<!--		<dependency>-->
+		<!--			<groupId>dev.langchain4j</groupId>-->
+		<!--			<artifactId>langchain4j-onnx-scoring</artifactId>-->
+		<!--			<version>1.10.0-beta18</version>-->
+		<!--			<exclusions>-->
+		<!--				<exclusion>-->
+		<!--					<groupId>com.microsoft.onnxruntime</groupId>-->
+		<!--					<artifactId>onnxruntime</artifactId>-->
+		<!--				</exclusion>-->
+		<!--			</exclusions>-->
+		<!--		</dependency>-->
+		<!--		<dependency>-->
+		<!--			<groupId>com.microsoft.onnxruntime</groupId>-->
+		<!--			<artifactId>onnxruntime_gpu</artifactId>-->
+		<!--			<version>1.18.0</version>-->
+		<!--		</dependency>-->
+		<!--		<dependency>-->
+		<!--			<groupId>io.quarkiverse.langchain4j</groupId>-->
+		<!--			<artifactId>quarkus-langchain4j-testing-evaluation-core</artifactId>-->
+		<!--		</dependency>-->
+		<!--		<dependency>-->
+		<!--			<groupId>io.quarkiverse.langchain4j</groupId>-->
+		<!--			<artifactId>quarkus-langchain4j-testing-evaluation-semantic-similarity</artifactId>-->
+		<!--		</dependency>-->
+				<dependency>
+					<groupId>io.quarkiverse.langchain4j</groupId>
+					<artifactId>quarkus-langchain4j-cohere</artifactId>
+				</dependency>
 		<dependency>
 			<groupId>io.quarkus</groupId>
 			<artifactId>quarkus-junit5</artifactId>

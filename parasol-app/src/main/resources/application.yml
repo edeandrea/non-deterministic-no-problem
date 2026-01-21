@@ -222,8 +222,9 @@ quarkus:
       profile:
         parent: prod
     hibernate-orm:
+      sql-load-script: import.sql
       schema-management:
-        strategy: update
+        strategy: drop-and-create
     kubernetes:
       deployment-target: openshift
     container-image:

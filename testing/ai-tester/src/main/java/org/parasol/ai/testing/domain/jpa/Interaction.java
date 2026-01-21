@@ -1,15 +1,19 @@
 package org.parasol.ai.testing.domain.jpa;
 
-import java.net.URI;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
 
@@ -21,7 +25,7 @@ public class Interaction {
 	private UUID interactionId;
 
 	@NotNull(message = "interactionUri must not be null")
-	private URI interactionUri;
+	private String interactionUri;
 
 	@Column(nullable = false)
 	@NotNull(message = "interactionDate must not be null")
@@ -47,6 +51,14 @@ public class Interaction {
 	@Column(columnDefinition = "TEXT")
 	private String causeErrorMessage;
 
+	@OneToMany(
+		mappedBy = "interaction",
+		cascade = CascadeType.ALL,
+		orphanRemoval = true,
+		fetch = FetchType.EAGER
+	)
+	private List<InteractionScore> scores = new ArrayList<>();
+
 	public Interaction() {
 	}
 
@@ -60,6 +72,7 @@ public class Interaction {
 		this.status = Optional.ofNullable(builder.status).orElseGet(Status::getDefault);
 		this.errorMessage = builder.errorMessage;
 		this.causeErrorMessage = builder.causeErrorMessage;
+		this.scores.addAll(builder.scores);;
 
 		if (this.interactionId == null) {
 			throw new IllegalArgumentException("interactionId must not be null");
@@ -82,7 +95,7 @@ public class Interaction {
 		return interactionId;
 	}
 
-	public URI getInteractionUri() {
+	public String getInteractionUri() {
 		return interactionUri;
 	}
 
@@ -114,6 +127,10 @@ public class Interaction {
 		return causeErrorMessage;
 	}
 
+	public List<InteractionScore> getScores() {
+		return scores;
+	}
+
 	public Builder toBuilder() {
 		return new Builder(this);
 	}
@@ -139,7 +156,7 @@ public class Interaction {
 
 	public static class Builder {
 		private UUID interactionId;
-		private URI interactionUri;
+		private String interactionUri;
 		private Instant interactionDate;
 		private String systemMessage;
 		private String userMessage;
@@ -147,6 +164,7 @@ public class Interaction {
 		private Status status;
 		private String errorMessage;
 		private String causeErrorMessage;
+		private List<InteractionScore> scores = new ArrayList<>();
 
 		private Builder() {
 		}
@@ -161,6 +179,7 @@ public class Interaction {
 			this.status = interaction.status;
 			this.errorMessage = interaction.errorMessage;
 			this.causeErrorMessage = interaction.causeErrorMessage;
+			this.scores.addAll(interaction.scores);
 		}
 
 		public Builder interactionId(UUID interactionId) {
@@ -168,7 +187,7 @@ public class Interaction {
 			return this;
 		}
 
-		public Builder interactionUri(URI interactionUri) {
+		public Builder interactionUri(String interactionUri) {
 			this.interactionUri = interactionUri;
 			return this;
 		}
@@ -205,6 +224,19 @@ public class Interaction {
 
 		public Builder causeErrorMessage(String causeErrorMessage) {
 			this.causeErrorMessage = causeErrorMessage;
+			return this;
+		}
+
+		public Builder score(InteractionScore score) {
+			if (score != null) {
+				this.scores.add(score);
+			}
+
+			return this;
+		}
+
+		public Builder clearScores() {
+			this.scores.clear();
 			return this;
 		}
 

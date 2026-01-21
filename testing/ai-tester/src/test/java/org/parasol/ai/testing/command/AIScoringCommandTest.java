@@ -1,4 +1,4 @@
-package org.parasol.ai.testing;
+package org.parasol.ai.testing.command;
 
 import org.junit.jupiter.api.Test;
 
@@ -7,7 +7,7 @@ import io.quarkus.test.junit.main.LaunchResult;
 import io.quarkus.test.junit.main.QuarkusMainTest;
 
 @QuarkusMainTest
-public class AITestingCommandTest {
+public class AIScoringCommandTest {
     @Test
     @Launch(exitCode = 2)
     public void testBasicLaunch(LaunchResult result) {
