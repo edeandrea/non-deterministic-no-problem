@@ -10,9 +10,9 @@ import jakarta.enterprise.context.ApplicationScoped;
 import org.parasol.ai.testing.domain.jpa.Interaction;
 import org.parasol.ai.testing.domain.jpa.InteractionScore;
 
-import io.quarkus.logging.Log;
-
 import dev.langchain4j.model.scoring.ScoringModel;
+
+import io.quarkus.logging.Log;
 
 @ApplicationScoped
 public class InteractionScorer {
@@ -24,7 +24,7 @@ public class InteractionScorer {
 
 	public Stream<InteractionScore> scoreAll(List<Interaction> interactions, Instant scoreTime) {
 		return interactions.stream()
-			.limit(5)
+			.limit(5)  // The Cohere free tier has a rate limit of 10 requests per minute
 			.map(interaction -> score(interaction, scoreTime));
 	}
 
