@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import jakarta.annotation.Priority;
@@ -13,8 +14,6 @@ import jakarta.interceptor.InvocationContext;
 
 import org.parasol.ai.scoring.domain.score.Interaction;
 import org.parasol.ai.scoring.domain.score.InteractionScore;
-
-import com.google.common.util.concurrent.AtomicDouble;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
@@ -98,30 +97,30 @@ public class InteractionScoringInterceptor {
 
 			this.gauges.computeIfAbsent(tags, tagsKey -> {
 				var gauge = new AtomicDouble(0.0);
-				Gauge.builder("%s.latest".formatted(interactionScored.name()), gauge, AtomicDouble::doubleValue)
-					.description(interactionScored.description())
-					.baseUnit(interactionScored.unit())
-					.tags(tags)
-					.register(this.meterRegistry);
+				Gauge.builder("%s.latest".formatted(interactionScored.name()), gauge, AtomicDouble::get)
+				     .description(interactionScored.description())
+				     .baseUnit(interactionScored.unit())
+				     .tags(tags)
+				     .register(this.meterRegistry);
 
 				return gauge;
 			}).set(score.getScore());
 
 			Counter.builder(interactionScored.name())
-				.description(interactionScored.description())
-				.baseUnit(interactionScored.unit())
-				.tags(tags)
-				.register(this.meterRegistry)
-				.increment();
-//			DistributionSummary.builder(interactionScored.name())
-//			                   .description(interactionScored.description())
-//			                   .baseUnit(interactionScored.unit())
-//			                   .tags(tags)
-//			                   .maximumExpectedValue(1.0)
-//			                   .publishPercentileHistogram()
-//			                   .serviceLevelObjectives(0.5, 0.75, 0.9)
-//			                   .register(this.meterRegistry)
-//			                   .record(score.getScore());
+			       .description(interactionScored.description())
+			       .baseUnit(interactionScored.unit())
+			       .tags(tags)
+			       .register(this.meterRegistry)
+			       .increment();
+			//			DistributionSummary.builder(interactionScored.name())
+			//			                   .description(interactionScored.description())
+			//			                   .baseUnit(interactionScored.unit())
+			//			                   .tags(tags)
+			//			                   .maximumExpectedValue(1.0)
+			//			                   .publishPercentileHistogram()
+			//			                   .serviceLevelObjectives(0.5, 0.75, 0.9)
+			//			                   .register(this.meterRegistry)
+			//			                   .record(score.getScore());
 		}
 	}
 
@@ -146,5 +145,51 @@ public class InteractionScoringInterceptor {
 		              .map(InteractionScored.class::cast)
 		              .filter(interactionScored -> !interactionScored.name().strip().isBlank())
 		              .findFirst();
+	}
+
+	private static class AtomicDouble {
+		private final AtomicLong bits;
+
+		private AtomicDouble() {
+			this(0.0);
+		}
+
+		private AtomicDouble(double initialValue) {
+			bits = new AtomicLong(Double.doubleToLongBits(initialValue));
+		}
+
+		public double get() {
+			return Double.longBitsToDouble(bits.get());
+		}
+
+		public void set(double newValue) {
+			bits.set(Double.doubleToLongBits(newValue));
+		}
+
+		public boolean compareAndSet(double expect, double update) {
+			return bits.compareAndSet(
+				Double.doubleToLongBits(expect),
+				Double.doubleToLongBits(update)
+			);
+		}
+
+		public double getAndSet(double newValue) {
+			return Double.longBitsToDouble(
+				bits.getAndSet(Double.doubleToLongBits(newValue))
+			);
+		}
+
+		public double getAndAdd(double delta) {
+			while (true) {
+				long current = bits.get();
+				double currentVal = Double.longBitsToDouble(current);
+				double nextVal = currentVal + delta;
+				long next = Double.doubleToLongBits(nextVal);
+
+				if (bits.compareAndSet(current, next)) {
+					return currentVal;
+				}
+			}
+		}
 	}
 }
