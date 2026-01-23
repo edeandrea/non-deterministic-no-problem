@@ -135,6 +135,31 @@ quarkus:
     jdbc:
       telemetry: true
 
+  # AI Interactions
+  rest-client:
+    logging:
+      scope: request-response
+    ai-interactions:
+      url: http://localhost:8888
+      follow-redirects: true
+
+  # OpenAPI generator
+  openapi-generator:
+    codegen:
+      input-base-dir: ../openapi
+      include: ai-interactions.yml
+      spec:
+        ai_interactions_yml:
+          config-key: ai-interactions
+        ai-interactions:
+          initialize-empty-collections: true
+          base-package: io.quarkiverse.aiinteractions.event
+          use-dynamic-url: false
+          type-mappings:
+            DateTime: Instant
+          import-mappings:
+            Instant: java.time.Instant
+
 # Ollama profile config
 '%ollama':
   quarkus:

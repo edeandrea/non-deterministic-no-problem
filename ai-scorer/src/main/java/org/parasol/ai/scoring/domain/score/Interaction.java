@@ -1,16 +1,13 @@
-package org.parasol.ai.testing.domain.jpa;
+package org.parasol.ai.scoring.domain.score;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
@@ -24,12 +21,13 @@ public class Interaction {
 	@NotNull(message = "interactionId must not be null")
 	private UUID interactionId;
 
-	@NotNull(message = "interactionUri must not be null")
-	private String interactionUri;
-
 	@Column(nullable = false)
 	@NotNull(message = "interactionDate must not be null")
 	private Instant interactionDate;
+
+	private String applicationName;
+	private String interfaceName;
+	private String methodName;
 
 	@Column(columnDefinition = "TEXT")
 	private String systemMessage;
@@ -39,17 +37,6 @@ public class Interaction {
 
 	@Column(columnDefinition = "TEXT")
 	private String result;
-
-	@Column(nullable = false)
-	@NotNull(message = "status must not be null")
-	@Enumerated(EnumType.STRING)
-	private Status status;
-
-	@Column(columnDefinition = "TEXT")
-	private String errorMessage;
-
-	@Column(columnDefinition = "TEXT")
-	private String causeErrorMessage;
 
 	@OneToMany(
 		mappedBy = "interaction",
@@ -64,14 +51,13 @@ public class Interaction {
 
 	private Interaction(Builder builder) {
 		this.interactionId = builder.interactionId;
-		this.interactionUri = builder.interactionUri;
+		this.applicationName = builder.applicationName;
+		this.interfaceName = builder.interfaceName;
+		this.methodName = builder.methodName;
 		this.interactionDate = builder.interactionDate;
 		this.systemMessage = builder.systemMessage;
 		this.userMessage = builder.userMessage;
 		this.result = builder.result;
-		this.status = Optional.ofNullable(builder.status).orElseGet(Status::getDefault);
-		this.errorMessage = builder.errorMessage;
-		this.causeErrorMessage = builder.causeErrorMessage;
 		this.scores.addAll(builder.scores);
 
 		if (this.interactionId == null) {
@@ -82,12 +68,8 @@ public class Interaction {
 			throw new IllegalArgumentException("interactionDate must not be null");
 		}
 
-		if (this.interactionUri == null) {
+		if (this.applicationName == null) {
 			throw new IllegalArgumentException("interactionUri must not be null");
-		}
-
-		if (this.status == null) {
-			throw new IllegalArgumentException("status must not be null");
 		}
 	}
 
@@ -95,8 +77,16 @@ public class Interaction {
 		return interactionId;
 	}
 
-	public String getInteractionUri() {
-		return interactionUri;
+	public String getApplicationName() {
+		return applicationName;
+	}
+
+	public String getInterfaceName() {
+		return interfaceName;
+	}
+
+	public String getMethodName() {
+		return methodName;
 	}
 
 	public Instant getInteractionDate() {
@@ -115,18 +105,6 @@ public class Interaction {
 		return result;
 	}
 
-	public Status getStatus() {
-		return status;
-	}
-
-	public String getErrorMessage() {
-		return errorMessage;
-	}
-
-	public String getCauseErrorMessage() {
-		return causeErrorMessage;
-	}
-
 	public List<InteractionScore> getScores() {
 		return scores;
 	}
@@ -143,27 +121,25 @@ public class Interaction {
 	public String toString() {
 		return "Interaction{" +
 			"interactionId=" + interactionId +
-			", interactionUri=" + interactionUri +
+			", applicationName='" + applicationName + "\'" +
+			", interfaceName='" + interfaceName + "\'" +
+			", methodName='" + methodName + "\'" +
 			", interactionDate=" + interactionDate +
 			", systemMessage='" + systemMessage + '\'' +
 			", userMessage='" + userMessage + '\'' +
 			", result='" + result + '\'' +
-			", status=" + status +
-			", errorMessage='" + errorMessage + '\'' +
-			", causeErrorMessage='" + causeErrorMessage + '\'' +
 			'}';
 	}
 
 	public static class Builder {
 		private UUID interactionId;
-		private String interactionUri;
+		private String applicationName;
+		private String interfaceName;
+		private String methodName;
 		private Instant interactionDate;
 		private String systemMessage;
 		private String userMessage;
 		private String result;
-		private Status status;
-		private String errorMessage;
-		private String causeErrorMessage;
 		private List<InteractionScore> scores = new ArrayList<>();
 
 		private Builder() {
@@ -171,14 +147,11 @@ public class Interaction {
 
 		private Builder(Interaction interaction) {
 			this.interactionId = interaction.interactionId;
-			this.interactionUri = interaction.interactionUri;
+			this.applicationName = interaction.applicationName;
 			this.interactionDate = interaction.interactionDate;
 			this.systemMessage = interaction.systemMessage;
 			this.userMessage = interaction.userMessage;
 			this.result = interaction.result;
-			this.status = interaction.status;
-			this.errorMessage = interaction.errorMessage;
-			this.causeErrorMessage = interaction.causeErrorMessage;
 			this.scores.addAll(interaction.scores);
 		}
 
@@ -187,8 +160,18 @@ public class Interaction {
 			return this;
 		}
 
-		public Builder interactionUri(String interactionUri) {
-			this.interactionUri = interactionUri;
+		public Builder applicationName(String applicationName) {
+			this.applicationName = applicationName;
+			return this;
+		}
+
+		public Builder interfaceName(String interfaceName) {
+			this.interfaceName = interfaceName;
+			return this;
+		}
+
+		public Builder methodName(String methodName) {
+			this.methodName = methodName;
 			return this;
 		}
 
@@ -209,21 +192,6 @@ public class Interaction {
 
 		public Builder result(String result) {
 			this.result = result;
-			return this;
-		}
-
-		public Builder status(Status status) {
-			this.status = status;
-			return this;
-		}
-
-		public Builder errorMessage(String errorMessage) {
-			this.errorMessage = errorMessage;
-			return this;
-		}
-
-		public Builder causeErrorMessage(String causeErrorMessage) {
-			this.causeErrorMessage = causeErrorMessage;
 			return this;
 		}
 

@@ -49,7 +49,7 @@ public class AiTestingService {
 	}
 
 	public TotalInteractionStats getTotalInteractionStats(Instant start, Optional<Instant> end, URI endpointUri) {
-		Log.infof("Getting total interaction stats between %s and %s for endpoint %s", start, end.orElse(NOW), endpointUri);
+		Log.infof("Getting total event stats between %s and %s for endpoint %s", start, end.orElse(NOW), endpointUri);
 
 		return this.aiInteractionsApi.getAIInteractionStats(endpointUri.toString(), end.orElse(NOW), start)
 		                             .getStats()
@@ -87,7 +87,7 @@ public class AiTestingService {
 
 	@Transactional
 	public void storeInteraction(Interaction interaction) {
-		Log.debugf("Storing interaction %s", interaction);
+		Log.debugf("Storing event %s", interaction);
 		this.interactionRepository.persist(interaction);
 	}
 

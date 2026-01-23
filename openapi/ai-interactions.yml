@@ -1,0 +1,81 @@
+---
+openapi: 3.1.2
+components:
+  schemas:
+    Instant:
+      type: string
+      format: date-time
+      examples:
+        - 2022-03-10T16:15:50Z
+    InteractionEvent:
+      type: object
+      discriminator:
+        propertyName: interactionType
+        mapping:
+          started: "#/components/schemas/InteractionStartedEvent"
+          completed: "#/components/schemas/InteractionCompletedEvent"
+      properties:
+        interactionId:
+          $ref: "#/components/schemas/UUID"
+        interactionDate:
+          $ref: "#/components/schemas/Instant"
+        interfaceName:
+          type: string
+        methodName:
+          type: string
+        interactionType:
+          type: string
+        applicationName:
+          type: string
+      required:
+        - interactionId
+        - interactionDate
+    InteractionStartedEvent:
+      allOf:
+        - $ref: "#/components/schemas/InteractionEvent"
+        - type: object
+          properties:
+            systemMessage:
+              type: string
+            userMessage:
+              type: string
+          required:
+            - userMessage
+    InteractionCompletedEvent:
+      allOf:
+        - $ref: "#/components/schemas/InteractionEvent"
+        - type: object
+          properties:
+            result:
+              type: string
+    UUID:
+      type: string
+      format: uuid
+      pattern: "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
+paths:
+  /ai/interaction:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InteractionEvent"
+      responses:
+        "204":
+          description: Success
+        "400":
+          description: Bad Request
+        "500":
+          description: Something bad happened
+      summary: Post AI Interaction Event
+      operationId: submitInteractionEvent
+      tags:
+        - AI Interaction
+info:
+  title: AI Interactions
+  version: "1.0"
+  description: Contract for getting AI interactions
+  contact:
+    name: Eric Deandrea
+    url: https://github.com/edeandrea

@@ -25,7 +25,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 4,
+  "id": 5,
   "links": [],
   "liveNow": true,
   "panels": [
@@ -59,7 +59,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               }
             ]
           },
@@ -98,7 +99,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.6.0",
+      "pluginVersion": "12.3.0",
       "targets": [
         {
           "datasource": {
@@ -170,6 +171,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -185,7 +187,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -217,7 +220,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.0",
+      "pluginVersion": "12.3.0",
       "targets": [
         {
           "datasource": {
@@ -246,7 +249,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "",
+      "description": "Shows the scores per AI service over time",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -258,6 +261,8 @@
             "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
+            "axisSoftMax": 1,
+            "axisSoftMin": 0,
             "barAlignment": 0,
             "barWidthFactor": 0.6,
             "drawStyle": "line",
@@ -269,13 +274,17 @@
               "viz": false
             },
             "insertNulls": false,
-            "lineInterpolation": "smooth",
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -285,17 +294,22 @@
               "mode": "off"
             }
           },
-          "decimals": 0,
+          "fieldMinMax": false,
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
               }
             ]
           },
-          "unit": "none"
+          "unit": "percent"
         },
         "overrides": []
       },
@@ -305,11 +319,11 @@
         "x": 0,
         "y": 5
       },
-      "id": 197,
+      "id": 202,
       "options": {
         "legend": {
           "calcs": [],
-          "displayMode": "list",
+          "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
         },
@@ -319,7 +333,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.0",
+      "pluginVersion": "12.3.0",
       "targets": [
         {
           "datasource": {
@@ -327,15 +341,17 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "exemplar": false,
-          "expr": "parasol_llm_interaction_failed_failed_interactions_total or vector(0)",
+          "exemplar": true,
+          "expr": "interaction_scored_latest_score*100 ",
+          "format": "time_series",
           "instant": false,
-          "legendFormat": "{{interfaceName}}.{{methodName}}",
+          "key": "Q-e2f057e3-03c0-4879-b23f-069fc152723b-0",
+          "legendFormat": "app={{applicationName}},service={{interfaceName}}.{{methodName}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "LLM interaction failures",
+      "title": "Scores over time",
       "type": "timeseries"
     },
     {
@@ -373,6 +389,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -387,7 +404,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -418,7 +436,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.0",
+      "pluginVersion": "12.3.0",
       "targets": [
         {
           "datasource": {
@@ -469,6 +487,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -491,13 +510,14 @@
               "viz": false
             },
             "insertNulls": false,
-            "lineInterpolation": "linear",
+            "lineInterpolation": "smooth",
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -513,14 +533,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
+                "color": "green",
+                "value": 0
               }
             ]
-          }
+          },
+          "unit": "none"
         },
         "overrides": []
       },
@@ -530,7 +548,7 @@
         "x": 0,
         "y": 13
       },
-      "id": 198,
+      "id": 197,
       "options": {
         "legend": {
           "calcs": [],
@@ -544,26 +562,23 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.0",
+      "pluginVersion": "12.3.0",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "parasol_llm_tool_executed_executed_tools_total{toolName!~\"\"}",
-          "fullMetaSearch": false,
-          "includeNullMetadata": true,
+          "exemplar": false,
+          "expr": "parasol_llm_interaction_failed_failed_interactions_total or vector(0)",
           "instant": false,
-          "legendFormat": "{{toolName}}",
+          "legendFormat": "{{interfaceName}}.{{methodName}}",
           "range": true,
-          "refId": "A",
-          "useBackend": false
+          "refId": "A"
         }
       ],
-      "title": "Number of tool invocations",
+      "title": "LLM interaction failures",
       "type": "timeseries"
     },
     {
@@ -599,6 +614,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -613,7 +629,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -644,7 +661,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.0",
+      "pluginVersion": "12.3.0",
       "targets": [
         {
           "editorMode": "code",
@@ -686,12 +703,116 @@
       "type": "timeseries"
     },
     {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 21
+      },
+      "id": 198,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "parasol_llm_tool_executed_executed_tools_total{toolName!~\"\"}",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "{{toolName}}",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        }
+      ],
+      "title": "Number of tool invocations",
+      "type": "timeseries"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 25
+        "y": 29
       },
       "id": 125,
       "panels": [],
@@ -726,7 +847,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "rgba(50, 172, 45, 0.97)"
+                "color": "rgba(50, 172, 45, 0.97)",
+                "value": 0
               },
               {
                 "color": "rgba(237, 129, 40, 0.89)",
@@ -746,7 +868,7 @@
         "h": 4,
         "w": 6,
         "x": 0,
-        "y": 26
+        "y": 30
       },
       "id": 65,
       "maxDataPoints": 100,
@@ -765,7 +887,7 @@
         "showThresholdMarkers": true,
         "sizing": "auto"
       },
-      "pluginVersion": "11.6.0",
+      "pluginVersion": "12.3.0",
       "targets": [
         {
           "datasource": {
@@ -821,7 +943,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "rgba(50, 172, 45, 0.97)"
+                "color": "rgba(50, 172, 45, 0.97)",
+                "value": 0
               },
               {
                 "color": "rgba(237, 129, 40, 0.89)",
@@ -841,7 +964,7 @@
         "h": 4,
         "w": 6,
         "x": 6,
-        "y": 26
+        "y": 30
       },
       "id": 75,
       "maxDataPoints": 100,
@@ -860,7 +983,7 @@
         "showThresholdMarkers": true,
         "sizing": "auto"
       },
-      "pluginVersion": "11.6.0",
+      "pluginVersion": "12.3.0",
       "targets": [
         {
           "datasource": {
@@ -884,7 +1007,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 30
+        "y": 34
       },
       "id": 163,
       "panels": [],
@@ -941,7 +1064,7 @@
         "h": 4,
         "w": 6,
         "x": 0,
-        "y": 31
+        "y": 35
       },
       "id": 63,
       "maxDataPoints": 100,
@@ -1025,7 +1148,7 @@
         "h": 4,
         "w": 6,
         "x": 6,
-        "y": 31
+        "y": 35
       },
       "id": 92,
       "maxDataPoints": 100,
@@ -1131,7 +1254,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 31
+        "y": 35
       },
       "id": 155,
       "options": {
@@ -1230,7 +1353,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 35
+        "y": 39
       },
       "id": 143,
       "options": {
@@ -1331,7 +1454,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 39
+        "y": 43
       },
       "id": 151,
       "options": {
@@ -1430,7 +1553,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 43
+        "y": 47
       },
       "id": 153,
       "options": {
@@ -1472,7 +1595,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 51
+        "y": 55
       },
       "id": 127,
       "panels": [
@@ -1871,7 +1994,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 52
+        "y": 56
       },
       "id": 128,
       "panels": [],
@@ -1945,7 +2068,7 @@
         "h": 7,
         "w": 11,
         "x": 0,
-        "y": 53
+        "y": 57
       },
       "id": 106,
       "options": {
@@ -2075,7 +2198,7 @@
         "h": 7,
         "w": 13,
         "x": 11,
-        "y": 53
+        "y": 57
       },
       "id": 93,
       "options": {
@@ -2280,7 +2403,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 60
+        "y": 64
       },
       "id": 124,
       "options": {
@@ -2386,7 +2509,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 60
+        "y": 64
       },
       "id": 32,
       "options": {
@@ -2523,7 +2646,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 60
+        "y": 64
       },
       "id": 61,
       "options": {
@@ -2587,7 +2710,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 67
+        "y": 71
       },
       "id": 192,
       "panels": [],
@@ -2661,7 +2784,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 68
+        "y": 72
       },
       "id": 193,
       "options": {
@@ -2797,7 +2920,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 68
+        "y": 72
       },
       "id": 194,
       "options": {
@@ -2859,7 +2982,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 76
+        "y": 80
       },
       "id": 129,
       "panels": [],
@@ -2932,7 +3055,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 77
+        "y": 81
       },
       "id": 3,
       "options": {
@@ -3010,7 +3133,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 84
+        "y": 88
       },
       "id": 130,
       "panels": [],
@@ -3081,7 +3204,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 85
+        "y": 89
       },
       "id": 78,
       "options": {
@@ -3158,7 +3281,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 92
+        "y": 96
       },
       "id": 131,
       "panels": [],
@@ -3230,7 +3353,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 93
+        "y": 97
       },
       "id": 98,
       "options": {
@@ -3333,7 +3456,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 93
+        "y": 97
       },
       "id": 101,
       "options": {
@@ -3449,7 +3572,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 93
+        "y": 97
       },
       "id": 99,
       "options": {
@@ -3506,7 +3629,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 100
+        "y": 104
       },
       "id": 132,
       "panels": [],
@@ -3578,7 +3701,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 101
+        "y": 105
       },
       "id": 37,
       "options": {
@@ -3680,7 +3803,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 101
+        "y": 105
       },
       "id": 38,
       "options": {
@@ -3726,7 +3849,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 108
+        "y": 112
       },
       "id": 133,
       "panels": [],
@@ -3798,7 +3921,7 @@
         "h": 7,
         "w": 6,
         "x": 0,
-        "y": 109
+        "y": 113
       },
       "id": 33,
       "options": {
@@ -3913,7 +4036,7 @@
         "h": 7,
         "w": 6,
         "x": 6,
-        "y": 109
+        "y": 113
       },
       "id": 83,
       "options": {
@@ -4014,7 +4137,7 @@
         "h": 7,
         "w": 6,
         "x": 12,
-        "y": 109
+        "y": 113
       },
       "id": 85,
       "options": {
@@ -4129,7 +4252,7 @@
         "h": 7,
         "w": 6,
         "x": 18,
-        "y": 109
+        "y": 113
       },
       "id": 84,
       "options": {
@@ -4171,7 +4294,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 116
+        "y": 120
       },
       "id": 173,
       "panels": [
@@ -4559,8 +4682,15 @@
   ],
   "preload": false,
   "refresh": "auto",
-  "schemaVersion": 41,
-  "tags": ["AI", "Auditing", "OpenTelemetry", "Micrometer", "Quarkus", "Metrics"],
+  "schemaVersion": 42,
+  "tags": [
+    "AI",
+    "Auditing",
+    "OpenTelemetry",
+    "Micrometer",
+    "Quarkus",
+    "Metrics"
+  ],
   "templating": {
     "list": [
       {
@@ -4632,5 +4762,5 @@
   "timezone": "browser",
   "title": "AI Dashboard",
   "uid": "few3cxgl3sf",
-  "version": 13
+  "version": 1
 }

@@ -1,4 +1,4 @@
-package org.parasol.ai.testing.evaluation;
+package org.parasol.ai.scoring.evaluation;
 
 import java.time.Instant;
 import java.util.List;
@@ -7,8 +7,8 @@ import java.util.stream.Stream;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
-import org.parasol.ai.testing.domain.jpa.Interaction;
-import org.parasol.ai.testing.domain.jpa.InteractionScore;
+import org.parasol.ai.scoring.domain.score.Interaction;
+import org.parasol.ai.scoring.domain.score.InteractionScore;
 
 import dev.langchain4j.model.scoring.ScoringModel;
 
@@ -24,7 +24,6 @@ public class InteractionScorer {
 
 	public Stream<InteractionScore> scoreAll(List<Interaction> interactions, Instant scoreTime) {
 		return interactions.stream()
-			.limit(5)  // The Cohere free tier has a rate limit of 10 requests per minute
 			.map(interaction -> score(interaction, scoreTime));
 	}
 
@@ -32,11 +31,16 @@ public class InteractionScorer {
 		return score(interaction, Instant.now());
 	}
 
+	@InteractionScored(
+		name = "interaction.scored",
+		description = "An interaction that has been scored",
+		unit = "score"
+	)
 	public InteractionScore score(Interaction interaction, Instant scoreTime) {
 		var query = new StringBuilder();
 
 		Optional.ofNullable(interaction.getSystemMessage())
-			.ifPresent(systemMessage -> query.append(systemMessage).append("\n\n"));
+		        .ifPresent(systemMessage -> query.append(systemMessage).append("\n\n"));
 
 		Optional.ofNullable(interaction.getUserMessage())
 			.ifPresent(query::append);

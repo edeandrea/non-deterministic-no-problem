@@ -1,0 +1,97 @@
+quarkus:
+  application:
+    name: ai-scorer
+
+  # HTTP
+  http:
+    port: 8888
+    test-port: 0
+    cors:
+      enabled: true
+      origins: "*"
+  dev-ui:
+    cors:
+      enabled: true
+  tls:
+    trust-all: true
+
+  hibernate-orm:
+    sql-load-script: import.sql
+    physical-naming-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+    schema-management:
+      strategy: drop-and-create
+
+  langchain4j:
+#    log-requests: true
+#    log-responses: true
+    cohere:
+      api-key: ${COHERE_API_KEY}
+      scoring-model:
+        model-name: rerank-v4.0-fast
+
+  # OpenTelemetry and tracing
+  otel:
+    logs:
+      enabled: true
+    metrics:
+      enabled: true
+  datasource:
+    metrics:
+      enabled: true
+    jdbc:
+      telemetry: true
+
+  # Jackson
+  rest:
+    jackson:
+      optimization:
+        enable-reflection-free-serialization: true
+
+  jackson:
+    serialization-inclusion: non-empty
+
+  # Container image
+  container-image:
+    builder: docker
+    group: edeandrea
+    name: "${quarkus.application.name}"
+
+  # OpenAPI
+  smallrye-openapi:
+    info-title: AI Scorer
+    info-description: AI Scorer API
+    info-version: 1.0
+    info-contact-name: Eric Deandrea
+    info-contact-url: https://github.com/edeandrea
+  swagger-ui:
+    always-include: true
+
+# Dev mode config
+'%dev':
+  quarkus:
+    datasource:
+      dev-ui:
+        allow-sql: true
+
+# Dev and test modes config
+'%dev,test':
+  quarkus:
+    log:
+      category:
+        'org.parasol':
+          level: DEBUG
+      console:
+        level: DEBUG
+
+# test mode config
+'%test':
+  quarkus:
+    otel:
+      logs:
+        enabled: false
+    observability:
+      enabled: false
+    micrometer:
+      export:
+        otlp:
+          enabled: "${%test.quarkus.observability.enabled}"

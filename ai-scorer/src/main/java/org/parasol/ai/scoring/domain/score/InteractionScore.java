@@ -1,4 +1,4 @@
-package org.parasol.ai.testing.domain.jpa;
+package org.parasol.ai.scoring.domain.score;
 
 import java.time.Instant;
 import java.util.Objects;
