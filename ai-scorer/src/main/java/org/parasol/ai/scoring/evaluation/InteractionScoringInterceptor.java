@@ -150,10 +150,6 @@ public class InteractionScoringInterceptor {
 	private static class AtomicDouble {
 		private final AtomicLong bits;
 
-		private AtomicDouble() {
-			this(0.0);
-		}
-
 		private AtomicDouble(double initialValue) {
 			bits = new AtomicLong(Double.doubleToLongBits(initialValue));
 		}
@@ -164,32 +160,6 @@ public class InteractionScoringInterceptor {
 
 		public void set(double newValue) {
 			bits.set(Double.doubleToLongBits(newValue));
-		}
-
-		public boolean compareAndSet(double expect, double update) {
-			return bits.compareAndSet(
-				Double.doubleToLongBits(expect),
-				Double.doubleToLongBits(update)
-			);
-		}
-
-		public double getAndSet(double newValue) {
-			return Double.longBitsToDouble(
-				bits.getAndSet(Double.doubleToLongBits(newValue))
-			);
-		}
-
-		public double getAndAdd(double delta) {
-			while (true) {
-				long current = bits.get();
-				double currentVal = Double.longBitsToDouble(current);
-				double nextVal = currentVal + delta;
-				long next = Double.doubleToLongBits(nextVal);
-
-				if (bits.compareAndSet(current, next)) {
-					return currentVal;
-				}
-			}
 		}
 	}
 }
