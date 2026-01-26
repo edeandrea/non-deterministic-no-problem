@@ -16,7 +16,7 @@
 		<quarkus.langchain4j.version>1.5.0</quarkus.langchain4j.version>
 		<quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
 		<quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
-		<quarkus.platform.version>3.30.6</quarkus.platform.version>
+		<quarkus.platform.version>3.30.8</quarkus.platform.version>
 		<quarkus.openapi-generator.version>2.14.0-lts</quarkus.openapi-generator.version>
 		<quarkus.sqlite4j.version>0.0.8</quarkus.sqlite4j.version>
 		<surefire-plugin.version>3.5.4</surefire-plugin.version>
