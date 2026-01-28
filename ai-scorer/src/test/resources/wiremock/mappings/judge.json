@@ -1,0 +1,37 @@
+{
+  "mappings": [
+    {
+      "request": {
+				"urlPathPattern": "/v1beta/models/.+",
+        "method": "POST",
+        "headers": {
+          "Content-Type": {
+            "equalTo": "application/json",
+            "caseInsensitive": true
+          }
+        },
+        "bodyPatterns": [
+					{
+						"matchesJsonPath": "$[?(@.contents.size() == 1)]"
+					},
+					{
+						"matchesJsonPath": "$.contents[?((@.role == 'user') && (@.parts.size() == 1))]"
+					},
+					{
+						"matchesJsonPath": {
+							"expression": "$.contents[?(@.role == 'user')].parts[0].text",
+							"matches": ".+"
+						}
+					}
+        ]
+      },
+      "response": {
+        "status": 200,
+        "bodyFileName": "judge-response.json",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    }
+  ]
+}

@@ -3,6 +3,7 @@ package ai.scoring.domain.interaction;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 import jakarta.persistence.CascadeType;
@@ -137,6 +138,20 @@ public class Interaction {
 			'}';
 	}
 
+	@Override
+	public boolean equals(Object o) {
+		if (!(o instanceof Interaction that)) {
+			return false;
+		}
+
+		return Objects.equals(interactionId, that.interactionId);
+	}
+
+	@Override
+	public int hashCode() {
+		return Objects.hashCode(interactionId);
+	}
+
 	public static class Builder {
 		private UUID interactionId;
 		private String applicationName;
@@ -155,6 +170,8 @@ public class Interaction {
 			this.interactionId = interaction.interactionId;
 			this.applicationName = interaction.applicationName;
 			this.interactionDate = interaction.interactionDate;
+			this.interfaceName = interaction.interfaceName;
+			this.methodName = interaction.methodName;
 			this.systemMessage = interaction.systemMessage;
 			this.userMessage = interaction.userMessage;
 			this.result = interaction.result;

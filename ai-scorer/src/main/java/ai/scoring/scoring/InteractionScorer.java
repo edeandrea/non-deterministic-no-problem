@@ -3,17 +3,16 @@ package ai.scoring.scoring;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Stream;
 
 import jakarta.enterprise.context.ApplicationScoped;
+
+import io.quarkus.logging.Log;
 
 import ai.scoring.domain.interaction.Interaction;
 import ai.scoring.domain.interaction.InteractionScore;
 import ai.scoring.domain.interaction.RescoreResult;
 import ai.scoring.evaluation.InteractionEvaluator;
 import dev.langchain4j.model.scoring.ScoringModel;
-
-import io.quarkus.logging.Log;
 
 @ApplicationScoped
 public class InteractionScorer {
@@ -28,11 +27,6 @@ public class InteractionScorer {
 	public InteractionScorer(ScoringModel scoringModel, InteractionEvaluator interactionEvaluator) {
 		this.scoringModel = scoringModel;
 		this.interactionEvaluator = interactionEvaluator;
-	}
-
-	public Stream<InteractionScore> scoreAll(List<Interaction> interactions, Instant scoreTime) {
-		return interactions.stream()
-			.map(interaction -> score(interaction, scoreTime));
 	}
 
 	public InteractionScore score(Interaction interaction) {
@@ -70,7 +64,7 @@ public class InteractionScorer {
 		var scoreDate = Instant.now();
 		var evaluationReport = this.interactionEvaluator.evaluate(interaction);
 
-		Log.debugf("Interaction %s rescored as %s", interaction.getInteractionId(), evaluationReport);
+		Log.debugf("Interaction %s rescored as %s", interaction.getInteractionId(), evaluationReport.score());
 
 		var score = InteractionScore.builder()
 			.interaction(interaction)

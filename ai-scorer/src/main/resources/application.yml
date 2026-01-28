@@ -2,6 +2,13 @@ quarkus:
   application:
     name: ai-scorer
 
+  ai:
+    scoring:
+      ai-judge:
+        judge-model-config-name: judge
+      semantic-similarity:
+        threshold: 0.75
+
   # HTTP
   http:
     port: 8888
@@ -22,11 +29,14 @@ quarkus:
       strategy: drop-and-create
 
   langchain4j:
-#    log-requests: true
-#    log-responses: true
+    log-requests: true
+    log-responses: true
     cohere:
       api-key: ${COHERE_API_KEY}
+      base-url: https://api.cohere.ai
       scoring-model:
+        log-requests: true
+        log-responses: true
         model-name: rerank-v4.0-fast
     ai:
       gemini:
@@ -35,6 +45,7 @@ quarkus:
         timeout: 5m
         api-key: ${GEMINI_API_KEY}
         judge:
+          api-key: "${quarkus.langchain4j.ai.gemini.api-key}"
           chat-model:
             model-id: gemini-2.5-flash
             temperature: 0.2
@@ -76,6 +87,12 @@ quarkus:
   swagger-ui:
     always-include: true
 
+  # Wiremock
+  wiremock:
+    devservices:
+      files-mapping: src/test/resources/wiremock
+      enabled: false
+
 # Dev mode config
 '%dev':
   quarkus:
@@ -94,14 +111,24 @@ quarkus:
         level: DEBUG
 
 # test mode config
-'%test':
+"%test":
+  ai:
+    scoring:
+      ai-judge:
+        model-config-name: judge
+      semantic-similarity:
+        threshold: 0.75
+
   quarkus:
     langchain4j:
       cohere:
         api-key: nothingspecial
+        base-url: http://localhost:${quarkus.wiremock.devservices.port}
       ai:
         gemini:
           api-key: nothingspecial
+          judge:
+            base-url: http://localhost:${quarkus.wiremock.devservices.port}
     otel:
       logs:
         enabled: false
@@ -111,3 +138,7 @@ quarkus:
       export:
         otlp:
           enabled: "${quarkus.observability.enabled}"
+
+    wiremock:
+      devservices:
+        enabled: true

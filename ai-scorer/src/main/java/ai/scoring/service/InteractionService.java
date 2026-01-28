@@ -38,27 +38,31 @@ public class InteractionService {
 	@WithSpan("handleInteractionEvent")
 	@Transactional
 	public Optional<InteractionScore> handleInteractionEvent(@SpanAttribute("arg.event") InteractionEvent event, @SpanAttribute("arg.interactionMode") InteractionMode interactionMode) {
-		var completedInteraction = storeInteractionEvent(event)
-			.filter(interaction -> event instanceof InteractionCompletedEvent);
-
-		return completedInteraction
-			.filter(interaction -> interactionMode == InteractionMode.NORMAL)
-			.map(this::scoreInteraction)
-			.or(() -> rescoreInteraction(completedInteraction, interactionMode))
-			.map(interactionScore -> {
-				saveInteraction(interactionScore.getInteraction());
-				return interactionScore;
-			});
+		return storeInteractionEvent(event)
+			.filter(interaction -> event instanceof InteractionCompletedEvent)
+			.flatMap(i -> computeInteractionScore(i, interactionMode));
 	}
 
-	private Optional<InteractionScore> rescoreInteraction(Optional<Interaction> completedInteraction, InteractionMode interactionMode) {
-		return completedInteraction.filter(interaction -> interactionMode == InteractionMode.RESCORE)
-					.map(interaction -> {
-						var rescoreResult = rescoreInteraction(interaction);
-						Log.infof("Interaction %s rescored as %s", rescoreResult.interactionScore().getInteraction(), rescoreResult.evaluationReport());
+	private Optional<InteractionScore> computeInteractionScore(Interaction completedInteraction, InteractionMode interactionMode) {
+		return switch(interactionMode) {
+			case NORMAL -> Optional.ofNullable(scoreInteraction(completedInteraction));
+			case RESCORE -> rescoreInteraction(completedInteraction, interactionMode)
+				.map(interactionScore -> {
+					saveInteraction(interactionScore.getInteraction());
+					return interactionScore;
+				});
+		};
+	}
 
-						return rescoreResult.interactionScore();
-					});
+	private Optional<InteractionScore> rescoreInteraction(Interaction completedInteraction, InteractionMode interactionMode) {
+		if (interactionMode == InteractionMode.RESCORE) {
+			var rescoreResult = rescoreInteraction(completedInteraction);
+			Log.infof("Interaction %s rescored as %s", rescoreResult.interactionScore().getInteraction().getInteractionId(), rescoreResult.interactionScore().getScore());
+
+			return Optional.ofNullable(rescoreResult.interactionScore());
+		}
+
+		return Optional.empty();
 	}
 
 	private Optional<Interaction> storeInteractionEvent(InteractionEvent event) {
@@ -108,35 +112,4 @@ public class InteractionService {
 	private InteractionScore scoreInteraction(Interaction interaction) {
 		return this.interactionScorer.score(interaction);
 	}
-
-	//	private Optional<InteractionScore> storeInteractionCompleted(InteractionCompletedEvent interactionCompletedEvent, InteractionMode interactionMode) {
-//		return this.interactionEventRepository.getCorrelatedStartedEvent(interactionCompletedEvent)
-//				.flatMap(startedEvent -> {
-//					var i = this.interactionMapper.map(startedEvent, interactionCompletedEvent);
-//
-//					var score = switch(interactionMode) {
-//						case NORMAL -> {
-//							var interactionScore = scoreInteraction(i);
-//							i = interactionScore.getInteraction();
-//							yield Optional.of(interactionScore);
-//						}
-//						case RESCORE -> Optional.<InteractionScore>empty();
-//					};
-//
-//					final var interaction = i;
-//
-//					score.ifPresent(s -> Log.infof("Interaction %s interaction: %s", interaction.getInteractionId(), s));
-//
-//					QuarkusTransaction.joiningExisting()
-//             .run(() -> {
-//               // Delete its corresponding interaction events
-//               this.interactionEventRepository.deleteAllForInteractionId(interactionCompletedEvent.getInvocationContext().getInteractionId());
-//
-//               // Store it as an interaction
-//               saveInteraction(interaction);
-//             });
-//
-//					return score;
-//				});
-//	}
 }

@@ -1,6 +1,7 @@
 package ai.scoring.evaluation;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.spi.CDI;
 
 import ai.scoring.domain.interaction.Interaction;
 import ai.scoring.domain.sample.Source;
@@ -16,11 +17,11 @@ import io.quarkus.arc.Unremovable;
 @ApplicationScoped
 @Unremovable
 public class InteractionsSampleLoader implements SampleLoader<String> {
-	private final InteractionRepository interactionRepository;
-
-	public InteractionsSampleLoader(InteractionRepository interactionRepository) {
-		this.interactionRepository = interactionRepository;
-	}
+//	private final InteractionRepository interactionRepository;
+//
+//	public InteractionsSampleLoader(InteractionRepository interactionRepository) {
+//		this.interactionRepository = interactionRepository;
+//	}
 
 	@Override
 	public boolean supports(String source) {
@@ -54,7 +55,7 @@ public class InteractionsSampleLoader implements SampleLoader<String> {
 
 	// Helper to get CDI instance when created via ServiceLoader
   private InteractionRepository getInteractionRepository() {
-		return this.interactionRepository;
-//    return CDI.current().select(InteractionRepository.class).get();
+//		return this.interactionRepository;
+    return CDI.current().select(InteractionRepository.class).get();
   }
 }
