@@ -104,4 +104,4 @@ quarkus:
     micrometer:
       export:
         otlp:
-          enabled: "${%test.quarkus.observability.enabled}"
+          enabled: "${quarkus.observability.enabled}"
