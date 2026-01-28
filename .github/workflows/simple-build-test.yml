@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - jfokus
     paths-ignore:
       - '**/*.md'
       - '.github/dependabot.yml'
