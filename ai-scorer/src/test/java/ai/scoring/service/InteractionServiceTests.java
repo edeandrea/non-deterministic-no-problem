@@ -85,6 +85,7 @@ class InteractionServiceTests {
 					                .interaction(interaction)
 					                .score(0.5)
 													.scoreDate(Instant.now())
+													.mode(InteractionMode.RESCORE)
 					                .build(),
 null))
 			.when(this.interactionScorer)

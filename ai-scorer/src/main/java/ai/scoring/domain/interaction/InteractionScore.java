@@ -5,6 +5,8 @@ import java.util.Objects;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -29,6 +31,10 @@ public class InteractionScore {
 	@NotNull(message = "interaction must not be null")
 	private Double score;
 
+	@Column(nullable = false)
+	@Enumerated(EnumType.STRING)
+	private InteractionMode mode;
+
 	public InteractionScore() {
 	}
 
@@ -36,6 +42,7 @@ public class InteractionScore {
 		this.interaction = builder.interaction;
 		this.scoreDate = builder.scoreDate;
 		this.score = builder.score;
+		this.mode = builder.mode;
 
 		if (this.interaction == null) {
 			throw new IllegalArgumentException("event must not be null");
@@ -47,6 +54,10 @@ public class InteractionScore {
 
 		if (this.score == null) {
 			throw new IllegalArgumentException("interaction must not be null");
+		}
+
+		if (this.mode == null) {
+			throw new IllegalArgumentException("mode must not be null");
 		}
 	}
 
@@ -60,6 +71,10 @@ public class InteractionScore {
 
 	public Double getScore() {
 		return score;
+	}
+
+	public InteractionMode getMode() {
+		return mode;
 	}
 
 	public Builder toBuilder() {
@@ -76,6 +91,7 @@ public class InteractionScore {
 			"interactionId=" + (interaction != null ? interaction.getInteractionId() : null) +
 			", scoreDate=" + scoreDate +
 			", interaction=" + score +
+			", mode=" + mode +
 			'}';
 	}
 
@@ -97,6 +113,7 @@ public class InteractionScore {
 		private Interaction interaction;
 		private Instant scoreDate;
 		private Double score;
+		private InteractionMode mode;
 
 		private Builder() {
 		}
@@ -105,6 +122,7 @@ public class InteractionScore {
 			this.interaction = source.interaction;
 			this.scoreDate = source.scoreDate;
 			this.score = source.score;
+			this.mode = source.mode;
 		}
 
 		public Builder interaction(Interaction interaction) {
@@ -119,6 +137,11 @@ public class InteractionScore {
 
 		public Builder score(Double score) {
 			this.score = score;
+			return this;
+		}
+
+		public Builder mode(InteractionMode mode) {
+			this.mode = mode;
 			return this;
 		}
 

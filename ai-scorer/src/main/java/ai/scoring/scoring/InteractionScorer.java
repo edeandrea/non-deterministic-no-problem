@@ -9,6 +9,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import io.quarkus.logging.Log;
 
 import ai.scoring.domain.interaction.Interaction;
+import ai.scoring.domain.interaction.InteractionMode;
 import ai.scoring.domain.interaction.InteractionScore;
 import ai.scoring.domain.interaction.RescoreResult;
 import ai.scoring.evaluation.InteractionEvaluator;
@@ -53,6 +54,7 @@ public class InteractionScorer {
 			.interaction(interaction)
 			.score(scoreResult.content())
 			.scoreDate(scoreTime)
+			.mode(InteractionMode.NORMAL)
 			.build();
 
 		interaction.getScores().add(score);
@@ -70,6 +72,7 @@ public class InteractionScorer {
 			.interaction(interaction)
 			.score(evaluationReport.score())
 			.scoreDate(scoreDate)
+			.mode(InteractionMode.RESCORE)
 			.build();
 
 		interaction.getScores().add(score);
