@@ -2,6 +2,9 @@ quarkus:
   application:
     name: non-deterministic
 
+  aiscoring:
+    interaction-mode: normal
+
   # Default LangChain4j configuration
   langchain4j:
     parasol-chat:
@@ -137,11 +140,11 @@ quarkus:
 
   # AI Interactions
   rest-client:
-    logging:
-      scope: request-response
     ai-interactions:
       url: http://localhost:8888
       follow-redirects: true
+      logging:
+        scope: request-response
 
   # OpenAPI generator
   openapi-generator:
@@ -153,8 +156,10 @@ quarkus:
           config-key: ai-interactions
         ai-interactions:
           initialize-empty-collections: true
-          base-package: io.quarkiverse.aiinteractions.event
+          base-package: ai.scoring.scorer
           use-dynamic-url: false
+          mutiny: true
+          use-bean-validation: true
           type-mappings:
             DateTime: Instant
           import-mappings:
@@ -216,6 +221,10 @@ quarkus:
     log:
       category:
         'org.parasol':
+          level: DEBUG
+        'ai.scoring':
+          level: DEBUG
+        'ai.scoring.events.api':
           level: DEBUG
       console:
         level: DEBUG

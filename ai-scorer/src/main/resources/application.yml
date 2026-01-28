@@ -28,6 +28,16 @@ quarkus:
       api-key: ${COHERE_API_KEY}
       scoring-model:
         model-name: rerank-v4.0-fast
+    ai:
+      gemini:
+        log-requests: true
+        log-responses: true
+        timeout: 5m
+        api-key: ${GEMINI_API_KEY}
+        judge:
+          chat-model:
+            model-id: gemini-2.5-flash
+            temperature: 0.2
 
   # OpenTelemetry and tracing
   otel:

@@ -8,8 +8,6 @@ import jakarta.interceptor.AroundInvoke;
 import jakarta.interceptor.Interceptor;
 import jakarta.interceptor.InvocationContext;
 
-import io.quarkus.opentelemetry.runtime.config.build.OTelBuildConfig;
-
 import dev.langchain4j.model.chat.response.ChatResponseMetadata;
 import dev.langchain4j.observability.api.event.AiServiceEvent;
 import dev.langchain4j.observability.api.event.AiServiceResponseReceivedEvent;
@@ -23,6 +21,8 @@ import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Context;
+
+import io.quarkus.opentelemetry.runtime.config.build.OTelBuildConfig;
 
 @InteractionObserved
 @Interceptor
@@ -84,25 +84,26 @@ public class InteractionObservabilityInterceptor {
 		                      .setAllAttributes(spanAttributes.build())
 		                      .startSpan();
 
-		try {
-			return context.proceed();
-		}
-		finally {
-			if (isOtelMetricsEnabled()) {
-				addToCounter(
-					auditObserved.name(),
-					auditObserved.description(),
-					auditObserved.unit(),
-					allTags
-				);
-
-				interactionEvent.filter(event -> event instanceof AiServiceResponseReceivedEvent)
-				                .map(AiServiceResponseReceivedEvent.class::cast)
-				                .map(event -> event.response().metadata())
-				                .ifPresent(this::addToTotalTokenCount);
+		try (var scope = span.makeCurrent()) {
+			try {
+				return context.proceed();
 			}
+			finally {
+				if (isOtelMetricsEnabled()) {
+					addToCounter(
+						auditObserved.name(),
+						auditObserved.description(),
+						auditObserved.unit(),
+						allTags);
 
-			span.end();
+					interactionEvent.filter(event -> event instanceof AiServiceResponseReceivedEvent)
+					                .map(AiServiceResponseReceivedEvent.class::cast)
+					                .map(event -> event.response().metadata())
+					                .ifPresent(this::addToTotalTokenCount);
+				}
+
+				span.end();
+			}
 		}
 	}
 

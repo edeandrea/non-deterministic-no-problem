@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
-	<groupId>org.parasol</groupId>
+	<groupId>io.quarkiverse.aiscoring</groupId>
 	<artifactId>ai-scorer</artifactId>
 	<version>1.0.0-SNAPSHOT</version>
 	<name>ai-scorer</name>
@@ -64,6 +64,18 @@
 		<dependency>
 			<groupId>io.quarkiverse.langchain4j</groupId>
 			<artifactId>quarkus-langchain4j-cohere</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.quarkiverse.langchain4j</groupId>
+			<artifactId>quarkus-langchain4j-testing-evaluation-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.quarkiverse.langchain4j</groupId>
+			<artifactId>quarkus-langchain4j-testing-evaluation-ai-judge</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.quarkiverse.langchain4j</groupId>
+			<artifactId>quarkus-langchain4j-ai-gemini</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>io.quarkus</groupId>
@@ -142,8 +154,8 @@
 						<configuration>
 							<inputSpec>${project.basedir}/../openapi/ai-interactions.yml</inputSpec>
 							<generatorName>jaxrs-spec</generatorName>
-							<apiPackage>io.quarkiverse.aiinteractions.api</apiPackage>
-							<modelPackage>io.quarkiverse.aiinteractions.model</modelPackage>
+							<apiPackage>ai.scoring.api</apiPackage>
+							<modelPackage>ai.scoring.model</modelPackage>
 							<library>quarkus</library>
 							<cleanupOutput>true</cleanupOutput>
 							<output>${project.build.directory}/generated-sources/openapi</output>
@@ -164,7 +176,9 @@
 								<dateLibrary>java8</dateLibrary>
 								<openApiNullable>false</openApiNullable>
 								<interfaceOnly>true</interfaceOnly>
-								<useBeanValidation>false</useBeanValidation>
+								<useBeanValidation>true</useBeanValidation>
+								<returnResponse>true</returnResponse>
+								<generateBuilders>true</generateBuilders>
 							</configOptions>
 						</configuration>
 					</execution>
