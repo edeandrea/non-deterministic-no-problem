@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: testing/ai-tester
+        working-directory: ai-tester
     strategy:
       fail-fast: false
       matrix:
