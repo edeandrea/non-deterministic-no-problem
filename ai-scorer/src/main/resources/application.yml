@@ -96,6 +96,12 @@ quarkus:
 # test mode config
 '%test':
   quarkus:
+    langchain4j:
+      cohere:
+        api-key: nothingspecial
+      ai:
+        gemini:
+          api-key: nothingspecial
     otel:
       logs:
         enabled: false
