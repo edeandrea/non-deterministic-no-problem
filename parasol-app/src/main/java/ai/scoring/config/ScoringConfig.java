@@ -7,4 +7,7 @@ import io.smallrye.config.WithDefault;
 public interface ScoringConfig {
 	@WithDefault("NORMAL")
 	InteractionMode interactionMode();
+
+	@WithDefault("0.75")
+	Double threshold();
 }

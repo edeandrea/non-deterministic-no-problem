@@ -5,7 +5,7 @@ quarkus:
   ai:
     scoring:
       ai-judge:
-        judge-model-config-name: judge
+        model-config-name: judge
       semantic-similarity:
         threshold: 0.75
 
@@ -94,6 +94,12 @@ quarkus:
 
 # Dev mode config
 '%dev':
+  ai:
+    scoring:
+      ai-judge:
+        model-config-name: judge
+      semantic-similarity:
+        threshold: 0.75
   quarkus:
     datasource:
       dev-ui:
@@ -113,6 +119,7 @@ quarkus:
 "%test":
   ai:
     scoring:
+      scoring-strategy: semantic-similarity
       ai-judge:
         model-config-name: judge
       semantic-similarity:
