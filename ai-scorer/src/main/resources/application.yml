@@ -1,13 +1,14 @@
+ai:
+  scoring:
+    scoring-strategy: ai-judge
+    ai-judge:
+      model-config-name: judge
+    semantic-similarity:
+      threshold: 0.75
+
 quarkus:
   application:
     name: ai-scorer
-
-  ai:
-    scoring:
-      ai-judge:
-        model-config-name: judge
-      semantic-similarity:
-        threshold: 0.75
 
   # HTTP
   http:
@@ -28,14 +29,10 @@ quarkus:
       strategy: drop-and-create
 
   langchain4j:
-    log-requests: true
-    log-responses: true
     cohere:
       api-key: ${COHERE_API_KEY}
       base-url: https://api.cohere.ai
       scoring-model:
-        log-requests: true
-        log-responses: true
         model-name: rerank-v4.0-fast
     ai:
       gemini:
@@ -94,12 +91,6 @@ quarkus:
 
 # Dev mode config
 '%dev':
-  ai:
-    scoring:
-      ai-judge:
-        model-config-name: judge
-      semantic-similarity:
-        threshold: 0.75
   quarkus:
     datasource:
       dev-ui:
@@ -117,14 +108,6 @@ quarkus:
 
 # test mode config
 "%test":
-  ai:
-    scoring:
-      scoring-strategy: semantic-similarity
-      ai-judge:
-        model-config-name: judge
-      semantic-similarity:
-        threshold: 0.75
-
   quarkus:
     langchain4j:
       cohere:
@@ -148,3 +131,45 @@ quarkus:
     wiremock:
       devservices:
         enabled: true
+
+'%openshift':
+  ai:
+    scoring:
+      scoring-strategy: ai-judge
+      ai-judge:
+        model-config-name: judge
+      semantic-similarity:
+        threshold: 0.75
+
+  quarkus:
+    config:
+      profile:
+        parent: prod
+    langchain4j:
+      ai:
+        gemini:
+          log-requests: false
+          log-responses: false
+    hibernate-orm:
+      schema-management:
+        strategy: drop-and-create
+    kubernetes:
+      deployment-target: openshift
+    container-image:
+      builder: openshift
+      registry: image-registry.openshift-image-registry.svc:5000
+    openshift:
+      part-of: scoring
+      base-jvm-image: registry.access.redhat.com/ubi9/openjdk-21:1.24
+      labels:
+        app: ai-scorer
+      env:
+        configmaps: scorer-app-config
+        secrets: scorer-db-creds,scorer-app-creds
+      route:
+        expose: true
+        tls:
+          termination: edge
+          insecure-edge-termination-policy: Redirect
+      annotations:
+        "app.openshift.io/connects-to": scorer-db,lgtm

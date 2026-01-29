@@ -3,7 +3,7 @@ quarkus:
     name: non-deterministic
 
   aiscoring:
-    interaction-mode: normal
+    interaction-mode: rescore
 
   # Default LangChain4j configuration
   langchain4j:
@@ -254,6 +254,12 @@ quarkus:
     config:
       profile:
         parent: prod
+    rest-client:
+      ai-interactions:
+        url: http://ai-scorer
+        follow-redirects: true
+        logging:
+          scope: request-response
     hibernate-orm:
       sql-load-script: import.sql
       schema-management:
@@ -265,12 +271,12 @@ quarkus:
       registry: image-registry.openshift-image-registry.svc:5000
     openshift:
       part-of: parasol-insurance
-      base-jvm-image: registry.access.redhat.com/ubi9/openjdk-21:1.23
+      base-jvm-image: registry.access.redhat.com/ubi9/openjdk-21:1.24
       labels:
         app: non-deterministic
       env:
-        configmaps: app-config
-        secrets: db-creds,app-creds
+        configmaps: parasol-app-config
+        secrets: parasol-db-creds,parasol-app-creds
       route:
         expose: true
         tls:
