@@ -78,6 +78,8 @@ public class InteractionPublisher {
 		Log.infof("Rescore result: %s", response.getScore());
 
 		if (response.getScore() <= this.scoringConfig.threshold()) {
+			// For now, this doesn't get propagated
+			// Due to https://github.com/langchain4j/langchain4j/issues/4499
 			throw new RescoreBelowThresholdException(this.rescoreInteractionResultMapper.map(response), this.scoringConfig.threshold());
 		}
 	}

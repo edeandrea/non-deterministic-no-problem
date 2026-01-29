@@ -158,7 +158,6 @@ quarkus:
           initialize-empty-collections: true
           base-package: ai.scoring.scorer
           use-dynamic-url: false
-          mutiny: true
           use-bean-validation: true
           type-mappings:
             DateTime: Instant
