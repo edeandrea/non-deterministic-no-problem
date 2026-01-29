@@ -77,6 +77,7 @@ public class InteractionResource implements AiApi {
 	public Response getInteractionById(UUID uuid) {
 		Log.infof("Getting interaction by id: %s", uuid);
 		return this.interactionService.getInteraction(uuid)
+			.map(this.interactionMapper::map)
 			.map(Response::ok)
 			.orElseGet(() -> Response.status(Status.NOT_FOUND))
 			.build();
