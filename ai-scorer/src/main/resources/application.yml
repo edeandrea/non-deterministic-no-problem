@@ -23,7 +23,6 @@ quarkus:
     trust-all: true
 
   hibernate-orm:
-    sql-load-script: import.sql
     physical-naming-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
     schema-management:
       strategy: drop-and-create

@@ -78,6 +78,14 @@ public class Interaction {
 		if (this.applicationName == null) {
 			throw new IllegalArgumentException("interactionUri must not be null");
 		}
+
+		if (this.interfaceName == null) {
+			throw new IllegalArgumentException("interfaceName must not be null");
+		}
+
+		if (this.methodName == null) {
+			throw new IllegalArgumentException("methodName must not be null");
+		}
 	}
 
 	public UUID getInteractionId() {

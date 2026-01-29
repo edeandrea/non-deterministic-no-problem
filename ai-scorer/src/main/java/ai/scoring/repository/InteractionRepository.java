@@ -7,6 +7,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
 import ai.scoring.domain.interaction.Interaction;
+import ai.scoring.domain.interaction.InteractionQuery;
 import ai.scoring.domain.sample.Source;
 
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
@@ -25,6 +26,11 @@ public class InteractionRepository implements PanacheRepositoryBase<Interaction,
 	public List<Interaction> findAllBySource(Source source) {
 		Log.debugf("Retrieving interactions for source %s", source);
 		return list("#Interaction.findAllBySource", parameters(source));
+	}
+
+	@Transactional
+	public List<Interaction> findInteractions(InteractionQuery query) {
+		return null;
 	}
 
 	private static Parameters parameters(Source source) {

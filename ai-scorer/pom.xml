@@ -189,9 +189,11 @@
 							<addCompileSourceRoot>true</addCompileSourceRoot>
 							<typeMappings>
 								<typeMapping>OffsetDateTime=Instant</typeMapping>
+								<typeMapping>DateTime=Instant</typeMapping>
 							</typeMappings>
 							<importMappings>
 								<importMapping>java.time.OffsetDateTime=java.time.Instant</importMapping>
+								<importMapping>Instant=java.time.Instant</importMapping>
 							</importMappings>
 							<generateApiDocumentation>false</generateApiDocumentation>
 							<generateApiTests>false</generateApiTests>
@@ -245,7 +247,7 @@
 				<artifactId>maven-surefire-plugin</artifactId>
 				<version>${surefire-plugin.version}</version>
 				<configuration>
-					<argLine>--add-opens java.base/java.lang=ALL-UNNAMED -javaagent:${org.mockito:mockito-core:jar}</argLine>
+					<argLine>--add-opens java.base/java.lang=ALL-UNNAMED</argLine>
 					<systemPropertyVariables>
 						<java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
 						<maven.home>${maven.home}</maven.home>

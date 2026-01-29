@@ -1,6 +1,8 @@
 package ai.scoring.service;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
@@ -10,6 +12,7 @@ import ai.scoring.domain.event.InteractionEvent;
 import ai.scoring.domain.event.InteractionStartedEvent;
 import ai.scoring.domain.interaction.Interaction;
 import ai.scoring.domain.interaction.InteractionMode;
+import ai.scoring.domain.interaction.InteractionQuery;
 import ai.scoring.domain.interaction.InteractionScore;
 import ai.scoring.domain.interaction.RescoreResult;
 import ai.scoring.mapping.InteractionMapper;
@@ -41,6 +44,15 @@ public class InteractionService {
 		return storeInteractionEvent(event)
 			.filter(interaction -> event instanceof InteractionCompletedEvent)
 			.flatMap(i -> computeInteractionScore(i, interactionMode));
+	}
+
+	@Transactional
+	public Optional<Interaction> getInteraction(UUID interactionId) {
+		return this.interactionRepository.findByIdOptional(interactionId);
+	}
+
+	public List<Interaction> findInteractions(InteractionQuery query) {
+		return this.interactionRepository.findInteractions(query);
 	}
 
 	private Optional<InteractionScore> computeInteractionScore(Interaction completedInteraction, InteractionMode interactionMode) {

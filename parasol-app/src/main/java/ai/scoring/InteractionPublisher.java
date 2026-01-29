@@ -6,7 +6,7 @@ import jakarta.enterprise.event.Observes;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 import ai.scoring.mapping.InteractionEventMapper;
-import ai.scoring.scorer.api.AiInteractionApi;
+import ai.scoring.scorer.api.AiInteractionsApi;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.observability.api.event.AiServiceCompletedEvent;
 import dev.langchain4j.observability.api.event.AiServiceEvent;
@@ -20,10 +20,10 @@ import io.smallrye.mutiny.Uni;
 
 @ApplicationScoped
 public class InteractionPublisher {
-	private final AiInteractionApi aiInteractionApi;
+	private final AiInteractionsApi aiInteractionApi;
 	private final InteractionEventMapper interactionEventMapper;
 
-	public InteractionPublisher(@RestClient AiInteractionApi aiInteractionApi, InteractionEventMapper interactionEventMapper) {
+	public InteractionPublisher(@RestClient AiInteractionsApi aiInteractionApi, InteractionEventMapper interactionEventMapper) {
 		this.aiInteractionApi = aiInteractionApi;
 		this.interactionEventMapper = interactionEventMapper;
 	}

@@ -70,13 +70,95 @@ components:
         score:
           type: number
           format: double
+        interactionMode:
+          $ref: "#/components/schemas/InteractionMode"
     InteractionMode:
       type: string
       enum:
         - NORMAL
         - RESCORE
+    Interactions:
+      type: object
+      properties:
+        interactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Interaction"
+    Interaction:
+      type: object
+      properties:
+        interactionId:
+          $ref: "#/components/schemas/UUID"
+        interactionDate:
+          $ref: "#/components/schemas/Instant"
+        applicationName:
+          type: string
+        interfaceName:
+          type: string
+        methodName:
+          type: string
+        systemMessage:
+          type: string
+        userMessage:
+          type: string
+        result:
+          type: string
+        scores:
+          type: array
+          items:
+            $ref: "#/components/schemas/InteractionScore"
+      required:
+        - interactionId
+        - interactionDate
+        - applicationName
+        - interfaceName
+        - methodName
 paths:
-  /ai/interaction:
+  /ai/interactions:
+    get:
+      parameters:
+        - name: applicationName
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: interfaceName
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: methodName
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: start
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/Instant"
+        - name: end
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/Instant"
+      responses:
+        "200":
+          description: List of interactions found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Interactions"
+        "400":
+          description: Bad Request
+        "404":
+          description: No interactions found
+        "500":
+          description: Something bad happened
+      summary: Search for interactions
+      operationId: findInteractions
+      tags:
+        - AIInteractions
     post:
       requestBody:
         required: true
@@ -97,10 +179,33 @@ paths:
           description: Bad Request
         "500":
           description: Something bad happened
-      summary: Post AI Interaction Event
+      summary: Submit AI Interaction Event
       operationId: submitInteractionEvent
       tags:
-        - AIInteraction
+        - AIInteractions
+  /ai/interactions/{uuid}:
+    get:
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: Interaction found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InteractionEvent"
+        "404":
+          description: Interaction not found
+        "500":
+          description: Something bad happened
+      summary: Get AI Interaction by UUID
+      operationId: getInteractionById
+      tags:
+        - AIInteractions
 info:
   title: AI Interactions
   version: "1.0"
