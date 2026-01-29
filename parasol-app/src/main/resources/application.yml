@@ -3,7 +3,7 @@ quarkus:
     name: non-deterministic
 
   aiscoring:
-    interaction-mode: rescore
+    interaction-mode: normal
 
   # Default LangChain4j configuration
   langchain4j:
@@ -159,6 +159,7 @@ quarkus:
           base-package: ai.scoring.scorer
           use-dynamic-url: false
           use-bean-validation: true
+          return-response: true
           type-mappings:
             DateTime: Instant
           import-mappings:
