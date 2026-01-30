@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - jfokus
     paths-ignore:
       - '**/*.md'
       - '.github/dependabot.yml'
@@ -30,17 +29,17 @@ defaults:
     shell: bash
 
 jobs:
-  ai-tester:
+  ai-scorer:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ai-tester
+        working-directory: ai-scorer
     strategy:
       fail-fast: false
       matrix:
         java:
           - '21'
-    name: ai-tester-jvm-java${{ matrix.java }}
+    name: ai-scorer-jvm-java${{ matrix.java }}
     steps:
       - uses: actions/checkout@v6
 
@@ -51,7 +50,7 @@ jobs:
           distribution: temurin
           cache: maven
 
-      - name: build-test-ai-tester-java${{ matrix.java }}
+      - name: build-test-ai-scorer-java${{ matrix.java }}
         run: |
           ./mvnw -B clean verify \
             -Dquarkus.http.host=0.0.0.0 \
