@@ -39,6 +39,7 @@ jobs:
       matrix:
         java:
           - '21'
+          - '25'
     name: ai-scorer-jvm-java${{ matrix.java }}
     steps:
       - uses: actions/checkout@v6
@@ -66,6 +67,7 @@ jobs:
       matrix:
         java:
           - '21'
+          - '25'
         ai-provider:
           - ollama
           - ollama-openai
