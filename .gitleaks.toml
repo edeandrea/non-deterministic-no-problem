@@ -1,5 +1,6 @@
 [allowlist]
     description = "Global Allowlist"
     paths = [
-        '''parasol-app\/src\/main\/kubernetes\/dependencies.yml$'''
+        '''parasol-app\/src\/main\/kubernetes\/dependencies.yml$''',
+        '''ai-scorer\/src\/main\/kubernetes\/dependencies.yml$'''
     ]
