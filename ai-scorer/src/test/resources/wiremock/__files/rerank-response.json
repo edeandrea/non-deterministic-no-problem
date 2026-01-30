@@ -1,0 +1,13 @@
+{
+  "meta": {
+    "billed_units": {
+      "search_units": 5
+    }
+  },
+  "results": [
+    {
+      "index": 0,
+      "relevance_score": 0.8565
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "mappings": [
+    {
+      "request": {
+        "urlPath": "/v2/rerank",
+        "method": "POST",
+        "headers": {
+          "Accept": {
+            "equalTo": "application/json",
+            "caseInsensitive": true
+          },
+          "Content-Type": {
+            "equalTo": "application/json",
+            "caseInsensitive": true
+          },
+          "Authorization": {
+            "matches": "Bearer .+"
+          }
+        },
+        "bodyPatterns": [
+          {
+            "matchesJsonPath": {
+              "expression": "$.model",
+              "matches": "rerank-.+"
+            }
+          },
+					{
+						"matchesJsonPath": {
+							"expression": "$.query",
+							"matches": ".+"
+						}
+					},
+          {
+            "matchesJsonPath": "$[?(@.documents.size() >= 1)]"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "bodyFileName": "rerank-response.json",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    }
+  ]
+}

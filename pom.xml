@@ -9,7 +9,6 @@
   <name>Parasol Insurance</name>
   <modules>
 		<module>parasol-app</module>
-	  <module>testing/ai-tester</module>
 	  <module>ai-scorer</module>
   </modules>
 </project>

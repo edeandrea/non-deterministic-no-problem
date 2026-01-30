@@ -18,7 +18,7 @@ import io.quarkus.logging.Log;
 public class InteractionObserver {
 	@InteractionObserved(
 		name = "parasol.llm.interaction.started",
-		description = "A count of LLM services started",
+		description = "A count of LLM interactions started",
 		unit = "service interactions started"
 	)
 	public void serviceStarted(@Observes AiServiceStartedEvent e) {

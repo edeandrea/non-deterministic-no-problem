@@ -1,3 +1,11 @@
+ai:
+  scoring:
+    scoring-strategy: ai-judge
+    ai-judge:
+      model-config-name: judge
+    semantic-similarity:
+      threshold: 0.75
+
 quarkus:
   application:
     name: ai-scorer
@@ -16,18 +24,27 @@ quarkus:
     trust-all: true
 
   hibernate-orm:
-    sql-load-script: import.sql
     physical-naming-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
     schema-management:
       strategy: drop-and-create
 
   langchain4j:
-#    log-requests: true
-#    log-responses: true
     cohere:
       api-key: ${COHERE_API_KEY}
+      base-url: https://api.cohere.ai
       scoring-model:
         model-name: rerank-v4.0-fast
+    ai:
+      gemini:
+        log-requests: true
+        log-responses: true
+        timeout: 5m
+        api-key: ${GEMINI_API_KEY}
+        judge:
+          api-key: "${quarkus.langchain4j.ai.gemini.api-key}"
+          chat-model:
+            model-id: gemini-2.5-flash
+            temperature: 0.2
 
   # OpenTelemetry and tracing
   otel:
@@ -66,6 +83,12 @@ quarkus:
   swagger-ui:
     always-include: true
 
+  # Wiremock
+  wiremock:
+    devservices:
+      files-mapping: src/test/resources/wiremock
+      enabled: false
+
 # Dev mode config
 '%dev':
   quarkus:
@@ -84,8 +107,17 @@ quarkus:
         level: DEBUG
 
 # test mode config
-'%test':
+"%test":
   quarkus:
+    langchain4j:
+      cohere:
+        api-key: nothingspecial
+        base-url: http://localhost:${quarkus.wiremock.devservices.port}
+      ai:
+        gemini:
+          api-key: nothingspecial
+          judge:
+            base-url: http://localhost:${quarkus.wiremock.devservices.port}
     otel:
       logs:
         enabled: false
@@ -94,4 +126,50 @@ quarkus:
     micrometer:
       export:
         otlp:
-          enabled: "${%test.quarkus.observability.enabled}"
+          enabled: "${quarkus.observability.enabled}"
+
+    wiremock:
+      devservices:
+        enabled: true
+
+'%openshift':
+  ai:
+    scoring:
+      scoring-strategy: ai-judge
+      ai-judge:
+        model-config-name: judge
+      semantic-similarity:
+        threshold: 0.75
+
+  quarkus:
+    config:
+      profile:
+        parent: prod
+    langchain4j:
+      ai:
+        gemini:
+          log-requests: false
+          log-responses: false
+    hibernate-orm:
+      schema-management:
+        strategy: drop-and-create
+    kubernetes:
+      deployment-target: openshift
+    container-image:
+      builder: openshift
+      registry: image-registry.openshift-image-registry.svc:5000
+    openshift:
+      part-of: scoring
+      base-jvm-image: registry.access.redhat.com/ubi9/openjdk-21:1.24
+      labels:
+        app: ai-scorer
+      env:
+        configmaps: scorer-app-config
+        secrets: scorer-db-creds,scorer-app-creds
+      route:
+        expose: true
+        tls:
+          termination: edge
+          insecure-edge-termination-policy: Redirect
+      annotations:
+        "app.openshift.io/connects-to": scorer-db,lgtm

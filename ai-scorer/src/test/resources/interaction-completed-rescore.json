@@ -1,0 +1,10 @@
+{
+	"interactionType": "completed",
+	"interactionId": "72d24391-bed5-4b35-89b0-9a9e884e9b99",
+	"interactionDate": "2023-09-20T12:34:56Z",
+	"applicationName": "non-deterministic",
+	"interfaceName": "ClaimService",
+	"methodName": "chat",
+	"interactionMode": "RESCORE",
+	"result": "Hello how may I help you?"
+}

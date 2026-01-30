@@ -25,7 +25,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 5,
+  "id": 4,
   "links": [],
   "liveNow": true,
   "panels": [
@@ -59,8 +59,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": 0
+                "color": "green"
               }
             ]
           },
@@ -99,7 +98,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "datasource": {
@@ -107,7 +106,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "exemplar": false,
+          "exemplar": true,
           "expr": "((((parasol_llm_token_input_count_tokens_total{modelName=\"gpt-5-mini-2025-08-07\"}/1000000)*0.25)+((parasol_llm_token_output_count_tokens_total{modelName=\"gpt-5-mini-2025-08-07\"}/1000000)*2)))",
           "format": "time_series",
           "instant": true,
@@ -122,7 +121,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "exemplar": false,
+          "exemplar": true,
           "expr": "((((parasol_llm_token_input_count_tokens_total{modelName=\"gpt-4o-mini-2024-07-18\"}/1000000)*0.15)+((parasol_llm_token_output_count_tokens_total{modelName=\"gpt-4o-mini-2024-07-18\"}/1000000)*0.60)))",
           "format": "time_series",
           "hide": false,
@@ -171,7 +170,6 @@
               "type": "linear"
             },
             "showPoints": "auto",
-            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -187,8 +185,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": 0
+                "color": "green"
               },
               {
                 "color": "red",
@@ -220,7 +217,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "datasource": {
@@ -229,7 +226,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "exemplar": false,
+          "exemplar": true,
           "expr": "parasol_llm_interaction_started_service_interactions_started_total{interfaceName!~\"\",methodName!~\"\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
@@ -239,6 +236,20 @@
           "range": true,
           "refId": "A",
           "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "scorer_interaction_started_service_interactions_started_total",
+          "hide": false,
+          "instant": false,
+          "interval": "",
+          "legendFormat": "AI Scorer",
+          "range": true,
+          "refId": "B"
         }
       ],
       "title": "Number of AI invocations",
@@ -284,7 +295,6 @@
               "type": "linear"
             },
             "showPoints": "auto",
-            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -300,8 +310,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": 0
+                "color": "green"
               },
               {
                 "color": "red",
@@ -333,7 +342,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "datasource": {
@@ -351,7 +360,7 @@
           "refId": "A"
         }
       ],
-      "title": "Scores over time",
+      "title": "Real-time scoring",
       "type": "timeseries"
     },
     {
@@ -389,7 +398,6 @@
               "type": "linear"
             },
             "showPoints": "auto",
-            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -404,8 +412,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": 0
+                "color": "green"
               },
               {
                 "color": "red",
@@ -436,7 +443,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "datasource": {
@@ -517,7 +524,6 @@
               "type": "linear"
             },
             "showPoints": "auto",
-            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -533,8 +539,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": 0
+                "color": "green"
               }
             ]
           },
@@ -562,7 +567,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "datasource": {
@@ -570,12 +575,25 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "exemplar": false,
+          "exemplar": true,
           "expr": "parasol_llm_interaction_failed_failed_interactions_total or vector(0)",
           "instant": false,
           "legendFormat": "{{interfaceName}}.{{methodName}}",
           "range": true,
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "scorer_interaction_failed_failed_interactions_total or vector(0)",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "AI Scorer",
+          "range": true,
+          "refId": "B"
         }
       ],
       "title": "LLM interaction failures",
@@ -583,8 +601,10 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "Token count broken out by model",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -614,7 +634,6 @@
               "type": "linear"
             },
             "showPoints": "auto",
-            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -629,8 +648,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": 0
+                "color": "green"
               },
               {
                 "color": "red",
@@ -647,7 +665,7 @@
         "x": 12,
         "y": 17
       },
-      "id": 199,
+      "id": 203,
       "options": {
         "legend": {
           "calcs": [],
@@ -661,16 +679,23 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
+          "adhocFilters": [],
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "editorMode": "code",
           "expr": "parasol_llm_token_input_count_tokens_total{modelName!~\"\"}",
+          "interval": "",
           "legendFormat": "Input tokens ({{modelName}})",
           "range": true,
           "refId": "A"
         },
         {
+          "adhocFilters": [],
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -678,11 +703,13 @@
           "editorMode": "code",
           "expr": "parasol_llm_token_output_count_tokens_total{modelName!~\"\"}",
           "hide": false,
+          "interval": "",
           "legendFormat": "Output tokens ({{modelName}})",
           "range": true,
           "refId": "B"
         },
         {
+          "adhocFilters": [],
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -693,13 +720,57 @@
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
+          "interval": "",
           "legendFormat": "Total tokens ({{modelName}})",
           "range": true,
           "refId": "C",
           "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "scorer_token_input_count_tokens_total{modelName!~\"\"}",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "key": "Q-4b04dbcf-aeb1-4538-867e-8b2e9baea520-3",
+          "legendFormat": "Input tokens ({{modelName}})",
+          "range": true,
+          "refId": "D",
+          "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "scorer_token_output_count_tokens_total{modelName!~\"\"}",
+          "instant": false,
+          "key": "Q-c7750f5f-f6ff-4ca6-b558-57b9d62e12d0-4",
+          "legendFormat": "Output tokens ({{modelName}})",
+          "range": true,
+          "refId": "E"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "scorer_token_count_tokens_total{modelName!~\"\"}",
+          "instant": false,
+          "key": "Q-1bdb1e05-f0f2-442e-aac4-f8de2a743609-5",
+          "legendFormat": "Total tokens ({{modelName}})",
+          "range": true,
+          "refId": "F"
         }
       ],
-      "title": "Token counts",
+      "title": "Token Counts",
       "type": "timeseries"
     },
     {
@@ -736,7 +807,6 @@
               "type": "linear"
             },
             "showPoints": "auto",
-            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -752,8 +822,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": 0
+                "color": "green"
               },
               {
                 "color": "red",
@@ -784,7 +853,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "datasource": {
@@ -847,8 +916,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "rgba(50, 172, 45, 0.97)",
-                "value": 0
+                "color": "rgba(50, 172, 45, 0.97)"
               },
               {
                 "color": "rgba(237, 129, 40, 0.89)",
@@ -887,7 +955,7 @@
         "showThresholdMarkers": true,
         "sizing": "auto"
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "datasource": {
@@ -943,8 +1011,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "rgba(50, 172, 45, 0.97)",
-                "value": 0
+                "color": "rgba(50, 172, 45, 0.97)"
               },
               {
                 "color": "rgba(237, 129, 40, 0.89)",
@@ -983,7 +1050,7 @@
         "showThresholdMarkers": true,
         "sizing": "auto"
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "datasource": {
@@ -3281,7 +3348,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 96
+        "y": 103
       },
       "id": 131,
       "panels": [],
@@ -3353,7 +3420,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 97
+        "y": 104
       },
       "id": 98,
       "options": {
@@ -3456,7 +3523,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 97
+        "y": 104
       },
       "id": 101,
       "options": {
@@ -3572,7 +3639,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 97
+        "y": 104
       },
       "id": 99,
       "options": {
@@ -3629,7 +3696,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 104
+        "y": 111
       },
       "id": 132,
       "panels": [],
@@ -3701,7 +3768,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 105
+        "y": 112
       },
       "id": 37,
       "options": {
@@ -3803,7 +3870,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 105
+        "y": 112
       },
       "id": 38,
       "options": {
@@ -3849,7 +3916,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 112
+        "y": 119
       },
       "id": 133,
       "panels": [],
@@ -3921,7 +3988,7 @@
         "h": 7,
         "w": 6,
         "x": 0,
-        "y": 113
+        "y": 120
       },
       "id": 33,
       "options": {
@@ -4036,7 +4103,7 @@
         "h": 7,
         "w": 6,
         "x": 6,
-        "y": 113
+        "y": 120
       },
       "id": 83,
       "options": {
@@ -4137,7 +4204,7 @@
         "h": 7,
         "w": 6,
         "x": 12,
-        "y": 113
+        "y": 120
       },
       "id": 85,
       "options": {
@@ -4252,7 +4319,7 @@
         "h": 7,
         "w": 6,
         "x": 18,
-        "y": 113
+        "y": 120
       },
       "id": 84,
       "options": {
@@ -4294,7 +4361,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 120
+        "y": 127
       },
       "id": 173,
       "panels": [
@@ -4682,7 +4749,7 @@
   ],
   "preload": false,
   "refresh": "auto",
-  "schemaVersion": 42,
+  "schemaVersion": 41,
   "tags": [
     "AI",
     "Auditing",
@@ -4755,12 +4822,12 @@
     ]
   },
   "time": {
-    "from": "now-30m",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "AI Dashboard",
   "uid": "few3cxgl3sf",
-  "version": 1
+  "version": 2
 }

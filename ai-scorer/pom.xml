@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
-	<groupId>org.parasol</groupId>
+	<groupId>io.quarkiverse.aiscoring</groupId>
 	<artifactId>ai-scorer</artifactId>
 	<version>1.0.0-SNAPSHOT</version>
 	<name>ai-scorer</name>
@@ -10,6 +10,7 @@
 	<properties>
 		<compiler-plugin.version>3.14.1</compiler-plugin.version>
 		<mapstruct.version>1.6.3</mapstruct.version>
+		<langchain4j-beta.version>1.10.0-beta18</langchain4j-beta.version>
 		<maven.compiler.release>21</maven.compiler.release>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -17,6 +18,7 @@
 		<quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
 		<quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
 		<quarkus.platform.version>3.30.8</quarkus.platform.version>
+		<quarkus.wiremock.version>1.5.3</quarkus.wiremock.version>
 		<skipITs>true</skipITs>
 		<surefire-plugin.version>3.5.4</surefire-plugin.version>
 	</properties>
@@ -66,6 +68,27 @@
 			<artifactId>quarkus-langchain4j-cohere</artifactId>
 		</dependency>
 		<dependency>
+			<groupId>io.quarkiverse.langchain4j</groupId>
+			<artifactId>quarkus-langchain4j-testing-evaluation-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.quarkiverse.langchain4j</groupId>
+			<artifactId>quarkus-langchain4j-testing-evaluation-ai-judge</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.quarkiverse.langchain4j</groupId>
+			<artifactId>quarkus-langchain4j-testing-evaluation-semantic-similarity</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.quarkiverse.langchain4j</groupId>
+			<artifactId>quarkus-langchain4j-ai-gemini</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>dev.langchain4j</groupId>
+			<artifactId>langchain4j-embeddings-bge-small-en-v15</artifactId>
+			<version>${langchain4j-beta.version}</version>
+		</dependency>
+		<dependency>
 			<groupId>io.quarkus</groupId>
 			<artifactId>quarkus-arc</artifactId>
 		</dependency>
@@ -107,14 +130,28 @@
 			<artifactId>quarkus-smallrye-health</artifactId>
 		</dependency>
 		<dependency>
+			<groupId>io.quarkiverse.wiremock</groupId>
+			<artifactId>quarkus-wiremock</artifactId>
+			<version>${quarkus.wiremock.version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
 			<groupId>org.mapstruct</groupId>
 			<artifactId>mapstruct</artifactId>
 			<version>${mapstruct.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>io.quarkus</groupId>
+			<artifactId>quarkus-openshift</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.quarkus</groupId>
 			<artifactId>quarkus-junit5</artifactId>
 			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.quarkus</groupId>
+			<artifactId>quarkus-junit5-mockito</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>io.rest-assured</groupId>
@@ -125,6 +162,12 @@
 			<groupId>org.assertj</groupId>
 			<artifactId>assertj-core</artifactId>
 			<version>3.27.6</version>
+		</dependency>
+		<dependency>
+			<groupId>io.quarkiverse.wiremock</groupId>
+			<artifactId>quarkus-wiremock-test</artifactId>
+			<version>${quarkus.wiremock.version}</version>
+			<scope>test</scope>
 		</dependency>
 	</dependencies>
 
@@ -142,17 +185,19 @@
 						<configuration>
 							<inputSpec>${project.basedir}/../openapi/ai-interactions.yml</inputSpec>
 							<generatorName>jaxrs-spec</generatorName>
-							<apiPackage>io.quarkiverse.aiinteractions.api</apiPackage>
-							<modelPackage>io.quarkiverse.aiinteractions.model</modelPackage>
+							<apiPackage>ai.scoring.api</apiPackage>
+							<modelPackage>ai.scoring.model</modelPackage>
 							<library>quarkus</library>
 							<cleanupOutput>true</cleanupOutput>
 							<output>${project.build.directory}/generated-sources/openapi</output>
 							<addCompileSourceRoot>true</addCompileSourceRoot>
 							<typeMappings>
 								<typeMapping>OffsetDateTime=Instant</typeMapping>
+								<typeMapping>DateTime=Instant</typeMapping>
 							</typeMappings>
 							<importMappings>
 								<importMapping>java.time.OffsetDateTime=java.time.Instant</importMapping>
+								<importMapping>Instant=java.time.Instant</importMapping>
 							</importMappings>
 							<generateApiDocumentation>false</generateApiDocumentation>
 							<generateApiTests>false</generateApiTests>
@@ -164,7 +209,9 @@
 								<dateLibrary>java8</dateLibrary>
 								<openApiNullable>false</openApiNullable>
 								<interfaceOnly>true</interfaceOnly>
-								<useBeanValidation>false</useBeanValidation>
+								<useBeanValidation>true</useBeanValidation>
+								<returnResponse>true</returnResponse>
+								<generateBuilders>true</generateBuilders>
 							</configOptions>
 						</configuration>
 					</execution>

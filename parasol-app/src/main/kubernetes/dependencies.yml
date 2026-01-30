@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: app-config
+  name: parasol-app-config
 data:
   quarkus.datasource.jdbc.url: jdbc:postgresql://non-deterministic-db:5432/non_deterministic
   quarkus.otel.exporter.otlp.endpoint: http://lgtm:4318
@@ -15,7 +15,7 @@ apiVersion: v1
 kind: Secret
 type: Opaque
 metadata:
-  name: db-creds
+  name: parasol-db-creds
 data:
   quarkus.datasource.username: bm9uX2RldGVybWluaXN0aWM=
   quarkus.datasource.password: bm9uX2RldGVybWluaXN0aWM=
@@ -24,7 +24,7 @@ apiVersion: v1
 kind: Secret
 type: Opaque
 metadata:
-  name: db-config
+  name: parasol-db-config
 data:
   POSTGRES_DB: bm9uX2RldGVybWluaXN0aWM=
   POSTGRES_USER: bm9uX2RldGVybWluaXN0aWM=
@@ -87,7 +87,7 @@ spec:
             - containerPort: 5432
           envFrom:
             - secretRef:
-                name: db-config
+                name: parasol-db-config
           volumeMounts:
             - mountPath: /var/lib/postgresql
               name: db-data
