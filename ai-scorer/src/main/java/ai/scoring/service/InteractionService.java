@@ -43,7 +43,11 @@ public class InteractionService {
 	public Optional<InteractionScore> handleInteractionEvent(@SpanAttribute("arg.event") InteractionEvent event, @SpanAttribute("arg.interactionMode") InteractionMode interactionMode) {
 		return storeInteractionEvent(event)
 			.filter(interaction -> event instanceof InteractionCompletedEvent)
-			.flatMap(i -> computeInteractionScore(i, interactionMode));
+			.flatMap(i -> computeInteractionScore(i, interactionMode))
+			.map(interactionScore -> {
+				saveInteraction(interactionScore.getInteraction());
+				return interactionScore;
+			});
 	}
 
 	@Transactional
@@ -58,11 +62,7 @@ public class InteractionService {
 	private Optional<InteractionScore> computeInteractionScore(Interaction completedInteraction, InteractionMode interactionMode) {
 		return switch(interactionMode) {
 			case NORMAL -> Optional.ofNullable(scoreInteraction(completedInteraction));
-			case RESCORE -> rescoreInteraction(completedInteraction, interactionMode)
-				.map(interactionScore -> {
-					saveInteraction(interactionScore.getInteraction());
-					return interactionScore;
-				});
+			case RESCORE -> rescoreInteraction(completedInteraction, interactionMode);
 		};
 	}
 
