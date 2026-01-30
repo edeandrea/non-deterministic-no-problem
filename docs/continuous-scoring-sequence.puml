@@ -1,0 +1,101 @@
+@startuml
+skinparam backgroundColor white
+skinparam BoxPadding 10
+skinparam ParticipantPadding 20
+skinparam MaxMessageSize 200
+autonumber
+
+' --- INCLUDES & ICONS ---
+!include <tupadr3/devicons2/quarkus>
+!include <tupadr3/font-awesome-5/robot>
+!include <tupadr3/font-awesome-5/brain>
+!include <tupadr3/font-awesome-5/database>
+
+' --- CUSTOM STYLES ---
+' This hides the border/shadow for items marked as <<nobox>>
+' effectively showing just the icon and text.
+skinparam participant {
+    BorderColor<<nobox>> white
+    BackgroundColor<<nobox>> white
+    Shadowing<<nobox>> false
+}
+
+' --- MANUAL OTel ICON ---
+sprite $otel [16x16/16] {
+0000000000000000
+0000000000000000
+0055550000555500
+0555555005555550
+0555555005555550
+0555555005555550
+0055550000555500
+0000000000000000
+0055550000555500
+0555555005555550
+0555555005555550
+0555555005555550
+0055550000555500
+0000000000000000
+0000000000000000
+0000000000000000
+}
+
+title Sequence: Continuous Scoring
+
+actor "User/Client" as User
+
+' --- MAIN APPLICATION BOX ---
+box "<$quarkus>\nApplication" #F9F9F9
+    participant "<$robot>\nLangChain4j" as LC4J <<Library>>
+    participant "<$quarkus>\nScoring Extension" as SE <<Library>>
+end box
+
+' --- EXTERNAL DEPENDENCIES ---
+participant "<$brain>\nOpenAI" as OpenAI #FFFFFF
+participant "<$quarkus>\nScoring Service" as CSS #E8F5E9
+participant "<$brain>\nCohere" as Cohere #FFFFFF
+participant "<$database>\nInteration &\nScoring DB" as DB
+participant "<$otel>\nOTel Collector" as OTel #FFF3E0
+
+' === THE FLOW ===
+
+User -> LC4J : Request
+activate LC4J
+
+' NOTE: User Waiting
+note right of LC4J #EFEFEF : Blocking Phase (User Waits)
+
+' 1. SYNCHRONOUS CALL TO OPENAI
+LC4J -> OpenAI : <<sync HTTP>>\nSend request
+activate OpenAI
+OpenAI --> LC4J : Response
+deactivate OpenAI
+
+' 2. HANDOFF TO EXTENSION
+LC4J -> SE : Fire event
+activate SE
+
+LC4J --> User : Response
+note right of LC4J #EFEFEF : Non-Blocking Phase (User is gone)
+deactivate LC4J
+
+' 3. ASYNC OBSERVABILITY
+SE ->> OTel : <<async gRPC>>\nSend Metrics/Traces/Logs
+
+' === BACKGROUND PROCESSING ===
+' 5. ASYNC SCORING
+SE ->> CSS : <<async>>\nSubmit Interaction for Scoring
+deactivate SE
+activate CSS
+CSS -> Cohere : Calculate Score
+activate Cohere
+Cohere --> CSS : Score
+deactivate Cohere
+CSS -> DB : Persist Interaction & Score
+activate DB
+DB --> CSS
+deactivate DB
+CSS ->> OTel : <<async gRPC>>\nSend Score +\nMetrics/Traces/Logs
+deactivate CSS
+
+@enduml

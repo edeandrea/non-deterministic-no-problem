@@ -1,0 +1,120 @@
+@startuml
+!include <C4/C4_Container>
+
+' --- INCLUDES ---
+!include <tupadr3/devicons2/quarkus>
+!include <tupadr3/devicons2/grafana>
+!include <tupadr3/font-awesome-5/robot>
+!include <tupadr3/font-awesome-5/database>
+!include <tupadr3/font-awesome-5/brain>
+
+' --- MANUAL OTel ICON ---
+sprite $otel [16x16/16] {
+0000000000000000
+0000000000000000
+0055550000555500
+0555555005555550
+0555555005555550
+0555555005555550
+0055550000555500
+0000000000000000
+0055550000555500
+0555555005555550
+0555555005555550
+0555555005555550
+0055550000555500
+0000000000000000
+0000000000000000
+0000000000000000
+}
+
+title Architecture: Continuous Scoring
+
+' Vertical stacking layout
+skinparam linetype polyline
+skinparam nodesep 60
+skinparam ranksep 60
+
+skinparam rectangle {
+    BackgroundColor<<Quarkus>> #F9F9F9
+    BorderColor<<Quarkus>> #333333
+    FontColor<<Quarkus>> #000000
+    Padding 10
+}
+
+actor "User/Client" as User
+
+' --- TOP TIER: APP & OPENAI ---
+together {
+    component "<$brain>\nOpenAI" as OpenAI #FFFFFF
+
+    rectangle "<$quarkus>\nApplication" as App {
+        component "<$robot>\nLangChain4j" as LC4J <<Library>>
+        component "<$quarkus>\nScoring Extension" as SE <<Library>>
+    }
+}
+
+' --- MIDDLE TIER: SCORING SERVICE (With Nested LC4J) ---
+' Changed from "component" to "rectangle" to allow nesting
+rectangle "<$quarkus>\nScoring Service" as CSS #E8F5E9 {
+    ' ADDED: Identical LangChain4j library inside
+    component "<$robot>\nLangChain4j" as CSS_LC4J <<Library>>
+}
+
+' --- MIDDLE TIER (RIGHT): Cohere & DB STACK ---
+together {
+    component "<$brain>\nCohere" as Cohere #FFFFFF
+    database "<$database>\nInteraction & Scoring\nDatabase" as DB
+}
+
+' --- BOTTOM TIER: OBSERVABILITY ---
+package "Observability Stack" {
+    component "<$otel>\nOpenTelemetry\nCollector" as OTel #FFF3E0
+    component "<$grafana>\nGrafana / Loki / Tempo" as Grafana #FFFFFF
+}
+
+' --- LAYOUT ANCHORS ---
+' 1. OpenAI above LC4J
+OpenAI -[hidden]down-> LC4J
+
+' 2. App above CSS
+App -[hidden]down-> CSS
+
+' 3. Cohere above DB
+Cohere -[hidden]down-> DB
+
+' 4. CSS to the left of Cohere
+CSS -[hidden]right-> Cohere
+
+' 5. OTel at the bottom
+DB -[hidden]down-> OTel
+
+' --- LOGIC FLOWS ---
+
+' User Interaction
+User -down-> App : Request
+
+' OpenAI
+LC4J -up-> OpenAI : <<sync HTTP>>
+
+' App Logic
+LC4J -right-> SE : emits events
+SE .down.> CSS : <<async>>\ninteractions
+
+' Scoring Logic
+' UPDATED: The internal LangChain4j talks to Cohere
+CSS_LC4J -left-> Cohere : <<sync HTTP>>\nScore
+
+' The Service talks to the DB (usually via Hibernate/Panache, not LC4J)
+CSS <-right-> DB : Fetch & Store\ninteractions & scores
+
+' --- TELEMETRY FLOWS ---
+
+App .down.> OTel : <<async gRPC>>\nMetrics/Logs/Traces
+
+' 2. Specific Component Telemetry
+SE ..> OTel : <<async gRPC>>\nMetrics/Logs/Traces
+CSS ..> OTel : <async gRPC>>\nMetrics/Logs/Traces
+OTel <-right- Grafana : data pull
+
+@enduml
