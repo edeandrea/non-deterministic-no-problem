@@ -70,12 +70,12 @@ public class InteractionPublisher {
 	}
 
 	private void fireEvent(AiServiceEvent event) {
-		Log.info("before firing");
+//		Log.info("before firing");
 		switch (this.scoringConfig.interactionMode()) {
 			case NORMAL -> handleNormalEventFiring(event);
 			case RESCORE -> handleRescoreEventFiring(event);
 		}
-		Log.info("after firing");
+//		Log.info("after firing");
 	}
 
 	private void handleRescoreEventFiring(AiServiceEvent event) {
@@ -85,17 +85,21 @@ public class InteractionPublisher {
 		var response = this.aiInteractionApi.submitInteractionEvent(this.interactionEventMapper.map(event));
 		var responseStatusFamily = response.getStatusInfo().getFamily();
 
-		if (responseStatusFamily == Family.SUCCESSFUL) {
-			Optional.ofNullable(response.getEntity())
-				.filter(SubmitInteractionEvent200Response.class::isInstance)
-				.map(SubmitInteractionEvent200Response.class::cast)
+		Log.debug("Got rescore response back");
+
+		if ((responseStatusFamily == Family.SUCCESSFUL) && response.hasEntity()) {
+			Optional.ofNullable(response.readEntity(SubmitInteractionEvent200Response.class))
 				.ifPresent(resp -> {
 					Log.infof("Rescore result: %s", resp.getScore());
 
 					if (resp.getScore() <= this.scoringConfig.threshold()) {
+						Log.errorf("Rescore [%s] below threshold: [%s]", resp.getScore(), this.scoringConfig.threshold());
 						// For now, this doesn't get propagated
 						// Due to https://github.com/langchain4j/langchain4j/issues/4499
-						throw new RescoreBelowThresholdException(this.rescoreInteractionResultMapper.map(resp), this.scoringConfig.threshold());
+						var e = new RescoreBelowThresholdException(this.rescoreInteractionResultMapper.map(resp), this.scoringConfig.threshold());
+						Log.errorf(e, e.getMessage());
+
+						throw e;
 					}
 				});
 		}

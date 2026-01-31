@@ -18,7 +18,7 @@ public interface AIScoringConfig {
 	SemanticSimilarityConfig semanticSimilarity();
 
 	interface SemanticSimilarityConfig {
-		@WithDefault("0.75")
+		@WithDefault("75")
 		Double threshold();
 
 		Optional<String> modelConfigName();

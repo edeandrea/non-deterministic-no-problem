@@ -1,4 +1,7 @@
 quarkus:
+  transaction-manager:
+    default-transaction-timeout: 3m
+
   application:
     name: non-deterministic
 
@@ -143,6 +146,8 @@ quarkus:
     ai-interactions:
       url: http://localhost:8888
       follow-redirects: true
+      connect-timeout: 240000
+      read-timeout: 240000
       logging:
         scope: request-response
 

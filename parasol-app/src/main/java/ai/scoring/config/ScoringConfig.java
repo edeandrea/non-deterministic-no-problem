@@ -8,6 +8,6 @@ public interface ScoringConfig {
 	@WithDefault("NORMAL")
 	InteractionMode interactionMode();
 
-	@WithDefault("0.75")
+	@WithDefault("75")
 	Double threshold();
 }
