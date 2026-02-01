@@ -5,7 +5,7 @@
 	<artifactId>parasol-app</artifactId>
 	<version>1.0</version>
 	<properties>
-		<assertj.version>3.27.6</assertj.version>
+		<assertj.version>3.27.7</assertj.version>
 		<compiler-plugin.version>3.14.1</compiler-plugin.version>
 		<maven.compiler.release>21</maven.compiler.release>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
