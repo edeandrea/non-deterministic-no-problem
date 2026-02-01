@@ -4,7 +4,7 @@ import org.parasol.ai.Email;
 import org.parasol.ai.GenerateEmailService;
 
 import dev.langchain4j.data.message.AiMessage;
-import dev.langchain4j.guardrail.JsonExtractorOutputGuardrail;
+import dev.langchain4j.guardrails.JsonExtractorOutputGuardrail;
 
 public abstract class GenerateEmailOutputGuardrail extends JsonExtractorOutputGuardrail<Email> {
 	public GenerateEmailOutputGuardrail() {

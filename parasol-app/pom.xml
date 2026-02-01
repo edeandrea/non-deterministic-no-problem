@@ -54,6 +54,10 @@
 			<artifactId>quarkus-langchain4j-openai</artifactId>
 		</dependency>
 		<dependency>
+			<groupId>dev.langchain4j</groupId>
+			<artifactId>langchain4j-guardrails</artifactId>
+		</dependency>
+		<dependency>
 			<groupId>io.quarkiverse.langchain4j</groupId>
 			<artifactId>quarkus-langchain4j-easy-rag</artifactId>
 		</dependency>
