@@ -10,7 +10,7 @@
 	<properties>
 		<compiler-plugin.version>3.14.1</compiler-plugin.version>
 		<mapstruct.version>1.6.3</mapstruct.version>
-		<langchain4j-beta.version>1.10.0-beta18</langchain4j-beta.version>
+		<langchain4j-beta.version>1.11.0-beta19</langchain4j-beta.version>
 		<maven.compiler.release>21</maven.compiler.release>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
