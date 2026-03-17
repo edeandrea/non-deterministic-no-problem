@@ -11,17 +11,17 @@
 	<properties>
 		<compiler-plugin.version>3.15.0</compiler-plugin.version>
 		<mapstruct.version>1.6.3</mapstruct.version>
-		<langchain4j-beta.version>1.11.0-beta19</langchain4j-beta.version>
+		<langchain4j-beta.version>1.12.2-beta22</langchain4j-beta.version>
 		<maven.compiler.release>21</maven.compiler.release>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-		<quarkus.langchain4j.version>1.5.0</quarkus.langchain4j.version>
+		<quarkus.langchain4j.version>1.7.4</quarkus.langchain4j.version>
 		<quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
 		<quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
-		<quarkus.platform.version>3.31.3</quarkus.platform.version>
+		<quarkus.platform.version>3.32.3</quarkus.platform.version>
 		<quarkus.wiremock.version>1.5.3</quarkus.wiremock.version>
 		<skipITs>true</skipITs>
-		<surefire-plugin.version>3.5.4</surefire-plugin.version>
+		<surefire-plugin.version>3.5.5</surefire-plugin.version>
 	</properties>
 
 	<dependencyManagement>
@@ -177,7 +177,7 @@
 			<plugin>
 				<groupId>org.openapitools</groupId>
 				<artifactId>openapi-generator-maven-plugin</artifactId>
-				<version>7.19.0</version>
+				<version>7.20.0</version>
 				<executions>
 					<execution>
 						<goals>
@@ -242,7 +242,7 @@
 				<artifactId>maven-surefire-plugin</artifactId>
 				<version>${surefire-plugin.version}</version>
 				<configuration>
-					<argLine>--add-opens java.base/java.lang=ALL-UNNAMED</argLine>
+					<argLine>@{argLine} --add-opens java.base/java.lang=ALL-UNNAMED</argLine>
 					<systemPropertyVariables>
 						<java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
 						<maven.home>${maven.home}</maven.home>
@@ -261,7 +261,7 @@
 					</execution>
 				</executions>
 				<configuration>
-					<argLine>--add-opens java.base/java.lang=ALL-UNNAMED</argLine>
+					<argLine>@{argLine} --add-opens java.base/java.lang=ALL-UNNAMED</argLine>
 					<systemPropertyVariables>
 						<native.image.path>${project.build.directory}/${project.build.finalName}-runner</native.image.path>
 						<java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>

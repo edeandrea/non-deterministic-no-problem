@@ -11,15 +11,15 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<quarkus.chappie.version>1.5.0</quarkus.chappie.version>
-		<quarkus.langchain4j.version>1.5.0</quarkus.langchain4j.version>
+		<quarkus.langchain4j.version>1.7.4</quarkus.langchain4j.version>
 		<quarkus.playwright.version>2.3.2</quarkus.playwright.version>
-		<quarkus.quinoa.version>2.7.1</quarkus.quinoa.version>
+		<quarkus.quinoa.version>2.7.2</quarkus.quinoa.version>
 		<quarkus.wiremock.version>1.5.3</quarkus.wiremock.version>
 		<quarkus.openapi-generator.version>2.14.0-lts</quarkus.openapi-generator.version>
 		<quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
 		<quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
-		<quarkus.platform.version>3.31.3</quarkus.platform.version>
-		<surefire-plugin.version>3.5.4</surefire-plugin.version>
+		<quarkus.platform.version>3.32.3</quarkus.platform.version>
+		<surefire-plugin.version>3.5.5</surefire-plugin.version>
 		<quarkus.mailpit.version>2.0.0</quarkus.mailpit.version>
 	</properties>
 	<dependencyManagement>
@@ -248,7 +248,7 @@
 				<artifactId>maven-surefire-plugin</artifactId>
 				<version>${surefire-plugin.version}</version>
 				<configuration>
-					<argLine>-javaagent:${org.mockito:mockito-core:jar}</argLine>
+					<argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar}</argLine>
 					<systemPropertyVariables>
 						<java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
 						<maven.home>${maven.home}</maven.home>
@@ -270,7 +270,7 @@
 					</execution>
 				</executions>
 				<configuration>
-					<argLine>-javaagent:${org.mockito:mockito-core:jar}</argLine>
+					<argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar}</argLine>
 					<reuseForks>false</reuseForks>
 					<systemPropertyVariables>
 						<native.image.path>${project.build.directory}/${project.build.finalName}-runner</native.image.path>
