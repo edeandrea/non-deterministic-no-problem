@@ -9,7 +9,7 @@ import dev.langchain4j.service.UserMessage;
 import io.quarkiverse.langchain4j.RegisterAiService;
 import io.quarkiverse.langchain4j.ToolBox;
 
-@RegisterAiService(modelName = "parasol-chat")
+@RegisterAiService(modelName = "parasol-chat", shouldThrowExceptionOnEventError = true)
 @SessionScoped
 public interface ClaimService {
     @SystemMessage("""

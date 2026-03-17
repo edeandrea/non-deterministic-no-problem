@@ -41,14 +41,17 @@ public class InteractionResource implements AiApi {
 
 	@Override
 	public Response submitInteractionEvent(@NotNull @Valid InteractionEvent event) {
-		Log.infof("Received event event: %s", event);
+		Log.infof("Received event: %s", event);
 
 		var interactionEvent = this.interactionEventMapper.map(event);
 		var interactionMode = this.interactionModeMapper.map(event.getInteractionMode());
 
 		return this.interactionService.handleInteractionEvent(interactionEvent, interactionMode)
 			.map(this.interactionScoreMapper::map)
-			.map(Response::ok)
+			.map(score -> {
+				Log.infof("Interaction score: %s", score);
+				return Response.ok(score);
+			})
 			.orElseGet(Response::noContent)
 			.build();
 	}

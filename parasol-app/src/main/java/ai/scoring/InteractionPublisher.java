@@ -87,7 +87,7 @@ public class InteractionPublisher {
 
 		Log.debug("Got rescore response back");
 
-		if ((responseStatusFamily == Family.SUCCESSFUL) && response.hasEntity()) {
+		if ((response.getStatus() == Status.OK.getStatusCode()) && response.hasEntity()) {
 			Optional.ofNullable(response.readEntity(SubmitInteractionEvent200Response.class))
 				.ifPresent(resp -> {
 					Log.infof("Rescore result: %s", resp.getScore());
@@ -97,7 +97,7 @@ public class InteractionPublisher {
 						// For now, this doesn't get propagated
 						// Due to https://github.com/langchain4j/langchain4j/issues/4499
 						var e = new RescoreBelowThresholdException(this.rescoreInteractionResultMapper.map(resp), this.scoringConfig.threshold());
-						Log.errorf(e, e.getMessage());
+						Log.error(e.getMessage());
 
 						throw e;
 					}
