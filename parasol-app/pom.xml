@@ -13,7 +13,7 @@
 		<quarkus.chappie.version>1.5.0</quarkus.chappie.version>
 		<quarkus.langchain4j.version>1.8.1</quarkus.langchain4j.version>
 		<quarkus.playwright.version>2.3.3</quarkus.playwright.version>
-		<quarkus.quinoa.version>2.7.2</quarkus.quinoa.version>
+		<quarkus.quinoa.version>2.8.0</quarkus.quinoa.version>
 		<quarkus.wiremock.version>1.5.3</quarkus.wiremock.version>
 		<quarkus.openapi-generator.version>2.14.0-lts</quarkus.openapi-generator.version>
 		<quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
