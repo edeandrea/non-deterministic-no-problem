@@ -4,6 +4,9 @@ import org.parasol.ai.ClaimService;
 import org.parasol.model.claim.ClaimBotQuery;
 import org.parasol.model.claim.ClaimBotQueryResponse;
 
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
+
 import io.quarkus.logging.Log;
 import io.quarkus.websockets.next.OnClose;
 import io.quarkus.websockets.next.OnError;
@@ -11,8 +14,6 @@ import io.quarkus.websockets.next.OnOpen;
 import io.quarkus.websockets.next.OnTextMessage;
 import io.quarkus.websockets.next.WebSocket;
 import io.quarkus.websockets.next.WebSocketConnection;
-
-import io.opentelemetry.instrumentation.annotations.WithSpan;
 
 @WebSocket(path = "/ws/query")
 public class ClaimWebsocketChatBot {
@@ -41,7 +42,7 @@ public class ClaimWebsocketChatBot {
     }
 
     @OnTextMessage
-    @WithSpan("ChatMessage")
+    @WithSpan(value = "ParasolAssistantChat", kind = SpanKind.SERVER)
     public ClaimBotQueryResponse onMessage(ClaimBotQuery query) {
         Log.infof("Got chat query: %s", query);
         var response = new ClaimBotQueryResponse("token", this.bot.chat(query), "");
@@ -51,7 +52,7 @@ public class ClaimWebsocketChatBot {
     }
 
 //    @OnTextMessage
-//  	@WithSpan("ChatMessage")
+//  	@WithSpan(value = "ParasolAssistantChat", kind = SpanKind.SERVER)
 //    @Blocking
 //    public Multi<ClaimBotQueryResponse> onMessage(ClaimBotQuery query) {
 //        Log.infof("Got chat query: %s", query);

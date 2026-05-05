@@ -3,10 +3,14 @@ quarkus:
     default-transaction-timeout: 3m
 
   application:
-    name: non-deterministic
+    name: parasol-app
 
   aiscoring:
     interaction-mode: normal
+    langfuse:
+      endpoint: http://localhost:3000
+      public-key: pk-lf-dev
+      secret-key: sk-lf-dev
 
   # Default LangChain4j configuration
   langchain4j:
@@ -15,8 +19,15 @@ quarkus:
         provider: openai
     embedding-model:
       provider: openai
+
     log-requests: true
     log-responses: true
+
+    tracing:
+      include-prompt: true
+      include-completion: true
+      include-tool-arguments: true
+      include-tool-result: true
 
     # RAG
     easy-rag:
@@ -105,8 +116,8 @@ quarkus:
     enable-spa-routing: true
     package-manager-install:
       ~: true
-      node-version: 24.12.0
-      npm-version: 10.9.4
+      node-version: 24.15.0
+      npm-version: 11.12.1
 
   # OpenAPI
   smallrye-openapi:
@@ -141,8 +152,16 @@ quarkus:
     jdbc:
       telemetry: true
 
-  # AI Interactions
+  # REST Clients
   rest-client:
+    langfuse-api:
+      url: "${quarkus.aiscoring.langfuse.endpoint}"
+      follow-redirects: true
+      connect-timeout: 240000
+      read-timeout: 240000
+      logging:
+        scope: request-response
+        body-limit: 2147483647
     ai-interactions:
       url: http://localhost:8888
       follow-redirects: true
@@ -215,6 +234,10 @@ quarkus:
 # Dev mode config
 '%dev':
   quarkus:
+    compose:
+      devservices:
+        files: ../docker-compose-devservices.yml
+#        stop-services: false
     datasource:
       dev-ui:
         allow-sql: true

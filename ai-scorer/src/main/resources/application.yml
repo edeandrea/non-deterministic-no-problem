@@ -29,6 +29,12 @@ quarkus:
       strategy: drop-and-create
 
   langchain4j:
+    tracing:
+      include-completion: true
+      include-prompt: true
+      include-tool-arguments: true
+      include-tool-result: true
+
     cohere:
       api-key: ${COHERE_API_KEY}
       base-url: https://api.cohere.ai
@@ -92,6 +98,10 @@ quarkus:
 # Dev mode config
 '%dev':
   quarkus:
+    compose:
+      devservices:
+        files: ../docker-compose-devservices.yml
+        stop-services: false
     datasource:
       dev-ui:
         allow-sql: true
