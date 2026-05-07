@@ -113,6 +113,10 @@
 			<artifactId>opentelemetry-jdbc</artifactId>
 		</dependency>
 		<dependency>
+			<groupId>io.opentelemetry</groupId>
+			<artifactId>opentelemetry-exporter-otlp</artifactId>
+		</dependency>
+		<dependency>
 			<groupId>io.quarkus</groupId>
 			<artifactId>quarkus-observability-devservices-lgtm</artifactId>
 			<scope>provided</scope>

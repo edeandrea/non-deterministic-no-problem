@@ -154,6 +154,7 @@ quarkus:
 
   # REST Clients
   rest-client:
+    follow-redirects: true
     langfuse-api:
       url: "${quarkus.aiscoring.langfuse.endpoint}"
       follow-redirects: true
@@ -162,6 +163,7 @@ quarkus:
       logging:
         scope: request-response
         body-limit: 2147483647
+        masked-headers: Authorization
     ai-interactions:
       url: http://localhost:8888
       follow-redirects: true

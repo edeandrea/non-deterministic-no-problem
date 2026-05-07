@@ -1,5 +1,7 @@
 package ai.scoring.langfuse;
 
+import java.time.Duration;
+
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 
@@ -21,21 +23,20 @@ public class LangfuseModelInitializer {
 	}
 
 	void onStartup(@Observes StartupEvent event) {
+		Log.info("Initializing Langfuse model");
 		var request = CreateModelRequest.builder()
 			.modelName("gpt-5-mini")
-			.matchPattern("(?i)^(gpt-5-mini)(@[a-zA-Z0-9]+)?$")
+			.matchPattern("(?i)^(gpt-5-mini)(-.+)?$")
 			.unit(ModelUsageUnit.TOKENS)
 			.inputPrice(0.00000025)
 			.outputPrice(0.000002)
 			.tokenizerId("openai")
 			.build();
 
-		try {
-			var created = this.langfuseApiClient.createModel(request);
-			Log.infof("Registered model in Langfuse (id=%s): %s", created.id(), created);
-		}
-		catch (Exception e) {
-			Log.warnf(e, "Could not register model '%s' in Langfuse (may not be available yet)", request.modelName());
-		}
+		this.langfuseApiClient.createModelAsync(request)
+			.invoke(created -> Log.infof("Registered model in Langfuse (id=%s)", created.id()))
+			.onFailure().invoke(e -> Log.warnf(e, "Could not register model '%s' in Langfuse (may not be available yet)", request.modelName()))
+			.await()
+			.atMost(Duration.ofSeconds(30));
 	}
 }
