@@ -4,7 +4,10 @@ import org.parasol.ai.ClaimService;
 import org.parasol.model.claim.ClaimBotQuery;
 import org.parasol.model.claim.ClaimBotQueryResponse;
 
+import io.opentelemetry.api.baggage.Baggage;
+import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.context.Context;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
 
 import io.quarkus.logging.Log;
@@ -18,18 +21,20 @@ import io.quarkus.websockets.next.WebSocketConnection;
 @WebSocket(path = "/ws/query")
 public class ClaimWebsocketChatBot {
     private final ClaimService bot;
+		private final WebSocketConnection connection;
 
-    public ClaimWebsocketChatBot(ClaimService bot) {
+    public ClaimWebsocketChatBot(ClaimService bot, WebSocketConnection connection) {
         this.bot = bot;
+	      this.connection = connection;
     }
 
     @OnOpen
-    public void onOpen(WebSocketConnection connection) {
+    public void onOpen() {
         Log.infof("Websocket connection %s opened", connection.id());
     }
 
     @OnClose
-    public void onClose(WebSocketConnection connection) {
+    public void onClose() {
         Log.infof("Websocket connection %s closed", connection.id());
     }
 
@@ -44,23 +49,15 @@ public class ClaimWebsocketChatBot {
     @OnTextMessage
     @WithSpan(value = "ParasolAssistantChat", kind = SpanKind.SERVER)
     public ClaimBotQueryResponse onMessage(ClaimBotQuery query) {
-        Log.infof("Got chat query: %s", query);
-        var response = new ClaimBotQueryResponse("token", this.bot.chat(query), "");
-        Log.debugf("Got chat response: %s", response);
+	      Span.current().setAttribute("gen_ai.conversation.id", this.connection.id());
+	      var baggage = Baggage.builder().put("gen_ai.conversation.id", this.connection.id()).build();
 
-        return response;
+        try (var scope = Context.current().with(baggage).makeCurrent()) {
+            Log.infof("Got chat query: %s", query);
+            var response = new ClaimBotQueryResponse("token", this.bot.chat(query), "");
+            Log.debugf("Got chat response: %s", response);
+
+            return response;
+        }
     }
-
-//    @OnTextMessage
-//  	@WithSpan(value = "ParasolAssistantChat", kind = SpanKind.SERVER)
-//    @Blocking
-//    public Multi<ClaimBotQueryResponse> onMessage(ClaimBotQuery query) {
-//        Log.infof("Got chat query: %s", query);
-//
-//        return bot.chat(query)
-//          .invoke(response -> Log.debugf("Got chat response: %s", response))
-//          .map(resp -> new ClaimBotQueryResponse("token", resp, ""));
-//    }
 }
-
-

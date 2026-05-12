@@ -80,6 +80,9 @@ public class LangfuseSpanExporter implements SpanExporter {
 		           .asMap()
 		           .keySet()
 		           .stream()
-		           .anyMatch(key -> key.getKey().startsWith("gen_ai."));
+		           .anyMatch(key -> {
+								 var k = key.getKey();
+								 return !"gen_ai.conversation.id".equals(k) && k.startsWith("gen_ai.");
+		           });
 	}
 }
