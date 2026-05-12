@@ -1,14 +1,19 @@
 package ai.scoring.langfuse.otel;
 
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import ai.scoring.langfuse.config.LangfuseConfig;
+import io.opentelemetry.api.trace.SpanContext;
 import io.opentelemetry.sdk.common.CompletableResultCode;
+import io.opentelemetry.sdk.trace.data.DelegatingSpanData;
 import io.opentelemetry.sdk.trace.data.SpanData;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
 
@@ -23,13 +28,34 @@ public class LangfuseSpanExporter implements SpanExporter {
 
 	@Override
 	public CompletableResultCode export(Collection<SpanData> spans) {
-		var filtered = this.config.onlyIncludeAiSpans() ?
-		               filterAiSpansWithAncestors(spans) :
-		               filterAllSpansFromAiTraces(spans);
+//		var filtered = this.config.onlyIncludeAiSpans() ?
+//		               filterAiSpansWithAncestors(spans) :
+//		               SpanHelper.filterAllSpansFromAiTraces(spans);
+//
+//		filtered.forEach(span -> Log.infof("Exporting span %s: %s", span.getSpanId(), span.getAttributes().asMap()));
 
-		return filtered.isEmpty() ?
+		var spansBySpanId = new HashMap<String, SpanData>();
+		var llmSpansByTrace = SpanHelper.getLLMSpansCallSpans(spans)
+			.peek(span -> spansBySpanId.put(span.getSpanId(), span))
+			.collect(Collectors.groupingBy(SpanData::getTraceId));
+
+		llmSpansByTrace.values()
+			.stream()
+			.map(s -> s.stream()
+				.min(Comparator.comparingLong(SpanData::getStartEpochNanos))
+			)
+			.filter(Optional::isPresent)
+			.map(Optional::get)
+			.forEach(firstLLMSpan -> spansBySpanId.put(firstLLMSpan.getSpanId(), new NoParentSpan(firstLLMSpan)));
+
+		var allSpans = llmSpansByTrace.values().stream()
+			.flatMap(Collection::stream)
+			.map(span -> spansBySpanId.get(span.getSpanId()))
+			.toList();
+
+		return allSpans.isEmpty() ?
 		       CompletableResultCode.ofSuccess() :
-		       this.delegate.export(filtered);
+		       this.delegate.export(allSpans);
 	}
 
 	@Override
@@ -40,20 +66,6 @@ public class LangfuseSpanExporter implements SpanExporter {
 	@Override
 	public CompletableResultCode shutdown() {
 		return this.delegate.shutdown();
-	}
-
-	/**
-	 * Includes all spans from any trace that contains at least one {@code gen_ai.*} span.
-	 * Non-AI traces are dropped entirely.
-	 */
-	private static Collection<SpanData> filterAllSpansFromAiTraces(Collection<SpanData> spans) {
-		return spans.stream()
-			.collect(Collectors.groupingBy(SpanData::getTraceId))
-			.values()
-			.stream()
-			.filter(group -> group.stream().anyMatch(LangfuseSpanExporter::isGenAiSpan))
-			.flatMap(Collection::stream)
-			.toList();
 	}
 
 	/**
@@ -69,20 +81,20 @@ public class LangfuseSpanExporter implements SpanExporter {
 		var seen = new HashSet<String>();
 
 		return spans.stream()
-			.filter(LangfuseSpanExporter::isGenAiSpan)
+			.filter(SpanHelper::isGenAiSpan)
 			.flatMap(span -> Stream.iterate(span, Objects::nonNull, current -> spanById.get(current.getParentSpanId()))
 				.takeWhile(current -> seen.add(current.getSpanId())))
 			.toList();
 	}
 
-	private static boolean isGenAiSpan(SpanData span) {
-		return span.getAttributes()
-		           .asMap()
-		           .keySet()
-		           .stream()
-		           .anyMatch(key -> {
-								 var k = key.getKey();
-								 return !"gen_ai.conversation.id".equals(k) && k.startsWith("gen_ai.");
-		           });
+	private static final class NoParentSpan extends DelegatingSpanData {
+		private NoParentSpan(SpanData delegate) {
+			super(delegate);
+		}
+
+		@Override
+		public SpanContext getParentSpanContext() {
+			return SpanContext.getInvalid();
+		}
 	}
 }

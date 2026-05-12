@@ -3,6 +3,7 @@ package ai.scoring.langfuse.otel;
 import jakarta.inject.Singleton;
 
 import io.opentelemetry.api.baggage.Baggage;
+import io.opentelemetry.api.baggage.BaggageEntry;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.sdk.trace.ReadWriteSpan;
 import io.opentelemetry.sdk.trace.ReadableSpan;
@@ -13,7 +14,7 @@ public class BaggageSpanProcessor implements SpanProcessor {
 	@Override
 	public void onStart(Context parentContext, ReadWriteSpan span) {
 		Baggage.fromContext(parentContext)
-		       .forEach((key, entry) -> span.setAttribute(key, entry.getValue()));
+		       .forEach((key, entry) -> processSpan(key, entry, span));
 	}
 
 	@Override
@@ -28,5 +29,11 @@ public class BaggageSpanProcessor implements SpanProcessor {
 	@Override
 	public boolean isEndRequired() {
 		return false;
+	}
+
+	private static void processSpan(String key, BaggageEntry entry, ReadWriteSpan span) {
+		if (SpanHelper.isGenAiSpan(span.toSpanData())) {
+			span.setAttribute(key, entry.getValue());
+		}
 	}
 }
