@@ -9,3 +9,15 @@ updates:
     directory: /
     schedule:
       interval: daily
+
+  - package-ecosystem: maven
+    directory: /
+    target-branch: langfuse
+    schedule:
+      interval: daily
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: langfuse
+    schedule:
+      interval: daily
