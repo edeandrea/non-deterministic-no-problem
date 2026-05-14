@@ -13,7 +13,7 @@ import io.opentelemetry.context.Context;
 
 import io.quarkus.websockets.next.WebSocketConnection;
 
-@Conversational
+@ConversationBoundary
 @Interceptor
 @Priority(APPLICATION + 100)
 public class ConversationalInterceptor {
