@@ -4,10 +4,8 @@ import org.parasol.ai.ClaimService;
 import org.parasol.model.claim.ClaimBotQuery;
 import org.parasol.model.claim.ClaimBotQueryResponse;
 
-import io.opentelemetry.api.baggage.Baggage;
-import io.opentelemetry.api.trace.Span;
+import ai.scoring.conversation.Conversational;
 import io.opentelemetry.api.trace.SpanKind;
-import io.opentelemetry.context.Context;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
 
 import io.quarkus.logging.Log;
@@ -48,16 +46,11 @@ public class ClaimWebsocketChatBot {
 
     @OnTextMessage
     @WithSpan(value = "ParasolAssistantChat", kind = SpanKind.SERVER)
+    @Conversational
     public ClaimBotQueryResponse onMessage(ClaimBotQuery query) {
-	      Span.current().setAttribute("gen_ai.conversation.id", this.connection.id());
-	      var baggage = Baggage.builder().put("gen_ai.conversation.id", this.connection.id()).build();
+        var response = new ClaimBotQueryResponse("token", this.bot.chat(query), "");
+        Log.debugf("Got chat response: %s", response);
 
-        try (var scope = Context.current().with(baggage).makeCurrent()) {
-            Log.infof("Got chat query: %s", query);
-            var response = new ClaimBotQueryResponse("token", this.bot.chat(query), "");
-            Log.debugf("Got chat response: %s", response);
-
-            return response;
-        }
-    }
+        return response;
+		}
 }
