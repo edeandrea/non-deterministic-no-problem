@@ -175,22 +175,35 @@ quarkus:
 
   # OpenAPI generator
   openapi-generator:
+    langfuse_yml:
+      auth:
+        basic_auth:
+          username: "${quarkus.aiscoring.langfuse.public-key}"
+          password: "${quarkus.aiscoring.langfuse.secret-key}"
     codegen:
       input-base-dir: ../openapi
-      include: ai-interactions.yml
+      include: ai-interactions.yml,langfuse.yml
+      initialize-empty-collections: true
+      use-bean-validation: true
+      type-mappings:
+        DateTime: Instant
+      import-mappings:
+        Instant: java.time.Instant
       spec:
         ai_interactions_yml:
           config-key: ai-interactions
         ai-interactions:
-          initialize-empty-collections: true
           base-package: ai.scoring.scorer
           use-dynamic-url: false
-          use-bean-validation: true
           return-response: true
-          type-mappings:
-            DateTime: Instant
-          import-mappings:
-            Instant: java.time.Instant
+        langfuse_yml:
+          config-key: langfuse-api
+        langfuse-api:
+          base-package: ai.scoring.langfuse.rest
+          config-key: langfuse
+          use-dynamic-url: false
+          register-rest-client: false
+          api-cdi-scope: none
 
 # Ollama profile config
 '%ollama':
