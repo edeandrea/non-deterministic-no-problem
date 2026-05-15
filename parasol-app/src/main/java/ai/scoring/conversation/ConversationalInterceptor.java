@@ -9,25 +9,24 @@ import jakarta.interceptor.Interceptor;
 import jakarta.interceptor.InvocationContext;
 
 import io.opentelemetry.api.trace.Span;
-import io.opentelemetry.context.Context;
+import io.opentelemetry.semconv.incubating.GenAiIncubatingAttributes;
 
 import io.quarkus.websockets.next.WebSocketConnection;
 
-@ConversationBoundary
+@Conversational
 @Interceptor
 @Priority(APPLICATION + 100)
 public class ConversationalInterceptor {
 	@AroundInvoke
+	@SuppressWarnings("unused")
 	public Object invoke(InvocationContext context) throws Exception {
-		var conversationId = getConversationId();
-		Span.current().setAttribute(ConversationBoundary.CONVERSATION_SPAN_NAME, conversationId);
+		Span.current()
+		    .setAttribute(GenAiIncubatingAttributes.GEN_AI_CONVERSATION_ID, getConversationId());
 
-		try (var scope = Context.current().makeCurrent()) {
-			return context.proceed();
-		}
+		return context.proceed();
 	}
 
-	public static String getConversationId() {
+	private static String getConversationId() {
 		return CDI.current().select(WebSocketConnection.class).get().id();
 	}
 }

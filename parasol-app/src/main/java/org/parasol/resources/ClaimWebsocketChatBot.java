@@ -4,7 +4,6 @@ import org.parasol.ai.ClaimService;
 import org.parasol.model.claim.ClaimBotQuery;
 import org.parasol.model.claim.ClaimBotQueryResponse;
 
-import ai.scoring.conversation.ConversationBoundary;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
 
@@ -46,7 +45,6 @@ public class ClaimWebsocketChatBot {
 
     @OnTextMessage
     @WithSpan(value = "ParasolAssistantChat", kind = SpanKind.SERVER)
-    @ConversationBoundary
     public ClaimBotQueryResponse onMessage(ClaimBotQuery query) {
         var response = new ClaimBotQueryResponse("token", this.bot.chat(query), "");
         Log.debugf("Got chat response: %s", response);

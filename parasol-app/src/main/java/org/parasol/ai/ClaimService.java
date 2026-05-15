@@ -4,6 +4,7 @@ import jakarta.enterprise.context.SessionScoped;
 
 import org.parasol.model.claim.ClaimBotQuery;
 
+import ai.scoring.conversation.Conversational;
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.UserMessage;
 import io.quarkiverse.langchain4j.RegisterAiService;
@@ -35,6 +36,7 @@ public interface ClaimService {
         Question: {{query.query}}
     """)
     @ToolBox(NotificationService.class)
+    @Conversational
 	  String chat(ClaimBotQuery query);
 //    Multi<String> chat(ClaimBotQuery query);
 }

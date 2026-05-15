@@ -31,6 +31,5 @@ import jakarta.interceptor.InterceptorBinding;
 @InterceptorBinding
 @Target({ METHOD, TYPE })
 @Retention(RUNTIME)
-public @interface ConversationBoundary {
-	String CONVERSATION_SPAN_NAME = "gen_ai.conversation.id";
+public @interface Conversational {
 }
