@@ -1,4 +1,4 @@
-package ai.scoring.langfuse;
+package ai.scoring.langfuse.init;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -6,6 +6,7 @@ import jakarta.enterprise.event.Observes;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 import ai.scoring.langfuse.rest.LangfuseApiClient;
+import ai.scoring.langfuse.rest.api.ModelsApi;
 import ai.scoring.langfuse.rest.model.CreateModelRequest;
 import ai.scoring.langfuse.rest.model.ModelUsageUnit;
 
@@ -13,15 +14,20 @@ import io.quarkus.logging.Log;
 import io.quarkus.runtime.StartupEvent;
 
 @ApplicationScoped
-public class LangfuseModelInitializer {
-	private final LangfuseApiClient langfuseApiClient;
+public class LangfuseCostModelInitializer {
+	private final ModelsApi langfuseModelsApi;
 
-	public LangfuseModelInitializer(@RestClient LangfuseApiClient langfuseApiClient) {
-		this.langfuseApiClient = langfuseApiClient;
+	public LangfuseCostModelInitializer(@RestClient LangfuseApiClient langfuseApiClient) {
+		this.langfuseModelsApi = langfuseApiClient;
 	}
 
 	void onStartup(@Observes StartupEvent event) {
-		Log.info("Initializing Langfuse model");
+		Log.info("Initializing Langfuse models");
+		populateGpt5MiniModel();
+	}
+
+	private void populateGpt5MiniModel() {
+		Log.info("Registering GPT-5-mini model");
 		var request = new CreateModelRequest()
 			.modelName("gpt-5-mini")
 			.matchPattern("(?i)^(gpt-5-mini)(-.+)?$")
@@ -31,7 +37,7 @@ public class LangfuseModelInitializer {
 			.tokenizerId("openai");
 
 		try {
-			var model = this.langfuseApiClient.modelsCreate(request);
+			var model = this.langfuseModelsApi.modelsCreate(request);
 			Log.infof("Registered model in Langfuse (id=%s)", model.getId());
 		}
 		catch (Exception e) {

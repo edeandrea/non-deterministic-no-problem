@@ -204,6 +204,7 @@ quarkus:
           use-dynamic-url: false
           register-rest-client: false
           api-cdi-scope: none
+          method-per-media-type: true
 
 # Ollama profile config
 '%ollama':
