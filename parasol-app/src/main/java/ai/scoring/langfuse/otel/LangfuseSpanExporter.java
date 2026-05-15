@@ -4,82 +4,106 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import ai.scoring.langfuse.config.LangfuseConfig;
+import org.jboss.logging.Logger;
+
+import ai.scoring.conversation.ConversationBoundary;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
-import io.opentelemetry.api.trace.SpanContext;
 import io.opentelemetry.sdk.common.CompletableResultCode;
 import io.opentelemetry.sdk.trace.data.DelegatingSpanData;
 import io.opentelemetry.sdk.trace.data.SpanData;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
 
 public class LangfuseSpanExporter implements SpanExporter {
-	private final SpanExporter delegate;
-	private final LangfuseConfig config;
+	private static final Logger LOG = Logger.getLogger(LangfuseSpanExporter.class);
 
-	LangfuseSpanExporter(SpanExporter delegate, LangfuseConfig config) {
+	private static final String PROMPT_ATTRIBUTE_KEY = "gen_ai.prompt";
+	private static final String COMPLETION_ATTRIBUTE_KEY = "gen_ai.completion";
+	private static final String LANGFUSE_TRACE_INPUT_ATTRIBUTE_KEY = "langfuse.trace.input";
+	private static final String LANGFUSE_TRACE_OUTPUT_ATTRIBUTE_KEY = "langfuse.trace.output";
+	
+	private final SpanExporter delegate;
+
+	LangfuseSpanExporter(SpanExporter delegate) {
 		this.delegate = delegate;
-		this.config = config;
 	}
 
 	@Override
 	public CompletableResultCode export(Collection<SpanData> spans) {
-		var spanById = spans.stream()
-			.collect(Collectors.toMap(SpanData::getSpanId, Function.identity(), (a, b) -> a));
+		var exportMap = filterAiSpansWithAncestors(spans);
 
-		var exportMap = filterAiSpansWithAncestors(spans, spanById);
+		exportMap.values()
+		         .stream()
+		         .collect(Collectors.groupingBy(SpanData::getTraceId))
+		         .forEach((traceId, s) -> {
+							 findFirstGenAiSpan(s)
+								 .ifPresent(llmSpan -> exportMap.put(llmSpan.getSpanId(), computeLangfuseSpan(llmSpan)));
 
-		exportMap.values().stream()
-			.filter(SpanHelper::isLLMCallSpan)
-			.collect(Collectors.groupingBy(SpanData::getTraceId))
-			.forEach((traceId, llmSpans) -> {
-				var firstLlmSpan = findFirstLlmSpan(llmSpans);
+							 findRootSpan(traceId, s)
+								 .ifPresent(rootSpan -> exportMap.put(rootSpan.getSpanId(), computeLangfuseSpan(rootSpan)));
+		         });
 
-				findRootSpan(traceId, exportMap.values())
-					.ifPresentOrElse(
-						root -> exportMap.put(root.getSpanId(), EnrichedSpanData.withGenAiAttributes(root, firstLlmSpan)),
-						() -> exportMap.put(firstLlmSpan.getSpanId(), EnrichedSpanData.asRoot(firstLlmSpan))
-					);
-		});
-
-		var toExport = exportMap.values().stream().toList();
-
-		return toExport.isEmpty() ?
+		return exportMap.isEmpty() ?
 		       CompletableResultCode.ofSuccess() :
-		       this.delegate.export(toExport);
+		       this.delegate.export(exportMap.values());
 	}
 
-	private static HashMap<String, SpanData> filterAiSpansWithAncestors(Collection<SpanData> spans, Map<String, SpanData> spanById) {
-		var seen = new HashSet<String>();
-		var result = new HashMap<String, SpanData>();
-
-		spans.stream()
-			.filter(SpanHelper::isGenAiSpan)
-			.flatMap(span -> Stream.iterate(span, Objects::nonNull, current -> spanById.get(current.getParentSpanId()))
-				.takeWhile(current -> seen.add(current.getSpanId())))
-			.forEach(span -> result.put(span.getSpanId(), span));
-
-		return result;
-	}
-
-	private static SpanData findFirstLlmSpan(List<SpanData> llmSpans) {
+	private static Optional<SpanData> findFirstGenAiSpan(Collection<SpanData> llmSpans) {
 		return llmSpans.stream()
-			.min(Comparator.comparingLong(SpanData::getStartEpochNanos))
-			.orElseThrow();
+			.filter(LangfuseSpanExporter::isGenAiSpan)
+			.min(Comparator.comparingLong(SpanData::getStartEpochNanos));
 	}
 
 	private static Optional<SpanData> findRootSpan(String traceId, Collection<SpanData> spans) {
 		return spans.stream()
-			.filter(s -> !s.getParentSpanContext().isValid() && s.getTraceId().equals(traceId))
+			.filter(s -> isRootSpanForTrace(traceId, s))
 			.findFirst();
+	}
+
+	private static boolean isRootSpan(SpanData span) {
+		return !span.getParentSpanContext().isValid();
+	}
+
+	private static boolean isRootSpanForTrace(String traceId, SpanData span) {
+		return isRootSpan(span) && span.getTraceId().equals(traceId);
+	}
+
+	private static SpanData computeLangfuseSpan(SpanData span) {
+ 		var attributes = span.getAttributes();
+		var attributesBuilder = attributes.toBuilder();
+
+		Optional.ofNullable(attributes.get(AttributeKey.stringKey(PROMPT_ATTRIBUTE_KEY)))
+			.ifPresent(v -> attributesBuilder.put(LANGFUSE_TRACE_INPUT_ATTRIBUTE_KEY, v));
+
+		Optional.ofNullable(attributes.get(AttributeKey.stringKey(COMPLETION_ATTRIBUTE_KEY)))
+			.ifPresent(v -> attributesBuilder.put(LANGFUSE_TRACE_OUTPUT_ATTRIBUTE_KEY, v));
+
+		var newAttributes = attributesBuilder.build();
+		return newAttributes.isEmpty() ? span : new EnrichedSpanData(span, newAttributes);
+	}
+
+	private static Map<String, SpanData> filterAiSpansWithAncestors(Collection<SpanData> spans) {
+		var spansById = spans.stream()
+			.collect(Collectors.toUnmodifiableMap(SpanData::getSpanId, Function.identity()));
+
+		var seen = new HashSet<String>();
+		var result = new HashMap<String, SpanData>();
+
+		spansById.values().stream()
+			.filter(LangfuseSpanExporter::isGenAiSpan)
+			.flatMap(span -> Stream.iterate(span, Objects::nonNull, current -> spansById.get(current.getParentSpanId()))
+				.takeWhile(current -> seen.add(current.getSpanId())))
+			.forEach(span -> result.put(span.getSpanId(), span));
+
+		return result;
 	}
 
 	@Override
@@ -91,45 +115,33 @@ public class LangfuseSpanExporter implements SpanExporter {
 	public CompletableResultCode shutdown() {
 		return this.delegate.shutdown();
 	}
+	
+	private static boolean isGenAiSpan(SpanData span) {
+		return spanAttributeKeysMatchCriteria(
+			span,
+			key -> !ConversationBoundary.CONVERSATION_SPAN_NAME.equalsIgnoreCase(key.getKey()) && key.getKey().startsWith("gen_ai.")
+		);
+	}
+
+	private static boolean spanAttributeKeysMatchCriteria(SpanData span, Predicate<AttributeKey> predicate) {
+		return span.getAttributes()
+		           .asMap()
+		           .keySet()
+		           .stream()
+		           .anyMatch(predicate);
+	}
 
 	private static final class EnrichedSpanData extends DelegatingSpanData {
 		private final Attributes mergedAttributes;
-		private final SpanContext parentSpanContext;
 
 		private EnrichedSpanData(SpanData delegate, Attributes mergedAttributes) {
-			this(delegate, mergedAttributes, null);
-		}
-
-		private EnrichedSpanData(SpanData delegate, Attributes mergedAttributes, SpanContext parentSpanContext) {
 			super(delegate);
 			this.mergedAttributes = mergedAttributes;
-			this.parentSpanContext = parentSpanContext;
-		}
-
-		static EnrichedSpanData withGenAiAttributes(SpanData delegate, SpanData genAiSource) {
-			var builder = delegate.getAttributes().toBuilder();
-
-			genAiSource.getAttributes().forEach((key, value) -> {
-				if (key.getKey().startsWith("gen_ai.")) {
-					builder.put((AttributeKey) key, value);
-				}
-			});
-
-			return new EnrichedSpanData(delegate, builder.build());
-		}
-
-		static EnrichedSpanData asRoot(SpanData delegate) {
-			return new EnrichedSpanData(delegate, delegate.getAttributes(), SpanContext.getInvalid());
 		}
 
 		@Override
 		public Attributes getAttributes() {
-			return mergedAttributes;
-		}
-
-		@Override
-		public SpanContext getParentSpanContext() {
-			return (parentSpanContext != null) ? parentSpanContext : super.getParentSpanContext();
+			return this.mergedAttributes;
 		}
 
 		@Override

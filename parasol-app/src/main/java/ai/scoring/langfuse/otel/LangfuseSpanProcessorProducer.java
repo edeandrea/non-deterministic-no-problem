@@ -31,7 +31,7 @@ public class LangfuseSpanProcessorProducer {
                                        .addHeader("x-langfuse-ingestion-version", "1")
                                        .build();
 
-    return BatchSpanProcessor.builder(new LangfuseSpanExporter(exporter, this.config))
+    return BatchSpanProcessor.builder(new LangfuseSpanExporter(exporter))
                              .build();
   }
 }

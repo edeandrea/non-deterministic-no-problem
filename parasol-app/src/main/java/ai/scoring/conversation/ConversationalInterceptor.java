@@ -17,12 +17,10 @@ import io.quarkus.websockets.next.WebSocketConnection;
 @Interceptor
 @Priority(APPLICATION + 100)
 public class ConversationalInterceptor {
-	private static final String CONVERSATION_SPAN_NAME = "gen_ai.conversation.id";
-
 	@AroundInvoke
 	public Object invoke(InvocationContext context) throws Exception {
 		var conversationId = getConversationId();
-		Span.current().setAttribute(CONVERSATION_SPAN_NAME, conversationId);
+		Span.current().setAttribute(ConversationBoundary.CONVERSATION_SPAN_NAME, conversationId);
 
 		try (var scope = Context.current().makeCurrent()) {
 			return context.proceed();

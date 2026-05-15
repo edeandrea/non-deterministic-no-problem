@@ -12,7 +12,4 @@ public interface LangfuseConfig {
 
 	String publicKey();
 	String secretKey();
-
-	@WithDefault("true")
-	boolean onlyIncludeAiSpans();
 }
