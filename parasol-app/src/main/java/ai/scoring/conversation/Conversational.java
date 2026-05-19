@@ -8,6 +8,7 @@ import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
+import jakarta.enterprise.util.Nonbinding;
 import jakarta.interceptor.InterceptorBinding;
 
 /**
@@ -32,4 +33,10 @@ import jakarta.interceptor.InterceptorBinding;
 @Target({ METHOD, TYPE })
 @Retention(RUNTIME)
 public @interface Conversational {
+	@Nonbinding
+	ConversationMode mode() default ConversationMode.STARTED;
+
+	enum ConversationMode {
+		STARTED, COMPLETED
+	}
 }

@@ -4,9 +4,6 @@ import org.parasol.ai.ClaimService;
 import org.parasol.model.claim.ClaimBotQuery;
 import org.parasol.model.claim.ClaimBotQueryResponse;
 
-import io.opentelemetry.api.trace.SpanKind;
-import io.opentelemetry.instrumentation.annotations.WithSpan;
-
 import io.quarkus.logging.Log;
 import io.quarkus.websockets.next.OnClose;
 import io.quarkus.websockets.next.OnError;
@@ -14,6 +11,11 @@ import io.quarkus.websockets.next.OnOpen;
 import io.quarkus.websockets.next.OnTextMessage;
 import io.quarkus.websockets.next.WebSocket;
 import io.quarkus.websockets.next.WebSocketConnection;
+
+import ai.scoring.conversation.Conversational;
+import ai.scoring.conversation.Conversational.ConversationMode;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 
 @WebSocket(path = "/ws/query")
 public class ClaimWebsocketChatBot {
@@ -31,6 +33,7 @@ public class ClaimWebsocketChatBot {
     }
 
     @OnClose
+    @Conversational(mode = ConversationMode.COMPLETED)
     public void onClose() {
         Log.infof("Websocket connection %s closed", connection.id());
     }

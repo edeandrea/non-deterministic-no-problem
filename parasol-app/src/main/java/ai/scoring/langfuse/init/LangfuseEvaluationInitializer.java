@@ -1,19 +1,27 @@
 package ai.scoring.langfuse.init;
 
+import static ai.scoring.langfuse.session.SessionSentiment.*;
+
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
-import jakarta.validation.Valid;
 
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 import ai.scoring.langfuse.config.LangfuseConfig;
 import ai.scoring.langfuse.config.LangfuseConfig.Scoring;
 import ai.scoring.langfuse.rest.LangfuseApiClient;
+import ai.scoring.langfuse.rest.model.ConfigCategory;
 import ai.scoring.langfuse.rest.model.CreateModelRequest;
+import ai.scoring.langfuse.rest.model.CreateScoreConfigRequest;
+import ai.scoring.langfuse.rest.model.EvaluationRuleFilter.OptionsOperator;
 import ai.scoring.langfuse.rest.model.LlmAdapter;
+import ai.scoring.langfuse.rest.model.ScoreConfig;
+import ai.scoring.langfuse.rest.model.ScoreConfigDataType;
+import ai.scoring.langfuse.session.SessionSentiment;
 import ai.scoring.langfuse.rest.model.LlmConnection;
 import ai.scoring.langfuse.rest.model.Model;
 import ai.scoring.langfuse.rest.model.ModelUsageUnit;
@@ -21,6 +29,7 @@ import ai.scoring.langfuse.rest.model.UnstableCreateEvaluationRuleRequest;
 import ai.scoring.langfuse.rest.model.UnstableCreateEvaluatorRequest;
 import ai.scoring.langfuse.rest.model.UnstableEvaluationRule;
 import ai.scoring.langfuse.rest.model.UnstableEvaluationRuleEvaluatorReference;
+import ai.scoring.langfuse.rest.model.EvaluationRuleFilter;
 import ai.scoring.langfuse.rest.model.UnstableEvaluationRuleMapping;
 import ai.scoring.langfuse.rest.model.UnstableEvaluationRuleMappingSource;
 import ai.scoring.langfuse.rest.model.UnstableEvaluationRuleTarget;
@@ -60,6 +69,12 @@ public class LangfuseEvaluationInitializer {
 
 	void onStartup(@Observes StartupEvent event) {
 		if (this.scoringConfig.initializeOnStartup()) {
+			createSessionSentimentScoreConfig()
+				.ifPresentOrElse(
+					sessionScore -> Log.info("Session Scoring config set up"),
+					() -> Log.warn("Session scoring config setup failed")
+				);
+
 			registerCohereModelDefinition()
 				.flatMap(model -> createLlmConnection())
 				.flatMap(this::handleEvaluator)
@@ -82,6 +97,10 @@ public class LangfuseEvaluationInitializer {
 			.target(UnstableEvaluationRuleTarget.OBSERVATION)
 			.enabled(true)
 			.sampling(1.0)
+			.filter(List.of(
+				EvaluationRuleFilter.stringOptionsFilter("environment", OptionsOperator.NONE_OF, List.of("langfuse-llm-as-a-judge")),
+				EvaluationRuleFilter.stringOptionsFilter("type", OptionsOperator.NONE_OF, List.of("SPAN", "EVENT"))
+			))
 			.mapping(List.of(
 				new UnstableEvaluationRuleMapping()
 					.variable("query")
@@ -104,6 +123,12 @@ public class LangfuseEvaluationInitializer {
 
 	private Optional<UnstableEvaluator> handleEvaluator(LlmConnection llmConnection) {
 		Log.info("Checking to see if relevance evaluator is already registered");
+		var scoreConfigOptional = createContinuousScoringScoreConfig();
+
+		scoreConfigOptional.ifPresentOrElse(
+				config -> Log.info("Continuous Scoring score config setup complete"),
+				() -> Log.warn("Continuous Scoring score config setup failed")
+			);
 
 		// @TODO this should be paginated - 100 is the max per page allowed
 		return this.langfuseApiClient.unstableEvaluatorsList(1, 100)
@@ -151,10 +176,10 @@ public class LangfuseEvaluationInitializer {
 	}
 
 	private Optional<UnstableEvaluator> createEvaluator(LlmConnection llmConnection) {
-		Log.infof("Initializing Cohere LLM Evaluator");
+		Log.infof("Initializing Continuous Scoring LLM Evaluator");
 
 		var request = new UnstableCreateEvaluatorRequest()
-			.name("Cohere Evaluator")
+			.name("Continuous Scoring Evaluator")
 			.prompt(PROMPT)
 			.modelConfig(new UnstableEvaluatorModelConfig()
 				.model(llmConnection.getCustomModels().getFirst())
@@ -169,11 +194,11 @@ public class LangfuseEvaluationInitializer {
 
 		try {
 			var evaluator = this.langfuseApiClient.unstableEvaluatorsCreate(request);
-			Log.infof("Registered Cohere LLM Evaluator: %s", evaluator.getId());
+			Log.infof("Registered Continuous Scoring LLM Evaluator: %s", evaluator.getId());
 			return Optional.of(evaluator);
 		}
 		catch (Exception e) {
-			Log.warnf(e, "Failed to initialize Cohere LLM Evaluator: %s", e.getMessage());
+			Log.warnf(e, "Failed to initialize Continuous Scoring LLM Evaluator: %s", e.getMessage());
 			return Optional.empty();
 		}
 	}
@@ -199,6 +224,55 @@ public class LangfuseEvaluationInitializer {
 		}
 		catch (Exception e) {
 			Log.warnf(e, "Failed to initialize Cohere LLM Connection: %s", e.getMessage());
+			return Optional.empty();
+		}
+	}
+
+	private Optional<ScoreConfig> createContinuousScoringScoreConfig() {
+		Log.info("Creating Continuous Scoring Evaluator score config");
+
+		var request = new CreateScoreConfigRequest()
+			.name("Continuous Scoring Evaluator")
+			.dataType(ScoreConfigDataType.NUMERIC)
+			.minValue(0.0)
+			.maxValue(1.0)
+			.description("Relevance score for individual AI responses. 0 = completely irrelevant, 1 = completely relevant.");
+
+		try {
+			var config = this.langfuseApiClient.scoreConfigsCreate(request);
+			Log.infof("Created Continuous Scoring score config (id=%s)", config.getId());
+			return Optional.of(config);
+		}
+		catch (Exception e) {
+			Log.warnf(e, "Failed to create Continuous Scoring score config: %s", e.getMessage());
+			return Optional.empty();
+		}
+	}
+
+	private Optional<ScoreConfig> createSessionSentimentScoreConfig() {
+		Log.info("Creating session-sentiment score config");
+
+		var categories = Arrays.stream(Sentiment.values())
+			.map(s ->
+				new ConfigCategory()
+					.label(s.label())
+					.value(s.value())
+			)
+			.toList();
+
+		var request = new CreateScoreConfigRequest()
+			.name(SessionSentiment.SCORE_NAME)
+			.dataType(ScoreConfigDataType.CATEGORICAL)
+			.categories(categories)
+			.description("Overall user sentiment for the conversation session. Evaluates whether the user's queries were answered, if they left satisfied, or if they appeared frustrated.");
+
+		try {
+			var config = this.langfuseApiClient.scoreConfigsCreate(request);
+			Log.infof("Created session-sentiment score config (id=%s)", config.getId());
+			return Optional.of(config);
+		}
+		catch (Exception e) {
+			Log.warnf(e, "Failed to create session-sentiment score config: %s", e.getMessage());
 			return Optional.empty();
 		}
 	}

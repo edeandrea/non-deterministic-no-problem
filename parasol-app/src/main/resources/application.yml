@@ -57,6 +57,12 @@ quarkus:
           temperature: 1
         timeout: 600s
         api-key: "${quarkus.langchain4j.openai.api-key}"
+      session-sentiment:
+        chat-model:
+          model-name: gpt-5-mini
+          temperature: 1
+        timeout: 600s
+        api-key: "${quarkus.langchain4j.openai.api-key}"
 
     # Milvus
     milvus:
@@ -79,6 +85,11 @@ quarkus:
         chat-model:
           model-id: llama3.2:latest
           temperature: 0.3
+      session-sentiment:
+        timeout: 600s
+        chat-model:
+          model-id: llama3.2:latest
+          temperature: 0
       embedding-model:
         model-id: snowflake-arctic-embed
 
@@ -189,6 +200,9 @@ quarkus:
         DateTime: Instant
       import-mappings:
         Instant: java.time.Instant
+      schema-mappings:
+        unstableEvaluationRuleFilter: ai.scoring.langfuse.rest.model.EvaluationRuleFilter
+        CreateScoreValue: ai.scoring.langfuse.rest.model.CreateScoreValue
       spec:
         ai_interactions_yml:
           config-key: ai-interactions
