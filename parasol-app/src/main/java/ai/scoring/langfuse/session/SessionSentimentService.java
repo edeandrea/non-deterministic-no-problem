@@ -4,6 +4,7 @@ import java.util.List;
 
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.UserMessage;
+import dev.langchain4j.service.guardrail.OutputGuardrails;
 import io.quarkiverse.langchain4j.RegisterAiService;
 import io.quarkiverse.langchain4j.RegisterAiService.NoRetrievalAugmentorSupplier;
 
@@ -47,5 +48,6 @@ public interface SessionSentimentService {
 
 		{/for}
 		""")
+	@OutputGuardrails(SessionSentimentGuardrail.class)
 	SessionSentiment evaluate(List<ConversationExchange> exchanges);
 }

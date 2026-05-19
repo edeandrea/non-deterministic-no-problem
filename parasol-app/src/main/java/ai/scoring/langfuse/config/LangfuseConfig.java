@@ -1,5 +1,6 @@
 package ai.scoring.langfuse.config;
 
+import java.time.Duration;
 import java.util.Optional;
 
 import io.smallrye.config.ConfigMapping;
@@ -15,12 +16,13 @@ public interface LangfuseConfig {
 	String publicKey();
 	String secretKey();
 
-	Scoring scoring();
+	Evaluation evaluation();
 
-	interface Scoring {
+	interface Evaluation {
 		@WithDefault("true")
 		boolean initializeOnStartup();
 
+		Session session();
 		Cohere cohere();
 
 		interface Cohere {
@@ -32,6 +34,17 @@ public interface LangfuseConfig {
 
 			@WithDefault("${COHERE_API_KEY:}")
 			Optional<String> apiKey();
+		}
+
+		interface Session {
+			@WithDefault("true")
+			boolean createDatasetOnSessionClose();
+
+			@WithDefault("true")
+			boolean scoreSession();
+
+			@WithDefault("5s")
+			Duration otelFlushWaitTime();
 		}
 	}
 }

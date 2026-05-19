@@ -12,6 +12,7 @@ import jakarta.enterprise.event.ObservesAsync;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 import ai.scoring.conversation.ConversationCompletedEvent;
+import ai.scoring.langfuse.config.LangfuseConfig;
 import ai.scoring.langfuse.rest.LangfuseApiClient;
 import ai.scoring.langfuse.rest.LangfuseNotFoundException;
 import ai.scoring.langfuse.rest.model.CreateDatasetItemRequest;
@@ -40,13 +41,13 @@ import io.quarkus.logging.Log;
  */
 @ApplicationScoped
 public class LangfuseSessionScoringService {
-	private static final int OTEL_FLUSH_DELAY_SECONDS = 5;
-
+	private final LangfuseConfig langfuseConfig;
 	private final Tracer tracer;
 	private final LangfuseApiClient langfuseApiClient;
 	private final SessionSentimentService sessionSentimentService;
 
-	public LangfuseSessionScoringService(Tracer tracer, @RestClient LangfuseApiClient langfuseApiClient, SessionSentimentService sessionSentimentService) {
+	public LangfuseSessionScoringService(LangfuseConfig langfuseConfig, Tracer tracer, @RestClient LangfuseApiClient langfuseApiClient, SessionSentimentService sessionSentimentService) {
+		this.langfuseConfig = langfuseConfig;
 		this.tracer = tracer;
 		this.langfuseApiClient = langfuseApiClient;
 		this.sessionSentimentService = sessionSentimentService;
@@ -58,7 +59,7 @@ public class LangfuseSessionScoringService {
 
 		try {
 			// This is to give time for OTEL to flush spans
-			TimeUnit.SECONDS.sleep(OTEL_FLUSH_DELAY_SECONDS);
+			TimeUnit.MILLISECONDS.sleep(this.langfuseConfig.evaluation().session().otelFlushWaitTime().toMillis());
 		}
 		catch (InterruptedException e) {
 			// eat it
@@ -78,6 +79,8 @@ public class LangfuseSessionScoringService {
 
 	private void fetchAndScoreSession(String conversationId) {
 		try {
+			var sessionEvalConfig = this.langfuseConfig.evaluation().session();
+
 			this.langfuseApiClient.sessionsGet(conversationId)
 				.getTraces()
 				.stream()
@@ -88,7 +91,8 @@ public class LangfuseSessionScoringService {
 					Collectors.toUnmodifiableList(),
 					exchanges -> Optional.ofNullable(exchanges)
 						.filter(e -> !e.isEmpty())
-						.map(e -> createDatasets(conversationId, e))
+						.map(e -> sessionEvalConfig.createDatasetOnSessionClose() ? createDatasets(conversationId, e) : e)
+						.filter(e -> sessionEvalConfig.scoreSession())
 						.map(this.sessionSentimentService::evaluate)
 				))
 				.ifPresentOrElse(

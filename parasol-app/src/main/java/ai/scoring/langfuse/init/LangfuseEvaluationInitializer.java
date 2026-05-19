@@ -12,7 +12,7 @@ import jakarta.enterprise.event.Observes;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 import ai.scoring.langfuse.config.LangfuseConfig;
-import ai.scoring.langfuse.config.LangfuseConfig.Scoring;
+import ai.scoring.langfuse.config.LangfuseConfig.Evaluation;
 import ai.scoring.langfuse.rest.LangfuseApiClient;
 import ai.scoring.langfuse.rest.model.ConfigCategory;
 import ai.scoring.langfuse.rest.model.CreateModelRequest;
@@ -59,11 +59,11 @@ public class LangfuseEvaluationInitializer {
 		Output: {{generation}}
 		""";
 
-	private final Scoring scoringConfig;
+	private final Evaluation scoringConfig;
 	private final LangfuseApiClient langfuseApiClient;
 
 	public LangfuseEvaluationInitializer(LangfuseConfig langfuseConfig, @RestClient LangfuseApiClient langfuseApiClient) {
-		this.scoringConfig = langfuseConfig.scoring();
+		this.scoringConfig = langfuseConfig.evaluation();
 		this.langfuseApiClient = langfuseApiClient;
 	}
 
@@ -71,7 +71,7 @@ public class LangfuseEvaluationInitializer {
 		if (this.scoringConfig.initializeOnStartup()) {
 			createSessionSentimentScoreConfig()
 				.ifPresentOrElse(
-					sessionScore -> Log.info("Session Scoring config set up"),
+					sessionScore -> Log.info("Session Evaluation config set up"),
 					() -> Log.warn("Session scoring config setup failed")
 				);
 
@@ -90,7 +90,7 @@ public class LangfuseEvaluationInitializer {
 		Log.infof("Creating evaluation rule for evaluator %s", evaluator.getName());
 
 		var request = new UnstableCreateEvaluationRuleRequest()
-			.name("Continuous Scoring Evaluator")
+			.name("Continuous Evaluation Evaluator")
 			.evaluator(new UnstableEvaluationRuleEvaluatorReference()
 				.name(evaluator.getName())
 				.scope(isManagedEvaluator(evaluator) ? UnstableEvaluatorScope.MANAGED : UnstableEvaluatorScope.PROJECT))
@@ -126,8 +126,8 @@ public class LangfuseEvaluationInitializer {
 		var scoreConfigOptional = createContinuousScoringScoreConfig();
 
 		scoreConfigOptional.ifPresentOrElse(
-				config -> Log.info("Continuous Scoring score config setup complete"),
-				() -> Log.warn("Continuous Scoring score config setup failed")
+				config -> Log.info("Continuous Evaluation score config setup complete"),
+				() -> Log.warn("Continuous Evaluation score config setup failed")
 			);
 
 		// @TODO this should be paginated - 100 is the max per page allowed
@@ -176,10 +176,10 @@ public class LangfuseEvaluationInitializer {
 	}
 
 	private Optional<UnstableEvaluator> createEvaluator(LlmConnection llmConnection) {
-		Log.infof("Initializing Continuous Scoring LLM Evaluator");
+		Log.infof("Initializing Continuous Evaluation LLM Evaluator");
 
 		var request = new UnstableCreateEvaluatorRequest()
-			.name("Continuous Scoring Evaluator")
+			.name("Continuous Evaluation Evaluator")
 			.prompt(PROMPT)
 			.modelConfig(new UnstableEvaluatorModelConfig()
 				.model(llmConnection.getCustomModels().getFirst())
@@ -194,11 +194,11 @@ public class LangfuseEvaluationInitializer {
 
 		try {
 			var evaluator = this.langfuseApiClient.unstableEvaluatorsCreate(request);
-			Log.infof("Registered Continuous Scoring LLM Evaluator: %s", evaluator.getId());
+			Log.infof("Registered Continuous Evaluation LLM Evaluator: %s", evaluator.getId());
 			return Optional.of(evaluator);
 		}
 		catch (Exception e) {
-			Log.warnf(e, "Failed to initialize Continuous Scoring LLM Evaluator: %s", e.getMessage());
+			Log.warnf(e, "Failed to initialize Continuous Evaluation LLM Evaluator: %s", e.getMessage());
 			return Optional.empty();
 		}
 	}
@@ -229,10 +229,10 @@ public class LangfuseEvaluationInitializer {
 	}
 
 	private Optional<ScoreConfig> createContinuousScoringScoreConfig() {
-		Log.info("Creating Continuous Scoring Evaluator score config");
+		Log.info("Creating Continuous Evaluation Evaluator score config");
 
 		var request = new CreateScoreConfigRequest()
-			.name("Continuous Scoring Evaluator")
+			.name("Continuous Evaluation Evaluator")
 			.dataType(ScoreConfigDataType.NUMERIC)
 			.minValue(0.0)
 			.maxValue(1.0)
@@ -240,11 +240,11 @@ public class LangfuseEvaluationInitializer {
 
 		try {
 			var config = this.langfuseApiClient.scoreConfigsCreate(request);
-			Log.infof("Created Continuous Scoring score config (id=%s)", config.getId());
+			Log.infof("Created Continuous Evaluation score config (id=%s)", config.getId());
 			return Optional.of(config);
 		}
 		catch (Exception e) {
-			Log.warnf(e, "Failed to create Continuous Scoring score config: %s", e.getMessage());
+			Log.warnf(e, "Failed to create Continuous Evaluation score config: %s", e.getMessage());
 			return Optional.empty();
 		}
 	}
