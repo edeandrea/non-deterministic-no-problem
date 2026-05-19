@@ -59,10 +59,10 @@ quarkus:
         api-key: "${quarkus.langchain4j.openai.api-key}"
       session-sentiment:
         chat-model:
-          model-name: gpt-5-mini
-          temperature: 1
+          model-name: command-r7b-12-2024
         timeout: 600s
-        api-key: "${quarkus.langchain4j.openai.api-key}"
+        api-key: "${COHERE_API_KEY:}"
+        base-url: https://api.cohere.ai/compatibility/v1
 
     # Milvus
     milvus:
