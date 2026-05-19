@@ -105,6 +105,10 @@ public class LangfuseSessionScoringService {
 	}
 
 	private List<ConversationExchange> createDatasets(String conversationId, List<ConversationExchange> exchanges) {
+		// This probably isn't the best way to do this
+		// Its essentially building a local cache, which if lots of apps are running concurrently, could mean that new datasets are added while performing this logic
+		// It would be better to try to fetch datasets and check each time, but this is simpler and should be fine for now
+		// #Demoware!
 		var existingDatasets = this.langfuseApiClient.datasetsList(null, null)
 			.getData()
 			.stream()
