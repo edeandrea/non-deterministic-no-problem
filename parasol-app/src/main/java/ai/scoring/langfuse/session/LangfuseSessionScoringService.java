@@ -22,6 +22,18 @@ import io.opentelemetry.api.trace.Tracer;
 
 import io.quarkus.logging.Log;
 
+/**
+ * Service responsible for scoring sessions by analyzing conversation sentiment.
+ * The service receives an async {@link ConversationCompletedEvent}, processes session data,
+ * evaluates the sentiment, and submits the calculated score to Langfuse as a session score.
+ *
+ * The scoring flow includes:
+ * - Observing conversation completion events.
+ * - Fetching session traces through the langfuse REST API.
+ * - Filtering and sorting relevant traces.
+ * - Performing sentiment evaluation based on conversation exchanges.
+ * - Posting the sentiment score back to Langfuse
+ */
 @ApplicationScoped
 public class LangfuseSessionScoringService {
 	private static final int OTEL_FLUSH_DELAY_SECONDS = 5;
@@ -41,6 +53,7 @@ public class LangfuseSessionScoringService {
 		Log.infof("Conversation %s completed - scoring conversation", conversationId);
 
 		try {
+			// This is to give time for OTEL to flush spans
 			TimeUnit.SECONDS.sleep(OTEL_FLUSH_DELAY_SECONDS);
 		}
 		catch (InterruptedException e) {

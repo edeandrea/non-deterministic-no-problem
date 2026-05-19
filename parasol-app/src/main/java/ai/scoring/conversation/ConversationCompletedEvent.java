@@ -1,5 +1,10 @@
 package ai.scoring.conversation;
 
+/**
+ * Represents an event indicating the completion of a conversation.
+ * The conversation completion event encapsulates details about
+ * the specific conversation that has been finalized.
+ */
 public interface ConversationCompletedEvent {
 	String getConversationId();
 	Builder toBuilder();

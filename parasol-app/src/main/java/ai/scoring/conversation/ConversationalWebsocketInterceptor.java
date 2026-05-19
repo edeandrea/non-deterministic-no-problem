@@ -20,13 +20,22 @@ import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.semconv.incubating.GenAiIncubatingAttributes;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
 
+/**
+ * Implementation of the {@link Conversational} annotation that is used to trigger conversation scoring within a websocket-based application.
+ * <p>
+ *   This means that it uses the websocket connection ID as the conversation ID. The websocket connection ID is resolved using {@link WebSocketConnection#id()}.
+ * </p>
+ * <p>
+ *   Upon closing a conversation, this interceptor will trigger the conversation scoring process asynchronously by firing an async {@link ConversationCompletedEvent}.
+ * </p>
+ */
 @Conversational
 @Interceptor
 @Priority(APPLICATION + 100)
-public class ConversationalInterceptor {
+public class ConversationalWebsocketInterceptor {
 	private final Event<ConversationCompletedEvent> conversationCompletedEvent;
 
-	public ConversationalInterceptor(Event<ConversationCompletedEvent> conversationCompletedEvent) {
+	public ConversationalWebsocketInterceptor(Event<ConversationCompletedEvent> conversationCompletedEvent) {
 		this.conversationCompletedEvent = conversationCompletedEvent;
 	}
 

@@ -19,13 +19,8 @@ import jakarta.interceptor.InterceptorBinding;
  * enabling tracing, monitoring, or contextual behavior during the execution
  * of methods or classes related to conversation processing.
  * <p>
- *   On a WebSocket class, this annotation can only be placed on methods with the following annotations:
- *   <ul>
- *   <li>{@link io.quarkus.websockets.next.OnOpen}</li>
- *   <li>{@link io.quarkus.websockets.next.OnClose}</li>
- *   <li>{@link io.quarkus.websockets.next.OnTextMessage}</li>
- *   <li>{@link io.quarkus.websockets.next.OnError}</li>
- * </ul>
+ *   Eventually this would be implementation independent (websocket, REST endpoint, CLI, etc). It would be up to the implementation
+ *   to figure out what the best way to handle conversational boundaries is for that implementation.
  * </p>
  */
 @Inherited
