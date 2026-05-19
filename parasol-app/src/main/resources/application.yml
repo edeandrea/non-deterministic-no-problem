@@ -61,7 +61,7 @@ quarkus:
         chat-model:
           model-name: command-r7b-12-2024
         timeout: 600s
-        api-key: "${COHERE_API_KEY:}"
+        api-key: "${COHERE_API_KEY}"
         base-url: https://api.cohere.ai/compatibility/v1
 
     # Milvus
