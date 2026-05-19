@@ -1,6 +1,7 @@
 package ai.scoring.langfuse.session;
 
 import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -13,9 +14,12 @@ import org.eclipse.microprofile.rest.client.inject.RestClient;
 import ai.scoring.conversation.ConversationCompletedEvent;
 import ai.scoring.langfuse.rest.LangfuseApiClient;
 import ai.scoring.langfuse.rest.LangfuseNotFoundException;
+import ai.scoring.langfuse.rest.model.CreateDatasetItemRequest;
+import ai.scoring.langfuse.rest.model.CreateDatasetRequest;
 import ai.scoring.langfuse.rest.model.CreateScoreValue;
 import ai.scoring.langfuse.rest.model.LegacyCreateScoreRequest;
 import ai.scoring.langfuse.rest.model.ScoreDataType;
+import ai.scoring.langfuse.rest.model.Dataset;
 import ai.scoring.langfuse.rest.model.Trace;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.Tracer;
@@ -79,12 +83,13 @@ public class LangfuseSessionScoringService {
 				.stream()
 				.filter(trace -> (trace.getTimestamp() != null) && (trace.getInput() != null) && (trace.getOutput() != null))
 				.sorted(Comparator.comparing(Trace::getTimestamp))
-				.map(trace -> new ConversationExchange(String.valueOf(trace.getInput()), String.valueOf(trace.getOutput())))
+				.map(ConversationExchange::from)
 				.collect(Collectors.collectingAndThen(
 					Collectors.toUnmodifiableList(),
-					exchanges -> exchanges.isEmpty() ?
-					             Optional.<SessionSentiment>empty() :
-					             Optional.ofNullable(this.sessionSentimentService.evaluate(exchanges))
+					exchanges -> Optional.ofNullable(exchanges)
+						.filter(e -> !e.isEmpty())
+						.map(e -> createDatasets(conversationId, e))
+						.map(this.sessionSentimentService::evaluate)
 				))
 				.ifPresentOrElse(
 					sentiment -> {
@@ -97,6 +102,30 @@ public class LangfuseSessionScoringService {
 		catch (LangfuseNotFoundException e) {
 			Log.debugf("Session %s not found in Langfuse, skipping scoring", conversationId);
 		}
+	}
+
+	private List<ConversationExchange> createDatasets(String conversationId, List<ConversationExchange> exchanges) {
+		var existingDatasets = this.langfuseApiClient.datasetsList(null, null)
+			.getData()
+			.stream()
+			.map(Dataset::getName)
+			.collect(Collectors.toSet());
+
+		exchanges.forEach(exchange -> {
+			var datasetName = "%s/%s".formatted(exchange.traceName(), conversationId);
+
+			if (existingDatasets.add(datasetName)) {
+				this.langfuseApiClient.datasetsCreate(new CreateDatasetRequest().name(datasetName));
+				Log.infof("Created dataset %s for session %s", datasetName, conversationId);
+			}
+
+			this.langfuseApiClient.datasetItemsCreate(new CreateDatasetItemRequest().datasetName(datasetName)
+			                                                                        .input(exchange.input())
+			                                                                        .expectedOutput(exchange.output())
+			                                                                        .sourceTraceId(exchange.traceId()));
+		});
+
+		return exchanges;
 	}
 
 	private void saveScore(String conversationId, SessionSentiment sentiment) {

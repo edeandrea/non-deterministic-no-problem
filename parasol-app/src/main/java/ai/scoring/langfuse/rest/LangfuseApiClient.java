@@ -13,6 +13,8 @@ import io.quarkus.logging.Log;
 import io.quarkus.rest.client.reactive.ClientBasicAuth;
 import io.quarkus.rest.client.reactive.ClientExceptionMapper;
 
+import ai.scoring.langfuse.rest.api.DatasetItemsApi;
+import ai.scoring.langfuse.rest.api.DatasetsApi;
 import ai.scoring.langfuse.rest.api.LegacyScoreV1Api;
 import ai.scoring.langfuse.rest.api.LlmConnectionsApi;
 import ai.scoring.langfuse.rest.api.ModelsApi;
@@ -26,7 +28,7 @@ import ai.scoring.langfuse.rest.api.UnstableEvaluatorsApi;
 @ClientBasicAuth(username = "${quarkus.aiscoring.langfuse.public-key}", password = "${quarkus.aiscoring.langfuse.secret-key}")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
-public interface LangfuseApiClient extends LegacyScoreV1Api, LlmConnectionsApi, ModelsApi, ScoreConfigsApi, SessionsApi, UnstableEvaluationRulesApi, UnstableEvaluatorsApi {
+public interface LangfuseApiClient extends DatasetItemsApi, DatasetsApi, LegacyScoreV1Api, LlmConnectionsApi, ModelsApi, ScoreConfigsApi, SessionsApi, UnstableEvaluationRulesApi, UnstableEvaluatorsApi {
 	@ClientExceptionMapper
 	static RuntimeException toException(Response response) {
 		var message = "Langfuse API error (%d): %s".formatted(response.getStatus(), response.readEntity(String.class));
