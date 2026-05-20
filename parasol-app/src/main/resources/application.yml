@@ -291,6 +291,13 @@ quarkus:
 # test mode config
 '%test':
   quarkus:
+    aiscoring:
+      langfuse:
+        evaluation:
+          session:
+            score-session: false
+          initialize-on-startup: false
+
     otel:
       logs:
         enabled: false

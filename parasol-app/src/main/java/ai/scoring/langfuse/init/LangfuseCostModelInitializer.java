@@ -5,15 +5,17 @@ import jakarta.enterprise.event.Observes;
 
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
+import io.quarkus.arc.profile.UnlessBuildProfile;
+import io.quarkus.logging.Log;
+import io.quarkus.runtime.StartupEvent;
+
 import ai.scoring.langfuse.rest.LangfuseApiClient;
 import ai.scoring.langfuse.rest.api.ModelsApi;
 import ai.scoring.langfuse.rest.model.CreateModelRequest;
 import ai.scoring.langfuse.rest.model.ModelUsageUnit;
 
-import io.quarkus.logging.Log;
-import io.quarkus.runtime.StartupEvent;
-
 @ApplicationScoped
+@UnlessBuildProfile("test")
 public class LangfuseCostModelInitializer {
 	private final ModelsApi langfuseModelsApi;
 
