@@ -28,6 +28,7 @@ public class ClaimWebsocketChatBot {
     }
 
     @OnOpen
+    @Conversational
     public void onOpen() {
         Log.infof("Websocket connection %s opened", connection.id());
     }

@@ -234,6 +234,7 @@ public class LangfuseEvaluationInitializer {
 		var request = new CreateScoreConfigRequest()
 			.name("Continuous Evaluation Evaluator")
 			.dataType(ScoreConfigDataType.NUMERIC)
+			.categories(null)
 			.minValue(0.0)
 			.maxValue(1.0)
 			.description("Relevance score for individual AI responses. 0 = completely irrelevant, 1 = completely relevant.");

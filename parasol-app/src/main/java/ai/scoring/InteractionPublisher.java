@@ -71,10 +71,10 @@ public class InteractionPublisher {
 
 	private void fireEvent(AiServiceEvent event) {
 //		Log.info("before firing");
-		switch (this.scoringConfig.interactionMode()) {
-			case NORMAL -> handleNormalEventFiring(event);
-			case RESCORE -> handleRescoreEventFiring(event);
-		}
+//		switch (this.scoringConfig.interactionMode()) {
+//			case NORMAL -> handleNormalEventFiring(event);
+//			case RESCORE -> handleRescoreEventFiring(event);
+//		}
 //		Log.info("after firing");
 	}
 
