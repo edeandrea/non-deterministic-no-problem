@@ -7,6 +7,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status.Family;
 
+import org.eclipse.microprofile.rest.client.annotation.RegisterProvider;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 
 import io.quarkus.logging.Log;
@@ -22,10 +23,12 @@ import ai.scoring.langfuse.rest.api.ScoreConfigsApi;
 import ai.scoring.langfuse.rest.api.SessionsApi;
 import ai.scoring.langfuse.rest.api.UnstableEvaluationRulesApi;
 import ai.scoring.langfuse.rest.api.UnstableEvaluatorsApi;
+import io.quarkiverse.openapi.generator.providers.PathParamEncodingParamConverterProvider;
 
 @Path("/")
 @RegisterRestClient(configKey = "langfuse-api")
 @ClientBasicAuth(username = "${quarkus.aiscoring.langfuse.public-key}", password = "${quarkus.aiscoring.langfuse.secret-key}")
+@RegisterProvider(PathParamEncodingParamConverterProvider.class)
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 public interface LangfuseApiClient extends DatasetItemsApi, DatasetsApi, LegacyScoreV1Api, LlmConnectionsApi, ModelsApi, ScoreConfigsApi, SessionsApi, UnstableEvaluationRulesApi, UnstableEvaluatorsApi {

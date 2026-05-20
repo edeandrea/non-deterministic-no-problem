@@ -1,6 +1,6 @@
 package ai.scoring.langfuse.init;
 
-import static ai.scoring.langfuse.session.SessionSentiment.*;
+import static ai.scoring.langfuse.session.SessionSentiment.Sentiment;
 
 import java.util.Arrays;
 import java.util.List;
@@ -17,19 +17,18 @@ import ai.scoring.langfuse.rest.LangfuseApiClient;
 import ai.scoring.langfuse.rest.model.ConfigCategory;
 import ai.scoring.langfuse.rest.model.CreateModelRequest;
 import ai.scoring.langfuse.rest.model.CreateScoreConfigRequest;
+import ai.scoring.langfuse.rest.model.EvaluationRuleFilter;
 import ai.scoring.langfuse.rest.model.EvaluationRuleFilter.OptionsOperator;
 import ai.scoring.langfuse.rest.model.LlmAdapter;
-import ai.scoring.langfuse.rest.model.ScoreConfig;
-import ai.scoring.langfuse.rest.model.ScoreConfigDataType;
-import ai.scoring.langfuse.session.SessionSentiment;
 import ai.scoring.langfuse.rest.model.LlmConnection;
 import ai.scoring.langfuse.rest.model.Model;
 import ai.scoring.langfuse.rest.model.ModelUsageUnit;
+import ai.scoring.langfuse.rest.model.ScoreConfig;
+import ai.scoring.langfuse.rest.model.ScoreConfigDataType;
 import ai.scoring.langfuse.rest.model.UnstableCreateEvaluationRuleRequest;
 import ai.scoring.langfuse.rest.model.UnstableCreateEvaluatorRequest;
 import ai.scoring.langfuse.rest.model.UnstableEvaluationRule;
 import ai.scoring.langfuse.rest.model.UnstableEvaluationRuleEvaluatorReference;
-import ai.scoring.langfuse.rest.model.EvaluationRuleFilter;
 import ai.scoring.langfuse.rest.model.UnstableEvaluationRuleMapping;
 import ai.scoring.langfuse.rest.model.UnstableEvaluationRuleMappingSource;
 import ai.scoring.langfuse.rest.model.UnstableEvaluationRuleTarget;
@@ -42,6 +41,7 @@ import ai.scoring.langfuse.rest.model.UnstableEvaluatorScope;
 import ai.scoring.langfuse.rest.model.UnstableEvaluatorType;
 import ai.scoring.langfuse.rest.model.UnstablePublicCategoricalEvaluatorOutputScoreDefinition;
 import ai.scoring.langfuse.rest.model.UpsertLlmConnectionRequest;
+import ai.scoring.langfuse.session.SessionSentiment;
 
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.StartupEvent;
@@ -234,7 +234,6 @@ public class LangfuseEvaluationInitializer {
 		var request = new CreateScoreConfigRequest()
 			.name("Continuous Evaluation Evaluator")
 			.dataType(ScoreConfigDataType.NUMERIC)
-			.categories(null)
 			.minValue(0.0)
 			.maxValue(1.0)
 			.description("Relevance score for individual AI responses. 0 = completely irrelevant, 1 = completely relevant.");
