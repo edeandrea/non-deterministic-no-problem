@@ -1,16 +1,17 @@
 package org.parasol.ai;
 
-import jakarta.enterprise.context.SessionScoped;
-
 import org.parasol.model.claim.ClaimBotQuery;
 
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.UserMessage;
 import io.quarkiverse.langchain4j.RegisterAiService;
 import io.quarkiverse.langchain4j.ToolBox;
+import io.quarkiverse.langchain4j.chatscopes.ChatRoute;
+import io.quarkiverse.langchain4j.chatscopes.ChatScoped;
+import io.quarkiverse.langchain4j.chatscopes.DefaultChatRoute;
 
 @RegisterAiService(modelName = "parasol-chat", shouldThrowExceptionOnEventError = true)
-@SessionScoped
+@ChatScoped
 public interface ClaimService {
     @SystemMessage("""
         You are a helpful, respectful and honest assistant named "Parasol Assistant".
@@ -34,6 +35,8 @@ public interface ClaimService {
 
         Question: {{query.query}}
     """)
+    @DefaultChatRoute
+    @ChatRoute("chat")
     @ToolBox(NotificationService.class)
 	  String chat(ClaimBotQuery query);
 //    Multi<String> chat(ClaimBotQuery query);

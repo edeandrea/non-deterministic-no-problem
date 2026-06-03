@@ -2,7 +2,7 @@ import config from '@app/config';
 import { faCommentDots, faPaperPlane } from '@fortawesome/free-regular-svg-icons';
 import { faPlusCircle } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { Button, Card, CardBody, CardHeader, Flex, FlexItem, Grid, GridItem, Icon, Panel, PanelMain, PanelMainBody, Stack, StackItem, Text, TextArea, TextContent, TextVariants, Tooltip } from '@patternfly/react-core';
+import { Button, Card, CardBody, CardHeader, Flex, FlexItem, Grid, GridItem, Panel, PanelMain, PanelMainBody, Stack, StackItem, Text, TextArea, TextContent, TextVariants, Tooltip } from '@patternfly/react-core';
 import * as React from 'react';
 import orb from '@app/assets/bgimages/orb.svg';
 import userAvatar from '@app/assets/bgimages/avatar-user.svg';
@@ -16,82 +16,102 @@ const Chat: React.FunctionComponent<{ claimSummary: string, claimId: string, inc
 
     const [queryText, setQueryText] = React.useState<Query>('');
     const [answerText, setAnswerText] = React.useState<Answer>([' Hi! I am Parasol Assistant. How can I help you today?']);
-    const [answerSources, setAnswerSources] = React.useState<string[]>([]); // Array of sources for the answer
     const [messageHistory, setMessageHistory] = React.useState<MessageHistory>([]);
 
-    const wsUrl = config.backend_api_url.replace(/http/, 'ws').replace(/\/api$/, '/ws');
+    const wsUrl = config.backend_api_url.replace(/^http/, 'ws').replace(/\/api$/, '') + '/_chat/routes';
 
-    const connection = React.useRef<WebSocket | null>(null);
+    const sessionRef = React.useRef<ChatScopesSession | null>(null);
+    const clientRef = React.useRef<ChatScopesClient | null>(null);
     const chatBotAnswer = document.getElementById('chatBotAnswer');
 
+    const createSession = async (client: ChatScopesClient): Promise<ChatScopesSession> => {
+        return client.builder()
+            .messageHandler((message: string) => {
+                setAnswerText([message]);
+            })
+            .errorHandler((error: string) => {
+                console.error('Chat error:', error);
+                setAnswerText(['An error occurred. Please try again.']);
+            })
+            .thinkingHandler((message: string) => {
+                console.log('Thinking: ', message);
+            })
+            .connect('chat');
+    };
+
     React.useEffect(() => {
-        const ws = new WebSocket(wsUrl + '/query') || {};
+        let cancelled = false;
+        const client = new ChatScopesClient();
 
-        ws.onopen = () => {
-            console.log('opened ws connection')
-        }
-        ws.onclose = (e) => {
-            console.log('close ws connection: ', e.code, e.reason)
-        }
-
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (data['type'] === 'token') {
-                setAnswerText(answerText => [...answerText, data['token']]);
-                return
-            } else if (data['type'] === 'source') {
-                setAnswerSources(answerSources => [...answerSources, data['source']]);
-                return
-            }
-        }
-
-        connection.current = ws;
-
-        // Clean up function
-        return () => {
-            if (connection.current) {
-                connection.current.close();
-                console.log('WebSocket connection closed');
-            }
+        const initSession = async () => {
+            await client.open(wsUrl);
+            if (cancelled) return;
+            clientRef.current = client;
+            sessionRef.current = await createSession(client);
         };
-    }, [])
+
+        initSession().catch((err) => {
+            if (!cancelled) {
+                console.error('Failed to initialize chat session:', err);
+            }
+        });
+
+        return () => {
+            cancelled = true;
+            client.websocket?.close();
+            clientRef.current = null;
+            sessionRef.current = null;
+        };
+    }, []);
 
     React.useEffect(() => {
         if (chatBotAnswer) {
             chatBotAnswer.scrollTop = chatBotAnswer.scrollHeight;
         }
-    }, [answerText, answerSources]);  // Dependency array
+    }, [answerText]);
 
 
     const sendQueryText = () => {
-        if (connection.current?.readyState === WebSocket.OPEN) {
-            const previousAnswer = answerText; // Save the previous response, needed because states are updated asynchronously
-            setMessageHistory([...messageHistory, previousAnswer, queryText]); // Add the previous response to the message history
-            setQueryText(''); // Clear the query text
-            setAnswerText([]); // Clear the previous response
-            setAnswerSources([]); // Clear the previous sources
-            // Put the query in a JSON object so that we can add other info later
-            if (queryText != "" ) {
-                let data = {
-                    claimId: claimId,
-                    query: queryText,
-                    claim: claimSummary,
-                    inceptionDate: inceptionDate
-                };
-                connection.current?.send(JSON.stringify(data)); // Send the query to the server
-            } else {
-                setAnswerText(['Please enter a query...']);
-             }
-            
-            
-            
-        };
-    }
+        if (!sessionRef.current) {
+            return;
+        }
+
+        if (queryText === '') {
+            setAnswerText(['Please enter a query...']);
+            return;
+        }
+
+        const previousAnswer = answerText;
+        setMessageHistory([...messageHistory, previousAnswer, queryText]);
+        setQueryText('');
+        setAnswerText([]);
+
+        sessionRef.current.sendData({
+            query: {
+                claimId: claimId,
+                query: queryText,
+                claim: claimSummary,
+                inceptionDate: inceptionDate
+            }
+        }).catch((err) => {
+            console.error('Failed to send query:', err);
+            setAnswerText(['An error occurred. Please try again.']);
+        });
+    };
 
     const resetMessageHistory = () => {
         setMessageHistory([]);
-        setAnswerSources([]);
-        setAnswerText(['Hi! I am Parasol Assistant. How can I help you today?']);
+        setAnswerText([' Hi! I am Parasol Assistant. How can I help you today?']);
+
+        if (clientRef.current) {
+            createSession(clientRef.current)
+                .then((session) => {
+                    sessionRef.current = session;
+                })
+                .catch((err) => {
+                    console.error('Failed to create new chat session:', err);
+                });
+        }
     };
 
     return (
@@ -140,7 +160,6 @@ const Chat: React.FunctionComponent<{ claimSummary: string, claimId: string, inc
                                 </GridItem>
                                 <GridItem span={11}>
                                     <Text component={TextVariants.p} className='chat-answer-text'>{answerText.join("") != "" && answerText.join("")}</Text>
-                                    <Text component={TextVariants.p} className='chat-source-text'>{answerSources.join("") != "" && "References: "}{answerSources.join("") != "" && answerSources.join(", ")}</Text>
                                 </GridItem>
                             </Grid>
                         </TextContent>

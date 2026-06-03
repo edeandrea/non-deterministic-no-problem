@@ -19,6 +19,7 @@
 		<quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
 		<quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
 		<quarkus.platform.version>3.35.4</quarkus.platform.version>
+		<quarkus.langfuse.version>0.1.1</quarkus.langfuse.version>
 		<surefire-plugin.version>3.5.5</surefire-plugin.version>
 		<quarkus.mailpit.version>2.0.0</quarkus.mailpit.version>
 	</properties>
@@ -52,6 +53,15 @@
 		<dependency>
 			<groupId>io.quarkiverse.langchain4j</groupId>
 			<artifactId>quarkus-langchain4j-openai</artifactId>
+		</dependency>
+		<dependency>
+		   <groupId>io.quarkiverse.langchain4j</groupId>
+		   <artifactId>quarkus-langchain4j-chat-scopes-websocket</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.quarkiverse.langfuse</groupId>
+			<artifactId>quarkus-langfuse</artifactId>
+			<version>${quarkus.langfuse.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>dev.langchain4j</groupId>

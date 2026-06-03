@@ -9,23 +9,26 @@ import java.util.stream.Collectors;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.ObservesAsync;
 
-import org.eclipse.microprofile.rest.client.inject.RestClient;
+import io.quarkus.logging.Log;
 
 import ai.scoring.conversation.ConversationCompletedEvent;
 import ai.scoring.langfuse.config.LangfuseConfig;
-import ai.scoring.langfuse.rest.LangfuseApiClient;
-import ai.scoring.langfuse.rest.LangfuseNotFoundException;
-import ai.scoring.langfuse.rest.model.CreateDatasetItemRequest;
-import ai.scoring.langfuse.rest.model.CreateDatasetRequest;
-import ai.scoring.langfuse.rest.model.CreateScoreValue;
-import ai.scoring.langfuse.rest.model.LegacyCreateScoreRequest;
-import ai.scoring.langfuse.rest.model.ScoreDataType;
-import ai.scoring.langfuse.rest.model.Dataset;
-import ai.scoring.langfuse.rest.model.Trace;
+import com.langfuse.api.LangfuseApi;
+import com.langfuse.api.datasetItems.DatasetItemsApi.APIDatasetItemsCreateRequest;
+import com.langfuse.api.datasets.DatasetsApi.APIDatasetsCreateRequest;
+import com.langfuse.api.datasets.DatasetsApi.APIDatasetsListRequest;
+import com.langfuse.api.legacyScoreV1.LegacyScoreV1Api.APILegacyScoreV1CreateRequest;
+import com.langfuse.api.model.CreateDatasetItemRequest;
+import com.langfuse.api.model.CreateDatasetRequest;
+import com.langfuse.api.model.CreateScoreValue;
+import com.langfuse.api.model.Dataset;
+import com.langfuse.api.model.LegacyCreateScoreRequest;
+import com.langfuse.api.model.ScoreDataType;
+import com.langfuse.api.model.Trace;
+import com.langfuse.api.sessions.SessionsApi.APISessionsGetRequest;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.Tracer;
-
-import io.quarkus.logging.Log;
+import io.quarkiverse.langfuse.client.LangfuseNotFoundException;
 
 /**
  * Service responsible for scoring sessions by analyzing conversation sentiment.
@@ -43,13 +46,13 @@ import io.quarkus.logging.Log;
 public class LangfuseSessionScoringService {
 	private final LangfuseConfig langfuseConfig;
 	private final Tracer tracer;
-	private final LangfuseApiClient langfuseApiClient;
+	private final LangfuseApi langfuseApi;
 	private final SessionSentimentService sessionSentimentService;
 
-	public LangfuseSessionScoringService(LangfuseConfig langfuseConfig, Tracer tracer, @RestClient LangfuseApiClient langfuseApiClient, SessionSentimentService sessionSentimentService) {
+	public LangfuseSessionScoringService(LangfuseConfig langfuseConfig, Tracer tracer, LangfuseApi langfuseApi, SessionSentimentService sessionSentimentService) {
 		this.langfuseConfig = langfuseConfig;
 		this.tracer = tracer;
-		this.langfuseApiClient = langfuseApiClient;
+		this.langfuseApi = langfuseApi;
 		this.sessionSentimentService = sessionSentimentService;
 	}
 
@@ -81,21 +84,24 @@ public class LangfuseSessionScoringService {
 		try {
 			var sessionEvalConfig = this.langfuseConfig.evaluation().session();
 
-			this.langfuseApiClient.sessionsGet(conversationId)
-				.getTraces()
-				.stream()
-				.filter(trace -> (trace.getTimestamp() != null) && (trace.getInput() != null) && (trace.getOutput() != null))
-				.sorted(Comparator.comparing(Trace::getTimestamp))
-				.map(ConversationExchange::from)
-				.collect(Collectors.collectingAndThen(
-					Collectors.toUnmodifiableList(),
-					exchanges -> Optional.ofNullable(exchanges)
-						.filter(e -> !e.isEmpty())
-						.map(e -> sessionEvalConfig.createDatasetOnSessionClose() ? createDatasets(conversationId, e) : e)
-						.filter(e -> sessionEvalConfig.scoreSession())
-						.map(this.sessionSentimentService::evaluate)
-				))
-				.ifPresentOrElse(
+			this.langfuseApi.sessions()
+			                .sessionsGet(APISessionsGetRequest.newBuilder()
+			                                                  .sessionId(conversationId)
+			                                                  .build())
+			                .getTraces()
+			                .stream()
+			                .filter(trace -> (trace.getTimestamp() != null) && (trace.getInput() != null) && (trace.getOutput() != null))
+			                .sorted(Comparator.comparing(Trace::getTimestamp))
+			                .map(ConversationExchange::from)
+			                .collect(Collectors.collectingAndThen(
+												Collectors.toUnmodifiableList(),
+				                exchanges -> Optional.ofNullable(exchanges)
+				                                     .filter(e -> !e.isEmpty())
+				                                     .map(e -> sessionEvalConfig.createDatasetOnSessionClose() ? createDatasets(conversationId, e) : e)
+				                                     .filter(e -> sessionEvalConfig.scoreSession())
+				                                     .map(this.sessionSentimentService::evaluate)
+			                ))
+			                .ifPresentOrElse(
 					sentiment -> {
 						Log.infof("Session %s sentiment: %s - %s", conversationId, sentiment.sentiment(), sentiment.reasoning());
 						saveScore(conversationId, sentiment);
@@ -113,39 +119,57 @@ public class LangfuseSessionScoringService {
 		// Its essentially building a local cache, which if lots of apps are running concurrently, could mean that new datasets are added while performing this logic
 		// It would be better to try to fetch datasets and check each time, but this is simpler and should be fine for now
 		// #Demoware!
-		var existingDatasets = this.langfuseApiClient.datasetsList(null, null)
-			.getData()
-			.stream()
-			.map(Dataset::getName)
-			.collect(Collectors.toSet());
+		var datasetsApi = this.langfuseApi.datasets();
+		var existingDatasets = datasetsApi.datasetsList(APIDatasetsListRequest.newBuilder().build())
+		                                       .getData()
+		                                       .stream()
+		                                       .map(Dataset::getName)
+		                                       .collect(Collectors.toSet());
 
 		exchanges.forEach(exchange -> {
 			var datasetName = "%s/%s".formatted(exchange.traceName(), conversationId);
 
 			if (existingDatasets.add(datasetName)) {
-				this.langfuseApiClient.datasetsCreate(new CreateDatasetRequest().name(datasetName));
+				var request = CreateDatasetRequest.builder()
+					.name(datasetName)
+					.build();
+
+				datasetsApi.datasetsCreate(APIDatasetsCreateRequest.newBuilder()
+					.createDatasetRequest(request)
+					.build());
 				Log.infof("Created dataset %s for session %s", datasetName, conversationId);
 			}
 
-			this.langfuseApiClient.datasetItemsCreate(new CreateDatasetItemRequest().datasetName(datasetName)
-			                                                                        .input(exchange.input())
-			                                                                        .expectedOutput(exchange.output())
-			                                                                        .sourceTraceId(exchange.traceId()));
+			var request = CreateDatasetItemRequest.builder()
+				.datasetName(datasetName)
+				.input(exchange.input())
+				.expectedOutput(exchange.output())
+				.sourceTraceId(exchange.traceId())
+				.build();
+
+			this.langfuseApi.datasetItems()
+				.datasetItemsCreate(APIDatasetItemsCreateRequest.newBuilder()
+					.createDatasetItemRequest(request)
+					.build());
 		});
 
 		return exchanges;
 	}
 
 	private void saveScore(String conversationId, SessionSentiment sentiment) {
-		var request = new LegacyCreateScoreRequest()
+		var request = LegacyCreateScoreRequest.builder()
 			.sessionId(conversationId)
 			.name(SessionSentiment.SCORE_NAME)
-			.value(CreateScoreValue.of(sentiment.sentiment().label()))
+			.value(new CreateScoreValue(sentiment.sentiment().label()))
 			.dataType(ScoreDataType.CATEGORICAL)
-			.comment(sentiment.reasoning());
+			.comment(sentiment.reasoning())
+			.build();
 
 		try {
-			var response = this.langfuseApiClient.legacyScoreV1Create(request);
+			var response = this.langfuseApi.legacyScoreV1()
+				.legacyScoreV1Create(APILegacyScoreV1CreateRequest.newBuilder()
+					.legacyCreateScoreRequest(request)
+					.build());
 			Log.infof("Posted session-sentiment score for session %s (scoreId=%s)", conversationId, response.getId());
 		}
 		catch (Exception e) {

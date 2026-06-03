@@ -1,6 +1,6 @@
 package ai.scoring.langfuse.session;
 
-import ai.scoring.langfuse.rest.model.Trace;
+import com.langfuse.api.model.Trace;
 
 public record ConversationExchange(String traceName, String traceId, String input, String output) {
   public static ConversationExchange from(Trace trace) {

@@ -9,42 +9,51 @@ import java.util.Optional;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 
-import org.eclipse.microprofile.rest.client.inject.RestClient;
+import io.quarkus.logging.Log;
+import io.quarkus.runtime.StartupEvent;
 
 import ai.scoring.langfuse.config.LangfuseConfig;
 import ai.scoring.langfuse.config.LangfuseConfig.Evaluation;
-import ai.scoring.langfuse.rest.LangfuseApiClient;
-import ai.scoring.langfuse.rest.model.ConfigCategory;
-import ai.scoring.langfuse.rest.model.CreateModelRequest;
-import ai.scoring.langfuse.rest.model.CreateScoreConfigRequest;
-import ai.scoring.langfuse.rest.model.EvaluationRuleFilter;
-import ai.scoring.langfuse.rest.model.EvaluationRuleFilter.OptionsOperator;
-import ai.scoring.langfuse.rest.model.LlmAdapter;
-import ai.scoring.langfuse.rest.model.LlmConnection;
-import ai.scoring.langfuse.rest.model.Model;
-import ai.scoring.langfuse.rest.model.ModelUsageUnit;
-import ai.scoring.langfuse.rest.model.ScoreConfig;
-import ai.scoring.langfuse.rest.model.ScoreConfigDataType;
-import ai.scoring.langfuse.rest.model.UnstableCreateEvaluationRuleRequest;
-import ai.scoring.langfuse.rest.model.UnstableCreateEvaluatorRequest;
-import ai.scoring.langfuse.rest.model.UnstableEvaluationRule;
-import ai.scoring.langfuse.rest.model.UnstableEvaluationRuleEvaluatorReference;
-import ai.scoring.langfuse.rest.model.UnstableEvaluationRuleMapping;
-import ai.scoring.langfuse.rest.model.UnstableEvaluationRuleMappingSource;
-import ai.scoring.langfuse.rest.model.UnstableEvaluationRuleTarget;
-import ai.scoring.langfuse.rest.model.UnstableEvaluator;
-import ai.scoring.langfuse.rest.model.UnstableEvaluatorModelConfig;
-import ai.scoring.langfuse.rest.model.UnstableEvaluatorOutputDataType;
-import ai.scoring.langfuse.rest.model.UnstableEvaluatorOutputDefinition;
-import ai.scoring.langfuse.rest.model.UnstableEvaluatorOutputFieldDefinition;
-import ai.scoring.langfuse.rest.model.UnstableEvaluatorScope;
-import ai.scoring.langfuse.rest.model.UnstableEvaluatorType;
-import ai.scoring.langfuse.rest.model.UnstablePublicCategoricalEvaluatorOutputScoreDefinition;
-import ai.scoring.langfuse.rest.model.UpsertLlmConnectionRequest;
 import ai.scoring.langfuse.session.SessionSentiment;
-
-import io.quarkus.logging.Log;
-import io.quarkus.runtime.StartupEvent;
+import com.langfuse.api.LangfuseApi;
+import com.langfuse.api.llmConnections.LlmConnectionsApi.APILlmConnectionsUpsertRequest;
+import com.langfuse.api.model.ConfigCategory;
+import com.langfuse.api.model.CreateModelRequest;
+import com.langfuse.api.model.CreateScoreConfigRequest;
+import com.langfuse.api.model.LlmAdapter;
+import com.langfuse.api.model.LlmConnection;
+import com.langfuse.api.model.Model;
+import com.langfuse.api.model.ModelUsageUnit;
+import com.langfuse.api.model.ScoreConfig;
+import com.langfuse.api.model.ScoreConfigDataType;
+import com.langfuse.api.model.UnstableCreateEvaluationRuleRequest;
+import com.langfuse.api.model.UnstableCreateEvaluatorRequest;
+import com.langfuse.api.model.UnstableEvaluationRule;
+import com.langfuse.api.model.UnstableEvaluationRuleEvaluatorReference;
+import com.langfuse.api.model.UnstableEvaluationRuleFilter;
+import com.langfuse.api.model.UnstableEvaluationRuleFilterOneOf3;
+import com.langfuse.api.model.UnstableEvaluationRuleFilterOneOf3.TypeEnum;
+import com.langfuse.api.model.UnstableEvaluationRuleMapping;
+import com.langfuse.api.model.UnstableEvaluationRuleMappingSource;
+import com.langfuse.api.model.UnstableEvaluationRuleOptionsFilterOperator;
+import com.langfuse.api.model.UnstableEvaluationRuleTarget;
+import com.langfuse.api.model.UnstableEvaluator;
+import com.langfuse.api.model.UnstableEvaluatorModelConfig;
+import com.langfuse.api.model.UnstableEvaluatorOutputDefinition;
+import com.langfuse.api.model.UnstableEvaluatorOutputDefinitionOneOf;
+import com.langfuse.api.model.UnstableEvaluatorOutputDefinitionOneOf.DataTypeEnum;
+import com.langfuse.api.model.UnstableEvaluatorOutputDefinitionOneOf1;
+import com.langfuse.api.model.UnstableEvaluatorOutputDefinitionOneOf2;
+import com.langfuse.api.model.UnstableEvaluatorOutputFieldDefinition;
+import com.langfuse.api.model.UnstableEvaluatorScope;
+import com.langfuse.api.model.UnstableEvaluatorType;
+import com.langfuse.api.model.UnstablePublicEvaluatorOutputDefinition;
+import com.langfuse.api.model.UpsertLlmConnectionRequest;
+import com.langfuse.api.models.ModelsApi.APIModelsCreateRequest;
+import com.langfuse.api.scoreConfigs.ScoreConfigsApi.APIScoreConfigsCreateRequest;
+import com.langfuse.api.unstableEvaluationRules.UnstableEvaluationRulesApi.APIUnstableEvaluationRulesCreateRequest;
+import com.langfuse.api.unstableEvaluators.UnstableEvaluatorsApi.APIUnstableEvaluatorsCreateRequest;
+import com.langfuse.api.unstableEvaluators.UnstableEvaluatorsApi.APIUnstableEvaluatorsListRequest;
 
 @ApplicationScoped
 public class LangfuseEvaluationInitializer {
@@ -60,11 +69,11 @@ public class LangfuseEvaluationInitializer {
 		""";
 
 	private final Evaluation scoringConfig;
-	private final LangfuseApiClient langfuseApiClient;
+	private final LangfuseApi langfuseApi;
 
-	public LangfuseEvaluationInitializer(LangfuseConfig langfuseConfig, @RestClient LangfuseApiClient langfuseApiClient) {
+	public LangfuseEvaluationInitializer(LangfuseConfig langfuseConfig, LangfuseApi langfuseApi) {
 		this.scoringConfig = langfuseConfig.evaluation();
-		this.langfuseApiClient = langfuseApiClient;
+		this.langfuseApi = langfuseApi;
 	}
 
 	void onStartup(@Observes StartupEvent event) {
@@ -89,29 +98,51 @@ public class LangfuseEvaluationInitializer {
 	private Optional<UnstableEvaluationRule> createEvaluationRule(UnstableEvaluator evaluator) {
 		Log.infof("Creating evaluation rule for evaluator %s", evaluator.getName());
 
-		var request = new UnstableCreateEvaluationRuleRequest()
+		var request = UnstableCreateEvaluationRuleRequest.builder()
 			.name("Continuous Evaluation Evaluator")
-			.evaluator(new UnstableEvaluationRuleEvaluatorReference()
+			.evaluator(UnstableEvaluationRuleEvaluatorReference.builder()
 				.name(evaluator.getName())
-				.scope(isManagedEvaluator(evaluator) ? UnstableEvaluatorScope.MANAGED : UnstableEvaluatorScope.PROJECT))
+				.scope(isManagedEvaluator(evaluator) ? UnstableEvaluatorScope.MANAGED : UnstableEvaluatorScope.PROJECT)
+				.build())
 			.target(UnstableEvaluationRuleTarget.OBSERVATION)
 			.enabled(true)
 			.sampling(1.0)
 			.filter(List.of(
-				EvaluationRuleFilter.stringOptionsFilter("environment", OptionsOperator.NONE_OF, List.of("langfuse-llm-as-a-judge")),
-				EvaluationRuleFilter.stringOptionsFilter("type", OptionsOperator.NONE_OF, List.of("SPAN", "EVENT"))
+				new UnstableEvaluationRuleFilter(
+					UnstableEvaluationRuleFilterOneOf3.builder()
+            .column("environment")
+            .operator(UnstableEvaluationRuleOptionsFilterOperator.NONE_OF)
+            .type(TypeEnum.STRING_OPTIONS)
+            .value(List.of(UnstableEvaluatorType.LLM_AS_JUDGE.getValue()))
+            .build()
+				),
+				new UnstableEvaluationRuleFilter(
+					UnstableEvaluationRuleFilterOneOf3.builder()
+						.column("type")
+						.operator(UnstableEvaluationRuleOptionsFilterOperator.NONE_OF)
+						.type(TypeEnum.STRING_OPTIONS)
+						.value(List.of("SPAN", "EVENT"))
+						.build()
+				)
 			))
 			.mapping(List.of(
-				new UnstableEvaluationRuleMapping()
+				UnstableEvaluationRuleMapping.builder()
 					.variable("query")
-					.source(UnstableEvaluationRuleMappingSource.INPUT),
-				new UnstableEvaluationRuleMapping()
+					.source(UnstableEvaluationRuleMappingSource.INPUT)
+					.build(),
+				UnstableEvaluationRuleMapping.builder()
 					.variable("generation")
 					.source(UnstableEvaluationRuleMappingSource.OUTPUT)
-			));
+					.build()
+			))
+			.build();
 
 		try {
-			var rule = this.langfuseApiClient.unstableEvaluationRulesCreate(request);
+			var rule = this.langfuseApi
+				.unstableEvaluationRules()
+				.unstableEvaluationRulesCreate(APIUnstableEvaluationRulesCreateRequest.newBuilder()
+				                                                                      .unstableCreateEvaluationRuleRequest(request)
+				                                                                      .build());
 			Log.infof("Created evaluation rule: %s", rule.getId());
 			return Optional.of(rule);
 		}
@@ -131,34 +162,71 @@ public class LangfuseEvaluationInitializer {
 			);
 
 		// @TODO this should be paginated - 100 is the max per page allowed
-		return this.langfuseApiClient.unstableEvaluatorsList(1, 100)
+		return this.langfuseApi
+			.unstableEvaluators()
+			.unstableEvaluatorsList(APIUnstableEvaluatorsListRequest.newBuilder()
+				.page(1)
+				.limit(100)
+				.build())
 			.getData()
 			.stream()
-			.filter(LangfuseEvaluationInitializer::isManagedEvaluator)
-			.findFirst()
-			.map(evaluator -> updateEvaluatorIfNecessary(evaluator, llmConnection))
-			.or(() -> createEvaluator(llmConnection));
+     .filter(LangfuseEvaluationInitializer::isManagedEvaluator)
+     .findFirst()
+     .map(evaluator -> updateEvaluatorIfNecessary(evaluator, llmConnection))
+     .or(() -> createEvaluator(llmConnection));
+	}
+
+	private static UnstableEvaluatorOutputDefinition getOutputDefinition(UnstablePublicEvaluatorOutputDefinition outputDefinition) {
+		return switch (outputDefinition.getActualInstance()) {
+			case UnstableEvaluatorOutputDefinitionOneOf oneOf ->
+				new UnstableEvaluatorOutputDefinition(
+					UnstableEvaluatorOutputDefinitionOneOf.builder()
+						.dataType(oneOf.getDataType())
+						.reasoning(oneOf.getReasoning())
+						.score(oneOf.getScore())
+						.build()
+				);
+
+			case UnstableEvaluatorOutputDefinitionOneOf1 oneOf1 ->
+				new UnstableEvaluatorOutputDefinition(
+					UnstableEvaluatorOutputDefinitionOneOf1.builder()
+						.dataType(oneOf1.getDataType())
+						.reasoning(oneOf1.getReasoning())
+						.score(oneOf1.getScore())
+						.build()
+				);
+
+			case UnstableEvaluatorOutputDefinitionOneOf2 oneOf2 ->
+				new UnstableEvaluatorOutputDefinition(
+					UnstableEvaluatorOutputDefinitionOneOf2.builder()
+						.dataType(oneOf2.getDataType())
+						.reasoning(oneOf2.getReasoning())
+						.score(oneOf2.getScore())
+						.build()
+				);
+
+			default -> throw new IllegalStateException("Unexpected output definition type: " + outputDefinition.getActualInstance());
+		};
 	}
 
 	private UnstableEvaluator updateEvaluatorIfNecessary(UnstableEvaluator evaluator, LlmConnection llmConnection) {
 		if (isManagedEvaluator(evaluator) && (evaluator.getModelConfig() == null)) {
-			var updateEvaluatorRequest = new UnstableCreateEvaluatorRequest()
+			var updateEvaluatorRequest = UnstableCreateEvaluatorRequest.builder()
 				.name(evaluator.getName())
 				.prompt(evaluator.getPrompt())
-				.modelConfig(new UnstableEvaluatorModelConfig()
+				.modelConfig(UnstableEvaluatorModelConfig.builder()
 					.model(llmConnection.getCustomModels().getFirst())
-					.provider(llmConnection.getProvider()))
-				.outputDefinition(new UnstableEvaluatorOutputDefinition()
-					.dataType(evaluator.getOutputDefinition().getDataType())
-					.reasoning(new UnstableEvaluatorOutputFieldDefinition()
-						.description(evaluator.getOutputDefinition().getReasoning().getDescription()))
-					.score(new UnstablePublicCategoricalEvaluatorOutputScoreDefinition()
-						.description(evaluator.getOutputDefinition().getScore().getDescription())
-						.shouldAllowMultipleMatches(Optional.ofNullable(evaluator.getOutputDefinition().getScore().getShouldAllowMultipleMatches()).orElse(false))
-						.categories(evaluator.getOutputDefinition().getScore().getCategories())));
+					.provider(llmConnection.getProvider())
+					.build())
+				.outputDefinition(getOutputDefinition(evaluator.getOutputDefinition()))
+				.build();
 
 			try {
-				return this.langfuseApiClient.unstableEvaluatorsCreate(updateEvaluatorRequest);
+				return this.langfuseApi
+					.unstableEvaluators()
+					.unstableEvaluatorsCreate(APIUnstableEvaluatorsCreateRequest.newBuilder()
+						.unstableCreateEvaluatorRequest(updateEvaluatorRequest)
+						.build());
 			}
 			catch (Exception e) {
 				Log.warnf(e, "Failed to update evaluator: %s", e.getMessage());
@@ -178,22 +246,32 @@ public class LangfuseEvaluationInitializer {
 	private Optional<UnstableEvaluator> createEvaluator(LlmConnection llmConnection) {
 		Log.infof("Initializing Continuous Evaluation LLM Evaluator");
 
-		var request = new UnstableCreateEvaluatorRequest()
+		var request = UnstableCreateEvaluatorRequest.builder()
 			.name("Continuous Evaluation Evaluator")
 			.prompt(PROMPT)
-			.modelConfig(new UnstableEvaluatorModelConfig()
+			.modelConfig(UnstableEvaluatorModelConfig.builder()
 				.model(llmConnection.getCustomModels().getFirst())
-				.provider(llmConnection.getProvider()))
-			.outputDefinition(new UnstableEvaluatorOutputDefinition()
-					.dataType(UnstableEvaluatorOutputDataType.NUMERIC)
-					.reasoning(new UnstableEvaluatorOutputFieldDefinition()
-						.description("Explain the assigned score in one concise sentence."))
-				.score(new UnstablePublicCategoricalEvaluatorOutputScoreDefinition()
-					.description("Return a numeric score between 0 and 1, where 0 means \"completely irrelevant\" and 1 means \"completely relevant\".")
-					.shouldAllowMultipleMatches(false)));
+				.provider(llmConnection.getProvider())
+				.build())
+			.outputDefinition(new UnstableEvaluatorOutputDefinition(
+				UnstableEvaluatorOutputDefinitionOneOf.builder()
+					.dataType(DataTypeEnum.NUMERIC)
+					.reasoning(UnstableEvaluatorOutputFieldDefinition.builder()
+						.description("Explain the assigned score in one concise sentence.")
+						.build())
+					.score(UnstableEvaluatorOutputFieldDefinition.builder()
+						.description("Return a numeric score between 0 and 1, where 0 means \"completely irrelevant\" and 1 means \"completely relevant\".")
+						.build())
+					.build()
+			))
+			.build();
 
 		try {
-			var evaluator = this.langfuseApiClient.unstableEvaluatorsCreate(request);
+			var evaluator = this.langfuseApi
+				.unstableEvaluators()
+				.unstableEvaluatorsCreate(APIUnstableEvaluatorsCreateRequest.newBuilder()
+					.unstableCreateEvaluatorRequest(request)
+					.build());
 			Log.infof("Registered Continuous Evaluation LLM Evaluator: %s", evaluator.getId());
 			return Optional.of(evaluator);
 		}
@@ -210,15 +288,20 @@ public class LangfuseEvaluationInitializer {
 
 		Log.infof("Initializing Cohere LLM Connection to model %s", cohere.modelName());
 
-		var request = new UpsertLlmConnectionRequest()
+		var request = UpsertLlmConnectionRequest.builder()
 			.provider("cohere")
 			.adapter(LlmAdapter.OPENAI)
 			.baseURL(cohere.baseUrl())
 			.secretKey(apiKey)
-			.addCustomModelsItem(cohere.modelName());
+			.customModels(List.of(cohere.modelName()))
+			.build();
 
 		try {
-			var connection = this.langfuseApiClient.llmConnectionsUpsert(request);
+			var connection = this.langfuseApi
+				.llmConnections()
+				.llmConnectionsUpsert(APILlmConnectionsUpsertRequest.newBuilder()
+					.upsertLlmConnectionRequest(request)
+					.build());
 			Log.infof("Registered Cohere LLM Connection: %s", connection.getId());
 			return Optional.of(connection);
 		}
@@ -231,15 +314,20 @@ public class LangfuseEvaluationInitializer {
 	private Optional<ScoreConfig> createContinuousScoringScoreConfig() {
 		Log.info("Creating Continuous Evaluation Evaluator score config");
 
-		var request = new CreateScoreConfigRequest()
+		var request = CreateScoreConfigRequest.builder()
 			.name("Continuous Evaluation Evaluator")
 			.dataType(ScoreConfigDataType.NUMERIC)
 			.minValue(0.0)
 			.maxValue(1.0)
-			.description("Relevance score for individual AI responses. 0 = completely irrelevant, 1 = completely relevant.");
+			.description("Relevance score for individual AI responses. 0 = completely irrelevant, 1 = completely relevant.")
+			.build();
 
 		try {
-			var config = this.langfuseApiClient.scoreConfigsCreate(request);
+			var config = this.langfuseApi
+				.scoreConfigs()
+				.scoreConfigsCreate(APIScoreConfigsCreateRequest.newBuilder()
+					.createScoreConfigRequest(request)
+					.build());
 			Log.infof("Created Continuous Evaluation score config (id=%s)", config.getId());
 			return Optional.of(config);
 		}
@@ -254,20 +342,26 @@ public class LangfuseEvaluationInitializer {
 
 		var categories = Arrays.stream(Sentiment.values())
 			.map(s ->
-				new ConfigCategory()
+				ConfigCategory.builder()
 					.label(s.label())
 					.value(s.value())
+					.build()
 			)
 			.toList();
 
-		var request = new CreateScoreConfigRequest()
+		var request = CreateScoreConfigRequest.builder()
 			.name(SessionSentiment.SCORE_NAME)
 			.dataType(ScoreConfigDataType.CATEGORICAL)
 			.categories(categories)
-			.description("Overall user sentiment for the conversation session. Evaluates whether the user's queries were answered, if they left satisfied, or if they appeared frustrated.");
+			.description("Overall user sentiment for the conversation session. Evaluates whether the user's queries were answered, if they left satisfied, or if they appeared frustrated.")
+			.build();
 
 		try {
-			var config = this.langfuseApiClient.scoreConfigsCreate(request);
+			var config = this.langfuseApi
+				.scoreConfigs()
+				.scoreConfigsCreate(APIScoreConfigsCreateRequest.newBuilder()
+					.createScoreConfigRequest(request)
+					.build());
 			Log.infof("Created session-sentiment score config (id=%s)", config.getId());
 			return Optional.of(config);
 		}
@@ -279,16 +373,21 @@ public class LangfuseEvaluationInitializer {
 
 	private Optional<Model> registerCohereModelDefinition() {
 		Log.info("Registering Cohere model");
-		var request = new CreateModelRequest()
+		var request = CreateModelRequest.builder()
 			.modelName("command-r7b")
 			.matchPattern("(?i)^(command-r7b)(-.+)?$")
 			.unit(ModelUsageUnit.TOKENS)
 			.inputPrice(0.00000004)
 			.outputPrice(0.00000015)
-			.tokenizerId("openai");
+			.tokenizerId("openai")
+			.build();
 
 		try {
-			var model = this.langfuseApiClient.modelsCreate(request);
+			var model = this.langfuseApi
+				.models()
+				.modelsCreate(APIModelsCreateRequest.newBuilder()
+					.createModelRequest(request)
+					.build());
 			Log.infof("Registered model in Langfuse (id=%s)", model.getId());
 			return Optional.of(model);
 		}

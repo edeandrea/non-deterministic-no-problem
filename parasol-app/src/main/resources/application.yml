@@ -7,10 +7,6 @@ quarkus:
 
   aiscoring:
     interaction-mode: normal
-    langfuse:
-      endpoint: http://localhost:3000
-      public-key: pk-lf-dev
-      secret-key: sk-lf-dev
 
   # Default LangChain4j configuration
   langchain4j:
@@ -166,15 +162,6 @@ quarkus:
   # REST Clients
   rest-client:
     follow-redirects: true
-    langfuse-api:
-      url: "${quarkus.aiscoring.langfuse.endpoint}"
-      follow-redirects: true
-      connect-timeout: 240000
-      read-timeout: 240000
-      logging:
-        scope: request-response
-        body-limit: 2147483647
-        masked-headers: Authorization
     ai-interactions:
       url: http://localhost:8888
       follow-redirects: true
@@ -186,23 +173,15 @@ quarkus:
 
   # OpenAPI generator
   openapi-generator:
-    langfuse_yml:
-      auth:
-        basic_auth:
-          username: "${quarkus.aiscoring.langfuse.public-key}"
-          password: "${quarkus.aiscoring.langfuse.secret-key}"
     codegen:
       input-base-dir: ../openapi
-      include: ai-interactions.yml,langfuse.yml
+      include: ai-interactions.yml
       initialize-empty-collections: true
       use-bean-validation: true
       type-mappings:
         DateTime: Instant
       import-mappings:
         Instant: java.time.Instant
-      schema-mappings:
-        unstableEvaluationRuleFilter: ai.scoring.langfuse.rest.model.EvaluationRuleFilter
-        CreateScoreValue: ai.scoring.langfuse.rest.model.CreateScoreValue
       spec:
         ai_interactions_yml:
           config-key: ai-interactions
@@ -210,15 +189,6 @@ quarkus:
           base-package: ai.scoring.scorer
           use-dynamic-url: false
           return-response: true
-        langfuse_yml:
-          config-key: langfuse-api
-        langfuse-api:
-          base-package: ai.scoring.langfuse.rest
-          config-key: langfuse
-          use-dynamic-url: false
-          register-rest-client: false
-          api-cdi-scope: none
-          method-per-media-type: true
 
 # Ollama profile config
 '%ollama':
@@ -264,10 +234,6 @@ quarkus:
 # Dev mode config
 '%dev':
   quarkus:
-    compose:
-      devservices:
-        files: ../docker-compose-devservices.yml
-#        stop-services: false
     datasource:
       dev-ui:
         allow-sql: true
