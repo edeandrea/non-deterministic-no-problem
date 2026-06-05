@@ -76,8 +76,8 @@ activate SE
 ' 3. ASYNC OBSERVABILITY
 SE ->> OTel : <<async gRPC>>\nSend Metrics/Traces/Logs
 
-' 5. ASYNC SCORING
-SE ->> CSS : <<async>>\nSubmit Interaction for Rescoring
+' 5. SYNC SCORING
+SE ->> CSS : <<sync>>\nSubmit Interaction for Rescoring
 activate CSS
 
 group Rescoring
