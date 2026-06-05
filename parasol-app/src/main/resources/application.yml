@@ -194,6 +194,10 @@ quarkus:
 '%ollama':
   quarkus:
     langchain4j:
+      openai:
+        api-key: changeme
+        session-sentiment:
+          api-key: changeme
       parasol-chat:
         chat-model:
           provider: ollama
