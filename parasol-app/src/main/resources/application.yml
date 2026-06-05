@@ -193,6 +193,12 @@ quarkus:
 # Ollama profile config
 '%ollama':
   quarkus:
+    aiscoring:
+      langfuse:
+        evaluation:
+          session:
+            score-session: false
+          initialize-on-startup: false
     langchain4j:
       openai:
         api-key: changeme
