@@ -7,11 +7,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.event.ObservesAsync;
 
 import io.quarkus.logging.Log;
 
-import ai.scoring.conversation.ConversationCompletedEvent;
+import ai.scoring.evaluation.SessionScoringService;
 import ai.scoring.langfuse.config.LangfuseConfig;
 import com.langfuse.api.LangfuseApi;
 import com.langfuse.api.datasetItems.DatasetItemsApi.APIDatasetItemsCreateRequest;
@@ -31,19 +30,14 @@ import io.opentelemetry.api.trace.Tracer;
 import io.quarkiverse.langfuse.client.LangfuseNotFoundException;
 
 /**
- * Service responsible for scoring sessions by analyzing conversation sentiment.
- * The service receives an async {@link ConversationCompletedEvent}, processes session data,
- * evaluates the sentiment, and submits the calculated score to Langfuse as a session score.
+ * Service responsible for scoring sessions using Langfuse's evaluation and scoring APIs.
+ * Implements the {@link SessionScoringService} interface.
  *
- * The scoring flow includes:
- * - Observing conversation completion events.
- * - Fetching session traces through the langfuse REST API.
- * - Filtering and sorting relevant traces.
- * - Performing sentiment evaluation based on conversation exchanges.
- * - Posting the sentiment score back to Langfuse
+ * This service automates the process of fetching session data, creating datasets if necessary,
+ * evaluating session sentiment, and recording the derived sentiment scores.
  */
 @ApplicationScoped
-public class LangfuseSessionScoringService {
+public class LangfuseSessionScoringService implements SessionScoringService {
 	private final LangfuseConfig langfuseConfig;
 	private final Tracer tracer;
 	private final LangfuseApi langfuseApi;
@@ -56,8 +50,8 @@ public class LangfuseSessionScoringService {
 		this.sessionSentimentService = sessionSentimentService;
 	}
 
-	public void onConversationCompleted(@ObservesAsync ConversationCompletedEvent event) {
-		var conversationId = event.getConversationId();
+	@Override
+	public void scoreSession(String conversationId) {
 		Log.infof("Conversation %s completed - scoring conversation", conversationId);
 
 		try {

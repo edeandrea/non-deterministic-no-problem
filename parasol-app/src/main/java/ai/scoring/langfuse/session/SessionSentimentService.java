@@ -2,6 +2,8 @@ package ai.scoring.langfuse.session;
 
 import java.util.List;
 
+import jakarta.enterprise.context.ApplicationScoped;
+
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.guardrail.OutputGuardrails;
@@ -9,6 +11,7 @@ import io.quarkiverse.langchain4j.RegisterAiService;
 import io.quarkiverse.langchain4j.RegisterAiService.NoRetrievalAugmentorSupplier;
 
 @RegisterAiService(modelName = "session-sentiment", retrievalAugmentor = NoRetrievalAugmentorSupplier.class)
+@ApplicationScoped
 public interface SessionSentimentService {
 
 	@SystemMessage("""

@@ -253,6 +253,11 @@ quarkus:
 # Dev and test modes config
 '%dev,test':
   quarkus:
+    langfuse:
+      log-requests: true
+      log-responses: true
+      pretty-print: true
+
     log:
       category:
         'org.parasol':
