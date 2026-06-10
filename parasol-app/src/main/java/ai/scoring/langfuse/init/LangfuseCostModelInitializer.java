@@ -7,6 +7,7 @@ import io.quarkus.arc.profile.UnlessBuildProfile;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.StartupEvent;
 
+import ai.scoring.langfuse.config.LangfuseConfig;
 import com.langfuse.api.LangfuseApi;
 import com.langfuse.api.model.CreateModelRequest;
 import com.langfuse.api.model.ModelUsageUnit;
@@ -17,14 +18,18 @@ import com.langfuse.api.models.ModelsApi.APIModelsCreateRequest;
 @UnlessBuildProfile("test")
 public class LangfuseCostModelInitializer {
 	private final ModelsApi langfuseModelsApi;
+	private final LangfuseConfig langfuseConfig;
 
-	public LangfuseCostModelInitializer(LangfuseApi langfuseApi) {
+	public LangfuseCostModelInitializer(LangfuseApi langfuseApi, LangfuseConfig langfuseConfig) {
 		this.langfuseModelsApi = langfuseApi.models();
+		this.langfuseConfig = langfuseConfig;
 	}
 
 	void onStartup(@Observes StartupEvent event) {
-		Log.info("Initializing Langfuse models");
-		populateGpt5MiniModel();
+		if (this.langfuseConfig.evaluation().initializeOnStartup()) {
+			Log.info("Initializing Langfuse models");
+			populateGpt5MiniModel();
+		}
 	}
 
 	private void populateGpt5MiniModel() {

@@ -1,0 +1,26 @@
+langfuse:
+  encryptionKey:
+    value: e098f1e3f571be035b2bcc5a94bdb77515ff8838819203601e14ec597a59579a
+  salt:
+    value: secureSalt
+  nextauth:
+    secret:
+      value: langfuse
+
+postgresql:
+  auth:
+    # If you want to use `postgres` as the username, you need to provide postgresPassword instead of password.
+    username: langfuse
+    password: langfuse
+
+clickhouse:
+  auth:
+    password: langfuse
+
+redis:
+  auth:
+    password: langfuse
+
+s3:
+  auth:
+    rootPassword: langfuse

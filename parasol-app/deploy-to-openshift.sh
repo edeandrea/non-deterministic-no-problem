@@ -1,7 +1,7 @@
 #!/bin/zsh
 
 oc delete secret parasol-app-creds
-oc create secret generic parasol-app-creds --from-literal=OPENAI_API_KEY=${OPENAI_API_KEY}
+oc create secret generic parasol-app-creds --from-literal=OPENAI_API_KEY=${OPENAI_API_KEY} --from-literal=COHERE_API_KEY=${COHERE_API_KEY}
 oc delete deployment non-deterministic
 
 oc apply -f src/main/kubernetes/dependencies.yml
@@ -9,3 +9,5 @@ oc apply -f src/main/kubernetes/dependencies.yml
   -Dquarkus.kubernetes.deploy=true \
   -Dquarkus.profile=openshift \
   -Dquarkus.container-image.group=$(oc project -q)
+
+# Need to helm install langfuse according to https://langfuse.com/self-hosting/deployment/kubernetes-helm#deploy-the-helm-chart
