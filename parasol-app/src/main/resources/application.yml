@@ -5,6 +5,9 @@ quarkus:
   application:
     name: parasol-app
 
+  langfuse:
+    environment: dev
+
   aiscoring:
     interaction-mode: normal
 

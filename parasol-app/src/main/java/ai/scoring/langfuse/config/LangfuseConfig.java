@@ -10,6 +10,9 @@ import io.smallrye.config.WithDefault;
 public interface LangfuseConfig {
 	Evaluation evaluation();
 
+	@WithDefault("default")
+	String environment();
+
 	interface Evaluation {
 		@WithDefault("true")
 		boolean initializeOnStartup();
