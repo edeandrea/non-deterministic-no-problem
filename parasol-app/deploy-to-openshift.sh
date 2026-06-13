@@ -11,3 +11,5 @@ oc apply -f src/main/kubernetes/dependencies.yml
   -Dquarkus.container-image.group=$(oc project -q)
 
 # Need to helm install langfuse according to https://langfuse.com/self-hosting/deployment/kubernetes-helm#deploy-the-helm-chart
+# helm install langfuse langfuse/langfuse -f langfuse-helm.values.yml
+# oc service expose langfuse-web

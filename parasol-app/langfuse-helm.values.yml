@@ -6,6 +6,25 @@ langfuse:
   nextauth:
     secret:
       value: langfuse
+  additionalEnv:
+    - name: LANGFUSE_INIT_ORG_ID
+      value: parasol-dev-org
+    - name: LANGFUSE_INIT_ORG_NAME
+      value: Parasol Dev Org
+    - name: LANGFUSE_INIT_PROJECT_ID
+      value: parasol-dev-project
+    - name: LANGFUSE_INIT_PROJECT_NAME
+      value: parasol-dev
+    - name: LANGFUSE_INIT_PROJECT_PUBLIC_KEY
+      value: pk-lf-b30687d2-4eb0-471b-a45d-38abe41b6a10
+    - name: LANGFUSE_INIT_PROJECT_SECRET_KEY
+      value: sk-lf-fef063e9-0806-49cb-b0fd-cfabdb2f9d04
+    - name: LANGFUSE_INIT_USER_EMAIL
+      value: dev@parasol.ai
+    - name: LANGFUSE_INIT_USER_NAME
+      value: DevUser
+    - name: LANGFUSE_INIT_USER_PASSWORD
+      value: password1234$#@!
 
 postgresql:
   auth:

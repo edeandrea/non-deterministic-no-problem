@@ -273,3 +273,17 @@ spec:
   to:
     kind: Service
     name: mailpit
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: langfuse-web
+spec:
+  port:
+    targetPort: http
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  to:
+    kind: Service
+    name: langfuse-web
