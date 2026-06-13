@@ -5,8 +5,8 @@ metadata:
   name: parasol-app-config
 data:
   quarkus.langfuse.base-url: http://langfuse-web:3000
-  quarkus.langfuse.username: pk-lf-b30687d2-4eb0-471b-a45d-38abe41b6a10
-  quarkus.langfuse.password: sk-lf-fef063e9-0806-49cb-b0fd-cfabdb2f9d04
+  quarkus.langfuse.public-key: pk-lf-b30687d2-4eb0-471b-a45d-38abe41b6a10
+  quarkus.langfuse.secret-key: sk-lf-fef063e9-0806-49cb-b0fd-cfabdb2f9d04
   quarkus.aiscoring.langfuse.evaluation.initialize-on-startup: "false"
   quarkus.datasource.jdbc.url: jdbc:postgresql://non-deterministic-db:5432/non_deterministic
   quarkus.otel.exporter.otlp.endpoint: http://lgtm:4318

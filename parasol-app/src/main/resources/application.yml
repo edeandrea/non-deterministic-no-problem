@@ -2,8 +2,8 @@
   quarkus:
     langfuse:
       base-url: http://langfuse-web-langfuse.apps.cluster-4jfwl.4jfwl.sandbox5436.opentlc.com
-      username: pk-lf-b30687d2-4eb0-471b-a45d-38abe41b6a10
-      password: sk-lf-fef063e9-0806-49cb-b0fd-cfabdb2f9d04
+      public-key: pk-lf-b30687d2-4eb0-471b-a45d-38abe41b6a10
+      secret-key: sk-lf-fef063e9-0806-49cb-b0fd-cfabdb2f9d04
       devservices:
         enabled: false
     aiscoring:

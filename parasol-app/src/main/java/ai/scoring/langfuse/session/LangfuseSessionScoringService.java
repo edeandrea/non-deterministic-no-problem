@@ -1,7 +1,9 @@
 package ai.scoring.langfuse.session;
 
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -121,11 +123,17 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 		                                       .collect(Collectors.toSet());
 
 		exchanges.forEach(exchange -> {
-			var datasetName = "%s/%s".formatted(exchange.traceName(), conversationId);
+			var datasetName = "%s".formatted(exchange.traceName());
+			var metadata = Map.of(
+						"session_id", conversationId,
+						"trace_id", exchange.traceId()
+					);
 
 			if (existingDatasets.add(datasetName)) {
 				var request = CreateDatasetRequest.builder()
 					.name(datasetName)
+					.description("Dataset for session %s".formatted(conversationId))
+					.metadata(metadata)
 					.build();
 
 				datasetsApi.datasetsCreate(APIDatasetsCreateRequest.newBuilder()
@@ -134,8 +142,12 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 				Log.infof("Created dataset %s for session %s", datasetName, conversationId);
 			}
 
+			var itemMetadata = new HashMap<>(metadata);
+			itemMetadata.put("trace_name", exchange.traceName());
+
 			var request = CreateDatasetItemRequest.builder()
 				.datasetName(datasetName)
+				.metadata(itemMetadata)
 				.input(exchange.input())
 				.expectedOutput(exchange.output())
 				.sourceTraceId(exchange.traceId())
