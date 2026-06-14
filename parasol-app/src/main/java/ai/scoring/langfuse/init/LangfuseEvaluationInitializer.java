@@ -16,6 +16,7 @@ import ai.scoring.langfuse.config.LangfuseConfig;
 import ai.scoring.langfuse.config.LangfuseConfig.Evaluation;
 import ai.scoring.langfuse.session.SessionSentiment;
 import com.langfuse.api.LangfuseApi;
+import com.langfuse.api.llmConnections.LlmConnectionsApi.APILlmConnectionsListRequest;
 import com.langfuse.api.llmConnections.LlmConnectionsApi.APILlmConnectionsUpsertRequest;
 import com.langfuse.api.model.ConfigCategory;
 import com.langfuse.api.model.CreateModelRequest;
@@ -50,8 +51,11 @@ import com.langfuse.api.model.UnstableEvaluatorType;
 import com.langfuse.api.model.UnstablePublicEvaluatorOutputDefinition;
 import com.langfuse.api.model.UpsertLlmConnectionRequest;
 import com.langfuse.api.models.ModelsApi.APIModelsCreateRequest;
+import com.langfuse.api.models.ModelsApi.APIModelsListRequest;
 import com.langfuse.api.scoreConfigs.ScoreConfigsApi.APIScoreConfigsCreateRequest;
+import com.langfuse.api.scoreConfigs.ScoreConfigsApi.APIScoreConfigsGetRequest;
 import com.langfuse.api.unstableEvaluationRules.UnstableEvaluationRulesApi.APIUnstableEvaluationRulesCreateRequest;
+import com.langfuse.api.unstableEvaluationRules.UnstableEvaluationRulesApi.APIUnstableEvaluationRulesListRequest;
 import com.langfuse.api.unstableEvaluators.UnstableEvaluatorsApi.APIUnstableEvaluatorsCreateRequest;
 import com.langfuse.api.unstableEvaluators.UnstableEvaluatorsApi.APIUnstableEvaluatorsListRequest;
 
@@ -78,16 +82,16 @@ public class LangfuseEvaluationInitializer {
 
 	void onStartup(@Observes StartupEvent event) {
 		if (this.scoringConfig.initializeOnStartup()) {
-			createSessionSentimentScoreConfig()
+			getOrCreateSessionSentimentScoreConfig()
 				.ifPresentOrElse(
 					sessionScore -> Log.info("Session Evaluation config set up"),
 					() -> Log.warn("Session scoring config setup failed")
 				);
 
-			registerCohereModelDefinition()
-				.flatMap(model -> createLlmConnection())
+			getOrRegisterCohereModelDefinition()
+				.flatMap(model -> getOrCreateCohereLlmConnection())
 				.flatMap(this::handleEvaluator)
-				.flatMap(this::createEvaluationRule)
+				.flatMap(this::getOrCreateEvaluationRule)
 				.ifPresentOrElse(
 					rule -> Log.info("LLM Evaluation set up"),
 					() -> Log.warn("LLM Evaluation setup failed")
@@ -95,66 +99,74 @@ public class LangfuseEvaluationInitializer {
 		}
 	}
 
-	private Optional<UnstableEvaluationRule> createEvaluationRule(UnstableEvaluator evaluator) {
-		Log.infof("Creating evaluation rule for evaluator %s", evaluator.getName());
-
-		var request = UnstableCreateEvaluationRuleRequest.builder()
-			.name("Continuous Evaluation Evaluator")
-			.evaluator(UnstableEvaluationRuleEvaluatorReference.builder()
-				.name(evaluator.getName())
-				.scope(isManagedEvaluator(evaluator) ? UnstableEvaluatorScope.MANAGED : UnstableEvaluatorScope.PROJECT)
-				.build())
-			.target(UnstableEvaluationRuleTarget.OBSERVATION)
-			.enabled(true)
-			.sampling(1.0)
-			.filter(List.of(
-				new UnstableEvaluationRuleFilter(
-					UnstableEvaluationRuleFilterOneOf3.builder()
-            .column("environment")
-            .operator(UnstableEvaluationRuleOptionsFilterOperator.NONE_OF)
-            .type(TypeEnum.STRING_OPTIONS)
-            .value(List.of(UnstableEvaluatorType.LLM_AS_JUDGE.getValue()))
-            .build()
-				),
-				new UnstableEvaluationRuleFilter(
-					UnstableEvaluationRuleFilterOneOf3.builder()
-						.column("type")
-						.operator(UnstableEvaluationRuleOptionsFilterOperator.NONE_OF)
-						.type(TypeEnum.STRING_OPTIONS)
-						.value(List.of("SPAN", "EVENT"))
-						.build()
-				)
-			))
-			.mapping(List.of(
-				UnstableEvaluationRuleMapping.builder()
-					.variable("query")
-					.source(UnstableEvaluationRuleMappingSource.INPUT)
-					.build(),
-				UnstableEvaluationRuleMapping.builder()
-					.variable("generation")
-					.source(UnstableEvaluationRuleMappingSource.OUTPUT)
-					.build()
-			))
-			.build();
-
+	private Optional<UnstableEvaluationRule> getExistingEvaluationRule(String name) {
 		try {
-			var rule = this.langfuseApi
+			return this.langfuseApi
 				.unstableEvaluationRules()
-				.unstableEvaluationRulesCreate(APIUnstableEvaluationRulesCreateRequest.newBuilder()
-				                                                                      .unstableCreateEvaluationRuleRequest(request)
-				                                                                      .build());
-			Log.infof("Created evaluation rule: %s", rule.getId());
-			return Optional.of(rule);
+				.unstableEvaluationRulesList(APIUnstableEvaluationRulesListRequest.newBuilder().build())
+				.getData()
+				.stream()
+				.filter(rule -> name.equalsIgnoreCase(rule.getName()))
+				.findFirst();
 		}
-		catch (Exception e) {
-			Log.warnf(e, "Failed to create evaluation rule: %s", e.getMessage());
+		catch (Exception ex) {
 			return Optional.empty();
 		}
 	}
 
+	private Optional<UnstableEvaluationRule> getOrCreateEvaluationRule(UnstableEvaluator evaluator) {
+		return getExistingEvaluationRule("Continuous Evaluation Evaluator")
+			.or(() -> {
+				Log.infof("Creating evaluation rule for evaluator %s", evaluator.getName());
+
+				var request = UnstableCreateEvaluationRuleRequest.builder()
+				                                                 .name("Continuous Evaluation Evaluator")
+				                                                 .evaluator(UnstableEvaluationRuleEvaluatorReference.builder()
+				                                                                                                    .name(evaluator.getName())
+				                                                                                                    .scope(isManagedEvaluator(evaluator) ? UnstableEvaluatorScope.MANAGED
+				                                                                                                                                         : UnstableEvaluatorScope.PROJECT)
+				                                                                                                    .build())
+				                                                 .target(UnstableEvaluationRuleTarget.OBSERVATION)
+				                                                 .enabled(true)
+				                                                 .sampling(1.0)
+				                                                 .filter(List.of(new UnstableEvaluationRuleFilter(UnstableEvaluationRuleFilterOneOf3.builder()
+				                                                                                                                                    .column("environment")
+				                                                                                                                                    .operator(UnstableEvaluationRuleOptionsFilterOperator.NONE_OF)
+				                                                                                                                                    .type(TypeEnum.STRING_OPTIONS)
+				                                                                                                                                    .value(List.of(UnstableEvaluatorType.LLM_AS_JUDGE.getValue()))
+				                                                                                                                                    .build()), new UnstableEvaluationRuleFilter(UnstableEvaluationRuleFilterOneOf3.builder()
+				                                                                                                                                                                                                                  .column("type")
+				                                                                                                                                                                                                                  .operator(UnstableEvaluationRuleOptionsFilterOperator.NONE_OF)
+				                                                                                                                                                                                                                  .type(TypeEnum.STRING_OPTIONS)
+				                                                                                                                                                                                                                  .value(List.of("SPAN", "EVENT"))
+				                                                                                                                                                                                                                  .build())))
+				                                                 .mapping(List.of(UnstableEvaluationRuleMapping.builder()
+				                                                                                               .variable("query")
+				                                                                                               .source(UnstableEvaluationRuleMappingSource.INPUT)
+				                                                                                               .build(), UnstableEvaluationRuleMapping.builder()
+				                                                                                                                                      .variable("generation")
+				                                                                                                                                      .source(UnstableEvaluationRuleMappingSource.OUTPUT)
+				                                                                                                                                      .build()))
+				                                                 .build();
+
+				try {
+					var rule = this.langfuseApi.unstableEvaluationRules()
+					                           .unstableEvaluationRulesCreate(APIUnstableEvaluationRulesCreateRequest.newBuilder()
+					                                                                                                 .unstableCreateEvaluationRuleRequest(request)
+					                                                                                                 .build());
+					Log.infof("Created evaluation rule: %s", rule.getId());
+					return Optional.of(rule);
+				}
+				catch (Exception e) {
+					Log.warnf(e, "Failed to create evaluation rule: %s", e.getMessage());
+					return Optional.empty();
+				}
+			});
+	}
+
 	private Optional<UnstableEvaluator> handleEvaluator(LlmConnection llmConnection) {
 		Log.info("Checking to see if relevance evaluator is already registered");
-		var scoreConfigOptional = createContinuousScoringScoreConfig();
+		var scoreConfigOptional = getOrCreateContinuousScoringScoreConfig();
 
 		scoreConfigOptional.ifPresentOrElse(
 				config -> Log.info("Continuous Evaluation score config setup complete"),
@@ -281,120 +293,171 @@ public class LangfuseEvaluationInitializer {
 		}
 	}
 
-	private Optional<LlmConnection> createLlmConnection() {
-		var cohere = this.scoringConfig.cohere();
-		var apiKey = cohere.apiKey()
-			.orElseThrow(() -> new IllegalStateException("Cohere API Key must be set to initialize Cohere LLM Connection"));
-
-		Log.infof("Initializing Cohere LLM Connection to model %s", cohere.modelName());
-
-		var request = UpsertLlmConnectionRequest.builder()
-			.provider("cohere")
-			.adapter(LlmAdapter.OPENAI)
-			.baseURL(cohere.baseUrl())
-			.secretKey(apiKey)
-			.customModels(List.of(cohere.modelName()))
-			.build();
-
+	private Optional<LlmConnection> getExistingLlmConnection(String provider) {
 		try {
-			var connection = this.langfuseApi
+			return this.langfuseApi
 				.llmConnections()
-				.llmConnectionsUpsert(APILlmConnectionsUpsertRequest.newBuilder()
-					.upsertLlmConnectionRequest(request)
-					.build());
-			Log.infof("Registered Cohere LLM Connection: %s", connection.getId());
-			return Optional.of(connection);
+				.llmConnectionsList(APILlmConnectionsListRequest.newBuilder().build())
+				.getData()
+				.stream()
+				.filter(conn -> provider.equalsIgnoreCase(conn.getProvider()))
+				.findFirst();
 		}
-		catch (Exception e) {
-			Log.warnf(e, "Failed to initialize Cohere LLM Connection: %s", e.getMessage());
+		catch (Exception ex) {
 			return Optional.empty();
 		}
 	}
 
-	private Optional<ScoreConfig> createContinuousScoringScoreConfig() {
-		Log.info("Creating Continuous Evaluation Evaluator score config");
+	private Optional<LlmConnection> getOrCreateCohereLlmConnection() {
+		return getExistingLlmConnection("cohere")
+			.or(() -> {
+				var cohere = this.scoringConfig.cohere();
+				var apiKey = cohere.apiKey()
+				                   .orElseThrow(() -> new IllegalStateException("Cohere API Key must be set to initialize Cohere LLM Connection"));
 
-		var request = CreateScoreConfigRequest.builder()
-			.name("Continuous Evaluation Evaluator")
-			.dataType(ScoreConfigDataType.NUMERIC)
-			.minValue(0.0)
-			.maxValue(1.0)
-			.description("Relevance score for individual AI responses. 0 = completely irrelevant, 1 = completely relevant.")
-			.build();
+				Log.infof("Initializing Cohere LLM Connection to model %s", cohere.modelName());
 
+				var request = UpsertLlmConnectionRequest.builder()
+				                                        .provider("cohere")
+				                                        .adapter(LlmAdapter.OPENAI)
+				                                        .baseURL(cohere.baseUrl())
+				                                        .secretKey(apiKey)
+				                                        .customModels(List.of(cohere.modelName()))
+				                                        .build();
+
+				try {
+					var connection = this.langfuseApi.llmConnections()
+					                                 .llmConnectionsUpsert(APILlmConnectionsUpsertRequest.newBuilder()
+					                                                                                     .upsertLlmConnectionRequest(request)
+					                                                                                     .build());
+					Log.infof("Registered Cohere LLM Connection: %s", connection.getId());
+					return Optional.of(connection);
+				}
+				catch (Exception e) {
+					Log.warnf(e, "Failed to initialize Cohere LLM Connection: %s", e.getMessage());
+					return Optional.empty();
+				}
+			});
+	}
+
+	private Optional<ScoreConfig> getOrCreateContinuousScoringScoreConfig() {
+		return getExistingScoreConfig("Continuous Evaluation Evaluator")
+			.or(() -> {
+				Log.info("Creating Continuous Evaluation Evaluator score config");
+
+				var request = CreateScoreConfigRequest.builder()
+				                                      .name("Continuous Evaluation Evaluator")
+				                                      .dataType(ScoreConfigDataType.NUMERIC)
+				                                      .minValue(0.0)
+				                                      .maxValue(1.0)
+				                                      .description("Relevance score for individual AI responses. 0 = completely irrelevant, 1 = completely relevant.")
+				                                      .build();
+
+				try {
+					var config = this.langfuseApi.scoreConfigs()
+					                             .scoreConfigsCreate(APIScoreConfigsCreateRequest.newBuilder()
+					                                                                             .createScoreConfigRequest(request)
+					                                                                             .build());
+					Log.infof("Created Continuous Evaluation score config (id=%s)", config.getId());
+					return Optional.of(config);
+				}
+				catch (Exception e) {
+					Log.warnf(e, "Failed to create Continuous Evaluation score config: %s", e.getMessage());
+					return Optional.empty();
+				}
+			});
+	}
+
+	private Optional<ScoreConfig> getExistingScoreConfig(String name) {
 		try {
-			var config = this.langfuseApi
+			return this.langfuseApi
 				.scoreConfigs()
-				.scoreConfigsCreate(APIScoreConfigsCreateRequest.newBuilder()
-					.createScoreConfigRequest(request)
-					.build());
-			Log.infof("Created Continuous Evaluation score config (id=%s)", config.getId());
-			return Optional.of(config);
+				.scoreConfigsGet(APIScoreConfigsGetRequest.newBuilder().build())
+				.getData()
+				.stream()
+				.filter(config -> name.equalsIgnoreCase(config.getName()))
+				.findFirst();
 		}
-		catch (Exception e) {
-			Log.warnf(e, "Failed to create Continuous Evaluation score config: %s", e.getMessage());
+		catch (Exception ex) {
 			return Optional.empty();
 		}
 	}
 
-	private Optional<ScoreConfig> createSessionSentimentScoreConfig() {
-		Log.info("Creating session-sentiment score config");
+	private Optional<ScoreConfig> getOrCreateSessionSentimentScoreConfig() {
+		return getExistingScoreConfig(SessionSentiment.SCORE_NAME)
+			.or(() -> {
+				Log.info("Creating session-sentiment score config");
 
-		var categories = Arrays.stream(Sentiment.values())
-			.map(s ->
-				ConfigCategory.builder()
-					.label(s.label())
-					.value(s.value())
-					.build()
-			)
-			.toList();
+				var categories = Arrays.stream(Sentiment.values())
+				                       .map(s -> ConfigCategory.builder()
+				                                               .label(s.label())
+				                                               .value(s.value())
+				                                               .build())
+				                       .toList();
 
-		var request = CreateScoreConfigRequest.builder()
-			.name(SessionSentiment.SCORE_NAME)
-			.dataType(ScoreConfigDataType.CATEGORICAL)
-			.categories(categories)
-			.description("Overall user sentiment for the conversation session. Evaluates whether the user's queries were answered, if they left satisfied, or if they appeared frustrated.")
-			.build();
+				var request = CreateScoreConfigRequest.builder()
+				                                      .name(SessionSentiment.SCORE_NAME)
+				                                      .dataType(ScoreConfigDataType.CATEGORICAL)
+				                                      .categories(categories)
+				                                      .description("Overall user sentiment for the conversation session. Evaluates whether the user's queries were answered, if they left satisfied, or if they appeared frustrated.")
+				                                      .build();
 
-		try {
-			var config = this.langfuseApi
-				.scoreConfigs()
-				.scoreConfigsCreate(APIScoreConfigsCreateRequest.newBuilder()
-					.createScoreConfigRequest(request)
-					.build());
-			Log.infof("Created session-sentiment score config (id=%s)", config.getId());
-			return Optional.of(config);
-		}
-		catch (Exception e) {
-			Log.warnf(e, "Failed to create session-sentiment score config: %s", e.getMessage());
-			return Optional.empty();
-		}
+				try {
+					var config = this.langfuseApi.scoreConfigs()
+					                             .scoreConfigsCreate(APIScoreConfigsCreateRequest.newBuilder()
+					                                                                             .createScoreConfigRequest(request)
+					                                                                             .build());
+					Log.infof("Created session-sentiment score config (id=%s)", config.getId());
+					return Optional.of(config);
+				}
+				catch (Exception e) {
+					Log.warnf(e, "Failed to create session-sentiment score config: %s", e.getMessage());
+					return Optional.empty();
+				}
+			});
 	}
 
-	private Optional<Model> registerCohereModelDefinition() {
-		Log.info("Registering Cohere model");
-		var request = CreateModelRequest.builder()
-			.modelName("command-r7b")
-			.matchPattern("(?i)^(command-r7b)(-.+)?$")
-			.unit(ModelUsageUnit.TOKENS)
-			.inputPrice(0.00000004)
-			.outputPrice(0.00000015)
-			.tokenizerId("openai")
-			.build();
-
+	private Optional<Model> getExistingCohereModelDefinition(String modelName) {
 		try {
-			var model = this.langfuseApi
+			return this.langfuseApi
 				.models()
-				.modelsCreate(APIModelsCreateRequest.newBuilder()
-					.createModelRequest(request)
-					.build());
-			Log.infof("Registered model in Langfuse (id=%s)", model.getId());
-			return Optional.of(model);
+				.modelsList(APIModelsListRequest.newBuilder().build())
+				.getData()
+				.stream()
+				.filter(model -> modelName.equalsIgnoreCase(model.getModelName()))
+				.findFirst();
 		}
-		catch (Exception e) {
-			Log.warnf(e, "Could not register model '%s' in Langfuse: %s", request.getModelName(), e.getMessage());
+		catch (Exception ex) {
+			return Optional.empty();
 		}
+	}
 
-		return Optional.empty();
+	private Optional<Model> getOrRegisterCohereModelDefinition() {
+		return getExistingCohereModelDefinition("command-r7b")
+			.or(() -> {
+				Log.info("Registering Cohere model");
+				var request = CreateModelRequest.builder()
+				                                .modelName("command-r7b")
+				                                .matchPattern("(?i)^(command-r7b)(-.+)?$")
+				                                .unit(ModelUsageUnit.TOKENS)
+				                                .inputPrice(0.00000004)
+				                                .outputPrice(0.00000015)
+				                                .tokenizerId("openai")
+				                                .build();
+
+				try {
+					var model = this.langfuseApi.models()
+					                            .modelsCreate(APIModelsCreateRequest.newBuilder()
+					                                                                .createModelRequest(request)
+					                                                                .build());
+					Log.infof("Registered model in Langfuse (id=%s)", model.getId());
+					return Optional.of(model);
+				}
+				catch (Exception e) {
+					Log.warnf(e, "Could not register model '%s' in Langfuse: %s", request.getModelName(), e.getMessage());
+				}
+
+				return Optional.empty();
+			});
 	}
 }
