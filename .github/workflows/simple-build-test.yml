@@ -44,7 +44,7 @@ jobs:
           - '25'
     name: ai-scorer-jvm-java${{ matrix.java }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Setup Java ${{ matrix.java }}
         uses: actions/setup-java@v5
@@ -75,7 +75,7 @@ jobs:
           - ollama-openai
     name: "jvm-build-test-${{ matrix.java }}-${{ matrix.ai-provider }}"
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Setup Java ${{ matrix.java }}
         uses: actions/setup-java@v5
