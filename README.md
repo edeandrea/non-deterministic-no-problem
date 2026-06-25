@@ -1,10 +1,8 @@
-This repo has 2 main folders:
-- [parasol-app](parasol-app)
-    - The main Parasol Insurance application
-- [ai-scorer](ai-scorer)
-    - The scoring app
+# App Architecture
 
-## Langfuse integration
+![architecture](images/arch.png)
+
+# Langfuse integration
 
 Things that can't yet be done programmatically:
 - Configuring evaluators (see https://github.com/orgs/langfuse/discussions/8241)
@@ -14,14 +12,26 @@ What you CAN auto-configure via LANGFUSE_INIT_* env vars:
 Workaround if you want fully automated scoring:
 - Build an external evaluation pipeline — compute scores in your code and push them to LangFuse via POST `/api/public/scores`. This is what ai-scorer essentially does today, just targeting LangFuse's API instead of its own PostgreSQL. 
 
-## Continuous Scoring
+# Using Ollama
+If you would like to use [Ollama](https://ollama.com/) instead, first install/run Ollama on your machine. Then do one of the following:
 
-![Architecture](docs/continuous-scoring-architecture.png)
+## Building the app
+When building the app, run `./mvnw clean package -DskipTests -Pollama` (or `quarkus build --clean --no-tests -Dollama`)
 
-![Sequence](docs/continuous-scoring-sequence.png)
+## Running dev mode
+When running dev mode, run `./mvnw quarkus:dev -Pollama` (or `quarkus dev -Dollama`).
 
-## Rescoring
+## Running tests
+When running tests, run `./mvnw verify -Pollama` (or `quarkus build --tests -Dollama`)
 
-![Architecture](docs/rescoring-architecture.png)
+## Running the app outside dev mode
+If you want to run the app outside dev mode, first build the app as described above, then run `java -Dquarkus.profile=ollama,prod -jar target/quarkus-app/quarkus-run.jar`
 
-![Sequence](docs/rescoring-sequence.png)
+# Using Ollama via the OpenAI endpoint
+If you would like to use [Ollama](https://ollama.com/) instead but using the OpenAI endpoint, first install/run Ollama on your machine. Then do one of the following:
+
+## Building the app
+When building the app, run `./mvnw clean package -DskipTests -Pollama-openai` (or `quarkus build --clean --no-tests -Dollama-openai`)
+
+## Running dev mode
+When running dev mode, run `./mvnw quarkus:dev -Pollama-openai` (or `quarkus dev -Dollama-openai`).

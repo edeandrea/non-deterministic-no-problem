@@ -31,39 +31,8 @@ defaults:
     shell: bash
 
 jobs:
-  ai-scorer:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ai-scorer
-    strategy:
-      fail-fast: false
-      matrix:
-        java:
-          - '21'
-          - '25'
-    name: ai-scorer-jvm-java${{ matrix.java }}
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Setup Java ${{ matrix.java }}
-        uses: actions/setup-java@v5
-        with:
-          java-version: ${{ matrix.java }}
-          distribution: temurin
-          cache: maven
-
-      - name: build-test-ai-scorer-java${{ matrix.java }}
-        run: |
-          ./mvnw -B clean verify \
-            -Dquarkus.http.host=0.0.0.0 \
-            -Dmaven.compiler.release=${{ matrix.java }}
-
   jvm-build-test:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: parasol-app
     strategy:
       fail-fast: false
       matrix:
