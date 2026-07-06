@@ -6,7 +6,6 @@ import java.util.stream.IntStream;
 
 import jakarta.inject.Inject;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -14,16 +13,15 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 import io.quarkus.test.junit.QuarkusTest;
 
-import io.smallrye.mutiny.infrastructure.Infrastructure;
 import com.langfuse.api.LangfuseApi;
 import com.langfuse.api.datasetItems.DatasetItemsApi.APIDatasetItemsCreateRequest;
 import com.langfuse.api.datasets.DatasetsApi.APIDatasetsCreateRequest;
 import com.langfuse.api.model.CreateDatasetItemRequest;
 import com.langfuse.api.model.CreateDatasetRequest;
+import io.smallrye.mutiny.infrastructure.Infrastructure;
 
 @QuarkusTest
 @TestMethodOrder(OrderAnnotation.class)
-@Disabled
 class LangfuseDatasetSampleLoaderTests {
 	@Inject
 	LangfuseApi langfuseApi;
