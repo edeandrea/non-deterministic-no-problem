@@ -1,5 +1,6 @@
 [allowlist]
     description = "Global Allowlist"
     paths = [
-        '''src\/main\/kubernetes\/dependencies.yml$'''
+        '''src\/main\/kubernetes\/dependencies.yml$''',
+        '''langfuse-helm\.values\.yml$'''
     ]

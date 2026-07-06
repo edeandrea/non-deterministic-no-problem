@@ -204,11 +204,6 @@ quarkus:
         scope: request-response
         body-limit: 2147483647
 
-  playwright:
-    devservices:
-      enabled: true
-      verbose: true
-
 # Ollama profile config
 '%ollama':
   quarkus:
@@ -299,6 +294,9 @@ quarkus:
           initialize-on-startup: false
 
     otel:
+      exporter:
+        otlp:
+          enabled: false
       logs:
         enabled: false
     observability:
