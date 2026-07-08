@@ -4,14 +4,13 @@ import java.util.Optional;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.spi.CDI;
 
 import com.langfuse.api.LangfuseApi;
 import com.langfuse.api.datasetItems.DatasetItemsApi.APIDatasetItemsListRequest;
 import com.langfuse.api.model.DatasetItem;
 import com.langfuse.api.model.DatasetStatus;
 import com.langfuse.api.model.PaginatedDatasetItems;
-
 import io.quarkiverse.langchain4j.testing.evaluation.EvaluationSample;
 import io.quarkiverse.langchain4j.testing.evaluation.Parameters;
 import io.quarkiverse.langchain4j.testing.evaluation.SampleLoadException;
@@ -19,24 +18,23 @@ import io.quarkiverse.langchain4j.testing.evaluation.SampleLoader;
 import io.quarkiverse.langchain4j.testing.evaluation.Samples;
 import io.quarkiverse.langfuse.client.LangfuseNotFoundException;
 
-@ApplicationScoped
-public class LangfuseDatasetSampleLoader implements SampleLoader<Object> {
-	private final LangfuseApi langfuseApi;
-
-	public LangfuseDatasetSampleLoader(LangfuseApi langfuseApi) {
-		this.langfuseApi = langfuseApi;
-	}
+public class LangfuseDatasetSampleLoader implements SampleLoader<String> {
+	// Helper to get CDI instance when created via ServiceLoader
+  private static LangfuseApi getLangfuseApi() {
+    return CDI.current().select(LangfuseApi.class).get();
+  }
 
 	@Override
 	public boolean supports(String source) {
+//		return true;
 		return Optional.ofNullable(source)
-			.map(String::trim)
-			.map(datasetName -> getDatasetItems(datasetName).count())
-			.orElse(0L) > 0;
+		               .map(String::trim)
+		               .map(datasetName -> getDatasetItems(datasetName).count())
+		               .orElse(0L) > 0;
 	}
 
 	@Override
-	public Samples<Object> load(String datasetName, Class<Object> outputType) throws SampleLoadException {
+	public Samples<String> load(String datasetName, Class<String> outputType) throws SampleLoadException {
 		return new Samples(
 			getDatasetItems(datasetName)
 				.map(this::toEvaluationSample)
@@ -44,11 +42,16 @@ public class LangfuseDatasetSampleLoader implements SampleLoader<Object> {
 		);
 	}
 
-	private EvaluationSample<Object> toEvaluationSample(DatasetItem datasetItem) {
-		return EvaluationSample.builder()
+	@Override
+	public int priority() {
+		return 100;
+	}
+
+	private EvaluationSample<String> toEvaluationSample(DatasetItem datasetItem) {
+		return EvaluationSample.<String>builder()
 			.withName(datasetItem.getDatasetId())
 			.withParameters(new Parameters().add("input", datasetItem.getInput()))
-			.withExpectedOutput(datasetItem.getExpectedOutput())
+			.withExpectedOutput(String.valueOf(datasetItem.getExpectedOutput()))
 			.build();
 	}
 
@@ -70,7 +73,7 @@ public class LangfuseDatasetSampleLoader implements SampleLoader<Object> {
 	}
 
 	private PaginatedDatasetItems fetchPage(String datasetName, int page) {
-		return this.langfuseApi
+		return getLangfuseApi()
 			.datasetItems()
 			.datasetItemsList(buildGetDatasetItemsRequest(datasetName, page));
 	}

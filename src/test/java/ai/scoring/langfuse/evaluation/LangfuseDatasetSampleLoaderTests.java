@@ -26,8 +26,7 @@ class LangfuseDatasetSampleLoaderTests {
 	@Inject
 	LangfuseApi langfuseApi;
 
-	@Inject
-	LangfuseDatasetSampleLoader langfuseDatasetSampleLoader;
+	LangfuseDatasetSampleLoader langfuseDatasetSampleLoader = new LangfuseDatasetSampleLoader();
 
 	@Test
 	@Order(0)
@@ -55,7 +54,7 @@ class LangfuseDatasetSampleLoaderTests {
 
 	@Test
 	@Order(2)
-	void emptyDatasetFound() {
+	void emptyDataset() {
 		assertThat(this.langfuseDatasetSampleLoader.supports("dataset1"))
 			.isFalse();
 	}
@@ -89,7 +88,7 @@ class LangfuseDatasetSampleLoaderTests {
 		assertThat(this.langfuseDatasetSampleLoader.supports("dataset2"))
 			.isTrue();
 
-		assertThat(this.langfuseDatasetSampleLoader.load("dataset2", Object.class))
+		assertThat(this.langfuseDatasetSampleLoader.load("dataset2", String.class))
 			.isNotNull()
 			.hasSize(1);
 	}
@@ -127,7 +126,7 @@ class LangfuseDatasetSampleLoaderTests {
 		assertThat(this.langfuseDatasetSampleLoader.supports("dataset3"))
 			.isTrue();
 
-		assertThat(this.langfuseDatasetSampleLoader.load("dataset3", Object.class))
+		assertThat(this.langfuseDatasetSampleLoader.load("dataset3", String.class))
 			.isNotNull()
 			.hasSize(520);
 	}

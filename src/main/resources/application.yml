@@ -92,6 +92,12 @@ quarkus:
         timeout: 600s
         api-key: "${COHERE_API_KEY}"
         base-url: https://api.cohere.ai/compatibility/v1
+      judge:
+        chat-model:
+          model-name: command-r7b-12-2024
+        timeout: 600s
+        api-key: "${COHERE_API_KEY}"
+        base-url: https://api.cohere.ai/compatibility/v1
 
     # Milvus
     milvus:
@@ -115,6 +121,11 @@ quarkus:
           model-id: llama3.2:latest
           temperature: 0.3
       session-sentiment:
+        timeout: 600s
+        chat-model:
+          model-id: llama3.2:latest
+          temperature: 0
+      judge:
         timeout: 600s
         chat-model:
           model-id: llama3.2:latest
@@ -217,6 +228,8 @@ quarkus:
       openai:
         api-key: changeme
         session-sentiment:
+          api-key: changeme
+        judge:
           api-key: changeme
       parasol-chat:
         chat-model:

@@ -47,7 +47,6 @@ public interface SessionSentimentService {
 		Question: {exchange.input}
 		
 		Answer: {exchange.output}
-
 		{/for}
 		""")
 	@OutputGuardrails(SessionSentimentGuardrail.class)

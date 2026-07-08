@@ -2,7 +2,7 @@ package org.parasol.ai;
 
 import org.parasol.model.claim.ClaimBotQuery;
 
-import ai.scoring.rescore.RescoringOutputGuardrail;
+import ai.scoring.drift.DriftDetectionOutputGuardrail;
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.guardrail.OutputGuardrails;
@@ -14,7 +14,7 @@ import io.quarkiverse.langchain4j.chatscopes.DefaultChatRoute;
 
 @RegisterAiService(modelName = "parasol-chat", shouldThrowExceptionOnEventError = true)
 @ChatScoped
-@OutputGuardrails(RescoringOutputGuardrail.class)
+@OutputGuardrails(DriftDetectionOutputGuardrail.class)
 public interface ClaimService {
     @SystemMessage("""
         You are a helpful, respectful and honest assistant named "Parasol Assistant".
