@@ -12,7 +12,7 @@ import io.quarkiverse.langchain4j.chatscopes.ChatRoute;
 import io.quarkiverse.langchain4j.chatscopes.ChatScoped;
 import io.quarkiverse.langchain4j.chatscopes.DefaultChatRoute;
 
-@RegisterAiService(modelName = "parasol-chat", shouldThrowExceptionOnEventError = true)
+@RegisterAiService(modelName = "parasol-chat")
 @ChatScoped
 @OutputGuardrails(DriftDetectionOutputGuardrail.class)
 public interface ClaimService {

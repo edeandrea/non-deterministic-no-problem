@@ -2,14 +2,17 @@ package ai.scoring.drift;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
+import io.quarkus.logging.Log;
+
 import ai.scoring.config.InteractionMode;
 import ai.scoring.config.ScoringConfig;
-import io.quarkiverse.langchain4j.testing.evaluation.Evaluation;
-import io.quarkiverse.langchain4j.testing.evaluation.EvaluationStrategy;
-import io.quarkiverse.langchain4j.testing.evaluation.SampleLoadException;
 import dev.langchain4j.guardrail.OutputGuardrail;
 import dev.langchain4j.guardrail.OutputGuardrailRequest;
 import dev.langchain4j.guardrail.OutputGuardrailResult;
+import dev.langchain4j.invocation.InvocationContext;
+import io.quarkiverse.langchain4j.testing.evaluation.Evaluation;
+import io.quarkiverse.langchain4j.testing.evaluation.EvaluationStrategy;
+import io.quarkiverse.langchain4j.testing.evaluation.SampleLoadException;
 
 @ApplicationScoped
 public class DriftDetectionOutputGuardrail implements OutputGuardrail {
@@ -28,15 +31,25 @@ public class DriftDetectionOutputGuardrail implements OutputGuardrail {
 			var numCpus = Runtime.getRuntime().availableProcessors();
 
 			try {
+				var sampleSetName = "langchain4j.aiservices.%s".formatted(getAIServiceName(invocationContext));
 				var evaluation = Evaluation.<String>builder()
 				                           .withConcurrency(Math.clamp(numCpus - 2, 1, numCpus))
-				                           .withSamples("%s.%s".formatted(invocationContext.interfaceName(), invocationContext.methodName()))
+				                           .withSamples(sampleSetName)
 				                           .evaluate(params -> request.responseFromLLM().aiMessage().text())
 				                           .using(this.evaluationStrategy)
 				                           .run();
 
-				return (evaluation.score() < this.scoringConfig.threshold()) ?
-				       failure("Score is below threshold of %s".formatted(this.scoringConfig.threshold())) :
+				Log.debugf("Score for sample '%s' == %s", sampleSetName, evaluation.score());
+				var score = evaluation.score() / 100.0;
+
+				return (score < this.scoringConfig.threshold()) ?
+				       fatal(
+								 "Score [%s] for sample '%s' is below threshold of %s".formatted(score, sampleSetName, this.scoringConfig.threshold()),
+					       DriftDetectionException.builder()
+					                              .sampleSetName(sampleSetName)
+					                              .score(score)
+					                              .threshold(this.scoringConfig.threshold())
+					                              .build()) :
 				       success();
 			}
 			catch (SampleLoadException ex) {
@@ -45,5 +58,13 @@ public class DriftDetectionOutputGuardrail implements OutputGuardrail {
 		}
 
 		return success();
+	}
+
+	private static String getAIServiceClassName(InvocationContext invocationContext) {
+		return invocationContext.interfaceName().substring(invocationContext.interfaceName().lastIndexOf('.') + 1);
+	}
+
+	private static String getAIServiceName(InvocationContext invocationContext) {
+		return "%s.%s".formatted(getAIServiceClassName(invocationContext), invocationContext.methodName());
 	}
 }

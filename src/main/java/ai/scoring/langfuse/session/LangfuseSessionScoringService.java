@@ -54,8 +54,6 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 
 	@Override
 	public void scoreSession(String conversationId) {
-		Log.infof("Conversation %s completed - scoring conversation", conversationId);
-
 		try {
 			// This is to give time for OTEL to flush spans
 			TimeUnit.MILLISECONDS.sleep(this.langfuseConfig.evaluation().session().otelFlushWaitTime().toMillis());
@@ -95,7 +93,7 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 				                                     .filter(e -> !e.isEmpty())
 				                                     .map(e -> sessionEvalConfig.createDatasetOnSessionClose() ? createDatasets(conversationId, e) : e)
 				                                     .filter(e -> sessionEvalConfig.scoreSession())
-				                                     .map(this.sessionSentimentService::evaluate)
+				                                     .map(this::evaluateSession)
 			                ))
 			                .ifPresentOrElse(
 					sentiment -> {
@@ -108,6 +106,11 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 		catch (LangfuseNotFoundException e) {
 			Log.debugf("Session %s not found in Langfuse, skipping scoring", conversationId);
 		}
+	}
+
+	private SessionSentiment evaluateSession(List<ConversationExchange> exchanges) {
+		Log.info("Conversation completed - scoring conversation");
+		return this.sessionSentimentService.evaluate(exchanges);
 	}
 
 	private List<ConversationExchange> createDatasets(String conversationId, List<ConversationExchange> exchanges) {

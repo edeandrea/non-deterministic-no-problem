@@ -9,7 +9,9 @@ import jakarta.enterprise.event.Observes;
 
 import io.quarkus.logging.Log;
 
+import ai.scoring.config.ScoringConfig;
 import ai.scoring.evaluation.SessionScoringService;
+import ai.scoring.langfuse.config.LangfuseConfig;
 import io.opentelemetry.api.baggage.Baggage;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;

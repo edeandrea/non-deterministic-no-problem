@@ -12,10 +12,25 @@
           headers: x-instana-key=uBp4GXpZQpKrHxMXNcvInQ,x-instana-host=edeandrea-m4max
           protocol: http/protobuf
 
+"%drift":
+  quarkus:
+    config:
+      profile:
+        parent: langfuse-ocp
+    aiscoring:
+      interaction-mode: drift-detection
+
 "%langfuse-ocp":
   quarkus:
+    otel:
+      exporter:
+        otlp:
+          enabled: false
+    observability:
+      lgtm:
+        enabled: false
     langfuse:
-      base-url: http://langfuse-web-langfuse.apps.cluster-k89fp.k89fp.sandbox1982.opentlc.com
+      base-url: https://langfuse-web-parasol.apps.cluster-mfjwb.mfjwb.sandbox3696.opentlc.com
       public-key: pk-lf-b30687d2-4eb0-471b-a45d-38abe41b6a10
       secret-key: sk-lf-fef063e9-0806-49cb-b0fd-cfabdb2f9d04
       log-requests: true
@@ -23,10 +38,12 @@
       pretty-print: true
       devservices:
         enabled: false
-#    aiscoring:
-#      langfuse:
-#        evaluation:
-#          initialize-on-startup: false
+
+    aiscoring:
+      langfuse:
+        evaluation:
+          session:
+            score-session: false
 
 quarkus:
   transaction-manager:
@@ -37,9 +54,6 @@ quarkus:
 
   langfuse:
     environment: dev
-
-  aiscoring:
-    interaction-mode: normal
 
   # Default LangChain4j configuration
   langchain4j:
@@ -95,6 +109,7 @@ quarkus:
       judge:
         chat-model:
           model-name: command-r7b-12-2024
+          temperature: 0
         timeout: 600s
         api-key: "${COHERE_API_KEY}"
         base-url: https://api.cohere.ai/compatibility/v1
@@ -292,6 +307,8 @@ quarkus:
         'ai.scoring':
           level: DEBUG
         'ai.scoring.events.api':
+          level: DEBUG
+        'io.quarkiverse.langchain4j.testing.evaluation':
           level: DEBUG
       console:
         level: DEBUG

@@ -2,7 +2,6 @@ package ai.scoring.langfuse.evaluation;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
-import ai.scoring.langfuse.evaluation.Evaluator.EvaluatorResult;
 import dev.langchain4j.guardrails.JsonExtractorOutputGuardrail;
 
 @ApplicationScoped
