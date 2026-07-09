@@ -57,7 +57,7 @@ import io.smallrye.config.SmallRyeConfig;
 @QuarkusTest
 @TestProfile(KeysTestProfile.class)
 class DriftDetectionOutputGuardrailTests {
-	private static final String DATASET_NAME = "SomeInterface.method";
+	private static final String DATASET_NAME = "langchain4j.aiservices.SomeInterface.method";
 	private static final OutputGuardrailRequest DEFAULT_REQUEST = OutputGuardrailRequest.builder()
 			.chatExecutor(new NoopChatExecutor())
 			.requestParams(GuardrailRequestParams.builder()
@@ -176,7 +176,7 @@ class DriftDetectionOutputGuardrailTests {
 			.thenReturn(EvaluationResult.failed(0.5, "Evaluation wasn't good"));
 
 		assertThat(this.rescoringOutputGuardrail.validate(DEFAULT_REQUEST))
-			.hasSingleFailureWithMessage("Score is below threshold of 0.7");
+			.hasSingleFailureWithMessage("Score [0.0] for sample 'langchain4j.aiservices.SomeInterface.method' is below threshold of 0.7");
 
 		verify(this.evaluator, times(2)).evaluate(any(EvaluationSample.class), eq("Some response"));
 	}
