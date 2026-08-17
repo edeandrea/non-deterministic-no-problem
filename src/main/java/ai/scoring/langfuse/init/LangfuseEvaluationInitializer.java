@@ -36,7 +36,6 @@ import com.langfuse.api.model.UnstableCreateEvaluatorRequestOneOf;
 import com.langfuse.api.model.UnstableEvaluationRule;
 import com.langfuse.api.model.UnstableEvaluationRuleFilter;
 import com.langfuse.api.model.UnstableEvaluationRuleFilterOneOf3;
-import com.langfuse.api.model.UnstableEvaluationRuleFilterOneOf3.TypeEnum;
 import com.langfuse.api.model.UnstableEvaluationRuleMapping;
 import com.langfuse.api.model.UnstableEvaluationRuleMappingSource;
 import com.langfuse.api.model.UnstableEvaluationRuleOptionsFilterOperator;
@@ -121,7 +120,7 @@ public non-sealed class LangfuseEvaluationInitializer extends LangfuseInitialize
 							                                                                   UnstableEvaluationRuleFilterOneOf3.builder()
 							                                                                                                     .column("environment")
 							                                                                                                     .operator(UnstableEvaluationRuleOptionsFilterOperator.NONE_OF)
-							                                                                                                     .type(TypeEnum.STRING_OPTIONS)
+							                                                                                                     .type(UnstableEvaluationRuleFilterOneOf3.TypeEnum.STRING_OPTIONS)
 							                                                                                                     .value(List.of(UnstableEvaluatorType.LLM_AS_JUDGE.getValue()))
 							                                                                                                     .build()
 						                                                                   ),
@@ -129,7 +128,7 @@ public non-sealed class LangfuseEvaluationInitializer extends LangfuseInitialize
 							                                                                   UnstableEvaluationRuleFilterOneOf3.builder()
 							                                                                                                     .column("type")
 							                                                                                                     .operator(UnstableEvaluationRuleOptionsFilterOperator.NONE_OF)
-							                                                                                                     .type(TypeEnum.STRING_OPTIONS)
+							                                                                                                     .type(UnstableEvaluationRuleFilterOneOf3.TypeEnum.STRING_OPTIONS)
 							                                                                                                     .value(List.of("SPAN", "EVENT"))
 							                                                                                                     .build()
 						                                                                   )
@@ -210,6 +209,7 @@ public non-sealed class LangfuseEvaluationInitializer extends LangfuseInitialize
 			if (llmEvaluator.getModelConfig() == null) {
 				var updateEvaluatorRequest = new UnstableCreateEvaluatorRequest(
 					UnstableCreateEvaluatorRequestOneOf.builder()
+					                                    .type(UnstableCreateEvaluatorRequestOneOf.TypeEnum.LLM_AS_JUDGE)
 					                                    .name(llmEvaluator.getName())
 					                                    .prompt(llmEvaluator.getPrompt())
 					                                    .modelConfig(UnstableEvaluatorModelConfig.builder()
@@ -248,6 +248,7 @@ public non-sealed class LangfuseEvaluationInitializer extends LangfuseInitialize
 
 		var request = new UnstableCreateEvaluatorRequest(
 			UnstableCreateEvaluatorRequestOneOf.builder()
+			                                    .type(UnstableCreateEvaluatorRequestOneOf.TypeEnum.LLM_AS_JUDGE)
 			                                    .name("Continuous Evaluation Evaluator")
 			                                    .prompt(PROMPT)
 			                                    .modelConfig(UnstableEvaluatorModelConfig.builder()

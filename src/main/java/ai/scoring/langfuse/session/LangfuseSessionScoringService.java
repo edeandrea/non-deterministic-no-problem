@@ -24,9 +24,9 @@ import com.langfuse.api.model.CreateDatasetRequest;
 import com.langfuse.api.model.CreateScoreRequest;
 import com.langfuse.api.model.CreateScoreValue;
 import com.langfuse.api.model.Dataset;
+import com.langfuse.api.model.ObservationV2;
 import com.langfuse.api.model.ScoreDataType;
-import com.langfuse.api.model.Trace;
-import com.langfuse.api.sessions.SessionsApi.APISessionsGetRequest;
+import com.langfuse.api.observations.ObservationsApi.APIObservationsGetManyRequest;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.Tracer;
 import io.quarkiverse.langfuse.client.LangfuseNotFoundException;
@@ -77,15 +77,18 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 	private void fetchAndScoreSession(String conversationId) {
 		try {
 			var sessionEvalConfig = this.langfuseConfig.evaluation().session();
+			var sessionFilter = """
+				[{"type":"string","column":"sessionId","operator":"=","value":"%s"}]""".formatted(conversationId);
 
-			this.langfuseApi.sessions()
-			                .sessionsGet(APISessionsGetRequest.newBuilder()
-			                                                  .sessionId(conversationId)
-			                                                  .build())
-			                .getTraces()
+			this.langfuseApi.observations()
+			                .observationsGetMany(APIObservationsGetManyRequest.newBuilder()
+			                                                                 .filter(sessionFilter)
+			                                                                 .fields("core,basic,io")
+			                                                                 .build())
+			                .getData()
 			                .stream()
-			                .filter(trace -> (trace.getTimestamp() != null) && (trace.getInput() != null) && (trace.getOutput() != null))
-			                .sorted(Comparator.comparing(Trace::getTimestamp))
+			                .filter(obs -> (obs.getStartTime() != null) && (obs.getInput() != null) && (obs.getOutput() != null))
+			                .sorted(Comparator.comparing(ObservationV2::getStartTime))
 			                .map(ConversationExchange::from)
 			                .collect(Collectors.collectingAndThen(
 												Collectors.toUnmodifiableList(),
