@@ -31,8 +31,9 @@ import com.langfuse.api.model.ScoreConfig;
 import com.langfuse.api.model.ScoreConfigDataType;
 import com.langfuse.api.model.UnstableCreateEvaluationRuleRequest;
 import com.langfuse.api.model.UnstableCreateEvaluatorRequest;
+import com.langfuse.api.model.UnstableCreateLlmAsJudgeEvaluationRuleRequest;
+import com.langfuse.api.model.UnstableCreateEvaluatorRequestOneOf;
 import com.langfuse.api.model.UnstableEvaluationRule;
-import com.langfuse.api.model.UnstableEvaluationRuleEvaluatorReference;
 import com.langfuse.api.model.UnstableEvaluationRuleFilter;
 import com.langfuse.api.model.UnstableEvaluationRuleFilterOneOf3;
 import com.langfuse.api.model.UnstableEvaluationRuleFilterOneOf3.TypeEnum;
@@ -42,6 +43,7 @@ import com.langfuse.api.model.UnstableEvaluationRuleOptionsFilterOperator;
 import com.langfuse.api.model.UnstableEvaluationRuleTarget;
 import com.langfuse.api.model.UnstableEvaluator;
 import com.langfuse.api.model.UnstableEvaluatorModelConfig;
+import com.langfuse.api.model.UnstableEvaluatorOneOf;
 import com.langfuse.api.model.UnstableEvaluatorOutputDefinition;
 import com.langfuse.api.model.UnstableEvaluatorOutputDefinitionOneOf;
 import com.langfuse.api.model.UnstableEvaluatorOutputDefinitionOneOf.DataTypeEnum;
@@ -49,6 +51,7 @@ import com.langfuse.api.model.UnstableEvaluatorOutputFieldDefinition;
 import com.langfuse.api.model.UnstableEvaluatorScope;
 import com.langfuse.api.model.UnstableEvaluatorType;
 import com.langfuse.api.model.UnstableEvaluators;
+import com.langfuse.api.model.UnstableLlmAsJudgeEvaluationRuleEvaluatorReference;
 import com.langfuse.api.model.UpsertLlmConnectionRequest;
 import com.langfuse.api.scoreConfigs.ScoreConfigsApi.APIScoreConfigsCreateRequest;
 import com.langfuse.api.unstableEvaluationRules.UnstableEvaluationRulesApi.APIUnstableEvaluationRulesCreateRequest;
@@ -95,59 +98,61 @@ public non-sealed class LangfuseEvaluationInitializer extends LangfuseInitialize
 	}
 
 	private Optional<UnstableEvaluationRule> getOrCreateEvaluationRule(UnstableEvaluator evaluator) {
+		var llmEvaluator = evaluator.getUnstableEvaluatorOneOf();
+
 		return getExistingEvaluationRule("Continuous Evaluation Evaluator")
 			.or(() -> {
-				Log.infof("Creating evaluation rule for evaluator %s", evaluator.getName());
+				Log.infof("Creating evaluation rule for evaluator %s", llmEvaluator.getName());
 
-				var request = UnstableCreateEvaluationRuleRequest.builder()
-				                                                 .name("Continuous Evaluation Evaluator")
-				                                                 .evaluator(
-					                                                 UnstableEvaluationRuleEvaluatorReference.builder()
-					                                                                                         .name(evaluator.getName())
-					                                                                                         .scope(isManagedEvaluator(evaluator) ? UnstableEvaluatorScope.MANAGED : UnstableEvaluatorScope.PROJECT)
-					                                                                                         .build()
-				                                                 )
-				                                                 .target(UnstableEvaluationRuleTarget.OBSERVATION)
-				                                                 .enabled(true)
-				                                                 .sampling(1.0)
-				                                                 .filter(
-					                                                 List.of(
-						                                                 new UnstableEvaluationRuleFilter(
-							                                                 UnstableEvaluationRuleFilterOneOf3.builder()
-							                                                                                   .column("environment")
-							                                                                                   .operator(UnstableEvaluationRuleOptionsFilterOperator.NONE_OF)
-							                                                                                   .type(TypeEnum.STRING_OPTIONS)
-							                                                                                   .value(List.of(UnstableEvaluatorType.LLM_AS_JUDGE.getValue()))
-							                                                                                   .build()
-						                                                 ),
-						                                                 new UnstableEvaluationRuleFilter(
-							                                                 UnstableEvaluationRuleFilterOneOf3.builder()
-							                                                                                   .column("type")
-							                                                                                   .operator(UnstableEvaluationRuleOptionsFilterOperator.NONE_OF)
-							                                                                                   .type(TypeEnum.STRING_OPTIONS)
-							                                                                                   .value(List.of("SPAN", "EVENT"))
-							                                                                                   .build()
-						                                                 )
-					                                                 )
-				                                                 )
-				                                                 .mapping(
-					                                                 List.of(
-						                                                 UnstableEvaluationRuleMapping.builder()
-						                                                                              .variable("query")
-						                                                                              .source(UnstableEvaluationRuleMappingSource.INPUT)
-						                                                                              .build(),
-						                                                 UnstableEvaluationRuleMapping.builder()
-						                                                                              .variable("generation")
-						                                                                              .source(UnstableEvaluationRuleMappingSource.OUTPUT)
-						                                                                              .build()
-					                                                 )
-				                                                 )
-				                                                 .build();
+				var llmRuleRequest = UnstableCreateLlmAsJudgeEvaluationRuleRequest.builder()
+				                                                                   .name("Continuous Evaluation Evaluator")
+				                                                                   .evaluator(
+					                                                                   UnstableLlmAsJudgeEvaluationRuleEvaluatorReference.builder()
+					                                                                                                                     .name(llmEvaluator.getName())
+					                                                                                                                     .scope(isManagedEvaluator(evaluator) ? UnstableEvaluatorScope.MANAGED : UnstableEvaluatorScope.PROJECT)
+					                                                                                                                     .build()
+				                                                                   )
+				                                                                   .target(UnstableEvaluationRuleTarget.OBSERVATION)
+				                                                                   .enabled(true)
+				                                                                   .sampling(1.0)
+				                                                                   .filter(
+					                                                                   List.of(
+						                                                                   new UnstableEvaluationRuleFilter(
+							                                                                   UnstableEvaluationRuleFilterOneOf3.builder()
+							                                                                                                     .column("environment")
+							                                                                                                     .operator(UnstableEvaluationRuleOptionsFilterOperator.NONE_OF)
+							                                                                                                     .type(TypeEnum.STRING_OPTIONS)
+							                                                                                                     .value(List.of(UnstableEvaluatorType.LLM_AS_JUDGE.getValue()))
+							                                                                                                     .build()
+						                                                                   ),
+						                                                                   new UnstableEvaluationRuleFilter(
+							                                                                   UnstableEvaluationRuleFilterOneOf3.builder()
+							                                                                                                     .column("type")
+							                                                                                                     .operator(UnstableEvaluationRuleOptionsFilterOperator.NONE_OF)
+							                                                                                                     .type(TypeEnum.STRING_OPTIONS)
+							                                                                                                     .value(List.of("SPAN", "EVENT"))
+							                                                                                                     .build()
+						                                                                   )
+					                                                                   )
+				                                                                   )
+				                                                                   .mapping(
+					                                                                   List.of(
+						                                                                   UnstableEvaluationRuleMapping.builder()
+						                                                                                                .variable("query")
+						                                                                                                .source(UnstableEvaluationRuleMappingSource.INPUT)
+						                                                                                                .build(),
+						                                                                   UnstableEvaluationRuleMapping.builder()
+						                                                                                                .variable("generation")
+						                                                                                                .source(UnstableEvaluationRuleMappingSource.OUTPUT)
+						                                                                                                .build()
+					                                                                   )
+				                                                                   )
+				                                                                   .build();
 
 				try {
 					var rule = this.langfuseApi.unstableEvaluationRules()
 					                           .unstableEvaluationRulesCreate(APIUnstableEvaluationRulesCreateRequest.newBuilder()
-					                                                                                                 .unstableCreateEvaluationRuleRequest(request)
+					                                                                                                 .unstableCreateEvaluationRuleRequest(new UnstableCreateEvaluationRuleRequest(llmRuleRequest))
 					                                                                                                 .build());
 					Log.infof("Created evaluation rule: %s", rule.getId());
 					return Optional.of(rule);
@@ -199,27 +204,33 @@ public non-sealed class LangfuseEvaluationInitializer extends LangfuseInitialize
 	}
 
 	private UnstableEvaluator updateEvaluatorIfNecessary(UnstableEvaluator evaluator, LlmConnection llmConnection) {
-		if (isManagedEvaluator(evaluator) && (evaluator.getModelConfig() == null)) {
-			var updateEvaluatorRequest = UnstableCreateEvaluatorRequest.builder()
-			                                                           .name(evaluator.getName())
-			                                                           .prompt(evaluator.getPrompt())
-			                                                           .modelConfig(UnstableEvaluatorModelConfig.builder()
-			                                                                                                    .model(llmConnection.getCustomModels().getFirst())
-			                                                                                                    .provider(llmConnection.getProvider())
-			                                                                                                    .build())
-			                                                           .outputDefinition(getOutputDefinition(evaluator.getOutputDefinition()))
-			                                                           .build();
+		if (isManagedEvaluator(evaluator)) {
+			var llmEvaluator = evaluator.getUnstableEvaluatorOneOf();
 
-			try {
-				return this.langfuseApi
-					.unstableEvaluators()
-					.unstableEvaluatorsCreate(APIUnstableEvaluatorsCreateRequest.newBuilder()
-					                                                            .unstableCreateEvaluatorRequest(updateEvaluatorRequest)
-					                                                            .build());
-			}
-			catch (Exception e) {
-				Log.warnf(e, "Failed to update evaluator: %s", e.getMessage());
-				return null;
+			if (llmEvaluator.getModelConfig() == null) {
+				var updateEvaluatorRequest = new UnstableCreateEvaluatorRequest(
+					UnstableCreateEvaluatorRequestOneOf.builder()
+					                                    .name(llmEvaluator.getName())
+					                                    .prompt(llmEvaluator.getPrompt())
+					                                    .modelConfig(UnstableEvaluatorModelConfig.builder()
+					                                                                             .model(llmConnection.getCustomModels().getFirst())
+					                                                                             .provider(llmConnection.getProvider())
+					                                                                             .build())
+					                                    .outputDefinition(getOutputDefinition(llmEvaluator.getOutputDefinition()))
+					                                    .build()
+				);
+
+				try {
+					return this.langfuseApi
+						.unstableEvaluators()
+						.unstableEvaluatorsCreate(APIUnstableEvaluatorsCreateRequest.newBuilder()
+						                                                            .unstableCreateEvaluatorRequest(updateEvaluatorRequest)
+						                                                            .build());
+				}
+				catch (Exception e) {
+					Log.warnf(e, "Failed to update evaluator: %s", e.getMessage());
+					return null;
+				}
 			}
 		}
 
@@ -227,33 +238,35 @@ public non-sealed class LangfuseEvaluationInitializer extends LangfuseInitialize
 	}
 
 	private static boolean isManagedEvaluator(UnstableEvaluator evaluator) {
-		return "helpfulness".equalsIgnoreCase(evaluator.getName()) &&
-			(evaluator.getType() == UnstableEvaluatorType.LLM_AS_JUDGE) &&
-			(evaluator.getScope() == UnstableEvaluatorScope.MANAGED);
+		return (evaluator.getActualInstance() instanceof UnstableEvaluatorOneOf llmEvaluator) &&
+			"helpfulness".equalsIgnoreCase(llmEvaluator.getName()) &&
+			(llmEvaluator.getScope() == UnstableEvaluatorScope.MANAGED);
 	}
 
 	private Optional<UnstableEvaluator> createEvaluator(LlmConnection llmConnection) {
 		Log.infof("Initializing Continuous Evaluation LLM Evaluator");
 
-		var request = UnstableCreateEvaluatorRequest.builder()
-		                                            .name("Continuous Evaluation Evaluator")
-		                                            .prompt(PROMPT)
-		                                            .modelConfig(UnstableEvaluatorModelConfig.builder()
-		                                                                                     .model(llmConnection.getCustomModels().getFirst())
-		                                                                                     .provider(llmConnection.getProvider())
-		                                                                                     .build())
-		                                            .outputDefinition(new UnstableEvaluatorOutputDefinition(
-			                                            UnstableEvaluatorOutputDefinitionOneOf.builder()
-			                                                                                  .dataType(DataTypeEnum.NUMERIC)
-			                                                                                  .reasoning(UnstableEvaluatorOutputFieldDefinition.builder()
-			                                                                                                                                   .description("Explain the assigned score in one concise sentence.")
-			                                                                                                                                   .build())
-			                                                                                  .score(UnstableEvaluatorOutputFieldDefinition.builder()
-			                                                                                                                               .description("Return a numeric score between 0 and 1, where 0 means \"completely irrelevant\" and 1 means \"completely relevant\".")
-			                                                                                                                               .build())
-			                                                                                  .build()
-		                                            ))
-		                                            .build();
+		var request = new UnstableCreateEvaluatorRequest(
+			UnstableCreateEvaluatorRequestOneOf.builder()
+			                                    .name("Continuous Evaluation Evaluator")
+			                                    .prompt(PROMPT)
+			                                    .modelConfig(UnstableEvaluatorModelConfig.builder()
+			                                                                             .model(llmConnection.getCustomModels().getFirst())
+			                                                                             .provider(llmConnection.getProvider())
+			                                                                             .build())
+			                                    .outputDefinition(new UnstableEvaluatorOutputDefinition(
+				                                    UnstableEvaluatorOutputDefinitionOneOf.builder()
+				                                                                          .dataType(DataTypeEnum.NUMERIC)
+				                                                                          .reasoning(UnstableEvaluatorOutputFieldDefinition.builder()
+				                                                                                                                           .description("Explain the assigned score in one concise sentence.")
+				                                                                                                                           .build())
+				                                                                          .score(UnstableEvaluatorOutputFieldDefinition.builder()
+				                                                                                                                       .description("Return a numeric score between 0 and 1, where 0 means \"completely irrelevant\" and 1 means \"completely relevant\".")
+				                                                                                                                       .build())
+				                                                                          .build()
+			                                    ))
+			                                    .build()
+		);
 
 		try {
 			var evaluator = this.langfuseApi
@@ -261,7 +274,7 @@ public non-sealed class LangfuseEvaluationInitializer extends LangfuseInitialize
 				.unstableEvaluatorsCreate(APIUnstableEvaluatorsCreateRequest.newBuilder()
 				                                                            .unstableCreateEvaluatorRequest(request)
 				                                                            .build());
-			Log.infof("Registered Continuous Evaluation LLM Evaluator: %s", evaluator.getId());
+			Log.infof("Registered Continuous Evaluation LLM Evaluator: %s", evaluator.getUnstableEvaluatorOneOf().getId());
 			return Optional.of(evaluator);
 		}
 		catch (Exception e) {

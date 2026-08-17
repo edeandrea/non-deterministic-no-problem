@@ -18,12 +18,12 @@ import com.langfuse.api.LangfuseApi;
 import com.langfuse.api.datasetItems.DatasetItemsApi.APIDatasetItemsCreateRequest;
 import com.langfuse.api.datasets.DatasetsApi.APIDatasetsCreateRequest;
 import com.langfuse.api.datasets.DatasetsApi.APIDatasetsListRequest;
-import com.langfuse.api.legacyScoreV1.LegacyScoreV1Api.APILegacyScoreV1CreateRequest;
+import com.langfuse.api.scores.ScoresApi.APIScoresCreateRequest;
 import com.langfuse.api.model.CreateDatasetItemRequest;
 import com.langfuse.api.model.CreateDatasetRequest;
+import com.langfuse.api.model.CreateScoreRequest;
 import com.langfuse.api.model.CreateScoreValue;
 import com.langfuse.api.model.Dataset;
-import com.langfuse.api.model.LegacyCreateScoreRequest;
 import com.langfuse.api.model.ScoreDataType;
 import com.langfuse.api.model.Trace;
 import com.langfuse.api.sessions.SessionsApi.APISessionsGetRequest;
@@ -163,7 +163,7 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 	}
 
 	private void saveScore(String conversationId, SessionSentiment sentiment) {
-		var request = LegacyCreateScoreRequest.builder()
+		var request = CreateScoreRequest.builder()
 			.sessionId(conversationId)
 			.name(SessionSentiment.SCORE_NAME)
 			.value(new CreateScoreValue(sentiment.sentiment().label()))
@@ -172,9 +172,9 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 			.build();
 
 		try {
-			var response = this.langfuseApi.legacyScoreV1()
-				.legacyScoreV1Create(APILegacyScoreV1CreateRequest.newBuilder()
-					.legacyCreateScoreRequest(request)
+			var response = this.langfuseApi.scores()
+				.scoresCreate(APIScoresCreateRequest.newBuilder()
+					.createScoreRequest(request)
 					.build());
 			Log.infof("Posted session-sentiment score for session %s (scoreId=%s)", conversationId, response.getId());
 		}

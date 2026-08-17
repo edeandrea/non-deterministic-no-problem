@@ -52,6 +52,8 @@ public abstract sealed class LangfuseInitializer permits LangfuseEvaluationIniti
 				.unstableEvaluationRulesList(APIUnstableEvaluationRulesListRequest.newBuilder().build())
 				.getData()
 				.stream()
+				.filter(readable -> readable.getActualInstance() instanceof UnstableEvaluationRule)
+				.map(readable -> (UnstableEvaluationRule) readable.getActualInstance())
 				.filter(rule -> name.equalsIgnoreCase(rule.getName()))
 				.findFirst();
 		}
