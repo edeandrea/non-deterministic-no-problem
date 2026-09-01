@@ -34,7 +34,7 @@ import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import com.langfuse.api.LangfuseApi;
 import com.langfuse.api.datasetItems.DatasetItemsApi.APIDatasetItemsListRequest;
 import com.langfuse.api.datasets.DatasetsApi.APIDatasetsListRequest;
-import com.langfuse.api.model.ScoreSubjectV3OneOf2;
+import com.langfuse.api.model.ScoreSubjectSessionV31;
 import com.langfuse.api.observations.ObservationsApi.APIObservationsGetManyRequest;
 import com.langfuse.api.scoresV3.ScoresV3Api.APIScoresV3GetManyV3Request;
 import io.quarkiverse.langchain4j.chatscopes.ChatScopeEnded;
@@ -220,13 +220,13 @@ class LangfuseSessionScoringServiceTests {
 			       assertThat(scores)
 				       .singleElement()
 				       .satisfies(score -> {
-					       var categorical = score.getScoreV3OneOf2();
+					       var categorical = score.getCategoricalScoreV31();
 					       assertThat(categorical.getName()).isEqualTo(SessionSentiment.SCORE_NAME);
 					       assertThat(categorical.getValue()).isEqualTo("POSITIVE");
 					       assertThat(categorical.getComment()).isNotBlank();
 
-					       var subject = categorical.getSubject().getScoreSubjectV3OneOf2();
-					       assertThat(subject.getKind()).isEqualTo(ScoreSubjectV3OneOf2.KindEnum.SESSION);
+					       var subject = categorical.getSubject().getScoreSubjectSessionV31();
+					       assertThat(subject.getKind()).isEqualTo(ScoreSubjectSessionV31.KindEnum.SESSION);
 					       assertThat(subject.getId()).isEqualTo(sessionId);
 				       });
 		       });
