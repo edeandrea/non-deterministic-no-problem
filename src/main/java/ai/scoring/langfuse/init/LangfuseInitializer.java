@@ -106,11 +106,11 @@ public abstract sealed class LangfuseInitializer permits LangfuseEvaluationIniti
 			                                 .llmConnectionsUpsert(APILlmConnectionsUpsertRequest.newBuilder()
 			                                                                                     .upsertLlmConnectionRequest(request)
 			                                                                                     .build());
-			Log.infof("Registered Cohere LLM Connection: %s", connection.getId());
+			Log.infof("Registered %s LLM Connection: %s", request.getProvider(), connection.getId());
 			return Optional.of(connection);
 		}
 		catch (Exception e) {
-			Log.warnf(e, "Failed to initialize Cohere LLM Connection: %s", e.getMessage());
+			Log.warnf(e, "Failed to initialize %s LLM Connection: %s", request.getProvider(), e.getMessage());
 		}
 
 		return Optional.empty();

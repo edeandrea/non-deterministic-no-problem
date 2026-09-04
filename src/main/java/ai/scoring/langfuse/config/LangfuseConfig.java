@@ -15,16 +15,14 @@ public interface LangfuseConfig {
 		boolean initializeOnStartup();
 
 		Session session();
-		Cohere cohere();
+		Gemini gemini();
 
-		interface Cohere {
-			@WithDefault("https://api.cohere.ai/compatibility/v1")
-			String baseUrl();
-
-			@WithDefault("command-r7b-12-2024")
+		// Gemini backs the Langfuse LLM-as-a-Judge evaluator (native Google AI Studio adapter).
+		interface Gemini {
+			@WithDefault("gemini-2.5-flash")
 			String modelName();
 
-			@WithDefault("${COHERE_API_KEY:}")
+			@WithDefault("${GEMINI_API_KEY:}")
 			Optional<String> apiKey();
 		}
 

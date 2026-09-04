@@ -22,6 +22,7 @@ import com.langfuse.api.LangfuseApi;
 import com.langfuse.api.evaluationRules.EvaluationRulesApi.APIEvaluationRulesCreateRequest;
 import com.langfuse.api.evaluators.EvaluatorsApi.APIEvaluatorsCreateRequest;
 import com.langfuse.api.evaluators.EvaluatorsApi.APIEvaluatorsListRequest;
+import com.langfuse.api.evaluators.EvaluatorsApi.APIEvaluatorsUpdateRequest;
 import com.langfuse.api.model.ConfigCategory;
 import com.langfuse.api.model.CreateEvaluationRuleRequest;
 import com.langfuse.api.model.CreateEvaluatorRequest;
@@ -40,7 +41,6 @@ import com.langfuse.api.model.LlmAdapter;
 import com.langfuse.api.model.LlmAsJudgeEvaluator1;
 import com.langfuse.api.model.LlmConnection;
 import com.langfuse.api.model.Model;
-import com.langfuse.api.model.ModelTokenizerId;
 import com.langfuse.api.model.ModelUsageUnit;
 import com.langfuse.api.model.PricingTierInput;
 import com.langfuse.api.model.PromptVariableMappingInput;
@@ -49,6 +49,8 @@ import com.langfuse.api.model.PublicEvaluatorNumericScore1;
 import com.langfuse.api.model.ScoreConfig;
 import com.langfuse.api.model.ScoreConfigDataType;
 import com.langfuse.api.model.StringOptionsEvaluationRuleFilter1;
+import com.langfuse.api.model.UpdateEvaluatorRequest;
+import com.langfuse.api.model.UpdateLlmAsJudgeEvaluatorRequest;
 import com.langfuse.api.model.UpsertLlmConnectionRequest;
 import com.langfuse.api.scoreConfigs.ScoreConfigsApi.APIScoreConfigsCreateRequest;
 
@@ -83,7 +85,12 @@ public non-sealed class LangfuseEvaluationInitializer extends LangfuseInitialize
 				);
 
 			getOrRegisterCohereModelDefinition()
-				.flatMap(model -> getOrCreateCohereLlmConnection())
+				.ifPresentOrElse(
+					model -> Log.info("Cohere model definition set up"),
+					() -> Log.warn("Cohere model definition setup failed")
+				);
+
+			getOrCreateGeminiLlmConnection()
 				.flatMap(this::handleEvaluator)
 				.flatMap(this::getOrCreateEvaluationRule)
 				.ifPresentOrElse(
@@ -113,7 +120,7 @@ public non-sealed class LangfuseEvaluationInitializer extends LangfuseInitialize
 					                                                                           .column("environment")
 					                                                                           .operator(EvaluationRuleOptionsFilterOperator.NONE_OF)
 					                                                                           .type(StringOptionsEvaluationRuleFilter1.TypeEnum.STRING_OPTIONS)
-					                                                                           .value(List.of(CreateLlmAsJudgeEvaluatorRequest1.TypeEnum.LLM_AS_JUDGE.getValue()))
+					                                                                           .value(List.of("langfuse-llm-as-a-judge", CreateLlmAsJudgeEvaluatorRequest1.TypeEnum.LLM_AS_JUDGE.getValue()))
 					                                                                           .build()
 				                                         ),
 				                                         new EvaluationRuleFilter(
@@ -165,7 +172,53 @@ public non-sealed class LangfuseEvaluationInitializer extends LangfuseInitialize
 				.filter(EVALUATOR_NAME::equalsIgnoreCase)
 				.isPresent())
 			.findFirst()
+			.map(existing -> ensureEvaluatorModel(existing, llmConnection))
 			.or(() -> createEvaluator(llmConnection));
+	}
+
+	private Evaluator ensureEvaluatorModel(Evaluator evaluator, LlmConnection llmConnection) {
+		var provider = llmConnection.getProvider();
+		var model = llmConnection.getCustomModels().getFirst();
+
+		return asLlmAsJudge(evaluator)
+			.filter(llmEvaluator -> !modelConfigMatches(llmEvaluator.getModelConfig(), provider, model))
+			.flatMap(llmEvaluator -> updateEvaluatorModel(llmEvaluator, provider, model))
+			.orElse(evaluator);
+	}
+
+	private static boolean modelConfigMatches(EvaluatorModelConfig modelConfig, String provider, String model) {
+		return Optional.ofNullable(modelConfig)
+		               .filter(config -> provider.equalsIgnoreCase(config.getProvider()))
+		               .filter(config -> model.equalsIgnoreCase(config.getModel()))
+		               .isPresent();
+	}
+
+	private Optional<Evaluator> updateEvaluatorModel(LlmAsJudgeEvaluator1 llmEvaluator, String provider, String model) {
+		Log.infof("Re-pointing evaluator %s to model %s/%s", llmEvaluator.getId(), provider, model);
+
+		var request = new UpdateEvaluatorRequest(
+			UpdateLlmAsJudgeEvaluatorRequest.builder()
+			                                .type(CreateLlmAsJudgeEvaluatorRequest1.TypeEnum.LLM_AS_JUDGE.getValue())
+			                                .modelConfig(EvaluatorModelConfig.builder()
+			                                                                 .provider(provider)
+			                                                                 .model(model)
+			                                                                 .build())
+			                                .build()
+		);
+
+		try {
+			var updated = this.langfuseApi.evaluators()
+			                              .evaluatorsUpdate(APIEvaluatorsUpdateRequest.newBuilder()
+			                                                                          .evaluatorId(llmEvaluator.getId())
+			                                                                          .updateEvaluatorRequest(request)
+			                                                                          .build());
+			Log.infof("Updated evaluator model config: %s", llmEvaluator.getId());
+			return Optional.of(updated);
+		}
+		catch (Exception e) {
+			Log.warnf(e, "Failed to update evaluator model config: %s", e.getMessage());
+			return Optional.empty();
+		}
 	}
 
 	private Stream<Evaluator> listEvaluators() {
@@ -245,21 +298,20 @@ public non-sealed class LangfuseEvaluationInitializer extends LangfuseInitialize
 		);
 	}
 
-	private Optional<LlmConnection> getOrCreateCohereLlmConnection() {
-		return getExistingLlmConnection("cohere")
+	private Optional<LlmConnection> getOrCreateGeminiLlmConnection() {
+		return getExistingLlmConnection(LlmAdapter.GOOGLE_AI_STUDIO.getValue())
 			.or(() -> {
-				var cohere = this.scoringConfig.cohere();
-				var apiKey = cohere.apiKey()
-				                   .orElseThrow(() -> new IllegalStateException("Cohere API Key must be set to initialize Cohere LLM Connection"));
+				var gemini = this.scoringConfig.gemini();
+				var apiKey = gemini.apiKey()
+				                   .orElseThrow(() -> new IllegalStateException("Gemini API Key must be set to initialize the Gemini LLM Connection"));
 
-				Log.infof("Initializing Cohere LLM Connection to model %s", cohere.modelName());
+				Log.infof("Initializing Gemini LLM Connection to model %s", gemini.modelName());
 
 				var request = UpsertLlmConnectionRequest.builder()
-				                                        .provider("cohere")
-				                                        .adapter(LlmAdapter.OPENAI)
-				                                        .baseURL(cohere.baseUrl())
+				                                        .provider(LlmAdapter.GOOGLE_AI_STUDIO.getValue())
+				                                        .adapter(LlmAdapter.GOOGLE_AI_STUDIO)
 				                                        .secretKey(apiKey)
-				                                        .customModels(List.of(cohere.modelName()))
+				                                        .customModels(List.of(gemini.modelName()))
 				                                        .build();
 
 				return createLLMConnection(request);
@@ -336,7 +388,6 @@ public non-sealed class LangfuseEvaluationInitializer extends LangfuseInitialize
 				                                .modelName("command-r7b")
 				                                .matchPattern("(?i)^(command-r7b)(-.+)?$")
 				                                .unit(ModelUsageUnit.TOKENS)
-				                                .tokenizerId(ModelTokenizerId.OPENAI)
 				                                .pricingTiers(
 					                                List.of(
 						                                PricingTierInput.builder()
