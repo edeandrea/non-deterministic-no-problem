@@ -28,9 +28,20 @@ langfuse:
 
 postgresql:
   auth:
-    # If you want to use `postgres` as the username, you need to provide postgresPassword instead of password.
     username: langfuse
     password: langfuse
+  podSecurityContext:
+    fsGroup: null
+    supplementalGroups: null
+  securityContext:
+    runAsUser: null
+    runAsGroup: null
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    privileged: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: [ ALL ]
 
 clickhouse:
   auth:
@@ -39,6 +50,12 @@ clickhouse:
 redis:
   auth:
     password: langfuse
+  podSecurityContext:
+    fsGroup: null
+    runAsUser: null
+    runAsGroup: null
+  securityContext:
+    runAsUser: null
 
 s3:
   auth:
