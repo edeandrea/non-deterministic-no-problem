@@ -31,7 +31,7 @@ const Chat: React.FunctionComponent<{ claimSummary: string, claimId: string, inc
             })
             .errorHandler((error: string) => {
                 console.error('Chat error:', error);
-                setAnswerText(['An error occurred. Please try again.']);
+                setAnswerText([`An error occurred: ${error}`]);
             })
             .thinkingHandler((message: string) => {
                 console.log('Thinking: ', message);
