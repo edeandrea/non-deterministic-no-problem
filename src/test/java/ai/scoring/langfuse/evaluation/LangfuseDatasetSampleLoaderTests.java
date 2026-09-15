@@ -2,6 +2,8 @@ package ai.scoring.langfuse.evaluation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 
 import jakarta.inject.Inject;
@@ -56,7 +58,11 @@ class LangfuseDatasetSampleLoaderTests {
 	@Order(2)
 	void emptyDataset() {
 		assertThat(this.langfuseDatasetSampleLoader.supports("dataset1"))
-			.isFalse();
+			.isTrue();
+
+		assertThat(this.langfuseDatasetSampleLoader.load("dataset1", String.class))
+			.isNotNull()
+			.isEmpty();
 	}
 
 	@Test
@@ -95,7 +101,7 @@ class LangfuseDatasetSampleLoaderTests {
 
 	@Test
 	@Order(4)
-	void datasetPaginationWorks() {
+	void datasetPaginationWorks() throws InterruptedException {
 		// Create dataset
 		this.langfuseApi.datasets().datasetsCreate(
 			APIDatasetsCreateRequest.newBuilder()
@@ -106,28 +112,37 @@ class LangfuseDatasetSampleLoaderTests {
 				)
 				.build());
 
+		var items = 520;
+		var latch = new CountDownLatch(items);
+
 		// Add items to dataset
-		IntStream.range(0, 520)
+		IntStream.range(0, items)
 			.forEach(i ->
-				Infrastructure.getDefaultExecutor().execute(() ->
-					this.langfuseApi.datasetItems().datasetItemsCreate(
-						APIDatasetItemsCreateRequest.newBuilder()
-							.createDatasetItemRequest(
-								CreateDatasetItemRequest.builder()
-									.datasetName("dataset3")
-									.input("intput")
-									.expectedOutput("output")
-									.sourceTraceId("1234")
-									.build())
-							.build())
+				Infrastructure.getDefaultExecutor().execute(() -> {
+						this.langfuseApi.datasetItems()
+						                .datasetItemsCreate(APIDatasetItemsCreateRequest.newBuilder()
+						                                                                .createDatasetItemRequest(CreateDatasetItemRequest.builder()
+						                                                                                                                  .datasetName("dataset3")
+						                                                                                                                  .input("intput")
+						                                                                                                                  .expectedOutput("output")
+						                                                                                                                  .sourceTraceId("1234")
+						                                                                                                                  .build())
+						                                                                .build());
+
+						latch.countDown();
+					}
 					)
 			);
 
 		assertThat(this.langfuseDatasetSampleLoader.supports("dataset3"))
 			.isTrue();
 
+		assertThat(latch.await(30, TimeUnit.SECONDS))
+			.as("All %d dataset items should be created", items)
+			.isTrue();
+
 		assertThat(this.langfuseDatasetSampleLoader.load("dataset3", String.class))
 			.isNotNull()
-			.hasSize(520);
+			.hasSize(items);
 	}
 }

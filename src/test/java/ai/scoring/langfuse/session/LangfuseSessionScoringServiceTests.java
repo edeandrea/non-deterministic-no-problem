@@ -173,14 +173,15 @@ class LangfuseSessionScoringServiceTests {
 		var sessionFilter = """
 			[{"type":"string","column":"sessionId","operator":"=","value":"%s"}]""".formatted(sessionId);
 
-		await().atMost(Duration.ofSeconds(15))
+		await()
+			 .atMost(Duration.ofSeconds(15))
 	     .pollInterval(Duration.ofSeconds(2))
 	     .pollDelay(Duration.ofSeconds(2))
 	     .untilAsserted(() -> {
 	       var observations = this.langfuseApi.observations()
 		       .observationsGetMany(APIObservationsGetManyRequest.newBuilder()
 			       .filter(sessionFilter)
-			       .fields("core,basic,io")
+			       .fields("core,basic,io,meta")
 			       .build())
 		       .getData();
 
@@ -199,15 +200,19 @@ class LangfuseSessionScoringServiceTests {
 			       assertThat(obs.getStartTime()).isNotNull();
 		       });
 
-	       var exchange = ConversationExchange.from(observationsWithIo.getFirst());
+	       var exchange = ConversationExchange.from(observationsWithIo.getFirst(), ConversationExchange.hierarchyOf(observations));
+	       assertThat(exchange.datasetName()).isEqualTo("langchain4j.aiservices.ClaimService.chat");
 	       assertThat(exchange.traceName()).isNotBlank();
 	       assertThat(exchange.traceId()).isNotBlank();
 	     });
 
-		// Wait for async session scoring to complete and verify score
-		await().atMost(Duration.ofSeconds(30))
+		// Wait for async session scoring to complete and verify score.
+		// The scorer may legitimately poll for up to otelFlushWaitTime + observationMaxWaitTime before it even starts
+		// evaluating, so give it that plus headroom for the sentiment call & score POST.
+		var sessionConfig = this.langfuseConfig.evaluation().session();
+		await().atMost(sessionConfig.otelFlushWaitTime().plus(sessionConfig.observationMaxWaitTime()).plusSeconds(30))
 		       .pollInterval(Duration.ofSeconds(2))
-		       .pollDelay(this.langfuseConfig.evaluation().session().otelFlushWaitTime())
+		       .pollDelay(sessionConfig.otelFlushWaitTime())
 		       .untilAsserted(() -> {
 			       var scores = this.langfuseApi.scoresV3()
 				       .scoresV3GetManyV3(APIScoresV3GetManyV3Request.newBuilder()
@@ -239,7 +244,7 @@ class LangfuseSessionScoringServiceTests {
 		assertThat(datasets)
 			.singleElement()
 			.satisfies(dataset -> {
-				assertThat(dataset.getName()).isNotBlank();
+				assertThat(dataset.getName()).isEqualTo("langchain4j.aiservices.ClaimService.chat");
 
 				var items = this.langfuseApi.datasetItems()
 					.datasetItemsList(APIDatasetItemsListRequest.newBuilder()
@@ -280,6 +285,7 @@ class LangfuseSessionScoringServiceTests {
 			return Map.ofEntries(
 				Map.entry("quarkus.aiscoring.interaction-mode", "normal"),
 				Map.entry("quarkus.aiscoring.langfuse.evaluation.initialize-on-startup", "true"),
+				Map.entry("quarkus.aiscoring.langfuse.evaluation.gemini.api-key", "changeme"),
 				Map.entry("quarkus.aiscoring.langfuse.evaluation.session.score-session", "true"),
 				Map.entry("quarkus.aiscoring.langfuse.evaluation.session.create-dataset-on-session-close", "true"),
 				Map.entry("quarkus.otel.exporter.otlp.enabled", "true"),

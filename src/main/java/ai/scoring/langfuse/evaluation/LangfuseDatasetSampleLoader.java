@@ -8,6 +8,8 @@ import jakarta.enterprise.inject.spi.CDI;
 
 import com.langfuse.api.LangfuseApi;
 import com.langfuse.api.datasetItems.DatasetItemsApi.APIDatasetItemsListRequest;
+import com.langfuse.api.datasets.DatasetsApi.APIDatasetsGetRequest;
+import com.langfuse.api.model.Dataset;
 import com.langfuse.api.model.DatasetItem;
 import com.langfuse.api.model.DatasetStatus;
 import com.langfuse.api.model.PaginatedDatasetItems;
@@ -26,11 +28,10 @@ public class LangfuseDatasetSampleLoader implements SampleLoader<String> {
 
 	@Override
 	public boolean supports(String source) {
-//		return true;
 		return Optional.ofNullable(source)
-		               .map(String::trim)
-		               .map(datasetName -> getDatasetItems(datasetName).count())
-		               .orElse(0L) > 0;
+			.map(String::strip)
+			.flatMap(this::getDataset)
+			.isPresent();
 	}
 
 	@Override
@@ -53,6 +54,22 @@ public class LangfuseDatasetSampleLoader implements SampleLoader<String> {
 			.withParameters(new Parameters().add("input", datasetItem.getInput()))
 			.withExpectedOutput(String.valueOf(datasetItem.getExpectedOutput()))
 			.build();
+	}
+
+	private Optional<Dataset> getDataset(String datasetName) {
+		try {
+			var request = APIDatasetsGetRequest.newBuilder()
+				.datasetName(datasetName)
+				.build();
+
+			return Optional.ofNullable(
+				getLangfuseApi().datasets()
+				                .datasetsGet(request)
+			);
+		}
+		catch (LangfuseNotFoundException ex) {
+			return Optional.empty();
+		}
 	}
 
 	private Stream<DatasetItem> getDatasetItems(String datasetName) {

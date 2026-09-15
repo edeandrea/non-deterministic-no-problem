@@ -47,6 +47,18 @@ Custom application code that:
 
 This is the only viable approach — Langfuse cannot orchestrate session-level evaluation in any language.
 
+#### Waiting for Langfuse to catch up
+
+Step 2 is not instantaneous. Spans reach Langfuse asynchronously twice over — the OpenTelemetry batch exporter flushes on its own schedule, and Langfuse then ingests OTLP traces into ClickHouse asynchronously — so a query fired the moment the session ends usually returns nothing, and the session would silently go unscored.
+
+`LangfuseSessionScoringService` therefore waits an initial flush period and then polls until at least one complete exchange (an observation with both input and output) is visible, or a deadline passes. It's implemented as a small Mutiny pipeline (`retry().withBackOff().expireIn()`) collapsed back to blocking with `await()`, since the scorer already runs on a background worker thread. Three properties under `quarkus.aiscoring.langfuse.evaluation.session` control it:
+
+| Property | Default | Purpose |
+|---|---|---|
+| `otel-flush-wait-time` | `5s` | Head start for the OTel exporter before the first query |
+| `observation-poll-interval` | `2s` | How often to re-query while the session still has no complete exchanges |
+| `observation-max-wait-time` | `30s` | Give up (and log a warning) if nothing has landed after this long |
+
 ---
 
 ## Tier 3: Drift Detection in CI/CD
@@ -73,6 +85,21 @@ After an intentional change (prompt, business logic, RAG retrieval, data pipelin
 | **3b. Change validation** | Prompt, business logic, data retrieval, RAG | LLM judge: "regression, equivalent, or improvement?" |
 
 In both modes, Langfuse dataset items serve as the baseline. The stored `expectedOutput` is the historical output. The evaluation strategy differs, but the infrastructure is the same.
+
+#### Dataset Naming Convention
+
+The session scorer (Tier 2) and the drift detection guardrail (Tier 3) share a single, deterministic dataset naming convention so that datasets recorded at runtime can be looked up at drift-evaluation time without any manual mapping. The dataset name is **the LangChain4j AI service span name, verbatim**:
+
+```
+langchain4j.aiservices.<AiServiceClassName>.<methodName>
+```
+
+Using the span name as-is means auto-recorded datasets are clearly namespaced apart from hand-curated ones, sort together in the Langfuse Datasets UI, and can be pasted straight into the Langfuse trace search to find the spans that populated them.
+
+- **At recording time** — `ai.scoring.langfuse.otel.AiServiceDatasetSpanProcessor` (an OpenTelemetry `SpanProcessor`) detects the LangChain4j AI service root span (`langchain4j.aiservices.*`), stamps it with `langfuse.dataset.name` (the span name), `ai.service.class`, and `ai.service.method` attributes, and cascades those attributes down to every descendant span (tool executions, model `completion` generations, etc.). The session scorer (`ConversationExchange`) reads the dataset name from the generation observation's metadata; if the attributes aren't present it walks up the observation hierarchy (via `parentObservationId`) to the enclosing `langchain4j.aiservices.*` span and uses its name, finally falling back to the trace name and then the observation name.
+- **At drift-evaluation time** — `DriftDetectionOutputGuardrail` rebuilds the same name from LangChain4j's `InvocationContext` (`langchain4j.aiservices.` + `interfaceName()` simple name + `.` + `methodName()`) and loads the matching dataset via `LangfuseDatasetSampleLoader`.
+
+The name is model-independent: whether a generation was produced by `gpt-5-mini`, `llama3.2`, or anything else, it lands in the dataset for the AI service method that invoked it.
 
 ### What Langfuse Provides
 

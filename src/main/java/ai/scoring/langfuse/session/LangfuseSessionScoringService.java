@@ -5,7 +5,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -30,6 +29,7 @@ import com.langfuse.api.observations.ObservationsApi.APIObservationsGetManyReque
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.Tracer;
 import io.quarkiverse.langfuse.client.LangfuseNotFoundException;
+import io.smallrye.mutiny.Uni;
 
 /**
  * Service responsible for scoring sessions using Langfuse's evaluation and scoring APIs.
@@ -54,14 +54,6 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 
 	@Override
 	public void scoreSession(String conversationId) {
-		try {
-			// This is to give time for OTEL to flush spans
-			TimeUnit.MILLISECONDS.sleep(this.langfuseConfig.evaluation().session().otelFlushWaitTime().toMillis());
-		}
-		catch (InterruptedException e) {
-			// eat it
-		}
-
 		var span = this.tracer.spanBuilder("ComputeSessionScore")
 		                      .setSpanKind(SpanKind.INTERNAL)
 		                      .startSpan();
@@ -77,19 +69,18 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 	private void fetchAndScoreSession(String conversationId) {
 		try {
 			var sessionEvalConfig = this.langfuseConfig.evaluation().session();
-			var sessionFilter = """
-				[{"type":"string","column":"sessionId","operator":"=","value":"%s"}]""".formatted(conversationId);
 
-			this.langfuseApi.observations()
-			                .observationsGetMany(APIObservationsGetManyRequest.newBuilder()
-			                                                                 .filter(sessionFilter)
-			                                                                 .fields("core,basic,io")
-			                                                                 .build())
-			                .getData()
-			                .stream()
-			                .filter(obs -> (obs.getStartTime() != null) && (obs.getInput() != null) && (obs.getOutput() != null))
+			// Fetch *all* observations for the session, not just the generations. The extra ones (the AI service root
+			// span, tool spans, ...) are what let ConversationExchange walk up from each generation to its enclosing
+			// langchain4j.aiservices.* span to work out which dataset it belongs in.
+			var sessionObservations = awaitSessionObservations(conversationId);
+			var hierarchy = ConversationExchange.hierarchyOf(sessionObservations);
+
+			// Only observations with both input and output (i.e. the generations) become exchanges
+			sessionObservations.stream()
+			                .filter(LangfuseSessionScoringService::isCompleteExchange)
 			                .sorted(Comparator.comparing(ObservationV2::getStartTime))
-			                .map(ConversationExchange::from)
+			                .map(obs -> ConversationExchange.from(obs, hierarchy))
 			                .collect(Collectors.collectingAndThen(
 												Collectors.toUnmodifiableList(),
 				                exchanges -> Optional.ofNullable(exchanges)
@@ -111,6 +102,73 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 		}
 	}
 
+	private static boolean isCompleteExchange(ObservationV2 observation) {
+		return (observation.getStartTime() != null) && (observation.getInput() != null) && (observation.getOutput() != null);
+	}
+
+	/**
+	 * Spans reach Langfuse asynchronously twice over: the OpenTelemetry batch exporter flushes on its own schedule,
+	 * and Langfuse then ingests OTLP traces into ClickHouse asynchronously. So the session's observations are
+	 * usually <em>not</em> queryable the instant the conversation ends - a single query fired straight away would
+	 * typically come back empty and the session would silently go unscored.
+	 * <p>
+	 * Instead: wait the initial flush period, then poll until at least one complete exchange (an observation with
+	 * both input and output) is visible, or the max wait elapses. On timeout an empty list is returned so the
+	 * caller's existing "nothing to score" handling applies.
+	 * <p>
+	 * Implemented as a Mutiny pipeline and then collapsed back to blocking with {@code await()}, purely because
+	 * {@code retry().withBackOff().expireIn()} expresses "poll until condition or deadline" more clearly than a
+	 * hand-rolled loop with sleeps, deadline arithmetic and interrupt handling. This method is always called on a
+	 * background worker thread (see {@code ConversationalBaggageHandler}), so blocking here is fine.
+	 */
+	private List<ObservationV2> awaitSessionObservations(String conversationId) {
+		var sessionConfig = this.langfuseConfig.evaluation().session();
+
+		return Uni.createFrom().item(conversationId)
+			// Give the OTel batch exporter a head start before the first query
+			.onItem().delayIt().by(sessionConfig.otelFlushWaitTime())
+			.flatMap(this::fetchSessionObservations)
+
+			// Mutiny's retry() is failure-driven, so "not ready yet" has to be surfaced as a failure to be retried on
+			.flatMap(observations ->
+				observations.stream().anyMatch(LangfuseSessionScoringService::isCompleteExchange) ?
+					Uni.createFrom().item(observations) :
+					Uni.createFrom().failure(new ObservationsNotReadyException(conversationId))
+			)
+
+			// Re-run the fetch every pollInterval until the deadline. withBackOff(x, x) pins the delay to a constant x;
+			// the default is exponential with jitter, which isn't what we want for "has it landed yet?" polling.
+			.onFailure(ObservationsNotReadyException.class)
+				.retry()
+				.withBackOff(sessionConfig.observationPollInterval(), sessionConfig.observationPollInterval())
+				.expireIn(sessionConfig.observationMaxWaitTime().toMillis())
+
+			// Still not ready when the retries expired: log and hand back an empty list rather than propagating
+			.onFailure(ObservationsNotReadyException.class)
+				.recoverWithItem(() -> {
+					Log.warnf("Gave up waiting for observations for session %s after %s", conversationId, sessionConfig.observationMaxWaitTime());
+					return List.of();
+				})
+
+			// Collapse back to blocking. This timeout is a backstop for the *whole* pipeline (including the initial
+			// delay and an in-flight HTTP call at the deadline), so it's deliberately a little larger than expireIn.
+			.await().atMost(sessionConfig.otelFlushWaitTime().plus(sessionConfig.observationMaxWaitTime()).plusSeconds(5));
+	}
+
+	private Uni<List<ObservationV2>> fetchSessionObservations(String conversationId) {
+		var sessionFilter = """
+			[{"type":"string","column":"sessionId","operator":"=","value":"%s"}]""".formatted(conversationId);
+		var request = APIObservationsGetManyRequest.newBuilder()
+		                                           .filter(sessionFilter)
+		                                           .fields("core,basic,io,meta")
+		                                           .build();
+
+		// Deferred supplier so each retry issues a fresh request rather than replaying the first response
+		return Uni.createFrom().completionStage(() -> this.langfuseApi.asyncObservations().observationsGetMany(request))
+			// Langfuse returns an empty body ({}) rather than an empty data array when nothing matches yet
+			.map(response -> Optional.ofNullable(response.getData()).orElseGet(List::of));
+	}
+
 	private SessionSentiment evaluateSession(List<ConversationExchange> exchanges) {
 		Log.info("Conversation completed - scoring conversation");
 		return this.sessionSentimentService.evaluate(exchanges);
@@ -129,7 +187,7 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 		                                       .collect(Collectors.toSet());
 
 		exchanges.forEach(exchange -> {
-			var datasetName = exchange.traceName();
+			var datasetName = exchange.datasetName();
 
 			if (existingDatasets.add(datasetName)) {
 				var request = CreateDatasetRequest.builder()
@@ -139,13 +197,14 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 				datasetsApi.datasetsCreate(APIDatasetsCreateRequest.newBuilder()
 					.createDatasetRequest(request)
 					.build());
-				Log.info("Created dataset");
+				Log.infof("Created dataset '%s'", datasetName);
 			}
 
 			var metadata = Map.of(
 						"session_id", conversationId,
 						"trace_id", exchange.traceId(),
-						"trace_name", exchange.traceName()
+						"trace_name", exchange.traceName(),
+						"dataset_name", datasetName
 					);
 
 			var request = CreateDatasetItemRequest.builder()
@@ -183,6 +242,21 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 		}
 		catch (Exception e) {
 			Log.warnf(e, "Failed to post session-sentiment score for session %s: %s", conversationId, e.getMessage());
+		}
+	}
+
+	/**
+	 * Signals that Langfuse has not yet ingested any complete exchange (an observation with both input and output)
+	 * for a session.
+	 * <p>
+	 * This is a <em>normal</em> transient state, not an error: spans reach Langfuse asynchronously and take a few
+	 * seconds to become queryable. It is modelled as an exception purely because Mutiny's {@code retry()} operator is
+	 * failure-driven, so "not ready yet" has to surface as a failure for {@link #awaitSessionObservations} to retry on it.
+	 * It never escapes that method.
+	 */
+	private static class ObservationsNotReadyException extends RuntimeException {
+		ObservationsNotReadyException(String conversationId) {
+			super("No complete exchanges yet for session %s".formatted(conversationId));
 		}
 	}
 }

@@ -6,6 +6,7 @@ import io.quarkus.logging.Log;
 
 import ai.scoring.config.InteractionMode;
 import ai.scoring.config.ScoringConfig;
+import ai.scoring.langfuse.otel.AiServiceAttributes;
 import dev.langchain4j.guardrail.OutputGuardrail;
 import dev.langchain4j.guardrail.OutputGuardrailRequest;
 import dev.langchain4j.guardrail.OutputGuardrailResult;
@@ -31,7 +32,7 @@ public class DriftDetectionOutputGuardrail implements OutputGuardrail {
 			var numCpus = Runtime.getRuntime().availableProcessors();
 
 			try {
-				var sampleSetName = "langchain4j.aiservices.%s".formatted(getAIServiceName(invocationContext));
+				var sampleSetName = getAIServiceName(invocationContext);
 				var evaluation = Evaluation.<String>builder()
 				                           .withConcurrency(Math.clamp(numCpus - 2, 1, numCpus))
 				                           .withSamples(sampleSetName)
@@ -64,7 +65,15 @@ public class DriftDetectionOutputGuardrail implements OutputGuardrail {
 		return invocationContext.interfaceName().substring(invocationContext.interfaceName().lastIndexOf('.') + 1);
 	}
 
+	/**
+	 * The dataset name is the LangChain4j AI service span name, verbatim:
+	 * {@code langchain4j.aiservices.<AiServiceClassName>.<methodName>}.
+	 * <p>
+	 * This must match what the session scorer records (see {@code ConversationExchange}) or drift detection will never
+	 * find any samples. Both sides share {@link AiServiceAttributes#AI_SERVICES_PREFIX} to keep them in lock-step.
+	 */
 	private static String getAIServiceName(InvocationContext invocationContext) {
-		return "%s.%s".formatted(getAIServiceClassName(invocationContext), invocationContext.methodName());
+		// interfaceName() is fully-qualified; Quarkus LangChain4j names the span with the simple class name
+		return "%s%s.%s".formatted(AiServiceAttributes.AI_SERVICES_PREFIX, getAIServiceClassName(invocationContext), invocationContext.methodName());
 	}
 }
