@@ -6,10 +6,7 @@ import java.util.stream.Stream;
 
 import jakarta.enterprise.inject.spi.CDI;
 
-import com.langfuse.api.LangfuseApi;
 import com.langfuse.api.datasetItems.DatasetItemsApi.APIDatasetItemsListRequest;
-import com.langfuse.api.datasets.DatasetsApi.APIDatasetsGetRequest;
-import com.langfuse.api.model.Dataset;
 import com.langfuse.api.model.DatasetItem;
 import com.langfuse.api.model.DatasetStatus;
 import com.langfuse.api.model.PaginatedDatasetItems;
@@ -18,19 +15,23 @@ import io.quarkiverse.langchain4j.testing.evaluation.Parameters;
 import io.quarkiverse.langchain4j.testing.evaluation.SampleLoadException;
 import io.quarkiverse.langchain4j.testing.evaluation.SampleLoader;
 import io.quarkiverse.langchain4j.testing.evaluation.Samples;
+import io.quarkiverse.langfuse.api.LangfuseOperations;
 import io.quarkiverse.langfuse.client.LangfuseNotFoundException;
 
 public class LangfuseDatasetSampleLoader implements SampleLoader<String> {
 	// Helper to get CDI instance when created via ServiceLoader
-  private static LangfuseApi getLangfuseApi() {
-    return CDI.current().select(LangfuseApi.class).get();
-  }
+	private static LangfuseOperations getLangfuseOperations() {
+		return CDI.current().select(LangfuseOperations.class).get();
+	}
 
 	@Override
 	public boolean supports(String source) {
 		return Optional.ofNullable(source)
 			.map(String::strip)
-			.flatMap(this::getDataset)
+			// datasets().findByName() throws IllegalArgumentException for blank names before issuing any request, and
+			// that isn't a SampleLoadException, so it would escape DriftDetectionOutputGuardrail.validate()
+			.filter(name -> !name.isBlank())
+			.flatMap(datasetName -> getLangfuseOperations().datasets().findByName(datasetName))
 			.isPresent();
 	}
 
@@ -56,22 +57,6 @@ public class LangfuseDatasetSampleLoader implements SampleLoader<String> {
 			.build();
 	}
 
-	private Optional<Dataset> getDataset(String datasetName) {
-		try {
-			var request = APIDatasetsGetRequest.newBuilder()
-				.datasetName(datasetName)
-				.build();
-
-			return Optional.ofNullable(
-				getLangfuseApi().datasets()
-				                .datasetsGet(request)
-			);
-		}
-		catch (LangfuseNotFoundException ex) {
-			return Optional.empty();
-		}
-	}
-
 	private Stream<DatasetItem> getDatasetItems(String datasetName) {
 		try {
 			var firstPage = fetchPage(datasetName, 1);
@@ -90,7 +75,8 @@ public class LangfuseDatasetSampleLoader implements SampleLoader<String> {
 	}
 
 	private PaginatedDatasetItems fetchPage(String datasetName, int page) {
-		return getLangfuseApi()
+		return getLangfuseOperations()
+			.api()
 			.datasetItems()
 			.datasetItemsList(buildGetDatasetItemsRequest(datasetName, page));
 	}

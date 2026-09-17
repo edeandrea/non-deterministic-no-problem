@@ -9,7 +9,8 @@ user, API keys). They do **not** cover evaluators, so at one point these had to 
 the Langfuse UI (see https://github.com/orgs/langfuse/discussions/8241).
 
 That is no longer the case here. `ai.scoring.langfuse.init.LangfuseEvaluationInitializer` provisions
-everything through the Langfuse REST API on application startup, gated on
+everything on application startup through the `LangfuseOperations` layer of the
+[quarkus-langfuse](https://github.com/quarkiverse/quarkus-langfuse) extension, gated on
 `quarkus.aiscoring.langfuse.evaluation.initialize-on-startup` (default `true`). On a `StartupEvent`
 it creates-or-reuses:
 
@@ -21,8 +22,10 @@ it creates-or-reuses:
 - an evaluation rule binding that evaluator to incoming traces (100% sampling, excluding `SPAN` and
   `EVENT` observation types)
 
-Each step is idempotent — existing entities are looked up by name and reused — and failures are
-logged as warnings rather than aborting startup.
+Each step is idempotent — existing entities are looked up by name and reused. That is now the
+extension's job: `createIfAbsent` (and `upsert` for the LLM connection) replaced the hand-written
+lookup-then-create code this app used to carry. Failures are logged as warnings rather than aborting
+startup.
 
 For the evaluation gaps that genuinely *can't* be solved through Langfuse today (session-level
 scoring, experiment orchestration from Java) and the workarounds implemented in this project, see

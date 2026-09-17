@@ -30,12 +30,9 @@ import ai.scoring.config.InteractionMode;
 import ai.scoring.config.ScoringConfig;
 import ai.scoring.langfuse.evaluation.Evaluator;
 import ai.scoring.drift.DriftDetectionOutputGuardrailTests.KeysTestProfile;
-import com.langfuse.api.LangfuseApi;
 import com.langfuse.api.datasetItems.DatasetItemsApi.APIDatasetItemsCreateRequest;
 import com.langfuse.api.datasetItems.DatasetItemsApi.APIDatasetItemsDeleteRequest;
 import com.langfuse.api.datasetItems.DatasetItemsApi.APIDatasetItemsListRequest;
-import com.langfuse.api.datasets.DatasetsApi.APIDatasetsCreateRequest;
-import com.langfuse.api.datasets.DatasetsApi.APIDatasetsGetRequest;
 import com.langfuse.api.model.CreateDatasetItemRequest;
 import com.langfuse.api.model.CreateDatasetRequest;
 import com.langfuse.api.model.DatasetStatus;
@@ -50,7 +47,7 @@ import io.quarkiverse.langchain4j.guardrails.NoopChatExecutor;
 import io.quarkiverse.langchain4j.runtime.aiservice.NoopChatMemory;
 import io.quarkiverse.langchain4j.testing.evaluation.EvaluationResult;
 import io.quarkiverse.langchain4j.testing.evaluation.EvaluationSample;
-import io.quarkiverse.langfuse.client.LangfuseNotFoundException;
+import io.quarkiverse.langfuse.api.LangfuseOperations;
 import io.smallrye.config.Config;
 import io.smallrye.config.SmallRyeConfig;
 
@@ -88,33 +85,22 @@ class DriftDetectionOutputGuardrailTests {
 	Evaluator evaluator;
 
 	@Inject
-	LangfuseApi langfuseApi;
+	LangfuseOperations langfuse;
 
 	@BeforeEach
 	void setup() {
-		// Create the dataset & items if it doesn't already exist
-		try {
-			this.langfuseApi.datasets()
-			                .datasetsGet(APIDatasetsGetRequest.newBuilder()
-			                                                  .datasetName(DATASET_NAME)
-			                                                  .build());
-		}
-		catch (LangfuseNotFoundException ex) {
-			// Dataset not there, so create it
-			this.langfuseApi.datasets()
-				.datasetsCreate(APIDatasetsCreateRequest.newBuilder()
-					.createDatasetRequest(CreateDatasetRequest.builder()
-						.name(DATASET_NAME)
-						.build()
-					)
-					.build());
-		}
+		// Create the dataset if it doesn't already exist
+		this.langfuse.datasets()
+		             .createIfAbsent(CreateDatasetRequest.builder()
+		                                                 .name(DATASET_NAME)
+		                                                 .build());
 
 		// Now create the dataset items
 		IntStream.range(0, 2)
 		         .forEach(i ->
-			         this.langfuseApi.datasetItems()
-			                         .datasetItemsCreate(APIDatasetItemsCreateRequest.newBuilder().createDatasetItemRequest(
+			         this.langfuse.api()
+			                      .datasetItems()
+			                      .datasetItemsCreate(APIDatasetItemsCreateRequest.newBuilder().createDatasetItemRequest(
 																 CreateDatasetItemRequest.builder()
 																                         .datasetName(DATASET_NAME)
 																                         .status(DatasetStatus.ACTIVE)
@@ -126,7 +112,8 @@ class DriftDetectionOutputGuardrailTests {
 
 	@AfterEach
 	void tearDown() {
-		this.langfuseApi.datasetItems()
+		this.langfuse.api()
+			.datasetItems()
 			.datasetItemsList(APIDatasetItemsListRequest.newBuilder()
 				.datasetName(DATASET_NAME)
 				.build()
@@ -134,7 +121,7 @@ class DriftDetectionOutputGuardrailTests {
 			.getData()
 			.stream()
 			.map(dataset -> APIDatasetItemsDeleteRequest.newBuilder().id(dataset.getId()).build())
-			.forEach(this.langfuseApi.datasetItems()::datasetItemsDelete);
+			.forEach(this.langfuse.api().datasetItems()::datasetItemsDelete);
 	}
 
 	@Test

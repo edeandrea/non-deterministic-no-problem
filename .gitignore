@@ -47,3 +47,4 @@ easy-rag-embeddings.json
 .quinoa/
 /testing/ai-tester/ai-interactions.db
 /.explyt/
+/.tasks/

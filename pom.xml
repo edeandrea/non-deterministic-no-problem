@@ -18,7 +18,7 @@
 		<quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
 		<quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
 		<quarkus.platform.version>3.39.2</quarkus.platform.version>
-		<quarkus.langfuse.version>0.5.0</quarkus.langfuse.version>
+		<quarkus.langfuse.version>0.6.0</quarkus.langfuse.version>
 		<surefire-plugin.version>3.6.0</surefire-plugin.version>
 		<quarkus.mailpit.version>2.1.2</quarkus.mailpit.version>
 	</properties>

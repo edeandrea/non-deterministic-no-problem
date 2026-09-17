@@ -117,10 +117,12 @@ Tiers 1 and 2 are independent of this switch; they are controlled by the
 
 The three evaluation tiers (see `langfuse-evaluation.md` for the full rationale):
 
-1. **Per-trace** — native Langfuse LLM-as-a-Judge. `LangfuseEvaluationInitializer` (the sole
-   permitted subclass of the `sealed` `LangfuseInitializer`) programmatically creates the Langfuse
-   model, LLM connection, score config, evaluator, and evaluation rule on a `StartupEvent`, gated
-   on `initialize-on-startup`.
+1. **Per-trace** — native Langfuse LLM-as-a-Judge. `LangfuseEvaluationInitializer` programmatically
+   creates the Langfuse model, LLM connection, score config, evaluator, and evaluation rule on a
+   `StartupEvent`, gated on `initialize-on-startup`. It uses the `LangfuseOperations` layer
+   (`createIfAbsent` / `upsert` / `findByName`) from quarkus-langfuse, dropping to the raw
+   `langfuse.api()` client only for the evaluator update call, which the operations layer does not
+   cover.
 2. **Session-level** — Langfuse has no session evaluation target, so this is custom code.
    `ConversationalBaggageHandler` observes `ChatScopeStarted/Activated/Deactivated/Ended`,
    propagates the conversation id as OTel baggage (`gen_ai.conversation.id`), and on session end
@@ -128,8 +130,11 @@ The three evaluation tiers (see `langfuse-evaluation.md` for the full rationale)
    `LangfuseSessionScoringService` polls Langfuse until the session's observations are ingested
    (OTel flush + async ClickHouse ingest), reconstructs `ConversationExchange`s, asks
    `SessionSentimentService` for a `SessionSentiment`, and posts the score back via the Langfuse
-   Score API. It also records the exchanges as a Langfuse dataset, gated on
-   `create-dataset-on-session-close`.
+   Score API (raw `api().scores()` — scores have no operations equivalent). It also records the
+   exchanges as a Langfuse dataset, gated on `create-dataset-on-session-close`: dataset names are
+   deduplicated and created sequentially through `async().datasets().createIfAbsent(...)` (not
+   atomic, so concurrent creation of the same name would race it against itself), then the dataset
+   items are created in parallel on the raw `api().asyncDatasetItems()` client.
 3. **Drift detection** — `DriftDetectionOutputGuardrail` runs the quarkus-langchain4j evaluation
    framework (`Evaluation.withSamples(<datasetName>)`) and returns a `fatal` result carrying a
    `DriftDetectionException` when the score falls below `quarkus.aiscoring.threshold`.
@@ -140,7 +145,9 @@ The three evaluation tiers (see `langfuse-evaluation.md` for the full rationale)
    - `LangfuseDatasetSampleLoader` (`SampleLoader<String>`) supplies the samples. It is **not**
      called directly — it is discovered via `ServiceLoader` through
      `src/main/resources/META-INF/services/io.quarkiverse.langchain4j.testing.evaluation.SampleLoader`,
-     grabs `LangfuseApi` via `CDI.current()`, pages through the dataset, and keeps only
+     grabs `LangfuseOperations` via `CDI.current()`, checks the dataset exists with
+     `datasets().findByName(...)` in `supports`, pages through the dataset items on the raw client
+     (`api().datasetItems()`, which the operations layer does not cover), and keeps only
      `DatasetStatus.ACTIVE` items.
    - `Evaluator` (`EvaluationStrategy<String>`) scores them by delegating to the `EvaluatorAgent`
      AI service (the `judge` model). It is the only `EvaluationStrategy` bean in the project —
@@ -243,9 +250,10 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   `http://localhost:${quarkus.wiremock.devservices.port}/v1`, then stubs the
   OpenAI-compatible `/chat/completions` endpoint. Stubs are registered programmatically in
   `@BeforeEach` — there is no `src/test/resources` directory.
-- **Langfuse is not mocked.** `DriftDetectionOutputGuardrailTests` and
-  `LangfuseSessionScoringServiceTests` inject the real `LangfuseApi` against the Langfuse dev
-  service, creating and tearing down real datasets/items around each test.
+- **Langfuse is not mocked.** `DriftDetectionOutputGuardrailTests`, `LangfuseDatasetSampleLoaderTests`
+  and `LangfuseSessionScoringServiceTests` inject the real `LangfuseOperations` (reaching the raw
+  client via `api()` where needed) against the Langfuse dev service, creating and tearing down real
+  datasets/items around each test.
 - AssertJ + Awaitility; Mockito is attached as a `-javaagent` in the surefire/failsafe config.
 
 ## Conventions
@@ -268,6 +276,14 @@ Beyond the global Java/Quarkus style rules in `AGENTS.md`, this repo specificall
   `InteractionPublisher`/`InteractionScorer` pipeline and a `RESCORE` interaction mode. **None of
   that exists any more** — it collapsed into this single app scoring against Langfuse in-process,
   and `InteractionMode` is now `NORMAL`/`DRIFT_DETECTION`. Do not reintroduce references to it.
+- **The quarkus-langfuse operations layer (`LangfuseOperations`, 0.6.0) only covers six domains:**
+  `models()`, `datasets()`, `llmConnections()`, `scoreConfigs()`, `evaluationRules()` and
+  `evaluators()`. There is nothing for observations, scores, dataset items, traces or sessions, so
+  those calls necessarily stay on the raw generated client reached via `langfuse.api()` (or
+  `langfuse.async()` for the reactive variants). Prefer the operations layer (`createIfAbsent`,
+  `upsert`, `findByName`/`findByProvider`) wherever it exists — it replaced the hand-rolled
+  lookup-then-create helpers and cursor-pagination loop that used to live in
+  `ai.scoring.langfuse.init`. The evaluator *update* call still drops to `api().evaluators()`.
 - `conversation-export.md` (1700+ lines) is a raw transcript of the design conversation behind
   `langfuse-evaluation.md`. It is a historical artifact, not documentation — don't treat it as
   spec and don't try to keep it in sync.
@@ -276,7 +292,8 @@ Beyond the global Java/Quarkus style rules in `AGENTS.md`, this repo specificall
   env vars do **not** cover evaluators.
 - Session scoring is inherently racy against Langfuse's async ingest. The wait/poll knobs live
   under `quarkus.aiscoring.langfuse.evaluation.session` (`otel-flush-wait-time`,
-  `observation-poll-interval`, `observation-max-wait-time`). If session scores go missing, tune
+  `observation-poll-interval`, `observation-max-wait-time`, `dataset-creation-max-wait-time`).
+  If session scores go missing, tune
   these before suspecting the scorer.
 - `NotificationService.sendEmail` deliberately moves the mailer onto `ForkJoinPool.commonPool()`
   with a 15s timeout — the reactive mailer blocks the calling (tool-execution) thread and deadlocks

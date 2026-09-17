@@ -2,6 +2,7 @@ package ai.scoring.langfuse.evaluation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
@@ -14,19 +15,22 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
 
-import com.langfuse.api.LangfuseApi;
+import ai.scoring.langfuse.evaluation.LangfuseDatasetSampleLoaderTests.KeysTestProfile;
 import com.langfuse.api.datasetItems.DatasetItemsApi.APIDatasetItemsCreateRequest;
-import com.langfuse.api.datasets.DatasetsApi.APIDatasetsCreateRequest;
 import com.langfuse.api.model.CreateDatasetItemRequest;
 import com.langfuse.api.model.CreateDatasetRequest;
+import io.quarkiverse.langfuse.api.LangfuseOperations;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
 
 @QuarkusTest
+@TestProfile(KeysTestProfile.class)
 @TestMethodOrder(OrderAnnotation.class)
 class LangfuseDatasetSampleLoaderTests {
 	@Inject
-	LangfuseApi langfuseApi;
+	LangfuseOperations langfuse;
 
 	LangfuseDatasetSampleLoader langfuseDatasetSampleLoader = new LangfuseDatasetSampleLoader();
 
@@ -41,13 +45,9 @@ class LangfuseDatasetSampleLoaderTests {
 	@Order(1)
 	void datasetDoesntExist() {
 		// Create dataset
-		this.langfuseApi.datasets().datasetsCreate(
-			APIDatasetsCreateRequest.newBuilder()
-				.createDatasetRequest(
-					CreateDatasetRequest.builder()
-						.name("dataset1")
-						.build()
-				)
+		this.langfuse.datasets().createIfAbsent(
+			CreateDatasetRequest.builder()
+				.name("dataset1")
 				.build());
 
 		assertThat(this.langfuseDatasetSampleLoader.supports("datasetX"))
@@ -69,17 +69,13 @@ class LangfuseDatasetSampleLoaderTests {
 	@Order(3)
 	void datasetFound() {
 		// Create dataset
-		this.langfuseApi.datasets().datasetsCreate(
-			APIDatasetsCreateRequest.newBuilder()
-				.createDatasetRequest(
-					CreateDatasetRequest.builder()
-						.name("dataset2")
-						.build()
-				)
+		this.langfuse.datasets().createIfAbsent(
+			CreateDatasetRequest.builder()
+				.name("dataset2")
 				.build());
 
 		// Add items to dataset
-		this.langfuseApi.datasetItems().datasetItemsCreate(
+		this.langfuse.api().datasetItems().datasetItemsCreate(
 			APIDatasetItemsCreateRequest.newBuilder()
 				.createDatasetItemRequest(
 					CreateDatasetItemRequest.builder()
@@ -103,13 +99,9 @@ class LangfuseDatasetSampleLoaderTests {
 	@Order(4)
 	void datasetPaginationWorks() throws InterruptedException {
 		// Create dataset
-		this.langfuseApi.datasets().datasetsCreate(
-			APIDatasetsCreateRequest.newBuilder()
-				.createDatasetRequest(
-					CreateDatasetRequest.builder()
-						.name("dataset3")
-						.build()
-				)
+		this.langfuse.datasets().createIfAbsent(
+			CreateDatasetRequest.builder()
+				.name("dataset3")
 				.build());
 
 		var items = 520;
@@ -119,8 +111,9 @@ class LangfuseDatasetSampleLoaderTests {
 		IntStream.range(0, items)
 			.forEach(i ->
 				Infrastructure.getDefaultExecutor().execute(() -> {
-						this.langfuseApi.datasetItems()
-						                .datasetItemsCreate(APIDatasetItemsCreateRequest.newBuilder()
+						this.langfuse.api()
+						             .datasetItems()
+						             .datasetItemsCreate(APIDatasetItemsCreateRequest.newBuilder()
 						                                                                .createDatasetItemRequest(CreateDatasetItemRequest.builder()
 						                                                                                                                  .datasetName("dataset3")
 						                                                                                                                  .input("intput")
@@ -144,5 +137,16 @@ class LangfuseDatasetSampleLoaderTests {
 		assertThat(this.langfuseDatasetSampleLoader.load("dataset3", String.class))
 			.isNotNull()
 			.hasSize(items);
+	}
+
+	public static class KeysTestProfile implements QuarkusTestProfile {
+		@Override
+		public Map<String, String> getConfigOverrides() {
+			return Map.of(
+				"quarkus.langchain4j.openai.api-key", "changeme",
+				"quarkus.langchain4j.openai.session-sentiment.api-key", "changeme",
+				"quarkus.langchain4j.openai.judge.api-key", "changeme"
+			);
+		}
 	}
 }

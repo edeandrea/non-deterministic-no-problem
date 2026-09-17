@@ -31,14 +31,14 @@ import ai.scoring.langfuse.config.LangfuseConfig;
 import ai.scoring.langfuse.session.LangfuseSessionScoringServiceTests.SessionScoringTestProfile;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.stubbing.Scenario;
-import com.langfuse.api.LangfuseApi;
 import com.langfuse.api.datasetItems.DatasetItemsApi.APIDatasetItemsListRequest;
-import com.langfuse.api.datasets.DatasetsApi.APIDatasetsListRequest;
+import com.langfuse.api.model.Dataset;
 import com.langfuse.api.model.ScoreSubjectSessionV31;
 import com.langfuse.api.observations.ObservationsApi.APIObservationsGetManyRequest;
 import com.langfuse.api.scoresV3.ScoresV3Api.APIScoresV3GetManyV3Request;
 import io.quarkiverse.langchain4j.chatscopes.ChatScopeEnded;
 import io.quarkiverse.langchain4j.chatscopes.LocalChatRoutes;
+import io.quarkiverse.langfuse.api.LangfuseOperations;
 import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 
 @QuarkusTest
@@ -94,7 +94,7 @@ class LangfuseSessionScoringServiceTests {
 		""";
 
 	@Inject
-	LangfuseApi langfuseApi;
+	LangfuseOperations langfuse;
 
 	@Inject
 	LangfuseConfig langfuseConfig;
@@ -178,7 +178,7 @@ class LangfuseSessionScoringServiceTests {
 	     .pollInterval(Duration.ofSeconds(2))
 	     .pollDelay(Duration.ofSeconds(2))
 	     .untilAsserted(() -> {
-	       var observations = this.langfuseApi.observations()
+	       var observations = this.langfuse.api().observations()
 		       .observationsGetMany(APIObservationsGetManyRequest.newBuilder()
 			       .filter(sessionFilter)
 			       .fields("core,basic,io,meta")
@@ -214,7 +214,7 @@ class LangfuseSessionScoringServiceTests {
 		       .pollInterval(Duration.ofSeconds(2))
 		       .pollDelay(sessionConfig.otelFlushWaitTime())
 		       .untilAsserted(() -> {
-			       var scores = this.langfuseApi.scoresV3()
+			       var scores = this.langfuse.api().scoresV3()
 				       .scoresV3GetManyV3(APIScoresV3GetManyV3Request.newBuilder()
 				                                                     .name(SessionSentiment.SCORE_NAME)
 				                                                     .sessionId(sessionId)
@@ -236,17 +236,19 @@ class LangfuseSessionScoringServiceTests {
 				       });
 		       });
 
-		// Verify dataset was created with items matching the conversation exchange
-		var datasets = this.langfuseApi.datasets()
-			.datasetsList(APIDatasetsListRequest.newBuilder().build())
-			.getData();
-
-		assertThat(datasets)
+		// Verify dataset was created with items matching the conversation exchange.
+		// The refactored createDatasets deduplicates dataset names, so exactly one dataset must exist.
+		assertThat(this.langfuse.datasets().findAll())
 			.singleElement()
 			.satisfies(dataset -> {
 				assertThat(dataset.getName()).isEqualTo("langchain4j.aiservices.ClaimService.chat");
 
-				var items = this.langfuseApi.datasetItems()
+				assertThat(this.langfuse.datasets().findByName(dataset.getName()))
+					.get()
+					.extracting(Dataset::getId)
+					.isEqualTo(dataset.getId());
+
+				var items = this.langfuse.api().datasetItems()
 					.datasetItemsList(APIDatasetItemsListRequest.newBuilder()
 						.datasetName(dataset.getName())
 						.build())

@@ -1,7 +1,6 @@
 package ai.scoring.langfuse.session;
 
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -13,22 +12,21 @@ import io.quarkus.logging.Log;
 
 import ai.scoring.evaluation.SessionScoringService;
 import ai.scoring.langfuse.config.LangfuseConfig;
-import com.langfuse.api.LangfuseApi;
 import com.langfuse.api.datasetItems.DatasetItemsApi.APIDatasetItemsCreateRequest;
-import com.langfuse.api.datasets.DatasetsApi.APIDatasetsCreateRequest;
-import com.langfuse.api.datasets.DatasetsApi.APIDatasetsListRequest;
 import com.langfuse.api.scores.ScoresApi.APIScoresCreateRequest;
 import com.langfuse.api.model.CreateDatasetItemRequest;
 import com.langfuse.api.model.CreateDatasetRequest;
 import com.langfuse.api.model.CreateScoreRequest;
 import com.langfuse.api.model.CreateScoreValue;
-import com.langfuse.api.model.Dataset;
 import com.langfuse.api.model.ObservationV2;
 import com.langfuse.api.model.ScoreDataType;
 import com.langfuse.api.observations.ObservationsApi.APIObservationsGetManyRequest;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.Tracer;
+import io.quarkiverse.langfuse.api.LangfuseOperations;
 import io.quarkiverse.langfuse.client.LangfuseNotFoundException;
+import io.smallrye.mutiny.Multi;
+import io.smallrye.mutiny.TimeoutException;
 import io.smallrye.mutiny.Uni;
 
 /**
@@ -42,13 +40,13 @@ import io.smallrye.mutiny.Uni;
 public class LangfuseSessionScoringService implements SessionScoringService {
 	private final LangfuseConfig langfuseConfig;
 	private final Tracer tracer;
-	private final LangfuseApi langfuseApi;
+	private final LangfuseOperations langfuse;
 	private final SessionSentimentService sessionSentimentService;
 
-	public LangfuseSessionScoringService(LangfuseConfig langfuseConfig, Tracer tracer, LangfuseApi langfuseApi, SessionSentimentService sessionSentimentService) {
+	public LangfuseSessionScoringService(LangfuseConfig langfuseConfig, Tracer tracer, LangfuseOperations langfuse, SessionSentimentService sessionSentimentService) {
 		this.langfuseConfig = langfuseConfig;
 		this.tracer = tracer;
-		this.langfuseApi = langfuseApi;
+		this.langfuse = langfuse;
 		this.sessionSentimentService = sessionSentimentService;
 	}
 
@@ -164,7 +162,8 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 		                                           .build();
 
 		// Deferred supplier so each retry issues a fresh request rather than replaying the first response
-		return Uni.createFrom().completionStage(() -> this.langfuseApi.asyncObservations().observationsGetMany(request))
+		// Observations have no operations equivalent in 0.6.0, so this stays on the raw async API
+		return Uni.createFrom().completionStage(() -> this.langfuse.api().asyncObservations().observationsGetMany(request))
 			// Langfuse returns an empty body ({}) rather than an empty data array when nothing matches yet
 			.map(response -> Optional.ofNullable(response.getData()).orElseGet(List::of));
 	}
@@ -175,53 +174,85 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 	}
 
 	private List<ConversationExchange> createDatasets(String conversationId, List<ConversationExchange> exchanges) {
-		// This probably isn't the best way to do this
-		// Its essentially building a local cache, which if lots of apps are running concurrently, could mean that new datasets are added while performing this logic
-		// It would be better to try to fetch datasets and check each time, but this is simpler and should be fine for now
-		// #Demoware!
-		var datasetsApi = this.langfuseApi.datasets();
-		var existingDatasets = datasetsApi.datasetsList(APIDatasetsListRequest.newBuilder().build())
-		                                       .getData()
-		                                       .stream()
-		                                       .map(Dataset::getName)
-		                                       .collect(Collectors.toSet());
+		// createIfAbsent looks the dataset up and only creates it when genuinely absent, so each exchange gets a fresh
+		// check against Langfuse rather than a snapshot taken once at the start. It is *not* atomic (a lookup followed
+		// by a create), so two processes can still collide; what it removes is the stale-snapshot problem.
+		//
+		// Because it isn't atomic, creating several datasets concurrently would let it race against *itself* whenever
+		// two exchanges share a dataset name. Names are therefore deduplicated and created one after another
+		// (concatenate), while the items - one per exchange, no contention between them - are created in parallel.
+		var distinctDatasetNames = exchanges.stream()
+		                                    .map(ConversationExchange::datasetName)
+		                                    .distinct()
+		                                    .toList();
 
-		exchanges.forEach(exchange -> {
-			var datasetName = exchange.datasetName();
+		// Each Uni<Void> emits null, which flattens to nothing, so the collected list is always empty: it is used only
+		// as a "all datasets have been created" completion signal, never for its contents.
+		var datasetsReady = Multi.createFrom().iterable(distinctDatasetNames)
+			.onItem().transformToUni(this::createDatasetIfAbsent)
+			.concatenate()
+			.collect().asList()
+			.replaceWithVoid();
 
-			if (existingDatasets.add(datasetName)) {
-				var request = CreateDatasetRequest.builder()
-					.name(datasetName)
-					.build();
+		var itemCreations = exchanges.stream()
+		                             .map(exchange -> createDatasetItem(conversationId, exchange))
+		                             .toList();
 
-				datasetsApi.datasetsCreate(APIDatasetsCreateRequest.newBuilder()
-					.createDatasetRequest(request)
-					.build());
-				Log.infof("Created dataset '%s'", datasetName);
-			}
-
-			var metadata = Map.of(
-						"session_id", conversationId,
-						"trace_id", exchange.traceId(),
-						"trace_name", exchange.traceName(),
-						"dataset_name", datasetName
-					);
-
-			var request = CreateDatasetItemRequest.builder()
-				.datasetName(datasetName)
-				.metadata(metadata)
-				.input(exchange.input())
-				.expectedOutput(exchange.output())
-				.sourceTraceId(exchange.traceId())
-				.build();
-
-			this.langfuseApi.datasetItems()
-				.datasetItemsCreate(APIDatasetItemsCreateRequest.newBuilder()
-					.createDatasetItemRequest(request)
-					.build());
-		});
+		// Recording datasets is best-effort: it must never abort scoring. Failures (including the CompositeException
+		// andFailFast() can raise, and the TimeoutException from the bounded await) are logged and swallowed here
+		// rather than propagating to fetchAndScoreSession, which only downgrades LangfuseNotFoundException.
+		try {
+			datasetsReady
+				.chain(() -> Uni.join().all(itemCreations).andFailFast())
+				// Bounded: a hung Langfuse call must not pin this worker thread forever
+				.await().atMost(this.langfuseConfig.evaluation().session().datasetCreationMaxWaitTime());
+		}
+		catch (TimeoutException e) {
+			Log.warnf("Gave up waiting for datasets of session %s to be recorded after %s", conversationId, this.langfuseConfig.evaluation().session().datasetCreationMaxWaitTime());
+		}
+		catch (Exception e) {
+			Log.warnf(e, "Failed to record datasets for session %s: %s", conversationId, e.getMessage());
+		}
 
 		return exchanges;
+	}
+
+	private Uni<Void> createDatasetIfAbsent(String datasetName) {
+		var request = CreateDatasetRequest.builder()
+			.name(datasetName)
+			.build();
+
+		return this.langfuse.async()
+			.datasets()
+			.createIfAbsent(request)
+			.invoke(() -> Log.infof("Dataset '%s' ready", datasetName))
+			.replaceWithVoid();
+	}
+
+	private Uni<Void> createDatasetItem(String conversationId, ConversationExchange exchange) {
+		var datasetName = exchange.datasetName();
+		var metadata = Map.of(
+					"session_id", conversationId,
+					"trace_id", exchange.traceId(),
+					"trace_name", exchange.traceName(),
+					"dataset_name", datasetName
+				);
+
+		var request = CreateDatasetItemRequest.builder()
+			.datasetName(datasetName)
+			.metadata(metadata)
+			.input(exchange.input())
+			.expectedOutput(exchange.output())
+			.sourceTraceId(exchange.traceId())
+			.build();
+
+		// Dataset items have no operations equivalent in 0.6.0, so they stay on the raw async API
+		return Uni.createFrom().completionStage(() -> this.langfuse.api()
+				.asyncDatasetItems()
+				.datasetItemsCreate(APIDatasetItemsCreateRequest.newBuilder()
+					.createDatasetItemRequest(request)
+					.build()))
+			.replaceWithVoid();
 	}
 
 	private void saveScore(String conversationId, SessionSentiment sentiment) {
@@ -234,7 +265,8 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 			.build();
 
 		try {
-			var response = this.langfuseApi.scores()
+			// Scores have no operations equivalent in 0.6.0, so this stays on the raw API
+			var response = this.langfuse.api().scores()
 				.scoresCreate(APIScoresCreateRequest.newBuilder()
 					.createScoreRequest(request)
 					.build());

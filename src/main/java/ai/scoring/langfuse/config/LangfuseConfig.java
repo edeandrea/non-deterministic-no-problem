@@ -53,6 +53,13 @@ public interface LangfuseConfig {
 			 */
 			@WithDefault("30s")
 			Duration observationMaxWaitTime();
+
+			/**
+			 * Upper bound on the total time to wait for the session's datasets and dataset items to be recorded
+			 * in Langfuse before giving up.
+			 */
+			@WithDefault("30s")
+			Duration datasetCreationMaxWaitTime();
 		}
 	}
 }
