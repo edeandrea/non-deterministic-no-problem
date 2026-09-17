@@ -34,7 +34,6 @@ jobs:
       fail-fast: false
       matrix:
         java:
-          - '21'
           - '25'
         ai-provider:
           - ollama

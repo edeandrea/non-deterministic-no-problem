@@ -4,13 +4,29 @@
 
 # Langfuse integration
 
-Things that can't yet be done programmatically:
-- Configuring evaluators (see https://github.com/orgs/langfuse/discussions/8241)
+Langfuse's own `LANGFUSE_INIT_*` environment variables cover only basic bootstrapping (org, project,
+user, API keys). They do **not** cover evaluators, so at one point these had to be created by hand in
+the Langfuse UI (see https://github.com/orgs/langfuse/discussions/8241).
 
-What you CAN auto-configure via LANGFUSE_INIT_* env vars:          
-  - Online Evaluators (LLM-as-a-Judge) — must be set up manually in the LangFuse UI                           
-Workaround if you want fully automated scoring:
-- Build an external evaluation pipeline — compute scores in your code and push them to LangFuse via POST `/api/public/scores`. This is what ai-scorer essentially does today, just targeting LangFuse's API instead of its own PostgreSQL. 
+That is no longer the case here. `ai.scoring.langfuse.init.LangfuseEvaluationInitializer` provisions
+everything through the Langfuse REST API on application startup, gated on
+`quarkus.aiscoring.langfuse.evaluation.initialize-on-startup` (default `true`). On a `StartupEvent`
+it creates-or-reuses:
+
+- a score config for session sentiment
+- a Cohere model definition
+- a Google AI Studio (Gemini) LLM connection, using `GEMINI_API_KEY`
+- a score config for continuous evaluation
+- the `Continuous Evaluation Evaluator` LLM-as-a-Judge evaluator
+- an evaluation rule binding that evaluator to incoming traces (100% sampling, excluding `SPAN` and
+  `EVENT` observation types)
+
+Each step is idempotent — existing entities are looked up by name and reused — and failures are
+logged as warnings rather than aborting startup.
+
+For the evaluation gaps that genuinely *can't* be solved through Langfuse today (session-level
+scoring, experiment orchestration from Java) and the workarounds implemented in this project, see
+[langfuse-evaluation.md](langfuse-evaluation.md).
 
 # Using Ollama
 If you would like to use [Ollama](https://ollama.com/) instead, first install/run Ollama on your machine. Then do one of the following:
@@ -35,3 +51,9 @@ When building the app, run `./mvnw clean package -DskipTests -Pollama-openai` (o
 
 ## Running dev mode
 When running dev mode, run `./mvnw quarkus:dev -Pollama-openai` (or `quarkus dev -Dollama-openai`).
+
+## Running tests
+When running tests, run `./mvnw verify -Pollama-openai` (or `quarkus build --tests -Dollama-openai`)
+
+## Running the app outside dev mode
+If you want to run the app outside dev mode, first build the app as described above, then run `java -Dquarkus.profile=ollama-openai,prod -jar target/quarkus-app/quarkus-run.jar`

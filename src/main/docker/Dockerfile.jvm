@@ -1,5 +1,5 @@
 ####
-# This Dockerfile is used in order to build a container that runs the Quarkus application in JVM mode with Java 21
+# This Dockerfile is used in order to build a container that runs the Quarkus application in JVM mode with Java 25
 #
 # Before building the container image run:
 #
@@ -75,7 +75,7 @@
 #   accessed directly. (example: "foo.example.com,bar.example.com")
 #
 ###
-FROM registry.access.redhat.com/ubi9/openjdk-21-runtime:1.24
+FROM registry.access.redhat.com/ubi10/openjdk-25-runtime:1.24
 
 ENV LANGUAGE='en_US:en'
 

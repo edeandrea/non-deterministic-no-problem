@@ -4,151 +4,290 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-"Non-Deterministic? No Problem!" is a demo application (Parasol Insurance) showing how to test non-deterministic AI systems. It consists of two independent Quarkus applications:
+**"Non-Deterministic? No Problem!"** is a demo application (Parasol Insurance) that shows how to
+test and continuously evaluate non-deterministic AI systems.
 
-- **`parasol-app/`** — The main insurance claims application with an AI chat bot
-- **`ai-scorer/`** — A separate scoring service that evaluates AI interaction quality
+It is a **single Quarkus application** (`org.parasol:parasol-app`, Java 25) with a React/PatternFly
+frontend served via Quinoa. There are **no sub-modules** — one `pom.xml` at the root.
 
-Both share a contract defined in **`openapi/ai-interactions.yml`**.
+The Java source is split into two top-level packages representing two distinct concerns:
+
+| Package | Concern |
+|---|---|
+| `org.parasol` | The insurance claims business application (claims REST API, AI chat bot, email notification, guardrails) |
+| `ai.scoring` | The reusable AI-quality layer (Langfuse integration, session scoring, drift detection) |
+
+Supporting docs:
+- `README.md` — architecture image, Ollama profiles, Langfuse integration notes
+- `langfuse-evaluation.md` — **the** design document: the three-tier evaluation strategy, Langfuse
+  platform/language gaps, and the workarounds implemented here. Read this before touching anything
+  under `ai.scoring.langfuse`.
+- `docs/*.puml` — PlantUML architecture and sequence diagrams
 
 ## Commands
 
-All Maven commands must be run from within each project's directory.
-
-### parasol-app
+All Maven commands run from the repository root via the wrapper.
 
 ```bash
-cd parasol-app
-
-# Dev mode (OpenAI, default) — requires OPENAI_API_KEY env var
+# Dev mode (OpenAI, default) — requires OPENAI_API_KEY (and COHERE_API_KEY for judge/sentiment)
 ./mvnw quarkus:dev
 
-# Dev mode with Ollama (local LLM)
+# Dev mode against a local Ollama
 ./mvnw -Pollama quarkus:dev
 
-# Dev mode with Ollama via OpenAI-compatible endpoint
+# Dev mode against Ollama via its OpenAI-compatible endpoint
 ./mvnw -Pollama-openai quarkus:dev
 
-# Run unit tests
+# Unit tests
 ./mvnw test
 
-# Run a single test class
+# A single test class
 ./mvnw test -Dtest=PolitenessOutputGuardrailTests
 
-# Run integration tests
+# Full verify (unit + integration tests)
 ./mvnw verify
 
-# Build (skip tests)
+# Exercise the drift-detection tests (otherwise skipped — see Testing below).
+# Needs a reachable Langfuse with populated datasets.
+./mvnw verify -Dquarkus.test.profile=drift
+
+# Build, skipping tests
 ./mvnw package -DskipTests
+
+# Run the built app outside dev mode
+java -Dquarkus.profile=ollama,prod -jar target/quarkus-app/quarkus-run.jar
 ```
 
-### ai-scorer
+### Frontend (from `src/main/webui/`)
 
 ```bash
-cd ai-scorer
-
-# Dev mode — requires COHERE_API_KEY and GEMINI_API_KEY env vars
-./mvnw quarkus:dev
-
-# Run unit tests
-./mvnw test
-
-# Run a single test class
-./mvnw test -Dtest=InteractionScorerTests
-
-# Run integration tests
-./mvnw verify
+npm test        # Jest
+npm run build   # production build into dist/
 ```
 
-### Frontend only (from `parasol-app/src/main/webui/`)
+Quinoa builds the frontend as part of the Maven build — you rarely need to run npm directly.
 
-```bash
-npm test        # Jest tests
-npm run build   # Production build
-```
+### CI
+
+`.github/workflows/simple-build-test.yml` runs `./mvnw -B clean verify` on Java 25 across the
+`ollama` and `ollama-openai` profiles. CI has no real OpenAI/Cohere/Gemini credentials, so **any new
+test must pass under the Ollama profiles**.
 
 ## Architecture
 
-### parasol-app (port 8080)
+### Business application — `org.parasol`
 
-**AI Services** (Quarkus LangChain4j `@RegisterAiService`):
-- `ClaimService` — session-scoped chat bot answering questions about a specific claim; uses RAG over policy PDFs from the classpath, with a `@ToolBox(NotificationService.class)` that can update claim status and trigger email
-- `GenerateEmailService` — generates claim status notification emails as a JSON `{"subject", "body"}` structure; uses multiple output guardrails
-- `PolitenessService` — an AI-powered guardrail check that evaluates politeness of an email body (model name: `politeness`)
+**AI services** (Quarkus LangChain4j `@RegisterAiService`):
 
-**Model names** configured in `application.yml`: `parasol-chat`, `generate-email`, `politeness`. Each resolves to OpenAI or Ollama depending on the active Maven profile.
+- `ClaimService` — the chat bot. `@ChatScoped` (session-scoped conversation), exposed as a chat
+  route (`@ChatRoute("chat")` / `@DefaultChatRoute`) over the websocket chat-routes endpoint
+  `/_chat/routes` provided by `quarkus-langchain4j-chat-scopes-websocket`. Uses RAG over
+  `src/main/resources/policies/policy-info.pdf` (Easy RAG, embeddings reused via
+  `easy-rag-embeddings.json`) and a `@ToolBox(NotificationService.class)`. Annotated with
+  `@OutputGuardrails(DriftDetectionOutputGuardrail.class)`, which is a no-op unless
+  `interaction-mode` is `DRIFT_DETECTION`.
+- `GenerateEmailService` — generates a `{subject, body}` `Email` record; four output guardrails.
+- `PolitenessService` — AI-backed politeness check used by `PolitenessOutputGuardrail`.
 
-**REST & WebSocket endpoints**:
-- `ClaimResource` — `GET /api/db/claims`, `GET /api/db/claims/{id}` (Panache entities backed by PostgreSQL)
-- `ClaimWebsocketChatBot` — WebSocket at `/ws/query`; receives `ClaimBotQuery`, returns `ClaimBotQueryResponse`
+**Output guardrails** on `GenerateEmailService` (all extend `GenerateEmailOutputGuardrail`):
+`EmailContainsRequiredInformationOutputGuardrail`, `EmailStartsAppropriatelyOutputGuardrail`,
+`EmailEndsAppropriatelyOutputGuardrail`, `PolitenessOutputGuardrail`.
 
-**Email flow**: The chat bot calls `NotificationService` (a LangChain4j tool) when users ask to update claim status. `NotificationService` updates the DB, calls `GenerateEmailService` to produce a JSON email, and sends it via Quarkus Mailer (Mailpit in dev/test).
+**Email flow:** the chat bot calls the `NotificationService.updateClaimStatus` tool → updates the
+`Claim` Panache entity → `GenerateEmailService` produces the email → sent via Quarkus Mailer
+(Mailpit dev service in dev/test).
 
-**Output Guardrails** on `GenerateEmailService` (all extend `GenerateEmailOutputGuardrail` → `JsonExtractorOutputGuardrail<Email>`):
-- `EmailContainsRequiredInformationOutputGuardrail`
-- `EmailStartsAppropriatelyOutputGuardrail`
-- `EmailEndsAppropriatelyOutputGuardrail`
-- `PolitenessOutputGuardrail` — delegates to `PolitenessService` for a second AI call
+**REST:** `ClaimResource` — `GET /api/db/claims`, `GET /api/db/claims/{id}` (Panache entities on
+PostgreSQL).
 
-**AI Interaction Scoring** (`ai.scoring` package in parasol-app):
-- `InteractionPublisher` observes `AiServiceStartedEvent` / `AiServiceCompletedEvent` CDI events from LangChain4j and forwards them to the `ai-scorer` service via a generated REST client
-- Two modes (configured via `quarkus.aiscoring.interaction-mode` in `application.yml`):
-  - `NORMAL` — fire-and-forget on a background thread
-  - `RESCORE` — synchronous; throws `RescoreBelowThresholdException` if the score falls below the configured threshold
-- The REST client is generated at build time from `openapi/ai-interactions.yml` into `ai.scoring.scorer` package
+**Frontend:** React + TypeScript + PatternFly in `src/main/webui/src/app/`, SPA routing enabled.
 
-**Observability**: OpenTelemetry + Micrometer. Dev mode uses the LGTM dev service (Grafana/Loki/Tempo/Mimir). `InteractionObservabilityInterceptor` (bound via `@InteractionObserved`) adds custom spans and token-usage counters (`parasol.llm.token.{input,output,total}.count`).
+### AI quality layer — `ai.scoring`
 
-**RAG**: `src/main/resources/policies/policy-info.pdf` is embedded at startup using Easy RAG with embedding reuse.
+Configuration is driven by `ScoringConfig` (`quarkus.aiscoring.*`) and `LangfuseConfig`
+(`quarkus.aiscoring.langfuse.*`), both `@ConfigMapping` interfaces.
 
-**Frontend**: React + TypeScript in `src/main/webui/src/`, served by Quarkus Quinoa (built to `dist/`). SPA routing is enabled.
+`InteractionMode` (default `NORMAL`) selects whether tier 3 is armed:
 
-### ai-scorer (port 8888)
+- `NORMAL` — `DriftDetectionOutputGuardrail.validate` returns `success()` immediately.
+- `DRIFT_DETECTION` — the guardrail actually evaluates and can fail the response.
 
-A standalone Quarkus service that receives interaction events from `parasol-app` and scores them.
+Tiers 1 and 2 are independent of this switch; they are controlled by the
+`quarkus.aiscoring.langfuse.evaluation.*` flags instead.
 
-**REST endpoint**: Implements the `AiApi` interface generated from `openapi/ai-interactions.yml`. Runs on virtual threads (`@RunOnVirtualThread`).
-- `POST /ai/interactions/events` — receives started/completed interaction events, stores them, and scores completed interactions
-- `GET /ai/interactions` — query stored interactions by `applicationName`, `interfaceName`, `methodName`, date range
-- `GET /ai/interactions/{uuid}` — get a single interaction by ID
+The three evaluation tiers (see `langfuse-evaluation.md` for the full rationale):
 
-**Scoring pipeline**:
-1. `InteractionResource` receives an `InteractionEvent` and delegates to `InteractionService`
-2. `InteractionService` stores events in PostgreSQL (via `InteractionEventRepository`), correlates started+completed pairs into `Interaction` records, then calls `InteractionScorer`
-3. `InteractionScorer` scores interactions using one of two strategies (configurable via `ai.scoring.scoring-strategy`):
-   - `ai-judge` — uses `InteractionEvaluator` with `AiJudgeStrategy` backed by **Google Gemini** (`gemini-2.5-flash`, model name: `judge`)
-   - `semantic-similarity` — uses `SemanticSimilarityStrategy` with the local **BGE-small-en-v1.5** embedding model; threshold configurable
-4. **NORMAL** mode: scores asynchronously, stores result. **RESCORE** mode: scores synchronously, returns score in the HTTP response so `parasol-app` can gate on it.
+1. **Per-trace** — native Langfuse LLM-as-a-Judge. `LangfuseEvaluationInitializer` (the sole
+   permitted subclass of the `sealed` `LangfuseInitializer`) programmatically creates the Langfuse
+   model, LLM connection, score config, evaluator, and evaluation rule on a `StartupEvent`, gated
+   on `initialize-on-startup`.
+2. **Session-level** — Langfuse has no session evaluation target, so this is custom code.
+   `ConversationalBaggageHandler` observes `ChatScopeStarted/Activated/Deactivated/Ended`,
+   propagates the conversation id as OTel baggage (`gen_ai.conversation.id`), and on session end
+   hands off to `SessionScoringService` on a background executor.
+   `LangfuseSessionScoringService` polls Langfuse until the session's observations are ingested
+   (OTel flush + async ClickHouse ingest), reconstructs `ConversationExchange`s, asks
+   `SessionSentimentService` for a `SessionSentiment`, and posts the score back via the Langfuse
+   Score API. It also records the exchanges as a Langfuse dataset, gated on
+   `create-dataset-on-session-close`.
+3. **Drift detection** — `DriftDetectionOutputGuardrail` runs the quarkus-langchain4j evaluation
+   framework (`Evaluation.withSamples(<datasetName>)`) and returns a `fatal` result carrying a
+   `DriftDetectionException` when the score falls below `quarkus.aiscoring.threshold`.
+   `DriftDetectionChatRouteExceptionHandler` turns that into a `DRIFT DETECTED!!!` chat-route error
+   instead of a stack trace.
 
-**Scoring model**: Cohere `rerank-v4.0-fast` (via `quarkus-langchain4j-cohere`) is used as the `ScoringModel` in `NORMAL` mode.
+   Two pieces plug into that framework:
+   - `LangfuseDatasetSampleLoader` (`SampleLoader<String>`) supplies the samples. It is **not**
+     called directly — it is discovered via `ServiceLoader` through
+     `src/main/resources/META-INF/services/io.quarkiverse.langchain4j.testing.evaluation.SampleLoader`,
+     grabs `LangfuseApi` via `CDI.current()`, pages through the dataset, and keeps only
+     `DatasetStatus.ACTIVE` items.
+   - `Evaluator` (`EvaluationStrategy<String>`) scores them by delegating to the `EvaluatorAgent`
+     AI service (the `judge` model). It is the only `EvaluationStrategy` bean in the project —
+     despite `quarkus-langchain4j-testing-evaluation-semantic-similarity` being on the classpath,
+     nothing currently wires up a semantic-similarity strategy.
 
-**Observability**: `InteractionScoringInterceptor` (bound via `@InteractionScored`) adds OTel spans and Micrometer gauges/counters for scored interactions (`interaction.scored`, `interaction.rescored`).
+**Dataset naming — the critical invariant.** The dataset name is the LangChain4j AI service span
+name verbatim: `langchain4j.aiservices.<AiServiceClassName>.<methodName>`.
 
-**MapStruct** mappers are used extensively to convert between domain objects and generated API model classes.
+- **Write side:** `AiServiceDatasetSpanProcessor` (an OTel `SpanProcessor`) stamps
+  `langfuse.dataset.name`, `ai.service.class`, and `ai.service.method` onto the AI service root span
+  and cascades them to every descendant (tool executions, model generations).
+- **Read side (tier 2):** `ConversationExchange` resolves the name with a five-step fallback —
+  attributes on the observation → attributes on an ancestor → name of the nearest
+  `langchain4j.aiservices.*` ancestor → trace name → the observation's own name. It also probes
+  three different metadata shapes (`langfuse.dataset.name`, `attributes.langfuse.dataset.name`, and
+  a nested `attributes` map) because Langfuse's OTLP ingestion has changed shape across releases.
+- **Read side (tier 3):** `DriftDetectionOutputGuardrail` rebuilds the name from the LangChain4j
+  `InvocationContext` (simple interface name + method name).
 
-### Shared Contract
+All sides share `AiServiceAttributes.AI_SERVICES_PREFIX` — **if you change the naming on one side,
+change it on the others or drift detection silently finds no samples** (it returns `success` on
+`SampleLoadException`, so a broken name looks like a pass, not a failure).
 
-`openapi/ai-interactions.yml` defines the API between the two services:
-- `parasol-app` uses `quarkus-openapi-generator` to generate a **client** (`ai.scoring.scorer` package)
-- `ai-scorer` uses the standard `openapi-generator-maven-plugin` to generate the **server interface** (`ai.scoring.api.AiApi`)
+### Models
 
-### Key Configuration
+Model names are configured in `src/main/resources/application.yml` and resolve per profile:
 
-| App | Required Env Vars |
-|-----|------------------|
-| `parasol-app` (default) | `OPENAI_API_KEY` |
-| `parasol-app` (ollama) | none |
-| `ai-scorer` | `COHERE_API_KEY`, `GEMINI_API_KEY` |
+| Model name | Used by | Default (OpenAI profile) |
+|---|---|---|
+| `parasol-chat` | `ClaimService` | `gpt-5-mini` |
+| `generate-email` | `GenerateEmailService` | `gpt-5-mini` |
+| `politeness` | `PolitenessService` | `gpt-5-mini` |
+| `session-sentiment` | `SessionSentimentService` | Cohere `command-r7b-12-2024` via its OpenAI-compatible endpoint |
+| `judge` | `EvaluatorAgent` (drift detection) | Cohere `command-r7b-12-2024` via its OpenAI-compatible endpoint |
 
-### Testing Approach
+Note the Cohere models are reached through the **OpenAI** extension pointed at
+`https://api.cohere.ai/compatibility/v1` with `COHERE_API_KEY` — there is no Cohere-specific
+extension in the build.
 
-**parasol-app**:
-- Guardrail unit tests use `@QuarkusTest` + `@InjectMock`/`@InjectSpy` + `dev.langchain4j.test.guardrail.GuardrailAssertions`
-- REST tests use REST Assured; WebSocket tests in `ClaimWebsocketChatBotTests`
-- E2E tests use Playwright (`org.parasol.ui` package)
-- AI model calls are mocked via LangChain4j WireMock dev services during tests
+There are **two separate judges**, which is easy to confuse:
+- The in-app `judge` model above, driving `EvaluatorAgent` → `Evaluator` for tier-3 drift detection.
+- The Langfuse-side LLM-as-a-Judge evaluator for tier 1, which runs inside Langfuse using **Google
+  Gemini** (`gemini-2.5-flash`, `LlmAdapter.GOOGLE_AI_STUDIO`) configured by
+  `LangfuseEvaluationInitializer` from `LangfuseConfig.Evaluation.Gemini`.
 
-**ai-scorer**:
-- `InteractionScorerTests`, `AIJudgeScorerTests`, `SemanticSimilarityScorerTests` test scoring logic directly
-- AI model calls (Cohere, Gemini) are mocked via WireMock (`src/test/resources/wiremock/`) in test profile
-- Observability is disabled in test profile for both apps
+Embeddings use the OpenAI embedding model by default (`quarkus.langchain4j.embedding-model`).
+
+Under `-Pollama` / `-Pollama-openai` every chat model maps to `llama3.2:latest`, embeddings to
+`snowflake-arctic-embed`, the OpenAI/Cohere API keys are stubbed to `changeme`, and Langfuse
+session scoring + startup initialization are disabled.
+
+### Configuration profiles
+
+`src/main/resources/application.yml` is the single config source. Notable profiles:
+
+| Profile | Purpose |
+|---|---|
+| `dev` | LGTM dev service, Mailpit, PostgreSQL dev service, Langfuse dev service |
+| `test` | Observability + Langfuse init/session scoring disabled |
+| `ollama`, `ollama-openai` | Local Ollama; Langfuse session scoring/init disabled |
+| `drift` | Parent `langfuse-ocp`; sets `quarkus.aiscoring.interaction-mode: drift-detection` |
+| `langfuse-ocp` | Points at a deployed Langfuse instance; disables OTLP export and LGTM |
+| `instana` | Exports OTLP to Instana instead of LGTM |
+| `prod`, `openshift` | Schema drop-and-create + `import.sql`; OpenShift deployment config |
+
+### Environment variables
+
+| Variable | When it is needed |
+|---|---|
+| `OPENAI_API_KEY` | Default profile — `parasol-chat`, `generate-email`, `politeness`, embeddings |
+| `COHERE_API_KEY` | Default profile — `session-sentiment` and `judge` |
+| `GEMINI_API_KEY` | Only when `LangfuseEvaluationInitializer` runs (`initialize-on-startup`); it throws `IllegalStateException` if absent |
+
+Under `-Pollama` / `-Pollama-openai` none of these are required.
+
+### Observability
+
+OpenTelemetry + Micrometer. Dev mode uses the LGTM dev service (Grafana/Loki/Tempo/Mimir).
+Traces are also exported to Langfuse via the `quarkus-langfuse` extension.
+
+## Testing
+
+Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/scoring/...`.
+
+- `@QuarkusTest` + `@InjectMock`/`@InjectSpy` + `dev.langchain4j.test.guardrail.GuardrailAssertions`
+  for guardrail tests.
+- REST Assured for REST; the websocket chat-routes client (`WebsocketChatRoutes.newClient(...)`)
+  for chat tests (`ClaimWebsocketChatBotTests`).
+- Playwright E2E tests in `org.parasol.ui`, extending the `@WithPlaywright` `PlaywrightTests` base
+  class (records video to `target/playwright`).
+- `ai.scoring.it.DriftDetectionTests` is annotated with the custom meta-annotation
+  `@DriftDetectionTest`, which combines `@QuarkusTest` with
+  `@EnabledIfApplicationProperty(named = "quarkus.aiscoring.interaction-mode", matches = "drift-detection")`
+  — the supporting JUnit condition classes live in `src/test/java/io/quarkus/test/junit/`. These
+  tests are skipped unless the `drift` profile is active.
+- **Mocking LLM calls:** the Quarkus WireMock dev service (`@ConnectWireMock` + an injected
+  `WireMock`). A `QuarkusTestProfile` repoints every relevant `quarkus.langchain4j.openai.*.base-url`
+  (including `parasol-chat`, `session-sentiment`, `judge`) at
+  `http://localhost:${quarkus.wiremock.devservices.port}/v1`, then stubs the
+  OpenAI-compatible `/chat/completions` endpoint. Stubs are registered programmatically in
+  `@BeforeEach` — there is no `src/test/resources` directory.
+- **Langfuse is not mocked.** `DriftDetectionOutputGuardrailTests` and
+  `LangfuseSessionScoringServiceTests` inject the real `LangfuseApi` against the Langfuse dev
+  service, creating and tearing down real datasets/items around each test.
+- AssertJ + Awaitility; Mockito is attached as a `-javaagent` in the surefire/failsafe config.
+
+## Conventions
+
+Beyond the global Java/Quarkus style rules in `AGENTS.md`, this repo specifically uses:
+
+- **Tabs for indentation**, tab width 2, max line length 180 (see `.editorconfig`). Note
+  `insert_final_newline = false`.
+- `io.quarkus.logging.Log` static methods (`Log.debugf`, `Log.warnf`) — no `Logger` fields.
+- `@ConfigMapping` interfaces with `@WithDefault` — not `@ConfigProperty` fields.
+- Constructor injection in `ai.scoring`; `org.parasol.ai.NotificationService` still uses `@Inject`
+  fields (legacy — prefer constructor injection for new code).
+- Hand-written fluent builders (e.g. `DriftDetectionException.builder()`), records for value types.
+- `Optional` chains over null checks and guard-clause early returns.
+
+## Gotchas
+
+- **Older revisions of this file described a two-module layout** (`parasol-app/` + `ai-scorer/`)
+  communicating over a REST contract in `openapi/ai-interactions.yml`, with an
+  `InteractionPublisher`/`InteractionScorer` pipeline and a `RESCORE` interaction mode. **None of
+  that exists any more** — it collapsed into this single app scoring against Langfuse in-process,
+  and `InteractionMode` is now `NORMAL`/`DRIFT_DETECTION`. Do not reintroduce references to it.
+- `conversation-export.md` (1700+ lines) is a raw transcript of the design conversation behind
+  `langfuse-evaluation.md`. It is a historical artifact, not documentation — don't treat it as
+  spec and don't try to keep it in sync.
+- Langfuse online evaluators historically had to be created by hand in the UI; this repo creates
+  them via the Langfuse API in `LangfuseEvaluationInitializer`. Langfuse's own `LANGFUSE_INIT_*`
+  env vars do **not** cover evaluators.
+- Session scoring is inherently racy against Langfuse's async ingest. The wait/poll knobs live
+  under `quarkus.aiscoring.langfuse.evaluation.session` (`otel-flush-wait-time`,
+  `observation-poll-interval`, `observation-max-wait-time`). If session scores go missing, tune
+  these before suspecting the scorer.
+- `NotificationService.sendEmail` deliberately moves the mailer onto `ForkJoinPool.commonPool()`
+  with a 15s timeout — the reactive mailer blocks the calling (tool-execution) thread and deadlocks
+  otherwise. Likewise `updateStatusIfFound` uses `QuarkusTransaction.joiningExisting()` because the
+  tool runs inside the AI service's invocation context.
+- The `langfuse-ocp` profile in `application.yml` contains a **committed Langfuse public and secret
+  key** pointing at a demo OpenShift cluster. There is a `.gitleaks.toml` at the root. Do not copy
+  this pattern for new credentials.
+- **Two different score scales meet in `DriftDetectionOutputGuardrail`.**
+  `quarkus.aiscoring.threshold` defaults to `0.75` (a 0–1 fraction), but `EvaluationReport.score()`
+  is `100.0 * passed / total` — a **pass-rate percentage**, not an average of the judge's
+  confidence. The guardrail divides by `100.0` to reconcile them. Consequently the per-sample
+  `EvaluatorResult.score()` returned by `EvaluatorAgent` never reaches the threshold comparison
+  directly; only its boolean `verdict` (via `EvaluationResult.passed()`) moves the needle.
