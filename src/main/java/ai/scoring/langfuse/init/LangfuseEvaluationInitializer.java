@@ -16,6 +16,7 @@ import io.quarkus.runtime.StartupEvent;
 import ai.scoring.langfuse.config.LangfuseConfig;
 import ai.scoring.langfuse.config.LangfuseConfig.Evaluation;
 import ai.scoring.langfuse.session.SessionSentiment;
+import com.langfuse.api.LangfuseApiException;
 import com.langfuse.api.evaluators.EvaluatorsApi.APIEvaluatorsUpdateRequest;
 import com.langfuse.api.model.ConfigCategory;
 import com.langfuse.api.model.CreateEvaluationRuleRequest;
@@ -141,6 +142,11 @@ public class LangfuseEvaluationInitializer {
 			Log.infof("Evaluation rule ready: %s", rule.getId());
 			return Optional.of(rule);
 		}
+		catch (LangfuseApiException e) {
+			// getMessage() carries the whole raw response body; getServerMessage() is the server's own sentence.
+			Log.warnf(e, "Failed to create evaluation rule (HTTP %d): %s", e.getStatusCode(), e.getServerMessage());
+			return Optional.empty();
+		}
 		catch (Exception e) {
 			Log.warnf(e, "Failed to create evaluation rule: %s", e.getMessage());
 			return Optional.empty();
@@ -173,6 +179,11 @@ public class LangfuseEvaluationInitializer {
 			return this.langfuse.evaluators()
 			                    .findByName(EVALUATOR_NAME)
 			                    .filter(existing -> asLlmAsJudge(existing).isPresent());
+		}
+		catch (LangfuseApiException e) {
+			// getMessage() carries the whole raw response body; getServerMessage() is the server's own sentence.
+			Log.warnf(e, "Failed to look up evaluator '%s' (HTTP %d): %s", EVALUATOR_NAME, e.getStatusCode(), e.getServerMessage());
+			return Optional.empty();
 		}
 		catch (Exception e) {
 			Log.warnf(e, "Failed to look up evaluator '%s': %s", EVALUATOR_NAME, e.getMessage());
@@ -220,6 +231,11 @@ public class LangfuseEvaluationInitializer {
 			Log.infof("Updated evaluator model config: %s", llmEvaluator.getId());
 			return Optional.of(updated);
 		}
+		catch (LangfuseApiException e) {
+			// getMessage() carries the whole raw response body; getServerMessage() is the server's own sentence.
+			Log.warnf(e, "Failed to update evaluator model config (HTTP %d): %s", e.getStatusCode(), e.getServerMessage());
+			return Optional.empty();
+		}
 		catch (Exception e) {
 			Log.warnf(e, "Failed to update evaluator model config: %s", e.getMessage());
 			return Optional.empty();
@@ -254,6 +270,11 @@ public class LangfuseEvaluationInitializer {
 			asLlmAsJudge(evaluator)
 				.ifPresent(llmEvaluator -> Log.infof("Registered Continuous Evaluation LLM Evaluator: %s", llmEvaluator.getId()));
 			return Optional.of(evaluator);
+		}
+		catch (LangfuseApiException e) {
+			// getMessage() carries the whole raw response body; getServerMessage() is the server's own sentence.
+			Log.warnf(e, "Failed to initialize Continuous Evaluation LLM Evaluator (HTTP %d): %s", e.getStatusCode(), e.getServerMessage());
+			return Optional.empty();
 		}
 		catch (Exception e) {
 			Log.warnf(e, "Failed to initialize Continuous Evaluation LLM Evaluator: %s", e.getMessage());
@@ -296,6 +317,11 @@ public class LangfuseEvaluationInitializer {
 		catch (IllegalStateException e) {
 			throw e;
 		}
+		catch (LangfuseApiException e) {
+			// getMessage() carries the whole raw response body; getServerMessage() is the server's own sentence.
+			Log.warnf(e, "Failed to set up %s LLM Connection (HTTP %d): %s", LlmAdapter.GOOGLE_AI_STUDIO.getValue(), e.getStatusCode(), e.getServerMessage());
+			return Optional.empty();
+		}
 		catch (Exception e) {
 			Log.warnf(e, "Failed to set up %s LLM Connection: %s", LlmAdapter.GOOGLE_AI_STUDIO.getValue(), e.getMessage());
 			return Optional.empty();
@@ -321,6 +347,11 @@ public class LangfuseEvaluationInitializer {
 			Log.infof("Registered %s LLM Connection: %s", request.getProvider(), connection.getId());
 			return Optional.of(connection);
 		}
+		catch (LangfuseApiException e) {
+			// getMessage() carries the whole raw response body; getServerMessage() is the server's own sentence.
+			Log.warnf(e, "Failed to initialize %s LLM Connection (HTTP %d): %s", request.getProvider(), e.getStatusCode(), e.getServerMessage());
+			return Optional.empty();
+		}
 		catch (Exception e) {
 			Log.warnf(e, "Failed to initialize %s LLM Connection: %s", request.getProvider(), e.getMessage());
 			return Optional.empty();
@@ -342,6 +373,11 @@ public class LangfuseEvaluationInitializer {
 			var config = this.langfuse.scoreConfigs().createIfAbsent(request);
 			Log.infof("Continuous Evaluation score config ready (id=%s)", config.getId());
 			return Optional.of(config);
+		}
+		catch (LangfuseApiException e) {
+			// getMessage() carries the whole raw response body; getServerMessage() is the server's own sentence.
+			Log.warnf(e, "Failed to create Continuous Evaluation score config (HTTP %d): %s", e.getStatusCode(), e.getServerMessage());
+			return Optional.empty();
 		}
 		catch (Exception e) {
 			Log.warnf(e, "Failed to create Continuous Evaluation score config: %s", e.getMessage());
@@ -370,6 +406,11 @@ public class LangfuseEvaluationInitializer {
 			var config = this.langfuse.scoreConfigs().createIfAbsent(request);
 			Log.infof("Session-sentiment score config ready (id=%s)", config.getId());
 			return Optional.of(config);
+		}
+		catch (LangfuseApiException e) {
+			// getMessage() carries the whole raw response body; getServerMessage() is the server's own sentence.
+			Log.warnf(e, "Failed to create session-sentiment score config (HTTP %d): %s", e.getStatusCode(), e.getServerMessage());
+			return Optional.empty();
 		}
 		catch (Exception e) {
 			Log.warnf(e, "Failed to create session-sentiment score config: %s", e.getMessage());
@@ -404,6 +445,13 @@ public class LangfuseEvaluationInitializer {
 			var model = this.langfuse.models().createIfAbsent(request);
 			Log.infof("Cohere model pricing definition ready in Langfuse (id=%s)", model.getId());
 			return Optional.of(model);
+		}
+		catch (LangfuseApiException e) {
+			// getMessage() carries the whole raw response body; getServerMessage() is the server's own sentence.
+			// A 404 here is not necessarily "missing": Langfuse also answers 404 for some refusals, and only the
+			// server message tells the two apart.
+			Log.warnf(e, "Could not register model '%s' in Langfuse (HTTP %d): %s", request.getModelName(), e.getStatusCode(), e.getServerMessage());
+			return Optional.empty();
 		}
 		catch (Exception e) {
 			Log.warnf(e, "Could not register model '%s' in Langfuse: %s", request.getModelName(), e.getMessage());

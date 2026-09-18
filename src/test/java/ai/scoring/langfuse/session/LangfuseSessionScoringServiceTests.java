@@ -181,7 +181,7 @@ class LangfuseSessionScoringServiceTests {
 	       var observations = this.langfuse.api().observations()
 		       .observationsGetMany(APIObservationsGetManyRequest.newBuilder()
 			       .filter(sessionFilter)
-			       .fields("core,basic,io,meta")
+			       .fields("core,basic,io,metadata")
 			       .build())
 		       .getData();
 

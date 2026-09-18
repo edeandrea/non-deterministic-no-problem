@@ -24,8 +24,10 @@ it creates-or-reuses:
 
 Each step is idempotent — existing entities are looked up by name and reused. That is now the
 extension's job: `createIfAbsent` (and `upsert` for the LLM connection) replaced the hand-written
-lookup-then-create code this app used to carry. Failures are logged as warnings rather than aborting
-startup.
+lookup-then-create code this app used to carry. The one call that still drops to the raw
+`langfuse.api()` client is re-pointing an existing evaluator at the configured model, because the
+operations layer has no `update` for evaluators. Failures are logged as warnings rather than
+aborting startup.
 
 For the evaluation gaps that genuinely *can't* be solved through Langfuse today (session-level
 scoring, experiment orchestration from Java) and the workarounds implemented in this project, see

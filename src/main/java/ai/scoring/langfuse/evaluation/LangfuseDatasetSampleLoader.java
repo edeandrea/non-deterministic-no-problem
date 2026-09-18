@@ -1,20 +1,17 @@
 package ai.scoring.langfuse.evaluation;
 
 import java.util.Optional;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import jakarta.enterprise.inject.spi.CDI;
 
-import com.langfuse.api.datasetItems.DatasetItemsApi.APIDatasetItemsListRequest;
 import com.langfuse.api.model.DatasetItem;
 import com.langfuse.api.model.DatasetStatus;
-import com.langfuse.api.model.PaginatedDatasetItems;
 import io.quarkiverse.langchain4j.testing.evaluation.EvaluationSample;
 import io.quarkiverse.langchain4j.testing.evaluation.Parameters;
 import io.quarkiverse.langchain4j.testing.evaluation.SampleLoadException;
 import io.quarkiverse.langchain4j.testing.evaluation.SampleLoader;
 import io.quarkiverse.langchain4j.testing.evaluation.Samples;
+import io.quarkiverse.langfuse.api.DatasetItemFilter;
 import io.quarkiverse.langfuse.api.LangfuseOperations;
 import io.quarkiverse.langfuse.client.LangfuseNotFoundException;
 
@@ -37,11 +34,24 @@ public class LangfuseDatasetSampleLoader implements SampleLoader<String> {
 
 	@Override
 	public Samples<String> load(String datasetName, Class<String> outputType) throws SampleLoadException {
-		return new Samples(
-			getDatasetItems(datasetName)
+		var datasetItemFilter = DatasetItemFilter.builder()
+			.datasetName(datasetName)
+			.build();
+
+		try {
+			var datasetItems = getLangfuseOperations()
+				.datasetItems()
+				.matching(datasetItemFilter)
+				.streamAll()
+				.filter(item -> item.getStatus() == DatasetStatus.ACTIVE)
 				.map(this::toEvaluationSample)
-				.toList()
-		);
+				.toList();
+
+			return new Samples(datasetItems);
+		}
+		catch (LangfuseNotFoundException _) {
+			return new Samples<>();
+		}
 	}
 
 	@Override
@@ -54,44 +64,6 @@ public class LangfuseDatasetSampleLoader implements SampleLoader<String> {
 			.withName(datasetItem.getDatasetId())
 			.withParameters(new Parameters().add("input", datasetItem.getInput()))
 			.withExpectedOutput(String.valueOf(datasetItem.getExpectedOutput()))
-			.build();
-	}
-
-	private Stream<DatasetItem> getDatasetItems(String datasetName) {
-		try {
-			var firstPage = fetchPage(datasetName, 1);
-			var totalPages = firstPage.getMeta().getTotalPages();
-
-			return Stream.concat(
-				getActiveDatasetItems(firstPage),
-				IntStream.rangeClosed(2, totalPages)
-					.mapToObj(page -> fetchPage(datasetName, page))
-					.flatMap(LangfuseDatasetSampleLoader::getActiveDatasetItems)
-			);
-		}
-		catch (LangfuseNotFoundException ex) {
-			return Stream.empty();
-		}
-	}
-
-	private PaginatedDatasetItems fetchPage(String datasetName, int page) {
-		return getLangfuseOperations()
-			.api()
-			.datasetItems()
-			.datasetItemsList(buildGetDatasetItemsRequest(datasetName, page));
-	}
-
-	private static Stream<DatasetItem> getActiveDatasetItems(PaginatedDatasetItems datasetItems) {
-		return datasetItems.getData()
-			.stream()
-			.filter(item -> item.getStatus() == DatasetStatus.ACTIVE);
-	}
-
-	private static APIDatasetItemsListRequest buildGetDatasetItemsRequest(String datasetName, int page) {
-		return APIDatasetItemsListRequest.newBuilder()
-			.datasetName(datasetName)
-			.limit(100)
-			.page(page)
 			.build();
 	}
 }

@@ -12,18 +12,17 @@ import io.quarkus.logging.Log;
 
 import ai.scoring.evaluation.SessionScoringService;
 import ai.scoring.langfuse.config.LangfuseConfig;
-import com.langfuse.api.datasetItems.DatasetItemsApi.APIDatasetItemsCreateRequest;
-import com.langfuse.api.scores.ScoresApi.APIScoresCreateRequest;
+import com.langfuse.api.LangfuseApiException;
 import com.langfuse.api.model.CreateDatasetItemRequest;
 import com.langfuse.api.model.CreateDatasetRequest;
 import com.langfuse.api.model.CreateScoreRequest;
 import com.langfuse.api.model.CreateScoreValue;
 import com.langfuse.api.model.ObservationV2;
 import com.langfuse.api.model.ScoreDataType;
-import com.langfuse.api.observations.ObservationsApi.APIObservationsGetManyRequest;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.Tracer;
 import io.quarkiverse.langfuse.api.LangfuseOperations;
+import io.quarkiverse.langfuse.api.ObservationFilter;
 import io.quarkiverse.langfuse.client.LangfuseNotFoundException;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.TimeoutException;
@@ -122,7 +121,7 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 	private List<ObservationV2> awaitSessionObservations(String conversationId) {
 		var sessionConfig = this.langfuseConfig.evaluation().session();
 
-		return Uni.createFrom().item(conversationId)
+		var pendingObservations = Uni.createFrom().item(conversationId)
 			// Give the OTel batch exporter a head start before the first query
 			.onItem().delayIt().by(sessionConfig.otelFlushWaitTime())
 			.flatMap(this::fetchSessionObservations)
@@ -148,24 +147,63 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 					return List.of();
 				})
 
-			// Collapse back to blocking. This timeout is a backstop for the *whole* pipeline (including the initial
-			// delay and an in-flight HTTP call at the deadline), so it's deliberately a little larger than expireIn.
-			.await().atMost(sessionConfig.otelFlushWaitTime().plus(sessionConfig.observationMaxWaitTime()).plusSeconds(5));
+			// Anything else that got this far (an API error, or paging that ran past the deadline mid-traversal) is
+			// still only a failure to gather best-effort telemetry: degrade to "nothing to score" rather than letting
+			// it escape onto the background worker thread. Must stay *after* the not-ready recovery above so that the
+			// more specific "gave up waiting" message still wins for the ordinary polling timeout.
+			.onFailure()
+				.recoverWithItem(failure -> {
+					Log.warnf(failure, "Failed to fetch observations for session %s: %s", conversationId, describeFailure(failure));
+					return List.of();
+				});
+
+		// Collapse back to blocking. This timeout is a backstop for the *whole* pipeline (including the initial
+		// delay and an in-flight paged traversal at the deadline - expireIn() doesn't cancel one mid-flight), so it's
+		// deliberately a little larger than expireIn. It is raised by the blocking collapse itself rather than inside
+		// the pipeline, so the recoveries above can't see it and it has to be caught here.
+		var backstop = sessionConfig.otelFlushWaitTime().plus(sessionConfig.observationMaxWaitTime()).plusSeconds(5);
+
+		try {
+			return pendingObservations.await().atMost(backstop);
+		}
+		catch (TimeoutException e) {
+			Log.warnf("Timed out after %s collecting observations for session %s", backstop, conversationId);
+			return List.of();
+		}
+	}
+
+	/**
+	 * Langfuse API failures carry the raw JSON response body in {@code getMessage()}, so prefer the status code and
+	 * server message for anything we log.
+	 */
+	private static String describeFailure(Throwable failure) {
+		return switch (failure) {
+			case LangfuseApiException apiFailure -> "HTTP %s - %s".formatted(apiFailure.getStatusCode(), apiFailure.getServerMessage());
+			default -> failure.getMessage();
+		};
 	}
 
 	private Uni<List<ObservationV2>> fetchSessionObservations(String conversationId) {
-		var sessionFilter = """
-			[{"type":"string","column":"sessionId","operator":"=","value":"%s"}]""".formatted(conversationId);
-		var request = APIObservationsGetManyRequest.newBuilder()
-		                                           .filter(sessionFilter)
-		                                           .fields("core,basic,io,meta")
-		                                           .build();
+		// Exactly the field groups this code consumes, and no more: `core` and `basic` carry startTime and
+		// parentObservationId (isCompleteExchange, ConversationExchange.hierarchyOf), `io` carries input/output
+		// (isCompleteExchange, ConversationExchange.from), and `metadata` feeds steps 1-2 of
+		// ConversationExchange.resolveDatasetName, which fall back to the span-name-based step 3 when metadata is
+		// absent. Nothing here reads model or usage, so those groups are deliberately not requested. Note the
+		// parameter is free-form text passed through unvalidated: an unknown group is silently ignored rather than
+		// rejected, which is exactly how the previous `meta` typo (the group is spelled `metadata`) went unnoticed.
+		var filter = ObservationFilter.builder()
+			.sessionId(conversationId)
+			.fields("core,basic,io,metadata")
+			.build();
 
-		// Deferred supplier so each retry issues a fresh request rather than replaying the first response
-		// Observations have no operations equivalent in 0.6.0, so this stays on the raw async API
-		return Uni.createFrom().completionStage(() -> this.langfuse.api().asyncObservations().observationsGetMany(request))
-			// Langfuse returns an empty body ({}) rather than an empty data array when nothing matches yet
-			.map(response -> Optional.ofNullable(response.getData()).orElseGet(List::of));
+		// deferred() is load-bearing, not stylistic: this Uni is the retried step of the polling pipeline in
+		// awaitSessionObservations, so it must issue a *new* query on every re-subscription. Handing back an
+		// already-started Uni would make every retry replay the first (empty) response and the session would
+		// never be scored.
+		return Uni.createFrom().deferred(() -> this.langfuse.async()
+			.observations()
+			.matching(filter)
+			.findAll());
 	}
 
 	private SessionSentiment evaluateSession(List<ConversationExchange> exchanges) {
@@ -210,6 +248,10 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 		catch (TimeoutException e) {
 			Log.warnf("Gave up waiting for datasets of session %s to be recorded after %s", conversationId, this.langfuseConfig.evaluation().session().datasetCreationMaxWaitTime());
 		}
+		catch (LangfuseApiException e) {
+			// getMessage() carries the whole raw response body; getServerMessage() is the server's own sentence.
+			Log.warnf(e, "Failed to record datasets for session %s (HTTP %d): %s", conversationId, e.getStatusCode(), e.getServerMessage());
+		}
 		catch (Exception e) {
 			Log.warnf(e, "Failed to record datasets for session %s: %s", conversationId, e.getMessage());
 		}
@@ -246,12 +288,11 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 			.sourceTraceId(exchange.traceId())
 			.build();
 
-		// Dataset items have no operations equivalent in 0.6.0, so they stay on the raw async API
-		return Uni.createFrom().completionStage(() -> this.langfuse.api()
-				.asyncDatasetItems()
-				.datasetItemsCreate(APIDatasetItemsCreateRequest.newBuilder()
-					.createDatasetItemRequest(request)
-					.build()))
+		// The created DatasetItem is discarded: callers only need the completion signal, since createDatasets
+		// joins these Unis purely to know when every item has landed.
+		return this.langfuse.async()
+			.datasetItems()
+			.create(request)
 			.replaceWithVoid();
 	}
 
@@ -265,12 +306,14 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 			.build();
 
 		try {
-			// Scores have no operations equivalent in 0.6.0, so this stays on the raw API
-			var response = this.langfuse.api().scores()
-				.scoresCreate(APIScoresCreateRequest.newBuilder()
-					.createScoreRequest(request)
-					.build());
+			// Deliberately the synchronous operations tree: this runs on a background worker thread and the score
+			// must be posted before the enclosing ComputeSessionScore span is ended by scoreSession().
+			var response = this.langfuse.scores().create(request);
 			Log.infof("Posted session-sentiment score for session %s (scoreId=%s)", conversationId, response.getId());
+		}
+		catch (LangfuseApiException e) {
+			// getMessage() carries the whole raw response body; getServerMessage() is the server's own sentence.
+			Log.warnf(e, "Failed to post session-sentiment score for session %s (HTTP %d): %s", conversationId, e.getStatusCode(), e.getServerMessage());
 		}
 		catch (Exception e) {
 			Log.warnf(e, "Failed to post session-sentiment score for session %s: %s", conversationId, e.getMessage());

@@ -129,12 +129,19 @@ The three evaluation tiers (see `langfuse-evaluation.md` for the full rationale)
    hands off to `SessionScoringService` on a background executor.
    `LangfuseSessionScoringService` polls Langfuse until the session's observations are ingested
    (OTel flush + async ClickHouse ingest), reconstructs `ConversationExchange`s, asks
-   `SessionSentimentService` for a `SessionSentiment`, and posts the score back via the Langfuse
-   Score API (raw `api().scores()` — scores have no operations equivalent). It also records the
+   `SessionSentimentService` for a `SessionSentiment`, and posts the score back with
+   `langfuse.scores().create(...)` — deliberately the synchronous tree, because the score must land
+   before `scoreSession` ends the enclosing `ComputeSessionScore` span. The observation query is a
+   typed `ObservationFilter` (`sessionId` + `fields("core,basic,io")`) handed to
+   `async().observations().matching(filter).findAll()`; `findAll()` pages through *all* matching
+   observations, so a session is no longer capped at one page. That call is wrapped in
+   `Uni.createFrom().deferred(...)`, which is load-bearing rather than stylistic: it is the retried
+   step of the polling pipeline and must re-query on every re-subscription, otherwise each retry
+   replays the first (empty) response and the session silently goes unscored. It also records the
    exchanges as a Langfuse dataset, gated on `create-dataset-on-session-close`: dataset names are
    deduplicated and created sequentially through `async().datasets().createIfAbsent(...)` (not
    atomic, so concurrent creation of the same name would race it against itself), then the dataset
-   items are created in parallel on the raw `api().asyncDatasetItems()` client.
+   items are created in parallel through `async().datasetItems().create(...)`.
 3. **Drift detection** — `DriftDetectionOutputGuardrail` runs the quarkus-langchain4j evaluation
    framework (`Evaluation.withSamples(<datasetName>)`) and returns a `fatal` result carrying a
    `DriftDetectionException` when the score falls below `quarkus.aiscoring.threshold`.
@@ -146,9 +153,12 @@ The three evaluation tiers (see `langfuse-evaluation.md` for the full rationale)
      called directly — it is discovered via `ServiceLoader` through
      `src/main/resources/META-INF/services/io.quarkiverse.langchain4j.testing.evaluation.SampleLoader`,
      grabs `LangfuseOperations` via `CDI.current()`, checks the dataset exists with
-     `datasets().findByName(...)` in `supports`, pages through the dataset items on the raw client
-     (`api().datasetItems()`, which the operations layer does not cover), and keeps only
-     `DatasetStatus.ACTIVE` items.
+     `datasets().findByName(...)` in `supports`, and reads the items with
+     `datasetItems().matching(DatasetItemFilter...).streamAll()` — no hand-written page arithmetic.
+     Two non-obvious constraints: `DatasetItemFilter` has no status criterion, so the
+     `DatasetStatus.ACTIVE` filter necessarily stays client-side; and `streamAll()` is lazy, so the
+     terminal `.toList()` has to run *inside* the `try` or the `LangfuseNotFoundException`-to-empty-list
+     behaviour silently stops working.
    - `Evaluator` (`EvaluationStrategy<String>`) scores them by delegating to the `EvaluatorAgent`
      AI service (the `judge` model). It is the only `EvaluationStrategy` bean in the project —
      despite `quarkus-langchain4j-testing-evaluation-semantic-similarity` being on the classpath,
@@ -251,9 +261,11 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   OpenAI-compatible `/chat/completions` endpoint. Stubs are registered programmatically in
   `@BeforeEach` — there is no `src/test/resources` directory.
 - **Langfuse is not mocked.** `DriftDetectionOutputGuardrailTests`, `LangfuseDatasetSampleLoaderTests`
-  and `LangfuseSessionScoringServiceTests` inject the real `LangfuseOperations` (reaching the raw
-  client via `api()` where needed) against the Langfuse dev service, creating and tearing down real
-  datasets/items around each test.
+  and `LangfuseSessionScoringServiceTests` inject the real `LangfuseOperations` against the Langfuse
+  dev service, creating and tearing down real datasets/items around each test. Their fixtures and
+  assertions still go through `api()` (`api().datasetItems()`, `api().observations()`,
+  `api().scoresV3()`) — that is test-fixture code that predates the operations layer covering those
+  domains, not a gap in the layer.
 - AssertJ + Awaitility; Mockito is attached as a `-javaagent` in the surefire/failsafe config.
 
 ## Conventions
@@ -276,14 +288,33 @@ Beyond the global Java/Quarkus style rules in `AGENTS.md`, this repo specificall
   `InteractionPublisher`/`InteractionScorer` pipeline and a `RESCORE` interaction mode. **None of
   that exists any more** — it collapsed into this single app scoring against Langfuse in-process,
   and `InteractionMode` is now `NORMAL`/`DRIFT_DETECTION`. Do not reintroduce references to it.
-- **The quarkus-langfuse operations layer (`LangfuseOperations`, 0.6.0) only covers six domains:**
-  `models()`, `datasets()`, `llmConnections()`, `scoreConfigs()`, `evaluationRules()` and
-  `evaluators()`. There is nothing for observations, scores, dataset items, traces or sessions, so
-  those calls necessarily stay on the raw generated client reached via `langfuse.api()` (or
-  `langfuse.async()` for the reactive variants). Prefer the operations layer (`createIfAbsent`,
-  `upsert`, `findByName`/`findByProvider`) wherever it exists — it replaced the hand-rolled
-  lookup-then-create helpers and cursor-pagination loop that used to live in
-  `ai.scoring.langfuse.init`. The evaluator *update* call still drops to `api().evaluators()`.
+- **The quarkus-langfuse operations layer (`LangfuseOperations`) covers broadly, but not
+  everything.** Prefer it (`createIfAbsent`, `upsert`, `findByName`/`findByProvider`, `matching`,
+  `streamAll`) wherever it exists — it replaced the hand-rolled lookup-then-create helpers and
+  pagination loops this app used to carry. The residual gaps that still force `langfuse.api()`:
+  - **No `update` on any domain except annotation queue items.** That is precisely why
+    `LangfuseEvaluationInitializer.updateEvaluatorModel` stays on
+    `api().evaluators().evaluatorsUpdate(...)` — it is not an oversight waiting to be tidied up.
+  - **Traces and sessions are not covered, deliberately.** They remain reachable only via `api()`.
+    Per the Langfuse upstream documentation these endpoints are deprecated, with a Langfuse Cloud
+    removal date of 16 November 2026 — that date is not asserted anywhere in the extension sources,
+    so treat it as an upstream claim to re-check rather than a verified project fact.
+  - **`/api/public/unstable/` endpoints (dashboards, dashboard widgets) are excluded** as a
+    standing project rule.
+- **Log Langfuse failures with `LangfuseApiException.getStatusCode()`/`getServerMessage()`, not
+  `getMessage()`** — `getMessage()` carries the entire raw JSON response body behind a
+  `Langfuse API error (404): ` prefix. The broad trailing `catch (Exception)` blocks in
+  `LangfuseEvaluationInitializer` are intentional: they run inside `onStartup(@Observes StartupEvent)`,
+  where an escaping exception aborts application boot.
+- **The observation `fields` parameter is unvalidated free-form text** — an unknown field group is
+  silently ignored, not rejected with a 400 — which is how the earlier `meta` typo survived so long
+  (the group is spelled `metadata`). `LangfuseSessionScoringService.fetchSessionObservations`
+  requests `"core,basic,io,metadata"`, which is exactly what the code consumes: `core`/`basic` carry
+  `startTime` and `parentObservationId` (`isCompleteExchange`, `ConversationExchange.hierarchyOf`),
+  `io` carries input/output (`isCompleteExchange`, `ConversationExchange.from`), and `metadata`
+  feeds steps 1-2 of `ConversationExchange.resolveDatasetName`, which read
+  `observation.getMetadata()` and fall back to the span-name-based step 3 when metadata is absent.
+  Note `io` does **not** include metadata — that is the separate `metadata` group.
 - `conversation-export.md` (1700+ lines) is a raw transcript of the design conversation behind
   `langfuse-evaluation.md`. It is a historical artifact, not documentation — don't treat it as
   spec and don't try to keep it in sync.

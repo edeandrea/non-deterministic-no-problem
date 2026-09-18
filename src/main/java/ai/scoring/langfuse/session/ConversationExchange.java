@@ -101,9 +101,11 @@ public record ConversationExchange(
 	 *   <li>the trace name</li>
 	 *   <li>this observation's own name</li>
 	 * </ol>
-	 * Steps 1-2 are what we expect once Langfuse surfaces the cascaded span attributes as metadata. Step 3 is what
-	 * actually fires today (the observations API doesn't return metadata for generations). Steps 4-5 are the
-	 * pre-existing behaviour, kept as a last resort so something always gets recorded.
+	 * Steps 1-2 are what we expect once Langfuse surfaces the cascaded span attributes as metadata. The
+	 * {@code metadata} field group <em>is</em> requested by {@code LangfuseSessionScoringService.fetchSessionObservations},
+	 * so these steps are no longer starved by the request itself; step 3 is nonetheless what has been observed to fire,
+	 * because the observations API hasn't been seen returning metadata for generations. Steps 4-5 are the pre-existing
+	 * behaviour, kept as a last resort so something always gets recorded.
 	 */
 	private static String resolveDatasetName(ObservationV2 observation, Function<String, Optional<ObservationV2>> parentLookup) {
 		// Materialise once: the ancestor list is scanned twice below (metadata, then names)
