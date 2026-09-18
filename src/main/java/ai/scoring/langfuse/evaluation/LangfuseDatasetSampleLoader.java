@@ -28,7 +28,7 @@ public class LangfuseDatasetSampleLoader implements SampleLoader<String> {
 			// datasets().findByName() throws IllegalArgumentException for blank names before issuing any request, and
 			// that isn't a SampleLoadException, so it would escape DriftDetectionOutputGuardrail.validate()
 			.filter(name -> !name.isBlank())
-			.flatMap(datasetName -> getLangfuseOperations().datasets().findByName(datasetName))
+			.flatMap(getLangfuseOperations().datasets()::findByName)
 			.isPresent();
 	}
 
