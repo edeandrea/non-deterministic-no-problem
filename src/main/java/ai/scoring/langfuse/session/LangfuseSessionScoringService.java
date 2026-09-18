@@ -55,7 +55,7 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 		                      .setSpanKind(SpanKind.INTERNAL)
 		                      .startSpan();
 
-		try (var scope = span.makeCurrent()) {
+		try (var _ = span.makeCurrent()) {
 			fetchAndScoreSession(conversationId);
 		}
 		finally {
@@ -221,12 +221,11 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 		// (concatenate), while the items - one per exchange, no contention between them - are created in parallel.
 		var distinctDatasetNames = exchanges.stream()
 		                                    .map(ConversationExchange::datasetName)
-		                                    .distinct()
-		                                    .toList();
+		                                    .distinct();
 
 		// Each Uni<Void> emits null, which flattens to nothing, so the collected list is always empty: it is used only
-		// as a "all datasets have been created" completion signal, never for its contents.
-		var datasetsReady = Multi.createFrom().iterable(distinctDatasetNames)
+		// as an "all datasets have been created" completion signal, never for its contents.
+		var datasetsReady = Multi.createFrom().items(distinctDatasetNames)
 			.onItem().transformToUni(this::createDatasetIfAbsent)
 			.concatenate()
 			.collect().asList()
@@ -241,7 +240,9 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 		// rather than propagating to fetchAndScoreSession, which only downgrades LangfuseNotFoundException.
 		try {
 			datasetsReady
-				.chain(() -> Uni.join().all(itemCreations).andFailFast())
+				.chain(() -> Uni.join()
+				                .all(itemCreations)
+				                .andFailFast())
 				// Bounded: a hung Langfuse call must not pin this worker thread forever
 				.await().atMost(this.langfuseConfig.evaluation().session().datasetCreationMaxWaitTime());
 		}
