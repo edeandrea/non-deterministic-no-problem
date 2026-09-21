@@ -2,7 +2,7 @@
 skinparam backgroundColor white
 skinparam BoxPadding 10
 skinparam ParticipantPadding 20
-skinparam MaxMessageSize 200
+skinparam MaxMessageSize 220
 autonumber
 
 ' --- INCLUDES & ICONS ---
@@ -12,12 +12,10 @@ autonumber
 !include <tupadr3/font-awesome-5/database>
 
 ' --- CUSTOM STYLES ---
-' This hides the border/shadow for items marked as <<nobox>>
-' effectively showing just the icon and text.
 skinparam participant {
-    BorderColor<<nobox>> white
-    BackgroundColor<<nobox>> white
-    Shadowing<<nobox>> false
+	BorderColor<<nobox>> white
+	BackgroundColor<<nobox>> white
+	Shadowing<<nobox>> false
 }
 
 ' --- MANUAL OTel ICON ---
@@ -40,62 +38,108 @@ sprite $otel [16x16/16] {
 0000000000000000
 }
 
-title Sequence: Continuous Scoring
+title Sequence: Tier 2 — Session Scoring (async, after the chat scope ends)
 
-actor "User/Client" as User
+actor "User / Browser" as User
 
-' --- MAIN APPLICATION BOX ---
-box "<$quarkus>\nApplication" #F9F9F9
-    participant "<$robot>\nLangChain4j" as LC4J <<Library>>
-    participant "<$quarkus>\nScoring Extension" as SE <<Library>>
+box "<$quarkus>\nParasol Application — request thread" #F9F9F9
+	participant "<$robot>\nClaimService\n<i>@ChatScoped</i>" as ClaimService
+	participant "ConversationalBaggageHandler" as Baggage
 end box
 
-' --- EXTERNAL DEPENDENCIES ---
-participant "<$brain>\nOpenAI" as OpenAI #FFFFFF
-participant "<$quarkus>\nScoring Service" as CSS #E8F5E9
-participant "<$brain>\nCohere" as Cohere #FFFFFF
-participant "<$database>\nInteration &\nScoring DB" as DB
-participant "<$otel>\nOTel Collector" as OTel #FFF3E0
+box "<$quarkus>\nParasol Application — background worker" #EFF7EF
+	participant "LangfuseSessionScoringService" as Scoring
+	participant "ConversationExchange" as Exchange
+	participant "<$robot>\nSessionSentimentService\n<i>model: session-sentiment</i>" as Sentiment
+end box
+
+participant "<$otel>\nOTel SDK /\nBatchSpanProcessor" as OTel #FFF3E0
+participant "<$database>\nLangfuse\n<i>API + async ClickHouse ingest</i>" as Langfuse #F3E5F5
+participant "<$brain>\nCohere\n<i>command-r7b-12-2024</i>" as Cohere #FFFFFF
 
 ' === THE FLOW ===
 
-User -> LC4J : Request
-activate LC4J
+User -> ClaimService : chat over WebSocket /_chat/routes
+activate ClaimService
+ClaimService ->> OTel : emit spans\n<i>langchain4j.aiservices.ClaimService.chat</i>
+ClaimService --> User : answer
+deactivate ClaimService
 
-' NOTE: User Waiting
-note right of LC4J #EFEFEF : Blocking Phase (User Waits)
+note over OTel, Langfuse #EFEFEF
+	Spans are exported in **batches** and Langfuse ingests them
+	**asynchronously** into ClickHouse — they are NOT queryable
+	the instant the conversation ends. That is why everything
+	below has to wait and poll.
+end note
 
-' 1. SYNCHRONOUS CALL TO OPENAI
-LC4J -> OpenAI : <<sync HTTP>>\nSend request
-activate OpenAI
-OpenAI --> LC4J : Response
-deactivate OpenAI
+User -> ClaimService : closes the chat scope
+ClaimService -> Baggage : <<CDI>> ChatScopeEnded
+activate Baggage
+Baggage -> Baggage : ConversationTracker.remove(conversationId)
+Baggage ->> Scoring : <<async>> Infrastructure.getDefaultExecutor()\n.execute(() -> scoreSession(conversationId))
+deactivate Baggage
 
-' 2. HANDOFF TO EXTENSION
-LC4J -> SE : Fire event
-activate SE
+note right of Baggage #EFEFEF : User is already gone —\nnothing below is on the request path
 
-LC4J --> User : Response
-note right of LC4J #EFEFEF : Non-Blocking Phase (User is gone)
-deactivate LC4J
+activate Scoring
+Scoring -> OTel : start INTERNAL span "ComputeSessionScore"\n(made current)
 
-' 3. ASYNC OBSERVABILITY
-SE ->> OTel : <<async gRPC>>\nSend Metrics/Traces/Logs
+' --- WAIT FOR THE FLUSH ---
+Scoring -> Scoring : delay quarkus.aiscoring.langfuse.session\n.otel-flush-wait-time (**5s**)
 
-' === BACKGROUND PROCESSING ===
-' 5. ASYNC SCORING
-SE ->> CSS : <<async>>\nSubmit Interaction for Scoring
-deactivate SE
-activate CSS
-CSS -> Cohere : Calculate Score
-activate Cohere
-Cohere --> CSS : Score
-deactivate Cohere
-CSS -> DB : Persist Interaction & Score
-activate DB
-DB --> CSS
-deactivate DB
-CSS ->> OTel : <<async gRPC>>\nSend Score +\nMetrics/Traces/Logs
-deactivate CSS
+' --- POLL UNTIL READY ---
+loop retry every 2s, expires after observation-max-wait-time (30s)
+	Scoring -> Langfuse : async observations()\n.matching(sessionId, fields "core,basic,io,metadata")\n.findAll()
+	activate Langfuse
+	Langfuse --> Scoring : observations
+	deactivate Langfuse
+	alt no observation has BOTH input and output
+		Scoring -> Scoring : fail with ObservationsNotReadyException\n-> retry with constant back-off
+	else at least one complete observation
+		Scoring -> Scoring : proceed
+	end
+end
+
+note right of Scoring #FFF3E0
+	On expiry: log "Gave up waiting", recover with an
+	empty list — session scoring is best-effort and
+	never breaks the application.
+end note
+
+' --- BUILD EXCHANGES ---
+Scoring -> Exchange : hierarchyOf(observations)
+activate Exchange
+Exchange -> Exchange : index by id, keep observations with\nstartTime + input + output, sort by startTime,\nresolve dataset name\n<i>langchain4j.aiservices.&lt;Class&gt;.&lt;method&gt;</i>
+Exchange --> Scoring : List<ConversationExchange>
+deactivate Exchange
+
+' --- DATASETS ---
+group create-dataset-on-session-close (default true)
+	Scoring -> Langfuse : datasets().createIfAbsent(...)\n**sequentially**, one per distinct dataset name
+	Scoring -> Langfuse : datasetItems().create(...)\n**in parallel** (join all, fail fast, 30s cap)\ninput / expectedOutput = the model's own prior answer /\nsourceTraceId + metadata
+	note right of Scoring : Failures are logged and swallowed
+end
+
+' --- SENTIMENT ---
+group score-session (default true)
+	Scoring -> Sentiment : evaluate(exchanges)
+	activate Sentiment
+	Sentiment -> Cohere : <<sync HTTP>> rate the conversation
+	activate Cohere
+	Cohere --> Sentiment : JSON verdict
+	deactivate Cohere
+	Sentiment -> Sentiment : SessionSentimentGuardrail\nextracts SessionSentiment(sentiment, reasoning)
+	Sentiment --> Scoring : SessionSentiment
+	deactivate Sentiment
+
+	Scoring -> Langfuse : **synchronous** scores().create(\nsessionId, "session-sentiment",\nCATEGORICAL value, comment = reasoning)
+	activate Langfuse
+	Langfuse --> Scoring : ok
+	deactivate Langfuse
+	note right of Scoring : Deliberately synchronous so the score\nlands before the span is closed
+end
+
+Scoring -> OTel : end span "ComputeSessionScore" (finally)
+deactivate Scoring
 
 @enduml

@@ -10,7 +10,7 @@
 		<maven.compiler.release>25</maven.compiler.release>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-		<quarkus.chappie.version>1.7.2</quarkus.chappie.version>
+
 		<quarkus.langchain4j.version>1.13.1</quarkus.langchain4j.version>
 		<quarkus.playwright.version>2.3.8</quarkus.playwright.version>
 		<quarkus.quinoa.version>2.9.0</quarkus.quinoa.version>
@@ -82,18 +82,12 @@
 			<groupId>io.quarkiverse.langchain4j</groupId>
 			<artifactId>quarkus-langchain4j-testing-evaluation-semantic-similarity</artifactId>
 		</dependency>
-		<!--    <dependency>-->
-		<!--      <groupId>io.quarkiverse.langchain4j</groupId>-->
-		<!--      <artifactId>quarkus-langchain4j-milvus</artifactId>-->
-		<!--    </dependency>-->
+
 		<dependency>
 			<groupId>io.quarkus</groupId>
 			<artifactId>quarkus-websockets-next</artifactId>
 		</dependency>
-		<!--		<dependency>-->
-		<!--			<groupId>io.quarkus</groupId>-->
-		<!--			<artifactId>quarkus-jdbc-h2</artifactId>-->
-		<!--		</dependency>-->
+
 		<dependency>
 			<groupId>io.quarkus</groupId>
 			<artifactId>quarkus-jdbc-postgresql</artifactId>
@@ -141,11 +135,7 @@
 			<groupId>io.quarkus</groupId>
 			<artifactId>quarkus-smallrye-health</artifactId>
 		</dependency>
-		<!--		<dependency>-->
-		<!--			<groupId>io.quarkiverse.chappie</groupId>-->
-		<!--			<artifactId>quarkus-chappie</artifactId>-->
-		<!--			<version>${quarkus.chappie.version}</version>-->
-		<!--		</dependency>-->
+
 		<dependency>
 			<groupId>io.quarkus</groupId>
 			<artifactId>quarkus-config-yaml</artifactId>

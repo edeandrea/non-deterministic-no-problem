@@ -4,9 +4,11 @@
 ' --- INCLUDES ---
 !include <tupadr3/devicons2/quarkus>
 !include <tupadr3/devicons2/grafana>
+!include <tupadr3/devicons2/postgresql>
 !include <tupadr3/font-awesome-5/robot>
 !include <tupadr3/font-awesome-5/database>
 !include <tupadr3/font-awesome-5/brain>
+!include <tupadr3/font-awesome-5/envelope>
 
 ' --- MANUAL OTel ICON ---
 sprite $otel [16x16/16] {
@@ -28,93 +30,131 @@ sprite $otel [16x16/16] {
 0000000000000000
 }
 
-title Architecture: Continuous Scoring
+title Architecture: Continuous Scoring (single Quarkus application)
 
-' Vertical stacking layout
 skinparam linetype polyline
-skinparam nodesep 60
-skinparam ranksep 60
+skinparam nodesep 55
+skinparam ranksep 55
 
 skinparam rectangle {
-    BackgroundColor<<Quarkus>> #F9F9F9
-    BorderColor<<Quarkus>> #333333
-    FontColor<<Quarkus>> #000000
-    Padding 10
+	BackgroundColor<<Quarkus>> #F9F9F9
+	BorderColor<<Quarkus>> #333333
+	FontColor<<Quarkus>> #000000
+	BackgroundColor<<Business>> #E3F2FD
+	BackgroundColor<<Scoring>> #E8F5E9
+	BackgroundColor<<Tier>> #FFFFFF
+	BackgroundColor<<InLangfuse>> #FCE4EC
+	Padding 10
 }
 
-actor "User/Client" as User
+actor "User / Browser\n(React + PatternFly UI)" as User
 
-' --- TOP TIER: APP & OPENAI ---
+' =====================================================================
+' THE ONE AND ONLY DEPLOYABLE: org.parasol:parasol-app
+' =====================================================================
+rectangle "<$quarkus>\nParasol Application (single Quarkus container)" as App <<Quarkus>> {
+
+	' ---------------- BUSINESS LAYER: org.parasol ----------------
+	rectangle "package org.parasol — business layer" as Business <<Business>> {
+		component "<$robot>\nClaimService\n<i>@RegisterAiService(\"parasol-chat\")</i>\n<i>@ChatScoped · Easy-RAG(policies/)</i>" as ClaimService
+		component "NotificationService\n<i>@Tool updateClaimStatus</i>" as Notification
+		component "<$robot>\nGenerateEmailService\n<i>model: generate-email</i>\n<i>4 output guardrails</i>" as GenEmail
+		component "<$robot>\nPolitenessService\n<i>model: politeness</i>\n<i>called from a guardrail</i>" as Politeness
+		component "ClaimResource\n<i>GET /api/db/claims[/{id}]</i>" as ClaimResource
+	}
+
+	' ---------------- EVALUATION LAYER: ai.scoring ----------------
+	rectangle "package ai.scoring — AI quality / evaluation layer" as Scoring <<Scoring>> {
+
+		rectangle "Tier 1 — per-trace judging (provisioning only)" as Tier1 <<Tier>> {
+			component "LangfuseEvaluationInitializer\n<i>@Observes StartupEvent</i>\n<i>score configs · model pricing ·</i>\n<i>Gemini LLM connection · evaluator · rule</i>" as Initializer
+		}
+
+		rectangle "Tier 2 — session scoring (async, after chat ends)" as Tier2 <<Tier>> {
+			component "ConversationalBaggageHandler\n<i>ChatScopeStarted/Activated/</i>\n<i>Deactivated/Ended</i>" as Baggage
+			component "LangfuseSessionScoringService\n<i>poll observations · build</i>\n<i>ConversationExchanges · datasets</i>" as SessionScoring
+			component "<$robot>\nSessionSentimentService\n<i>model: session-sentiment</i>" as Sentiment
+		}
+
+		rectangle "Tier 3 — drift detection (inline, %drift only)" as Tier3 <<Tier>> {
+			component "DriftDetectionOutputGuardrail\n<i>active when interaction-mode</i>\n<i>= DRIFT_DETECTION</i>" as Drift
+			component "LangfuseDatasetSampleLoader\n<i>SampleLoader (ServiceLoader)</i>" as SampleLoader
+			component "<$robot>\nEvaluator / EvaluatorAgent\n<i>model: judge</i>" as Evaluator
+		}
+
+		component "<$otel>\nAiServiceDatasetSpanProcessor\n<i>stamps langfuse.dataset.name =</i>\n<i>langchain4j.aiservices.&lt;Class&gt;.&lt;method&gt;</i>" as SpanProcessor #FFF3E0
+	}
+}
+
+' =====================================================================
+' EXTERNAL SYSTEMS
+' =====================================================================
 together {
-    component "<$brain>\nOpenAI" as OpenAI #FFFFFF
-
-    rectangle "<$quarkus>\nApplication" as App {
-        component "<$robot>\nLangChain4j" as LC4J <<Library>>
-        component "<$quarkus>\nScoring Extension" as SE <<Library>>
-    }
+	component "<$brain>\nOpenAI\n<i>gpt-5-mini + embeddings</i>" as OpenAI #FFFFFF
+	component "<$brain>\nCohere\n<i>command-r7b-12-2024 via</i>\n<i>api.cohere.ai/compatibility/v1</i>" as Cohere #FFFFFF
 }
 
-' --- MIDDLE TIER: SCORING SERVICE (With Nested LC4J) ---
-' Changed from "component" to "rectangle" to allow nesting
-rectangle "<$quarkus>\nScoring Service" as CSS #E8F5E9 {
-    ' ADDED: Identical LangChain4j library inside
-    component "<$robot>\nLangChain4j" as CSS_LC4J <<Library>>
+database "<$postgresql>\nPostgreSQL\n<i>claims</i>" as DB
+
+rectangle "<$database>\nLangfuse" as Langfuse #F3E5F5 {
+	component "Traces · sessions · datasets · scores" as LangfuseCore
+	component "<$brain>\nGoogle Gemini\n<i>gemini-2.5-flash</i>\n<i>LLM-as-a-judge runs HERE,</i>\n<i>never called by the app</i>" as Gemini <<InLangfuse>> #FCE4EC
 }
 
-' --- MIDDLE TIER (RIGHT): Cohere & DB STACK ---
-together {
-    component "<$brain>\nCohere" as Cohere #FFFFFF
-    database "<$database>\nInteraction & Scoring\nDatabase" as DB
+component "<$envelope>\nMailpit / SMTP" as Mail #FFFFFF
+
+package "Observability Stack (LGTM Dev Service)" {
+	component "<$otel>\nOpenTelemetry Collector" as OTel #FFF3E0
+	component "<$grafana>\nGrafana / Loki / Tempo / Prometheus" as Grafana #FFFFFF
 }
 
-' --- BOTTOM TIER: OBSERVABILITY ---
-package "Observability Stack" {
-    component "<$otel>\nOpenTelemetry\nCollector" as OTel #FFF3E0
-    component "<$grafana>\nGrafana / Loki / Tempo" as Grafana #FFFFFF
-}
+' =====================================================================
+' FLOWS
+' =====================================================================
+User -down-> ClaimService : WebSocket /_chat/routes\nroute "chat"
+User -down-> ClaimResource : HTTPS GET
+
+ClaimResource -down-> DB : Panache
+Notification -down-> DB : update status\n<i>joiningExisting tx</i>
+
+ClaimService -right-> Notification : tool call
+Notification -down-> GenEmail : generate email
+GenEmail -down-> Politeness : PolitenessOutputGuardrail\n<i>LLM call inside a guardrail</i>
+Notification -down-> Mail : ReactiveMailer\n<i>ForkJoinPool.commonPool()</i>
+
+ClaimService -up-> OpenAI : <<sync HTTP>> chat + RAG embeddings
+GenEmail -up-> OpenAI : <<sync HTTP>>
+Politeness -up-> OpenAI : <<sync HTTP>>
+
+Sentiment -up-> Cohere : <<sync HTTP>> session sentiment
+Evaluator -up-> Cohere : <<sync HTTP>> judge verdict
+
+' Tier wiring
+ClaimService .right.> Baggage : @ChatScoped CDI events
+Baggage .down.> SessionScoring : ChatScopeEnded\n<i>Infrastructure.getDefaultExecutor()</i>
+SessionScoring -right-> Sentiment : evaluate(exchanges)
+ClaimService .down.> Drift : @OutputGuardrails
+Drift -right-> SampleLoader : load samples\n<i>via SampleLoader SPI</i>
+Drift -down-> Evaluator : EvaluationStrategy
+
+' Langfuse traffic
+Initializer -down-> LangfuseCore : provision score configs,\nmodel pricing, evaluator + rule
+LangfuseCore -down-> Gemini : runs the relevance\nLLM-as-a-judge (tier 1)
+SessionScoring -down-> LangfuseCore : poll observations,\ncreate datasets + items, POST score
+SampleLoader -down-> LangfuseCore : read ACTIVE dataset items
+
+' Telemetry
+App .down.> OTel : <<async OTLP>>\ntraces / metrics / logs
+SpanProcessor .down.> LangfuseCore : <<async OTLP>>\nspans + dataset attributes
+OTel <-right- Grafana : data pull
 
 ' --- LAYOUT ANCHORS ---
-' 1. OpenAI above LC4J
-OpenAI -[hidden]down-> LC4J
-
-' 2. App above CSS
-App -[hidden]down-> CSS
-
-' 3. Cohere above DB
-Cohere -[hidden]down-> DB
-
-' 4. CSS to the left of Cohere
-CSS -[hidden]right-> Cohere
-
-' 5. OTel at the bottom
-DB -[hidden]down-> OTel
-
-' --- LOGIC FLOWS ---
-
-' User Interaction
-User -down-> App : Request
-
-' OpenAI
-LC4J -up-> OpenAI : <<sync HTTP>>
-
-' App Logic
-LC4J -right-> SE : emits events
-SE .down.> CSS : <<async>>\ninteractions
-
-' Scoring Logic
-' UPDATED: The internal LangChain4j talks to Cohere
-CSS_LC4J -left-> Cohere : <<sync HTTP>>\nScore
-
-' The Service talks to the DB (usually via Hibernate/Panache, not LC4J)
-CSS <-right-> DB : Fetch & Store\ninteractions & scores
-
-' --- TELEMETRY FLOWS ---
-
-App .down.> OTel : <<async gRPC>>\nMetrics/Logs/Traces
-
-' 2. Specific Component Telemetry
-SE ..> OTel : <<async gRPC>>\nMetrics/Logs/Traces
-CSS ..> OTel : <async gRPC>>\nMetrics/Logs/Traces
-OTel <-right- Grafana : data pull
+Business -[hidden]down-> Scoring
+Tier1 -[hidden]down-> Tier2
+Tier2 -[hidden]down-> Tier3
+OpenAI -[hidden]right-> Cohere
+DB -[hidden]right-> Langfuse
+Langfuse -[hidden]right-> Mail
+Mail -[hidden]down-> OTel
 
 @enduml

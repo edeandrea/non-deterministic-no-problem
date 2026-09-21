@@ -1,7 +1,7 @@
 package ai.scoring.it;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
+import static org.assertj.core.api.Assertions.fail;
 import static org.awaitility.Awaitility.await;
 
 import java.time.Duration;
@@ -55,18 +55,19 @@ public class DriftDetectionTests {
 				
 				Marty has attached necessary documents, such as photos, a police report, and an estimate for repair costs, to his email. He requests prompt attention to the claim and is available at (916) 555-4385 or marty.mcfly@email.com for any additional information or documentation needed.
 				""", "Who is at fault?", LocalDate.of(1955, 9, 30))));
+		}
 
-			await().atMost(Duration.ofSeconds(15))
-			       .pollInterval(Duration.ofSeconds(2))
-			       .pollDelay(Duration.ofSeconds(2))
-			       .untilAsserted(() -> {
-				       assertThat(errors).isEmpty();
+		await()
+			.atMost(Duration.ofSeconds(15))
+			.pollInterval(Duration.ofSeconds(2))
+			.pollDelay(Duration.ofSeconds(2))
+			.until(() -> (messages.size() == 1) || (errors.size() == 1));
 
-				       assertThat(messages).isNotEmpty()
-				                           .singleElement()
-				                           .asInstanceOf(STRING)
-				                           .doesNotContainIgnoringCase("drift detected");
-			       });
+		if ((errors.size() == 1) && errors.getFirst().toLowerCase().contains("drift detected")) {
+			fail("Drift detected in the response: %s", errors.getFirst());
+		}
+		else {
+			assertThat(messages).singleElement();
 		}
 	}
 }

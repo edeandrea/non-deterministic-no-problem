@@ -19,6 +19,20 @@
         parent: langfuse-ocp
     aiscoring:
       interaction-mode: drift-detection
+    otel:
+      exporter:
+        otlp:
+          enabled: false
+      logs:
+        enabled: false
+      sdk:
+        disabled: true
+    observability:
+      enabled: false
+    micrometer:
+      export:
+        otlp:
+          enabled: false
 
 "%langfuse-ocp":
   quarkus:
@@ -30,7 +44,7 @@
       lgtm:
         enabled: false
     langfuse:
-      base-url: https://langfuse-web-app.apps.cluster-mmkc7.dyn.redhatworkshops.io
+      base-url: https://langfuse-web-parasol.apps.cluster-89g4g.dyn.redhatworkshops.io
       public-key: pk-lf-b30687d2-4eb0-471b-a45d-38abe41b6a10
       secret-key: sk-lf-fef063e9-0806-49cb-b0fd-cfabdb2f9d04
       log-requests: true
@@ -113,10 +127,6 @@ quarkus:
         timeout: 600s
         api-key: "${COHERE_API_KEY}"
         base-url: https://api.cohere.ai/compatibility/v1
-
-    # Milvus
-    milvus:
-      dimension: 1536
 
     # Ollama
     ollama:
@@ -221,14 +231,6 @@ quarkus:
   # REST Clients
   rest-client:
     follow-redirects: true
-    ai-interactions:
-      url: http://localhost:8888
-      follow-redirects: true
-      connect-timeout: 240000
-      read-timeout: 240000
-      logging:
-        scope: request-response
-        body-limit: 2147483647
 
 # Ollama profile config
 '%ollama':
@@ -257,8 +259,6 @@ quarkus:
           provider: ollama
       embedding-model:
         provider: ollama
-      milvus:
-        dimension: 1024
 
 # Ollama using OpenAI endpoint profile config
 '%ollama-openai':
@@ -280,8 +280,6 @@ quarkus:
             model-name: "${quarkus.langchain4j.ollama.parasol-chat.chat-model.model-id}"
         embedding-model:
           model-name: "${quarkus.langchain4j.ollama.embedding-model.model-id}"
-      milvus:
-        dimension: 1024
 
 # Dev mode config
 '%dev':

@@ -1,0 +1,130 @@
+@startuml
+!include <C4/C4_Container>
+
+' --- INCLUDES ---
+!include <tupadr3/devicons2/quarkus>
+!include <tupadr3/font-awesome-5/robot>
+!include <tupadr3/font-awesome-5/brain>
+!include <tupadr3/font-awesome-5/database>
+!include <tupadr3/font-awesome-5/shield_alt>
+!include <tupadr3/font-awesome-5/envelope>
+!include <tupadr3/font-awesome-5/file_alt>
+
+' --- MANUAL OTel ICON ---
+sprite $otel [16x16/16] {
+0000000000000000
+0000000000000000
+0055550000555500
+0555555005555550
+0555555005555550
+0555555005555550
+0055550000555500
+0000000000000000
+0055550000555500
+0555555005555550
+0555555005555550
+0555555005555550
+0055550000555500
+0000000000000000
+0000000000000000
+0000000000000000
+}
+
+title Application Flow: Parasol Claim Assistant
+
+skinparam linetype polyline
+skinparam nodesep 50
+skinparam ranksep 50
+
+skinparam rectangle {
+	BackgroundColor<<Humans>> #E3F2FD
+	BorderColor<<Humans>> #1565C0
+	BackgroundColor<<Software>> #FFF8E1
+	BorderColor<<Software>> #F9A825
+	BackgroundColor<<Scoring>> #E8F5E9
+	BorderColor<<Scoring>> #2E7D32
+	Padding 10
+}
+
+actor "User" as User
+
+component "Chat Bot\n<i>WebSocket /_chat/routes</i>\n<i>React + PatternFly UI</i>" as ChatBot #FFFFFF
+
+' =====================================================================
+' "AI replacing humans" — conversational claim handling
+' =====================================================================
+rectangle "AI replacing humans\n<i>a conversation a human used to have</i>" as Humans <<Humans>> {
+	component "<$robot>\nClaim AI Assistant\n<i>ClaimService · model parasol-chat</i>\n<i>@ChatScoped</i>" as ClaimService
+	database "<$file_alt>\nPolicy Document Store\n<i>Easy-RAG over policies/</i>" as Policies
+	component "<$brain>\nChat Model\n<i>gpt-5-mini</i>" as ChatModel #FFFFFF
+}
+
+' =====================================================================
+' "AI replacing software" — deterministic work done by an LLM
+' =====================================================================
+rectangle "AI replacing software\n<i>code a developer used to write</i>" as Software <<Software>> {
+	component "Claim Status Notification\n<i>NotificationService</i>\n<i>@Tool updateClaimStatus</i>" as Notification
+	component "<$robot>\nGenerate Email AI Assistant\n<i>GenerateEmailService · model generate-email</i>" as GenEmail
+	component "<$brain>\nEmail Model\n<i>gpt-5-mini</i>" as EmailModel #FFFFFF
+
+	rectangle "<$shield_alt>\nOutput Guardrails\n<i>there are NO input guardrails</i>" as Guardrails #FFFFFF {
+		component "EmailContainsRequiredInformation" as G1
+		component "EmailStartsAppropriately" as G2
+		component "EmailEndsAppropriately" as G3
+		component "PolitenessOutputGuardrail" as G4
+	}
+
+	component "<$robot>\nPoliteness AI Assistant\n<i>PolitenessService · model politeness</i>" as Politeness
+	component "<$brain>\nPoliteness Model\n<i>gpt-5-mini</i>" as PolitenessModel #FFFFFF
+}
+
+' =====================================================================
+' Evaluation layer — absent from the original hand-drawn diagram
+' =====================================================================
+rectangle "ai.scoring — AI quality layer\n<i>how we test a non-deterministic system</i>" as Scoring <<Scoring>> {
+	component "Tier 1\nLangfuseEvaluationInitializer\n<i>provisions the Langfuse</i>\n<i>LLM-as-a-judge (Gemini)</i>" as Tier1
+	component "Tier 2\nConversationalBaggageHandler ->\nLangfuseSessionScoringService ->\nSessionSentimentService" as Tier2
+	component "Tier 3\nDriftDetectionOutputGuardrail +\nLangfuseDatasetSampleLoader +\nEvaluator / EvaluatorAgent" as Tier3
+}
+
+database "<$database>\nLangfuse\n<i>traces · sessions · datasets · scores</i>\n<i>Gemini judge runs inside Langfuse</i>" as Langfuse #F3E5F5
+database "PostgreSQL\n<i>claims</i>" as DB
+component "<$envelope>\nSMTP (Mailpit)" as Mail #FFFFFF
+
+' =====================================================================
+' FLOWS
+' =====================================================================
+User -down-> ChatBot : asks about a claim
+ChatBot -down-> ClaimService : ClaimBotQuery\n<i>route "chat"</i>
+
+ClaimService -right-> Policies : RAG retrieval
+ClaimService -down-> ChatModel : <<sync HTTP>> prompt + context
+
+ClaimService -down-> Notification : tool invocation\n<i>updateClaimStatus(claimId, status)</i>
+Notification -down-> DB : persist new status
+Notification -down-> GenEmail : generateEmail(ClaimInfo)
+
+GenEmail -down-> EmailModel : <<sync HTTP>>
+GenEmail -down-> Guardrails : validate / reprompt the Email JSON
+G4 -down-> Politeness : isPolite(email body)\n<b>an LLM call from INSIDE a guardrail</b>
+Politeness -down-> PolitenessModel : <<sync HTTP>>
+
+Notification -down-> Mail : ReactiveMailer.send
+
+' Evaluation wiring
+ClaimService .right.> Tier3 : @OutputGuardrails\n<i>drift check (%drift only)</i>
+ClaimService .right.> Tier2 : ChatScopeEnded\n<i>async session scoring</i>
+Tier1 .down.> Langfuse : provision judge + rule at startup
+Tier2 .down.> Langfuse : datasets + session-sentiment score
+Tier3 .down.> Langfuse : read dataset samples
+ClaimService .down.> Langfuse : <<async OTLP>> traces\n<i>langfuse.dataset.name stamped by</i>\n<i>AiServiceDatasetSpanProcessor</i>
+
+' --- LAYOUT ANCHORS ---
+Humans -[hidden]down-> Software
+Software -[hidden]down-> Scoring
+G1 -[hidden]right-> G2
+G2 -[hidden]right-> G3
+G3 -[hidden]right-> G4
+DB -[hidden]right-> Mail
+
+@enduml

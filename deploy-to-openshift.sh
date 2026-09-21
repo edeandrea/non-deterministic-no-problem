@@ -33,6 +33,15 @@ oc wait --for=condition=Established \
   crd/keeperclusters.clickhouse.com \
   --timeout=600s
 
+# Set up docker pull secret
+oc delete secret dockerhub-auth || true
+oc create secret docker-registry dockerhub-auth \
+  --docker-server=docker.langfuse.com \
+  --docker-username=edeandrea \
+  --docker-password=${DOCKERHUB_READONLY_PAT} \
+  --docker-email=eric.deandrea@gmail.com
+oc secrets link default dockerhub-auth --for=pull
+
 # Need to helm install langfuse according to https://langfuse.com/self-hosting/deployment/kubernetes-helm#deploy-the-helm-chart
 helm repo add langfuse https://langfuse.github.io/langfuse-k8s
 helm repo update langfuse

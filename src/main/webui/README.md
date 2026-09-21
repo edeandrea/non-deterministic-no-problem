@@ -1,111 +1,105 @@
-# Patternfly Seed
+# Parasol Insurance Web UI
 
-Patternfly Seed is an open source build scaffolding utility for web apps. The primary purpose of this project is to give developers a jump start when creating new projects that will use patternfly. A secondary purpose of this project is to serve as a reference for how to configure various aspects of an application that uses patternfly, webpack, react, typescript, etc.
+The React + TypeScript + [PatternFly](https://www.patternfly.org/) frontend for the Parasol Insurance
+claims demo. It is served by the Quarkus backend through the
+[Quinoa](https://docs.quarkiverse.io/quarkus-quinoa/dev/) extension — it is **not** a standalone app.
 
-Out of the box you'll get an app layout with chrome (header/sidebar), routing, build pipeline, test suite, and some code quality tools. Basically, all the essentials.
+See the repository root [`README.md`](../../../README.md) and [`CLAUDE.md`](../../../CLAUDE.md) for
+overall project context.
 
-<img width="1058" alt="Out of box dashboard view of patternfly seed" src="https://user-images.githubusercontent.com/5942899/103803761-03a0a500-501f-11eb-870a-345d7d035e6b.png">
+## How it is built
 
-## Quick-start
+You normally never run npm by hand. Quinoa runs the npm install/build for you as part of the Maven
+build from the repository root:
 
 ```bash
-git clone https://github.com/patternfly/patternfly-react-seed
-cd patternfly-react-seed
-npm install && npm run start:dev
+./mvnw quarkus:dev   # live coding, frontend included
+./mvnw package       # production build, frontend bundled into the app
 ```
 
-## Development scripts
+Quinoa configuration lives in [`src/main/resources/application.yml`](../resources/application.yml)
+under `quarkus.quinoa`:
 
-```sh
-# Install development/build dependencies
-npm install
-
-# Start the development server
-npm run start:dev
-
-# Run a production build (outputs to "dist" dir)
-npm run build
-
-# Run the test suite
-npm run test
-
-# Run the test suite with coverage
-npm run test:coverage
-
-# Run the linter
-npm run lint
-
-# Run the code formatter
-npm run format
-
-# Launch a tool to inspect the bundle size
-npm run bundle-profile:analyze
-
-# Start the express server (run a production build first)
-npm run start
-
-# Start storybook component explorer
-npm run storybook
-
-# Build storybook component explorer as standalone app (outputs to "storybook-static" dir)
-npm run build:storybook
+```yaml
+quinoa:
+  build-dir: dist
+  enable-spa-routing: true
+  package-manager-install:
+    ~: true
+    node-version: 24.15.0
+    npm-version: 11.12.1
 ```
 
-## Configurations
-* [TypeScript Config](./tsconfig.json)
-* [Webpack Config](./webpack.common.js)
-* [Jest Config](./jest.config.js)
-* [Editor Config](./.editorconfig)
+`package-manager-install` means Node and npm are downloaded and pinned by the build — you do not need
+them installed locally.
 
-## Raster image support
+## npm scripts
 
-To use an image asset that's shipped with PatternFly core, you'll prefix the paths with "@assets". `@assets` is an alias for the PatternFly assets directory in node_modules.
+These are the scripts actually defined in [`package.json`](./package.json):
 
-For example:
-```js
-import imgSrc from '@assets/images/g_sizing.png';
-<img src={imgSrc} alt="Some image" />
+| Script | Purpose |
+| --- | --- |
+| `start:dev` | webpack dev server (`webpack.dev.js`) |
+| `build` | production build into `dist` (runs `prebuild`: `type-check` + `clean`) |
+| `start` | serve an already-built `dist` with `sirv` on port 8080 |
+| `test`, `test:watch`, `test:coverage` | Jest test suite |
+| `lint` / `eslint` | ESLint over `./src/` |
+| `format` | Prettier over `./src/**/*.{tsx,ts}` |
+| `type-check` | `tsc --noEmit` |
+| `ci-checks` | `type-check` + `lint` + `test:coverage` |
+| `build:bundle-profile`, `bundle-profile:analyze` | bundle size analysis |
+| `clean` | `rimraf dist` |
+| `dr:surge` | `node dr-surge.js` (deploy-preview helper) |
+
+## Talking to the backend
+
+[`src/app/config.tsx`](./src/app/config.tsx) resolves the backend base URL once:
+
+```ts
+backend_api_url: process.env.BACKEND_API_URL || window.location.protocol + '//' + window.location.host + '/api'
 ```
 
-You can use a similar technique to import assets from your local app, just prefix the paths with "@app". `@app` is an alias for the main src/app directory.
+`BACKEND_API_URL` is injected at build time via `dotenv-webpack` (`systemvars: true`), so an exported
+shell variable or a `.env` file both work. The root [`pom.xml`](../../../pom.xml) sets
+`BACKEND_API_URL=http://localhost:8081/api` for the surefire and failsafe executions.
+
+* **REST** — `ClaimsList` and `ClaimDetail` call `GET {backend_api_url}/db/claims` and
+  `GET {backend_api_url}/db/claims/{id}` with axios.
+* **Chat** — [`Chat.tsx`](./src/app/components/Chat/Chat.tsx) is a WebSocket, not REST. It derives the
+  socket URL from the same config value by swapping the scheme and stripping the `/api` suffix:
+
+  ```ts
+  const wsUrl = config.backend_api_url.replace(/^http/, 'ws').replace(/\/api$/, '') + '/_chat/routes';
+  ```
+
+  It connects with the `ChatScopesClient` (loaded in [`src/index.html`](./src/index.html) from
+  `/_chat/javascript/chatscopes.js`) to the route named `chat`, and sends:
+
+  ```json
+  { "query": { "claimId": "...", "query": "...", "claim": "...", "inceptionDate": "..." } }
+  ```
+
+## Path aliases
+
+Configured in [`tsconfig.json`](./tsconfig.json) and wired into webpack via `TsconfigPathsPlugin`
+in [`webpack.common.js`](./webpack.common.js):
+
+* `@app/*` → `src/app/*`
+* `@assets/*` → PatternFly's `@patternfly/react-core/dist/styles/assets/*`
 
 ```js
 import loader from '@app/assets/images/loader.gif';
-<img src={loader} alt="Content loading />
+import imgSrc from '@assets/images/g_sizing.png';
 ```
 
-## Vector image support
-Inlining SVG in the app's markup is also possible.
-
-```js
-import logo from '@app/assets/images/logo.svg';
-<span dangerouslySetInnerHTML={{__html: logo}} />
-```
-
-You can also use SVG when applying background images with CSS. To do this, your SVG's must live under a `bgimages` directory (this directory name is configurable in [webpack.common.js](./webpack.common.js#L5)). This is necessary because you may need to use SVG's in several other context (inline images, fonts, icons, etc.) and so we need to be able to differentiate between these usages so the appropriate loader is invoked.
-```css
-body {
-  background: url(./assets/bgimages/img_avatar.svg);
-}
-```
+SVGs under a `bgimages` directory are inlined as data URIs (see `BG_IMAGES_DIRNAME` in
+`webpack.common.js`), which is what makes them usable as CSS `background` images.
 
 ## Adding custom CSS
-When importing CSS from a third-party package for the first time, you may encounter the error `Module parse failed: Unexpected token... You may need an appropriate loader to handle this file typ...`. You need to register the path to the stylesheet directory in [stylePaths.js](./stylePaths.js). We specify these explicitly for performance reasons to avoid webpack needing to crawl through the entire node_modules directory when parsing CSS modules.
 
-## Code quality tools
-* For accessibility compliance, we use [react-axe](https://github.com/dequelabs/react-axe)
-* To keep our bundle size in check, we use [webpack-bundle-analyzer](https://github.com/webpack-contrib/webpack-bundle-analyzer)
-* To keep our code formatting in check, we use [prettier](https://github.com/prettier/prettier)
-* To keep our code logic and test coverage in check, we use [jest](https://github.com/facebook/jest)
-* To ensure code styles remain consistent, we use [eslint](https://eslint.org/)
-* To provide a place to showcase custom components, we integrate with [storybook](https://storybook.js.org/)
+When importing CSS from a third-party package for the first time you may hit
+`Module parse failed: Unexpected token...`. Register the stylesheet directory in
+[`stylePaths.js`](./stylePaths.js) — it is consumed by `webpack.dev.js` and `webpack.prod.js` and is
+explicit for performance, so webpack does not crawl all of `node_modules`.
 
-## Multi environment configuration
-This project uses [dotenv-webpack](https://www.npmjs.com/package/dotenv-webpack) for exposing environment variables to your code. Either export them at the system level like `export MY_ENV_VAR=http://dev.myendpoint.com && npm run start:dev` or simply drop a `.env` file in the root that contains your key-value pairs like below:
-
-```sh
-ENV_1=http://1.myendpoint.com
-ENV_2=http://2.myendpoint.com
-```
-
-With that in place, you can use the values in your code like `console.log(process.env.ENV_1);`
+Other config: [TypeScript](./tsconfig.json) · [webpack](./webpack.common.js) · [Jest](./jest.config.js) · [EditorConfig](./.editorconfig)

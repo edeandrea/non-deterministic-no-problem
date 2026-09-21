@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **"Non-Deterministic? No Problem!"** is a demo application (Parasol Insurance) that shows how to
 test and continuously evaluate non-deterministic AI systems.
 
-It is a **single Quarkus application** (`org.parasol:parasol-app`, Java 25) with a React/PatternFly
+It is a **single Quarkus application** (`org.parasol:parasol-app`, Java 25, Quarkus 3.39.3) with a React/PatternFly
 frontend served via Quinoa. There are **no sub-modules** — one `pom.xml` at the root.
 
 The Java source is split into two top-level packages representing two distinct concerns:
@@ -18,11 +18,22 @@ The Java source is split into two top-level packages representing two distinct c
 | `ai.scoring` | The reusable AI-quality layer (Langfuse integration, session scoring, drift detection) |
 
 Supporting docs:
-- `README.md` — architecture image, Ollama profiles, Langfuse integration notes
+- `README.md` — build/run instructions, Ollama profiles, Langfuse integration notes
 - `langfuse-evaluation.md` — **the** design document: the three-tier evaluation strategy, Langfuse
   platform/language gaps, and the workarounds implemented here. Read this before touching anything
   under `ai.scoring.langfuse`.
-- `docs/*.puml` — PlantUML architecture and sequence diagrams
+- `docs/*.puml` — three PlantUML diagrams: `application-flow.puml` (the business flow —
+  chat → tool → email), `continuous-scoring-architecture.puml` (single-container component view of
+  the evaluation layer) and `continuous-scoring-sequence.puml` (the tier-2 session-scoring
+  sequence).
+- `images/arch.png` — the hand-drawn overview of the business flow, framed as "Code I write" vs
+  "Is this code?", embedded at the top of README.md's Architecture section with
+  `docs/application-flow.png` below it as the detailed complement. It is a **source-less raster**
+  (no `.excalidraw`/`.drawio` original) that has already been pixel-edited — a white rectangle
+  painted over a now-removed "Input Guardrails" box describing a component that does not exist (all
+  seven guardrails here are output-side). Changing it means pixel editing or a full redraw, not
+  editing a source file, and this machine has no Pillow, numpy or ImageMagick — the last edit
+  needed a hand-rolled Python PNG codec.
 
 ## Commands
 
@@ -58,6 +69,13 @@ All Maven commands run from the repository root via the wrapper.
 java -Dquarkus.profile=ollama,prod -jar target/quarkus-app/quarkus-run.jar
 ```
 
+### Diagrams
+
+```bash
+# Re-render every docs/*.puml to a sibling PNG (pinned PlantUML, needs graphviz `dot`)
+./docs/render-diagrams.sh
+```
+
 ### Frontend (from `src/main/webui/`)
 
 ```bash
@@ -89,9 +107,14 @@ test must pass under the Ollama profiles**.
 - `GenerateEmailService` — generates a `{subject, body}` `Email` record; four output guardrails.
 - `PolitenessService` — AI-backed politeness check used by `PolitenessOutputGuardrail`.
 
-**Output guardrails** on `GenerateEmailService` (all extend `GenerateEmailOutputGuardrail`):
+**Output guardrails** on `GenerateEmailService` (all extend `GenerateEmailOutputGuardrail`, itself a
+`dev.langchain4j.guardrails.JsonExtractorOutputGuardrail<Email>`):
 `EmailContainsRequiredInformationOutputGuardrail`, `EmailStartsAppropriatelyOutputGuardrail`,
 `EmailEndsAppropriatelyOutputGuardrail`, `PolitenessOutputGuardrail`.
+
+The project has **seven guardrail classes in total and they are all output guardrails** — the four
+email ones above plus `DriftDetectionOutputGuardrail`, `SessionSentimentGuardrail` and
+`EvaluatorResultOutputGuardrail`. There are **zero input guardrails**.
 
 **Email flow:** the chat bot calls the `NotificationService.updateClaimStatus` tool → updates the
 `Claim` Panache entity → `GenerateEmailService` produces the email → sent via Quarkus Mailer
@@ -122,17 +145,23 @@ The three evaluation tiers (see `langfuse-evaluation.md` for the full rationale)
    `StartupEvent`, gated on `initialize-on-startup`. It uses the `LangfuseOperations` layer
    (`createIfAbsent` / `upsert` / `findByName`) from quarkus-langfuse, dropping to the raw
    `langfuse.api()` client only for the evaluator update call, which the operations layer does not
-   cover.
+   cover. `createEvaluationRule` installs two `NONE_OF` filters on the rule: `environment` not in
+   (`langfuse-llm-as-a-judge`, `llm-as-judge`) — which is what stops the judge from scoring its own
+   output — and `type` not in (`SPAN`, `EVENT`), so only generations get scored.
 2. **Session-level** — Langfuse has no session evaluation target, so this is custom code.
    `ConversationalBaggageHandler` observes `ChatScopeStarted/Activated/Deactivated/Ended`,
    propagates the conversation id as OTel baggage (`gen_ai.conversation.id`), and on session end
    hands off to `SessionScoringService` on a background executor.
    `LangfuseSessionScoringService` polls Langfuse until the session's observations are ingested
    (OTel flush + async ClickHouse ingest), reconstructs `ConversationExchange`s, asks
-   `SessionSentimentService` for a `SessionSentiment`, and posts the score back with
+   `SessionSentimentService` for a `SessionSentiment` (that AI service carries
+   `@OutputGuardrails(SessionSentimentGuardrail.class)` — an `@ApplicationScoped`
+   `JsonExtractorOutputGuardrail<SessionSentiment>` in `ai.scoring.langfuse.session` that exists
+   purely as deserialization insurance for models that wrap their JSON in prose), and posts the
+   score back with
    `langfuse.scores().create(...)` — deliberately the synchronous tree, because the score must land
    before `scoreSession` ends the enclosing `ComputeSessionScore` span. The observation query is a
-   typed `ObservationFilter` (`sessionId` + `fields("core,basic,io")`) handed to
+   typed `ObservationFilter` (`sessionId` + `fields("core,basic,io,metadata")`) handed to
    `async().observations().matching(filter).findAll()`; `findAll()` pages through *all* matching
    observations, so a session is no longer capped at one page. That call is wrapped in
    `Uni.createFrom().deferred(...)`, which is load-bearing rather than stylistic: it is the retried
@@ -160,7 +189,11 @@ The three evaluation tiers (see `langfuse-evaluation.md` for the full rationale)
      terminal `.toList()` has to run *inside* the `try` or the `LangfuseNotFoundException`-to-empty-list
      behaviour silently stops working.
    - `Evaluator` (`EvaluationStrategy<String>`) scores them by delegating to the `EvaluatorAgent`
-     AI service (the `judge` model). It is the only `EvaluationStrategy` bean in the project —
+     AI service (the `judge` model), whose `isResponseCorrect` method carries
+     `@OutputGuardrails(EvaluatorResultOutputGuardrail.class)` — an `@ApplicationScoped`
+     `JsonExtractorOutputGuardrail<EvaluatorResult>` in `ai.scoring.langfuse.evaluation`, again just
+     deserialization insurance rather than business validation. `Evaluator` is the only
+     `EvaluationStrategy` bean in the project —
      despite `quarkus-langchain4j-testing-evaluation-semantic-similarity` being on the classpath,
      nothing currently wires up a semantic-similarity strategy.
 
@@ -206,9 +239,16 @@ There are **two separate judges**, which is easy to confuse:
 
 Embeddings use the OpenAI embedding model by default (`quarkus.langchain4j.embedding-model`).
 
-Under `-Pollama` / `-Pollama-openai` every chat model maps to `llama3.2:latest`, embeddings to
-`snowflake-arctic-embed`, the OpenAI/Cohere API keys are stubbed to `changeme`, and Langfuse
-session scoring + startup initialization are disabled.
+The two Ollama profiles are **not** equivalent:
+- `%ollama` switches `parasol-chat`, `generate-email`, `politeness` and the embedding model to
+  `provider: ollama` (`llama3.2:latest`, embeddings `snowflake-arctic-embed`), stubs
+  `quarkus.langchain4j.openai.api-key` plus the `session-sentiment` and `judge` API keys to
+  `changeme`, and disables Langfuse session scoring + startup initialization. Note
+  `session-sentiment` and `judge` keep `provider: openai` pointed at the Cohere-compatible
+  endpoint — they are *not* moved to Ollama, they are just given a dummy key.
+- `%ollama-openai` only repoints the OpenAI client's `base-url` at `http://localhost:11434/v1` for
+  `parasol-chat`, `generate-email`, `politeness` and the embedding model. It stubs **no** API keys
+  and does **not** disable session scoring or startup initialization.
 
 ### Configuration profiles
 
@@ -216,9 +256,10 @@ session scoring + startup initialization are disabled.
 
 | Profile | Purpose |
 |---|---|
-| `dev` | LGTM dev service, Mailpit, PostgreSQL dev service, Langfuse dev service |
+| `dev` | Only `datasource.dev-ui.allow-sql` + `mailer.mock: false`. The LGTM, Mailpit, PostgreSQL and Langfuse dev services do run in dev mode, but they come from the extensions' own Dev Services defaults, not from this profile block |
 | `test` | Observability + Langfuse init/session scoring disabled |
-| `ollama`, `ollama-openai` | Local Ollama; Langfuse session scoring/init disabled |
+| `ollama` | Local Ollama via the Ollama extension; OpenAI/Cohere keys stubbed to `changeme`; Langfuse session scoring + startup init disabled |
+| `ollama-openai` | Local Ollama via the OpenAI client (`base-url: http://localhost:11434/v1`); no key stubs, no `quarkus.aiscoring` overrides |
 | `drift` | Parent `langfuse-ocp`; sets `quarkus.aiscoring.interaction-mode: drift-detection` |
 | `langfuse-ocp` | Points at a deployed Langfuse instance; disables OTLP export and LGTM |
 | `instana` | Exports OTLP to Instana instead of LGTM |
@@ -232,7 +273,19 @@ session scoring + startup initialization are disabled.
 | `COHERE_API_KEY` | Default profile — `session-sentiment` and `judge` |
 | `GEMINI_API_KEY` | Only when `LangfuseEvaluationInitializer` runs (`initialize-on-startup`); it throws `IllegalStateException` if absent |
 
-Under `-Pollama` / `-Pollama-openai` none of these are required.
+Under `-Pollama` none of these are required — the OpenAI and Cohere keys are stubbed to `changeme`
+and `LangfuseEvaluationInitializer` is switched off.
+
+Under `-Pollama-openai` nothing is stubbed, but which keys you actually need depends on the goal,
+because the Maven profile sets **two different Quarkus profiles**:
+- `quarkus:dev` and the packaged app run under `quarkus.profile=ollama-openai,prod`, so
+  `COHERE_API_KEY` is needed for `session-sentiment`/`judge` and `GEMINI_API_KEY` is needed because
+  startup initialization stays enabled.
+- `./mvnw test` / `./mvnw verify` run under `quarkus.test.profile=ollama-openai,test` (forced on
+  surefire and failsafe), and `%test` sets `initialize-on-startup: false` and `score-session: false`
+  — so the initializer and session scorer are inert and **neither `COHERE_API_KEY` nor
+  `GEMINI_API_KEY` is required for the build**. That is why CI passes with only a stubbed
+  `OPENAI_API_KEY`.
 
 ### Observability
 
@@ -250,10 +303,17 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
 - Playwright E2E tests in `org.parasol.ui`, extending the `@WithPlaywright` `PlaywrightTests` base
   class (records video to `target/playwright`).
 - `ai.scoring.it.DriftDetectionTests` is annotated with the custom meta-annotation
-  `@DriftDetectionTest`, which combines `@QuarkusTest` with
-  `@EnabledIfApplicationProperty(named = "quarkus.aiscoring.interaction-mode", matches = "drift-detection")`
-  — the supporting JUnit condition classes live in `src/test/java/io/quarkus/test/junit/`. These
-  tests are skipped unless the `drift` profile is active.
+  `ai.scoring.it.DriftDetectionTest`, which combines `@QuarkusTest` with **four** independent
+  enablement conditions, each carrying its own `disabledReason`:
+  `@EnabledIfConfig(named = "quarkus.aiscoring.interaction-mode", matches = "drift-detection")`
+  (`io.quarkus.test.junit.condition.EnabledIfConfig`, which ships with Quarkus itself — not
+  `@EnabledIfApplicationProperty`, and there is no local copy of the condition classes),
+  `@EnabledIfSystemProperty(named = "quarkus.profile", matches = "drift")`,
+  `@EnabledIfEnvironmentVariable(named = "OPENAI_API_KEY", matches = ".+")` and
+  `@EnabledIfEnvironmentVariable(named = "COHERE_API_KEY", matches = ".+")`. The annotation also
+  nests `DriftTestProfile implements QuarkusTestProfile`, which returns the `drift` config profile.
+  Practical consequence: these tests need the `drift` profile **and** real OpenAI *and* Cohere keys,
+  so they can never run in CI, which only supplies a stubbed `OPENAI_API_KEY=change-me`.
 - **Mocking LLM calls:** the Quarkus WireMock dev service (`@ConnectWireMock` + an injected
   `WireMock`). A `QuarkusTestProfile` repoints every relevant `quarkus.langchain4j.openai.*.base-url`
   (including `parasol-chat`, `session-sentiment`, `judge`) at
@@ -288,6 +348,10 @@ Beyond the global Java/Quarkus style rules in `AGENTS.md`, this repo specificall
   `InteractionPublisher`/`InteractionScorer` pipeline and a `RESCORE` interaction mode. **None of
   that exists any more** — it collapsed into this single app scoring against Langfuse in-process,
   and `InteractionMode` is now `NORMAL`/`DRIFT_DETECTION`. Do not reintroduce references to it.
+- **Tiers 2 and 3 are mutually exclusive in practice.** `%drift` is the only profile that sets
+  `quarkus.aiscoring.interaction-mode: drift-detection`, and it declares `langfuse-ocp` as its
+  parent profile — which sets `score-session: false` and disables the OTLP exporter. So whenever
+  tier 3 is armed, tier-2 session scoring is off; only tiers 1 and 3 are live under `%drift`.
 - **The quarkus-langfuse operations layer (`LangfuseOperations`) covers broadly, but not
   everything.** Prefer it (`createIfAbsent`, `upsert`, `findByName`/`findByProvider`, `matching`,
   `streamAll`) wherever it exists — it replaced the hand-rolled lookup-then-create helpers and
