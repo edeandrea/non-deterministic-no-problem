@@ -2,5 +2,6 @@
     description = "Global Allowlist"
     paths = [
         '''src\/main\/kubernetes\/dependencies.yml$''',
-        '''langfuse-helm\.values\.yml$'''
+        '''langfuse-helm\.values\.yml$''',
+        '''deploy-to-openshift\.sh$'''
     ]
