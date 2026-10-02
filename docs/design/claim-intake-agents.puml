@@ -1,0 +1,82 @@
+@startuml
+' Agent topology of the email claim intake. Keep in sync with docs/design/email-claim-intake.md (Agent architecture).
+skinparam backgroundColor white
+skinparam componentStyle rectangle
+skinparam defaultTextAlignment center
+skinparam PackageBackgroundColor #FAFBFD
+skinparam NoteBackgroundColor #FFFDE7
+skinparam ArrowColor #4A6FA5
+skinparam component {
+  BackgroundColor<<LLM>> #E3F2FD
+  BorderColor<<LLM>> #1565C0
+  BackgroundColor<<no LLM>> #F1F8E9
+  BorderColor<<no LLM>> #558B2F
+  BackgroundColor<<app>> #FFFFFF
+}
+
+title Email claim intake: agent topology
+
+actor Customer
+actor "Claims processor" as CP
+component "GreenMail\n(SMTP + IMAP)" as GM <<app>>
+database "PostgreSQL" as DB
+
+package "Parasol app" {
+  component "ClaimsInboxWatcher\nIMAP IDLE, one email at a time" as W <<app>>
+  component "ClaimEmailProcessor\nmatches the email to a claim (code)\nand checks the sender first;\nchecks the policy number,\nsaves claims and photos,\nsends replies, files the email" as P <<app>>
+  component "IntakeReplySender\nQute templates" as RS <<app>>
+  component "Review REST API\nPOST /api/db/claims/{id}/review-decisions" as RR <<app>>
+  component "ClaimReviewService\nresumes the paused workflow" as RSV <<app>>
+  component "DatabaseAgenticScopeStore\npaused workflow state" as ST <<app>>
+
+  package "ClaimsMailboxAgent: root workflow (sequence)\nmemory id = inbound Message-ID; returns IntakeOutcome" as ROOT {
+    component "EmailClassifierAgent\nemail → email type" as C <<LLM>>
+
+    package "EmailRouter (conditional)\nmatched claim first, then email type" as ROUTER {
+      package "ClaimExtractionWorkflow (parallel)\n→ claim extraction" as EX {
+        component "ClaimSummaryAgent\n→ summary" as SUM <<LLM>>
+        component "ClaimSentimentAgent\n→ sentiment" as SEN <<LLM>>
+        component "IncidentDetailsAgent\n→ description, date, location,\ncategory, policy number" as DET <<LLM>>
+      }
+      component "ClaimFollowUpAgent\nstatus answer;\nread-only status tool" as FU <<LLM>>
+      component "Not-a-claim /\nno-matching-claim agent" as NAC <<no LLM>>
+    }
+
+    package "Review step (complete claims only)" as REVIEW {
+      component "ClaimReviewAgent\nhuman in the loop:\npauses the workflow\n→ review decision" as HR <<no LLM>>
+      component "Review decision router\nReady / Needs more information" as DR <<no LLM>>
+    }
+  }
+}
+
+Customer --> GM : email (Roundcube)
+GM --> W : new mail
+W --> P
+P --> ROOT : Message-ID, email,\nmatched claim (or none),\nclaim history
+C --> ROUTER : email type
+ROUTER --> EX : matched pending claim,\nor no match + new claim
+ROUTER --> FU : matched claim\nin any other status
+ROUTER --> NAC : no match +\nnot a claim or follow-up
+EX --> HR : all required\ndetails present
+HR --> DR : decision (on resume)
+ROOT --> P : IntakeOutcome,\nor paused for review
+ROOT ..> ST : saves state at the pause
+ST --> DB
+P --> DB : claims, photos
+P --> RS
+RS --> GM : reply (SMTP)
+
+CP --> RR : Ready /\nNeeds more information
+RR --> RSV
+RSV --> ROOT : complete the pending review,\nre-run with the same Message-ID
+RSV --> P : apply the outcome
+
+legend right
+  |= Colour |= Meaning |
+  |<#E3F2FD> | calls the LLM (claim-intake model) |
+  |<#F1F8E9> | no LLM call |
+  Every LLM agent runs without chat memory or RAG.
+  Composite steps (sequence, conditional, parallel)
+  make no LLM call themselves.
+endlegend
+@enduml

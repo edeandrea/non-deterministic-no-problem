@@ -201,3 +201,5 @@ profiles.
   profiles and the gotchas that bite.
 - [langfuse-evaluation.md](langfuse-evaluation.md) — the three-tier evaluation design, the Langfuse
   platform gaps behind it and the workarounds chosen.
+- [docs/design/email-claim-intake.md](docs/design/email-claim-intake.md) — the proposed design for
+  the upcoming email claim intake (workflow, claim states, agent architecture). Not implemented yet.

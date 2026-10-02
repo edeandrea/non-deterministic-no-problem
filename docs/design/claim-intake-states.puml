@@ -1,0 +1,32 @@
+@startuml
+' Claim states set by the email intake. Keep in sync with docs/design/email-claim-intake.md (Claim states).
+skinparam backgroundColor white
+skinparam StateBackgroundColor #F5F7FA
+skinparam StateBorderColor #4A6FA5
+skinparam NoteBackgroundColor #FFFDE7
+hide empty description
+
+title Claim states set by the email intake
+
+state "Pending Information" as PI
+state "Pending Review" as PR
+state "In Process" as IP
+
+[*] --> PI : new claim email,\ndetails missing
+[*] --> PR : new claim email,\ndetails complete
+
+PI --> PI : customer reply,\ndetails still missing
+PI --> PR : customer reply\ncompletes the details
+
+PR --> PR : customer reply, details still complete\n(waiting review superseded, new review)
+PR --> PI : customer reply leaves details missing\n(waiting review superseded)
+PR --> PI : claims processor:\nNeeds more information
+PR --> IP : claims processor:\nReady
+
+note right of IP
+  Pending = Pending Information or Pending Review.
+  A claim in any other status (e.g. New, In Process,
+  Processed, Denied) only gets a status answer
+  and is never updated. Intake never sets New.
+end note
+@enduml

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Renders every docs/*.puml diagram to a sibling PNG.
+# Renders every docs/*.puml and docs/design/*.puml diagram to a sibling PNG.
 #
 # Downloads a pinned PlantUML release into a cache directory if it isn't already
 # there — nothing is installed globally. Graphviz (`dot`) must be on the PATH.
@@ -26,7 +26,7 @@ else
 fi
 
 shopt -s nullglob
-PUML_FILES=("$DOCS_DIR"/*.puml)
+PUML_FILES=("$DOCS_DIR"/*.puml "$DOCS_DIR"/design/*.puml)
 shopt -u nullglob
 
 if [[ ${#PUML_FILES[@]} -eq 0 ]]; then
