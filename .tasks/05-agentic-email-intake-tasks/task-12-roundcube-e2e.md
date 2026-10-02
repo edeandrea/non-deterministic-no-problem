@@ -40,12 +40,19 @@ the LLM mocked, and runs on every CI build.
 ## Key Points
 
 - Use stable Roundcube selectors (form field names, ARIA roles), found by inspecting Roundcube 1.7.x. Record them in `PLAN.md`.
-- The WireMock stubs must return deterministic agent outputs for the classifier, extraction and summary calls, including on resume after a review decision.
+- The WireMock stubs must return deterministic agent outputs for the classifier, extraction and summary calls,
+  including on resume after a review decision.
+  - **Match each stub on the last message only** (e.g. a JSONPath on `$.messages[-1].content`), never on the
+    whole request body. The agents are stateless (spike Q6, Q19), but matching on the last message keeps the stubs
+    correct even if a prompt gains a system message or history, and avoids leftover content matching the wrong stub.
+  - Distinguish the reply in scenarios 2 and 3 from the first email by content in that last message (the
+    combined correspondence marks the newest reply).
 - This test must pass in CI under both `-Pollama` and `-Pollama-openai`, with only `OPENAI_API_KEY=change-me`.
 - The E2E doesn't assert telemetry (spans, metrics, logs); task 11 covers that.
 
 ## Done When
 
 - [ ] All three scenarios pass locally under `-Pollama`.
+- [ ] Every WireMock stub matches on the last message only.
 - [ ] The test runs as part of `./mvnw verify` (not excluded or tagged off).
 - [ ] The test leaves no claims, images, mail or agentic scope rows behind.

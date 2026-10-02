@@ -54,6 +54,9 @@ record the answers before the design (task 02) is written and before any feature
       in the root trace, or a global `ExecutorProvider` is needed.
   18. The earliest startup hook that runs before any agent is built (for `AgenticScopePersister.setStore`)
       and before the first `MonitoredAgent` use.
+  19. Inside a workflow whose root has `@MemoryId`, how a sub-agent's chat memory is keyed when it
+      isn't turned off (the root's memory id, or `"default"`?), and whether entries pile up. Confirm that
+      `NoChatMemoryProviderSupplier` on every sub-agent sends each LLM call with no history.
 - Record every answer, with the evidence (test name, observed output, versions used), in
   `.tasks/05-agentic-email-intake-tasks/spike-results.md`, and summarise the answers in `PLAN.md` →
   Shared Context → Spike Results. The task 02 design cites them as evidence.
@@ -73,7 +76,7 @@ record the answers before the design (task 02) is written and before any feature
 
 ## Done When
 
-- [ ] `spike-results.md` answers all eighteen questions with evidence, and `PLAN.md` Spike Results summarises them.
+- [ ] `spike-results.md` answers all nineteen questions with evidence, and `PLAN.md` Spike Results summarises them.
 - [ ] `PLAN.md` records a feasibility verdict for suspend/resume through Quarkus. If it isn't feasible, stop and ask the user (task 07's decision gate).
 - [ ] The worktree is removed; the local spike branch is kept and was never pushed.
 - [ ] The user's working tree and `main` are unchanged.

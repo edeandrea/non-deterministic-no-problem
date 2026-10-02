@@ -200,8 +200,15 @@ When this lands: close Dependabot PRs #209, #210 and #211.
   - **The user's real-key runs passed.** Committed `150b9f9` and pushed to PR #219. The PR body's Verification section is updated, and #212's Verify item is ticked.
   - **PR state:** BEHIND main (`ec1ca14`, #220) and still BLOCKED by the Java 21 required checks. Squash auto-merge is still enabled.
 
+### Merged
+- **2026-10-02:** PR #219 was rebased onto `ec1ca14` (#220) by the user and squash-merged as `2575c10` on `main`, with an admin bypass before CI finished. The user dropped the Java 21 required checks from ruleset 3005185.
+- **Post-merge:** commit `c3491b8` on the local branch `rerender-design-diagrams-plantuml-1.2026.8` re-renders the three #220 design PNGs with PlantUML 1.2026.8. Dimensions changed by ≤ 14 px; no banners, no crops. It is not pushed yet.
+
 ### Follow-ups (not in this PR)
-- Ruleset 3005185: drop the `jvm-build-test-21-*` required checks, since CI only builds Java 25.
+**Closed out (user, 2026-10-02):** none of the items below are being pursued. The user considers them irrelevant now. The Dependabot PRs closed themselves once #219 landed.
+- ~~Ruleset 3005185: drop the `jvm-build-test-21-*` required checks~~ (done by the user).
+- Close the superseded Dependabot PRs #209, #210 and #211.
+- `README.md:52` says "The three PlantUML diagrams", but `docs/` now has 6 `.puml` files (3 of them in `docs/design/`).
 - `-Pollama-openai` CI:
   - add `ingestion-strategy=OFF` to the two `KeysTestProfile`s (`DriftDetectionOutputGuardrailTests`, `LangfuseDatasetSampleLoaderTests`);
   - add key stubs to `NotificationServiceTests`/`ClaimsDetailPageTests`.

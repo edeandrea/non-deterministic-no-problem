@@ -31,3 +31,4 @@ Every step except #216 is useful on its own.
 ## Related
 
 - #218 Clean up the Grafana AI dashboard (independent of steps 2–5; blocked by #212)
+- {{ISSUE_7}} Spike: compare a LangChain4j decision model (Jev) with the LLM email classifier (follow-up to #216; blocked until it lands and a quarkus-langchain4j release ships the typesafe extension)

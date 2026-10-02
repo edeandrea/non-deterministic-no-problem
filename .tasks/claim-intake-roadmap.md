@@ -19,6 +19,10 @@ Filed on GitHub as **#212–#216** (bodies in `github-issues/`, numbers in `gith
 (body in `github-issues/issue-06-grafana-dashboard.md`; independent of steps 2–5, blocked by step 1
 because step 1 bumps the `grafana/otel-lgtm` image).
 
+**Related, not part of the five-step order:** #221 Spike: compare a LangChain4j decision model (Jev)
+with the LLM email classifier (body in `github-issues/issue-07-decision-model-spike.md`; a follow-up
+to step 5, blocked by step 5 and by a quarkus-langchain4j release that ships `quarkus-langchain4j-typesafe`).
+
 ## Draft issue bodies (for filing on GitHub)
 
 Titles and first lines must not contain closing keywords (`close`, `fix`, `resolve` and their forms);
