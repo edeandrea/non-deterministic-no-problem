@@ -1,7 +1,14 @@
 @startuml
 skinparam backgroundColor white
 skinparam BoxPadding 10
-skinparam ParticipantPadding 20
+' PlantUML 1.2026.8 ignores skinparam ParticipantPadding; a horizontal participant Margin replaces it
+<style>
+sequenceDiagram {
+  participant {
+    Margin 0 20
+  }
+}
+</style>
 skinparam MaxMessageSize 220
 autonumber
 

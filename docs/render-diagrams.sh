@@ -9,7 +9,7 @@
 
 set -euo pipefail
 
-PLANTUML_VERSION="1.2026.0"
+PLANTUML_VERSION="1.2026.8"
 DOCS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CACHE_DIR="${TMPDIR:-/tmp}"
 PLANTUML_JAR="${CACHE_DIR%/}/plantuml-${PLANTUML_VERSION}.jar"
@@ -35,7 +35,8 @@ if [[ ${#PUML_FILES[@]} -eq 0 ]]; then
 fi
 
 echo "Rendering ${#PUML_FILES[@]} diagram(s)..."
-java -jar "$PLANTUML_JAR" -tpng -failfast2 "${PUML_FILES[@]}"
+# PlantUML crops PNGs at 4096px per side by default; the architecture diagram sits right at that edge.
+java -DPLANTUML_LIMIT_SIZE=8192 -jar "$PLANTUML_JAR" -tpng -failfast2 "${PUML_FILES[@]}"
 
 echo
 echo "Produced:"
