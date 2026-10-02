@@ -26,8 +26,8 @@ quinoa:
   enable-spa-routing: true
   package-manager-install:
     ~: true
-    node-version: 24.15.0
-    npm-version: 11.12.1
+    node-version: 24.21.0
+    npm-version: 11.21.0
 ```
 
 `package-manager-install` means Node and npm are downloaded and pinned by the build — you do not need
