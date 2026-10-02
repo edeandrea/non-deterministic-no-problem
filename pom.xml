@@ -7,13 +7,14 @@
 	<properties>
 		<assertj.version>3.27.7</assertj.version>
 		<compiler-plugin.version>3.16.0</compiler-plugin.version>
+		<dependency-plugin.version>3.11.0</dependency-plugin.version>
 		<maven.compiler.release>25</maven.compiler.release>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
 		<quarkus.langchain4j.version>1.14.1</quarkus.langchain4j.version>
-		<quarkus.playwright.version>2.3.8</quarkus.playwright.version>
-		<quarkus.quinoa.version>2.9.0</quarkus.quinoa.version>
+		<quarkus.playwright.version>2.3.10</quarkus.playwright.version>
+		<quarkus.quinoa.version>2.9.2</quarkus.quinoa.version>
 		<quarkus.wiremock.version>1.7.0</quarkus.wiremock.version>
 		<quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
 		<quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
@@ -295,6 +296,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-dependency-plugin</artifactId>
+				<version>${dependency-plugin.version}</version>
 				<executions>
 					<execution>
 						<goals>
