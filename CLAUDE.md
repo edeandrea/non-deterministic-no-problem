@@ -248,6 +248,10 @@ There are **two separate judges**, which is easy to confuse:
   `LangfuseEvaluationInitializer` from `LangfuseConfig.Evaluation.Gemini`.
 
 Embeddings use the OpenAI embedding model by default (`quarkus.langchain4j.embedding-model`).
+Because `reuse-embeddings` is enabled, the ingested vectors are cached in `easy-rag-embeddings.json`
+(project root, gitignored) and reloaded on every restart. OpenAI (1536-dimension) and
+`snowflake-arctic-embed` (1024-dimension) vectors are incompatible, so delete that file when
+switching between the default and the Ollama profiles.
 
 The two Ollama profiles are **not** equivalent:
 - `%ollama` switches `parasol-chat`, `generate-email`, `politeness` and the embedding model to
@@ -331,6 +335,13 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   `http://localhost:${quarkus.wiremock.devservices.port}/v1`, then stubs the
   OpenAI-compatible `/chat/completions` endpoint. Stubs are registered programmatically in
   `@BeforeEach` — there is no `src/test/resources` directory.
+- **Easy RAG in WireMock-backed profiles:** a profile that repoints the default
+  `quarkus.langchain4j.openai.base-url` at WireMock (`DriftDetectionChatRouteExceptionHandlerTests`,
+  `LangfuseSessionScoringServiceTests`) also sets `quarkus.langchain4j.easy-rag.ingestion-strategy=OFF`.
+  Otherwise Easy RAG ingests the policy documents at boot, calling `/v1/embeddings` before the
+  `@BeforeEach` stubs exist. With `OFF` the in-memory store starts empty and `easy-rag-embeddings.json`
+  is neither read nor written; queries are still embedded at chat time, so those tests keep a
+  1536-dimension `/v1/embeddings` stub.
 - **Langfuse is not mocked.** `DriftDetectionOutputGuardrailTests`, `LangfuseDatasetSampleLoaderTests`
   and `LangfuseSessionScoringServiceTests` inject the real `LangfuseOperations` against the Langfuse
   dev service, creating and tearing down real datasets/items around each test. Their fixtures and

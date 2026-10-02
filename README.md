@@ -190,6 +190,10 @@ The two profiles differ in what else they touch:
   `http://localhost:11434/v1`. It stubs no API key and disables neither session scoring nor the
   startup initialization.
 
+Easy RAG caches the policy embeddings in `easy-rag-embeddings.json` in the project root and reuses
+them on every restart. OpenAI and Ollama embeddings have different sizes (1536 vs 1024 dimensions),
+so delete that file whenever you switch between the default profile and an Ollama profile.
+
 CI runs `./mvnw -B clean verify` across both profiles with only a stubbed
 `OPENAI_API_KEY: change-me`. That works because `verify` activates the `%test` profile, which is
 where `score-session: false` and `initialize-on-startup: false` come from — not from the Ollama

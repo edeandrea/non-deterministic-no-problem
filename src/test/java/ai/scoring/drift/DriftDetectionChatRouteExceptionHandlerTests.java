@@ -89,7 +89,8 @@ class DriftDetectionChatRouteExceptionHandlerTests {
 				.willReturn(okJson(OPENAI_RESPONSE))
 		);
 
-		// Easy RAG embeds the user query before the chat call; stub a zero vector so it has something to work with
+		// Easy RAG still embeds the user query before the chat call (against an empty store, since boot-time ingestion is
+		// off in the test profile); stub a zero vector so it has something to work with
 		var embeddingVector = IntStream.range(0, 1536)
 		                               .mapToObj(i -> "0.0")
 		                               .collect(Collectors.joining(",", "[", "]"));
@@ -153,6 +154,9 @@ class DriftDetectionChatRouteExceptionHandlerTests {
 				Map.entry("quarkus.langchain4j.openai.parasol-chat.base-url", WIREMOCK_URL),
 				Map.entry("quarkus.langchain4j.openai.session-sentiment.api-key", "changeme"),
 				Map.entry("quarkus.langchain4j.openai.judge.api-key", "changeme"),
+				// Boot-time Easy RAG ingestion would call /v1/embeddings before the @BeforeEach WireMock stubs exist, and the
+				// test must not depend on a cached easy-rag-embeddings.json. OFF also skips reading/writing that file.
+				Map.entry("quarkus.langchain4j.easy-rag.ingestion-strategy", "OFF"),
 				// Keep the rest of the scoring machinery out of the way; we're only interested in the chat route
 				Map.entry("quarkus.aiscoring.langfuse.evaluation.initialize-on-startup", "false"),
 				Map.entry("quarkus.aiscoring.langfuse.evaluation.session.score-session", "false"),
