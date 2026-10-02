@@ -26,6 +26,9 @@ Supporting docs:
   chat → tool → email), `continuous-scoring-architecture.puml` (single-container component view of
   the evaluation layer) and `continuous-scoring-sequence.puml` (the tier-2 session-scoring
   sequence).
+- `docs/design/email-claim-intake.md` — the **proposed** design for the email claim intake ([#216](https://github.com/edeandrea/non-deterministic-no-problem/issues/216)):
+  workflow, claim states and agent topology, with three diagrams (`docs/design/claim-intake-*.puml`).
+  None of it is implemented yet; don't describe it as existing code.
 - `images/arch.png` — the hand-drawn overview of the business flow, framed as "Code I write" vs
   "Is this code?", embedded at the top of README.md's Architecture section with
   `docs/application-flow.png` below it as the detailed complement. It is a **source-less raster**
@@ -72,7 +75,7 @@ java -Dquarkus.profile=ollama,prod -jar target/quarkus-app/quarkus-run.jar
 ### Diagrams
 
 ```bash
-# Re-render every docs/*.puml to a sibling PNG (pinned PlantUML, needs graphviz `dot`)
+# Re-render every docs/*.puml and docs/design/*.puml to a sibling PNG (pinned PlantUML, needs graphviz `dot`)
 ./docs/render-diagrams.sh
 ```
 
