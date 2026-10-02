@@ -234,6 +234,13 @@ Note the Cohere models are reached through the **OpenAI** extension pointed at
 `https://api.cohere.ai/compatibility/v1` with `COHERE_API_KEY` — there is no Cohere-specific
 extension in the build.
 
+Every base (non-profile) `quarkus.langchain4j.openai.<name>.chat-model` block sets `temperature` **and** `top-p`
+explicitly. That is deliberate. Since quarkus-langchain4j 1.14 the OpenAI extension leaves both
+out of the request unless they are configured, so the provider's own default applies. The
+explicit values keep the pre-1.14 wire behaviour (temperature `1.0` unless overridden, top-p `1.0`).
+Don't delete the `top-p: 1` lines because they look redundant. The `%ollama-openai` overrides
+inherit these values, because they only repoint `base-url` and `model-name`.
+
 There are **two separate judges**, which is easy to confuse:
 - The in-app `judge` model above, driving `EvaluatorAgent` → `Evaluator` for tier-3 drift detection.
 - The Langfuse-side LLM-as-a-Judge evaluator for tier 1, which runs inside Langfuse using **Google
