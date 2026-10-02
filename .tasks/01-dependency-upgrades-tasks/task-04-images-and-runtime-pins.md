@@ -9,7 +9,16 @@ versions recorded in the version inventory.
 
 ## What to Do
 
-- `src/main/kubernetes/dependencies.yml`: bump `postgres` and `grafana/otel-lgtm`. Leave `axllent/mailpit` (removed in issue 4).
+- Concrete changes from the inventory and the user's decisions:
+  - `grafana/otel-lgtm` 0.11.0 → 0.35.0 (`dependencies.yml:161`). Check its release notes for port, env var or volume-path changes that affect `dependencies.yml`.
+  - `postgres`: **keep** the floating `18` tag (user decision).
+  - Quinoa `node-version` 24.15.0 → latest 24.x LTS, re-verified at execution time. `npm-version` goes to the latest 11.x (11.21.0 at inventory time), staying on LTS and never npm 12.
+  - `clickhouse-operator-helm` 0.0.5 → 0.0.8 (`deploy-to-openshift.sh:25`).
+  - **pin** the Langfuse Helm chart to 2.1.3 (`deploy-to-openshift.sh:48`).
+  - cert-manager (commented-out line, `deploy-to-openshift.sh:12`) v1.20.2 → v1.21.2.
+  - PlantUML jar 1.2026.0 → 1.2026.8 (`docs/render-diagrams.sh:12`). Re-render `docs/*.puml` and compare the PNG dimensions with the old renders.
+  - UBI images, Dockerfile bases and CI actions are already latest: keep. Leave `.github/dependabot.yml` alone (user decision).
+- `src/main/kubernetes/dependencies.yml`: leave `axllent/mailpit` (removed in issue 4).
 - `src/main/resources/application.yml`: bump `quarkus.openshift.base-jvm-image`, and the Quinoa
   `node-version` / `npm-version` if newer LTS-compatible releases exist.
 - `src/main/docker/Dockerfile.jvm` and `Dockerfile.native`: bump the `FROM` base images.
@@ -22,6 +31,7 @@ versions recorded in the version inventory.
 - `src/main/kubernetes/dependencies.yml`, `src/main/resources/application.yml`
 - `src/main/docker/Dockerfile.jvm`, `src/main/docker/Dockerfile.native`
 - `.github/workflows/simple-build-test.yml`, `deploy-to-openshift.sh`, `langfuse-helm.values.yml`
+- `docs/render-diagrams.sh`, `docs/*.png`
 
 ## Key Points
 

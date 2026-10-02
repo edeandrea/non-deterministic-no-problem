@@ -14,6 +14,8 @@ Every document that states a version or depends on version-specific behaviour ma
   - Javadoc in `src/main/java`
   - Search terms: `1.13`, `3.40`, `quarkus-langchain4j`, `langchain4j 1.`, `Java 2`, `node`, image tags
 - Update anything the bumps made stale.
+- Known item: `CLAUDE.md:10` says Quarkus 3.39.3, but `pom.xml` has 3.40.1 (this predates #212; fix it here).
+- Task 02 found no doc that mentions quarkus-langchain4j or langchain4j versions.
 - If a release note changed behaviour this repo documents (e.g. guardrail retry semantics, chat-scope
   routing, span naming), update the affected `CLAUDE.md` Gotchas entry.
 - Leave `AGENTS.md` untouched. It holds the user's global rules and is deliberately untracked.

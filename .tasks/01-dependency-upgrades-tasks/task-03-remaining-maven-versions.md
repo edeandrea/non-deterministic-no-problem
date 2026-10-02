@@ -13,6 +13,12 @@ recorded in the version inventory.
   - Quarkus platform, quarkus-langfuse, quinoa, playwright, wiremock
   - assertj, the compiler, surefire and failsafe plugins
   - `os-maven-plugin`, `maven-dependency-plugin`
+- Concrete bumps from the inventory:
+  - Quinoa 2.9.0 → 2.9.2
+  - quarkus-playwright 2.3.8 → 2.3.10
+  - **pin** `maven-dependency-plugin` to 3.11.0 (currently unpinned; user decision)
+  - Maven distribution 3.9.16 → 3.10.0 in `.mvn/wrapper/maven-wrapper.properties`. The wrapper itself (3.3.4) is already the latest.
+- Every other Maven pin is already at latest stable (keep).
 - Skip the Mailpit versions; Mailpit is removed in issue 4.
 - If quarkus-langfuse has a newer release, read its release notes for changes to the
   `LangfuseOperations` layer before bumping. `ai.scoring` depends on it heavily.
@@ -21,7 +27,7 @@ recorded in the version inventory.
 
 ## Files/Areas
 
-- `pom.xml`
+- `pom.xml`, `.mvn/wrapper/maven-wrapper.properties`
 - Java sources only where a bump forces a change
 
 ## Key Points

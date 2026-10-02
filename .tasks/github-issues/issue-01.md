@@ -47,12 +47,12 @@ images → {{ISSUE_4}} GreenMail + Roundcube → {{ISSUE_5}} agentic email intak
 
 ## Tasks
 
-- [ ] **Version inventory:** every pin, with its current version, latest stable version and action (bump / keep / skip + reason)
-- [ ] Bump the quarkus-langchain4j BOM and handle any breaking changes
-- [ ] Bump the remaining Maven dependencies and plugins
-- [ ] Bump container images, runtime pins and CI actions
-- [ ] Update every doc that states a version (`README.md`, `CLAUDE.md`, `langfuse-evaluation.md`, `docs/`, `src/main/webui/README.md`)
-- [ ] **Verify:**
+- [x] **Version inventory:** every pin, with its current version, latest stable version and action (bump / keep / skip + reason)
+- [x] Bump the quarkus-langchain4j BOM and handle any breaking changes
+- [x] Bump the remaining Maven dependencies and plugins
+- [x] Bump container images, runtime pins and CI actions
+- [x] Update every doc that states a version (`README.md`, `CLAUDE.md`, `langfuse-evaluation.md`, `docs/`, `src/main/webui/README.md`)
+- [x] **Verify:** — _PR #219; agent checks, independent reviews and the maintainer's real-key runs passed_
   - `test-compile` under `-Pollama` and the default profile
   - an independent review
   - real-key `./mvnw verify` plus a dev-mode smoke test, run by the maintainer
