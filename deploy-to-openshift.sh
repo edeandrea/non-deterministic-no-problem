@@ -9,7 +9,7 @@ oc delete clusterrolebinding $(oc get clusterrolebinding -o name | grep langfuse
 ##################
 # Cert manager
 #helm install cert-manager oci://quay.io/jetstack/charts/cert-manager \
-#  --version v1.20.2 \
+#  --version v1.21.2 \
 #  --namespace cert-manager \
 #  --create-namespace \
 #  --set crds.enabled=true
@@ -22,7 +22,7 @@ oc delete clusterrolebinding $(oc get clusterrolebinding -o name | grep langfuse
 ##################
 # ClickHouse operator
 helm upgrade --install clickhouse-operator oci://ghcr.io/clickhouse/clickhouse-operator-helm \
-  --version 0.0.5 \
+  --version 0.0.8 \
   --namespace clickhouse-operator \
   --create-namespace \
   --rollback-on-failure \
@@ -45,7 +45,9 @@ oc secrets link default dockerhub-auth --for=pull
 # Need to helm install langfuse according to https://langfuse.com/self-hosting/deployment/kubernetes-helm#deploy-the-helm-chart
 helm repo add langfuse https://langfuse.github.io/langfuse-k8s
 helm repo update langfuse
-helm upgrade --install langfuse langfuse/langfuse -f langfuse-helm.values.yml
+helm upgrade --install langfuse langfuse/langfuse \
+  --version 2.1.3 \
+  -f langfuse-helm.values.yml
 
 oc delete secret parasol-app-creds || true
 oc create secret generic parasol-app-creds \

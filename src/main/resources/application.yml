@@ -94,29 +94,36 @@ quarkus:
         enabled: true
 
     # OpenAI
+    # temperature/top-p are set explicitly on every chat model because quarkus-langchain4j 1.14+ no longer sends
+    # them unless configured; these values preserve the pre-1.14 defaults (temperature 1.0, top-p 1.0)
     openai:
       api-key: "${OPENAI_API_KEY}"
       parasol-chat:
         chat-model:
           model-name: gpt-5-mini
           temperature: 1
+          top-p: 1
         timeout: 600s
         api-key: "${quarkus.langchain4j.openai.api-key}"
       generate-email:
         chat-model:
           model-name: gpt-5-mini
           temperature: 1
+          top-p: 1
         timeout: 600s
         api-key: "${quarkus.langchain4j.openai.api-key}"
       politeness:
         chat-model:
           model-name: gpt-5-mini
           temperature: 1
+          top-p: 1
         timeout: 600s
         api-key: "${quarkus.langchain4j.openai.api-key}"
       session-sentiment:
         chat-model:
           model-name: command-r7b-12-2024
+          temperature: 1
+          top-p: 1
         timeout: 600s
         api-key: "${COHERE_API_KEY}"
         base-url: https://api.cohere.ai/compatibility/v1
@@ -124,6 +131,7 @@ quarkus:
         chat-model:
           model-name: command-r7b-12-2024
           temperature: 0
+          top-p: 1
         timeout: 600s
         api-key: "${COHERE_API_KEY}"
         base-url: https://api.cohere.ai/compatibility/v1
@@ -192,8 +200,8 @@ quarkus:
     enable-spa-routing: true
     package-manager-install:
       ~: true
-      node-version: 24.15.0
-      npm-version: 11.12.1
+      node-version: 24.21.0
+      npm-version: 11.21.0
 
   # OpenAPI
   smallrye-openapi:

@@ -74,7 +74,7 @@ The full rationale, including which Langfuse platform gaps drove each tier, is i
 - **Java 25**
 - **Maven** — use the included wrapper (`./mvnw`); no separate install needed
 - **A container runtime** (Docker or Podman). The Quarkus extensions on the classpath start Dev
-  Services for PostgreSQL, Langfuse, Mailpit and LGTM (Grafana/Loki/Tempo/Mimir) automatically in
+  Services for PostgreSQL, Langfuse, Mailpit and LGTM (Grafana/Loki/Tempo/Prometheus) automatically in
   dev and test mode
 - **API keys**, depending on what you want to exercise:
 
@@ -189,6 +189,10 @@ The two profiles differ in what else they touch:
 - `%ollama-openai` keeps the OpenAI client and just repoints the same four at
   `http://localhost:11434/v1`. It stubs no API key and disables neither session scoring nor the
   startup initialization.
+
+Easy RAG caches the policy embeddings in `easy-rag-embeddings.json` in the project root and reuses
+them on every restart. OpenAI and Ollama embeddings have different sizes (1536 vs 1024 dimensions),
+so delete that file whenever you switch between the default profile and an Ollama profile.
 
 CI runs `./mvnw -B clean verify` across both profiles with only a stubbed
 `OPENAI_API_KEY: change-me`. That works because `verify` activates the `%test` profile, which is

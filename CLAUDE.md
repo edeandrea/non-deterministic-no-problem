@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **"Non-Deterministic? No Problem!"** is a demo application (Parasol Insurance) that shows how to
 test and continuously evaluate non-deterministic AI systems.
 
-It is a **single Quarkus application** (`org.parasol:parasol-app`, Java 25, Quarkus 3.39.3) with a React/PatternFly
+It is a **single Quarkus application** (`org.parasol:parasol-app`, Java 25, Quarkus 3.40.1) with a React/PatternFly
 frontend served via Quinoa. There are **no sub-modules** — one `pom.xml` at the root.
 
 The Java source is split into two top-level packages representing two distinct concerns:
@@ -234,6 +234,13 @@ Note the Cohere models are reached through the **OpenAI** extension pointed at
 `https://api.cohere.ai/compatibility/v1` with `COHERE_API_KEY` — there is no Cohere-specific
 extension in the build.
 
+Every base (non-profile) `quarkus.langchain4j.openai.<name>.chat-model` block sets `temperature` **and** `top-p`
+explicitly. That is deliberate. Since quarkus-langchain4j 1.14 the OpenAI extension leaves both
+out of the request unless they are configured, so the provider's own default applies. The
+explicit values keep the pre-1.14 wire behaviour (temperature `1.0` unless overridden, top-p `1.0`).
+Don't delete the `top-p: 1` lines because they look redundant. The `%ollama-openai` overrides
+inherit these values, because they only repoint `base-url` and `model-name`.
+
 There are **two separate judges**, which is easy to confuse:
 - The in-app `judge` model above, driving `EvaluatorAgent` → `Evaluator` for tier-3 drift detection.
 - The Langfuse-side LLM-as-a-Judge evaluator for tier 1, which runs inside Langfuse using **Google
@@ -241,6 +248,10 @@ There are **two separate judges**, which is easy to confuse:
   `LangfuseEvaluationInitializer` from `LangfuseConfig.Evaluation.Gemini`.
 
 Embeddings use the OpenAI embedding model by default (`quarkus.langchain4j.embedding-model`).
+Because `reuse-embeddings` is enabled, the ingested vectors are cached in `easy-rag-embeddings.json`
+(project root, gitignored) and reloaded on every restart. OpenAI (1536-dimension) and
+`snowflake-arctic-embed` (1024-dimension) vectors are incompatible, so delete that file when
+switching between the default and the Ollama profiles.
 
 The two Ollama profiles are **not** equivalent:
 - `%ollama` switches `parasol-chat`, `generate-email`, `politeness` and the embedding model to
@@ -292,7 +303,8 @@ because the Maven profile sets **two different Quarkus profiles**:
 
 ### Observability
 
-OpenTelemetry + Micrometer. Dev mode uses the LGTM dev service (Grafana/Loki/Tempo/Mimir).
+OpenTelemetry + Micrometer. Dev mode uses the LGTM dev service (Grafana/Loki/Tempo/Prometheus).
+The `grafana/otel-lgtm` image ships Prometheus as its metrics store, not Mimir, despite the "M" in LGTM.
 Traces are also exported to Langfuse via the `quarkus-langfuse` extension.
 
 ## Testing
@@ -323,6 +335,13 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   `http://localhost:${quarkus.wiremock.devservices.port}/v1`, then stubs the
   OpenAI-compatible `/chat/completions` endpoint. Stubs are registered programmatically in
   `@BeforeEach` — there is no `src/test/resources` directory.
+- **Easy RAG in WireMock-backed profiles:** a profile that repoints the default
+  `quarkus.langchain4j.openai.base-url` at WireMock (`DriftDetectionChatRouteExceptionHandlerTests`,
+  `LangfuseSessionScoringServiceTests`) also sets `quarkus.langchain4j.easy-rag.ingestion-strategy=OFF`.
+  Otherwise Easy RAG ingests the policy documents at boot, calling `/v1/embeddings` before the
+  `@BeforeEach` stubs exist. With `OFF` the in-memory store starts empty and `easy-rag-embeddings.json`
+  is neither read nor written; queries are still embedded at chat time, so those tests keep a
+  1536-dimension `/v1/embeddings` stub.
 - **Langfuse is not mocked.** `DriftDetectionOutputGuardrailTests`, `LangfuseDatasetSampleLoaderTests`
   and `LangfuseSessionScoringServiceTests` inject the real `LangfuseOperations` against the Langfuse
   dev service, creating and tearing down real datasets/items around each test. Their fixtures and
