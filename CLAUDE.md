@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **"Non-Deterministic? No Problem!"** is a demo application (Parasol Insurance) that shows how to
 test and continuously evaluate non-deterministic AI systems.
 
-It is a **single Quarkus application** (`org.parasol:parasol-app`, Java 25, Quarkus 3.39.3) with a React/PatternFly
+It is a **single Quarkus application** (`org.parasol:parasol-app`, Java 25, Quarkus 3.40.1) with a React/PatternFly
 frontend served via Quinoa. There are **no sub-modules** — one `pom.xml` at the root.
 
 The Java source is split into two top-level packages representing two distinct concerns:
@@ -299,7 +299,8 @@ because the Maven profile sets **two different Quarkus profiles**:
 
 ### Observability
 
-OpenTelemetry + Micrometer. Dev mode uses the LGTM dev service (Grafana/Loki/Tempo/Mimir).
+OpenTelemetry + Micrometer. Dev mode uses the LGTM dev service (Grafana/Loki/Tempo/Prometheus).
+The `grafana/otel-lgtm` image ships Prometheus as its metrics store, not Mimir, despite the "M" in LGTM.
 Traces are also exported to Langfuse via the `quarkus-langfuse` extension.
 
 ## Testing

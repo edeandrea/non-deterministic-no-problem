@@ -74,7 +74,7 @@ The full rationale, including which Langfuse platform gaps drove each tier, is i
 - **Java 25**
 - **Maven** — use the included wrapper (`./mvnw`); no separate install needed
 - **A container runtime** (Docker or Podman). The Quarkus extensions on the classpath start Dev
-  Services for PostgreSQL, Langfuse, Mailpit and LGTM (Grafana/Loki/Tempo/Mimir) automatically in
+  Services for PostgreSQL, Langfuse, Mailpit and LGTM (Grafana/Loki/Tempo/Prometheus) automatically in
   dev and test mode
 - **API keys**, depending on what you want to exercise:
 
