@@ -10,19 +10,19 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
 
-import org.parasol.claim.persistence.ClaimImageRepository;
+import org.parasol.claim.persistence.ClaimImagePersistence;
 
 /** REST endpoints for claim image metadata and binary content. */
 @Path("/api/db/claims/{id}/images")
 public class ClaimImageResource {
 	@Inject
-	ClaimImageRepository claimImageRepository;
+	ClaimImagePersistence claimImagePersistence;
 
 	/** Lists a claim's images without returning their binary content. */
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
 	public Response listImages(@PathParam("id") long claimId, @Context UriInfo uriInfo) {
-		var response = claimImageRepository.listForClaim(claimId)
+		var response = claimImagePersistence.listForClaim(claimId)
 			.map(images -> images.stream()
 				.map(image -> new ClaimImageMetadata(
 					image.id(),
@@ -43,7 +43,7 @@ public class ClaimImageResource {
 	@Path("/{imageId}")
 	@Produces(MediaType.WILDCARD)
 	public Response getImage(@PathParam("id") long claimId, @PathParam("imageId") long imageId, @Context UriInfo uriInfo) {
-		var image = claimImageRepository.findContentForClaim(claimId, imageId);
+		var image = claimImagePersistence.findContentForClaim(claimId, imageId);
 
 		var response = image
 			.map(foundImage -> Response.ok(foundImage.data())

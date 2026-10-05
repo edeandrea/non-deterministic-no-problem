@@ -9,7 +9,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 
 import org.parasol.claim.model.ClaimImageKind;
-import org.parasol.claim.persistence.ClaimImageRepository;
+import org.parasol.claim.persistence.ClaimImagePersistence;
 
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.StartupEvent;
@@ -31,10 +31,10 @@ public class ClaimImageSeeder {
 		new SeedImage(6L, "car6-processed.jpg", ClaimImageKind.PROCESSED)
 	);
 
-	private final ClaimImageRepository claimImageRepository;
+	private final ClaimImagePersistence claimImagePersistence;
 
-	ClaimImageSeeder(ClaimImageRepository claimImageRepository) {
-		this.claimImageRepository = claimImageRepository;
+	ClaimImageSeeder(ClaimImagePersistence claimImagePersistence) {
+		this.claimImagePersistence = claimImagePersistence;
 	}
 
 	void onStart(@Observes StartupEvent event) {
@@ -48,12 +48,12 @@ public class ClaimImageSeeder {
 	}
 
 	void seedImage(SeedImage seedImage) {
-		if (!claimImageRepository.claimExists(seedImage.claimId())) {
+		if (!claimImagePersistence.claimExists(seedImage.claimId())) {
 			Log.warnf("Skipping image %s because claim id %d was not found", seedImage.fileName(), seedImage.claimId());
 			return;
 		}
 
-		var result = claimImageRepository.storeSeedImageIfAbsent(
+		var result = claimImagePersistence.storeSeedImageIfAbsent(
 			seedImage.claimId(),
 			seedImage.kind(),
 			seedImage.fileName(),
@@ -61,10 +61,10 @@ public class ClaimImageSeeder {
 			readImage(seedImage.fileName())
 		);
 
-		if (result == ClaimImageRepository.SeedResult.CREATED) {
+		if (result == ClaimImagePersistence.SeedResult.CREATED) {
 			Log.infof("Seeded %s image %s for claim id %d", seedImage.kind(), seedImage.fileName(), seedImage.claimId());
 		}
-		else if (result == ClaimImageRepository.SeedResult.CLAIM_NOT_FOUND) {
+		else if (result == ClaimImagePersistence.SeedResult.CLAIM_NOT_FOUND) {
 			Log.warnf("Skipping image %s because claim id %d was not found", seedImage.fileName(), seedImage.claimId());
 		}
 	}

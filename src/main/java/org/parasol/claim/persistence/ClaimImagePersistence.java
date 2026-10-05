@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Optional;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
 import jakarta.persistence.Tuple;
 import jakarta.transaction.Transactional;
 
@@ -11,21 +13,22 @@ import org.parasol.claim.model.Claim;
 import org.parasol.claim.model.ClaimImage;
 import org.parasol.claim.model.ClaimImageKind;
 
-import io.quarkus.hibernate.orm.panache.PanacheRepository;
-
 @ApplicationScoped
 @Transactional
-public class ClaimImageRepository implements PanacheRepository<ClaimImage> {
+public class ClaimImagePersistence {
+	@Inject
+	EntityManager entityManager;
+
 	public boolean claimExists(long claimId) {
-		return Claim.<Claim>findByIdOptional(claimId).isPresent();
+		return entityManager.find(Claim.class, claimId) != null;
 	}
 
 	public Optional<List<ClaimImageSummary>> listForClaim(long claimId) {
-		if (Claim.<Claim>findByIdOptional(claimId).isEmpty()) {
+		if (entityManager.find(Claim.class, claimId) == null) {
 			return Optional.empty();
 		}
 
-		return Optional.of(getEntityManager()
+		return Optional.of(entityManager
 			.createQuery("""
 				select image.id as id, image.kind as kind, image.fileName as fileName, image.contentType as contentType
 				from ClaimImage image
@@ -45,9 +48,17 @@ public class ClaimImageRepository implements PanacheRepository<ClaimImage> {
 	}
 
 	public Optional<ClaimImageContent> findContentForClaim(long claimId, long imageId) {
-		return find("id = ?1 and claim.id = ?2", imageId, claimId)
-			.firstResultOptional()
-			.map(image -> new ClaimImageContent(image.data, image.contentType));
+		return entityManager.createQuery("""
+			select image.data as data, image.contentType as contentType
+			from ClaimImage image
+			where image.id = :imageId and image.claim.id = :claimId
+			""", Tuple.class)
+			.setParameter("imageId", imageId)
+			.setParameter("claimId", claimId)
+			.getResultList()
+			.stream()
+			.findFirst()
+			.map(image -> new ClaimImageContent(image.get("data", byte[].class), image.get("contentType", String.class)));
 	}
 
 	public ClaimImage storeImage(Claim claim, ClaimImageKind kind, String fileName, String contentType, byte[] data) {
@@ -57,22 +68,32 @@ public class ClaimImageRepository implements PanacheRepository<ClaimImage> {
 		image.fileName = fileName;
 		image.contentType = contentType;
 		image.data = data.clone();
-		persistAndFlush(image);
+		entityManager.persist(image);
+		entityManager.flush();
 
 		return image;
 	}
 
 	public SeedResult storeSeedImageIfAbsent(long claimId, ClaimImageKind kind, String fileName, String contentType, byte[] data) {
-		var claim = Claim.<Claim>findByIdOptional(claimId);
-		if (claim.isEmpty()) {
+		var claim = entityManager.find(Claim.class, claimId);
+		if (claim == null) {
 			return SeedResult.CLAIM_NOT_FOUND;
 		}
 
-		if (count("claim.id = ?1 and fileName = ?2 and kind = ?3", claimId, fileName, kind) > 0) {
+		var existingCount = entityManager.createQuery("""
+			select count(image)
+			from ClaimImage image
+			where image.claim.id = :claimId and image.fileName = :fileName and image.kind = :kind
+			""", Long.class)
+			.setParameter("claimId", claimId)
+			.setParameter("fileName", fileName)
+			.setParameter("kind", kind)
+			.getSingleResult();
+		if (existingCount > 0) {
 			return SeedResult.ALREADY_PRESENT;
 		}
 
-		storeImage(claim.orElseThrow(), kind, fileName, contentType, data);
+		storeImage(claim, kind, fileName, contentType, data);
 
 		return SeedResult.CREATED;
 	}
