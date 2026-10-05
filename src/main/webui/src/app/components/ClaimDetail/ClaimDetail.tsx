@@ -13,27 +13,43 @@ import { ImageCarousel } from '../ImageCarousel/ImageCarousel';
 
 interface ClaimProps { }
 
+interface ClaimImage {
+  id: number;
+  kind: 'ORIGINAL' | 'PROCESSED';
+  file_name: string;
+  content_type: string;
+  url: string;
+}
+
 const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
 
   // Claims data
   const { claim_id } = useParams<{ claim_id: string }>();
   const [claim, setClaim] = React.useState<any>({});
+  const [images, setImages] = React.useState<ClaimImage[]>([]);
 
   React.useEffect(() => {
+    setClaim({});
+    setImages([]);
+
     axios.get(config.backend_api_url + `/db/claims/${claim_id}`)
-      .then((response) => {
-        response.data.original_images = [{image_name: `images/original_car${claim_id}.jpg`, image_key: `src/app/assets/images/original_car${claim_id}.jpg`, claim_id: `${claim_id}`}];
-        response.data.processed_images = [{image_name: `images/car${claim_id}-processed.jpg`, image_key: `src/app/assets/images/car${claim_id}-processed.jpg`, claim_id: `${claim_id}`}];
-        //image_name, image_key, claim_id
-        console.log(`images for ${claim_id}`);
-        console.log(response.data);
-        setClaim(response.data);
-      })
+      .then((response) => setClaim(response.data))
       .catch(error => {
         console.error(error);
       });
 
+    axios.get(config.backend_api_url + `/db/claims/${claim_id}/images`)
+      .then((response) => setImages(response.data))
+      .catch(error => {
+        console.error(error);
+        setImages([]);
+      });
+
   }, [claim_id]);
+
+  const originalImages = images.filter(image => image.kind === 'ORIGINAL');
+  const processedImages = images.filter(image => image.kind === 'PROCESSED');
+  const displayImages = processedImages.length > 0 ? processedImages : originalImages;
 
   // Tabs control
   const [activeTabKey, setActiveTabKey] = React.useState<string | number>(0);
@@ -180,7 +196,9 @@ const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
                                 <Text component={TextVariants.h3}>Body:</Text>
                                 <div className='display-linebreak'>{claim.body}</div>
                                 <Text component={TextVariants.h3}>Attached images:</Text>
-                                {claim && claim.original_images && <Grid><GridItem span={4}><ImageCarousel images={claim.original_images} /></GridItem></Grid>}
+                                {originalImages.length > 0
+                                  ? <Grid><GridItem span={4}><ImageCarousel images={originalImages} /></GridItem></Grid>
+                                  : 'No images attached'}
                               </TextContent>
                             </AccordionContent>
                           </AccordionItem>
@@ -196,7 +214,7 @@ const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
           <GridItem span={4}>
             <Card isRounded={true} className='width-100'>
               <CardBody>
-                {(claim && claim.processed_images) ? <ImageCarousel images={claim.processed_images} /> : 'No images attached'}
+                {displayImages.length > 0 ? <ImageCarousel images={displayImages} /> : 'No images attached'}
               </CardBody>
             </Card>
           </GridItem>

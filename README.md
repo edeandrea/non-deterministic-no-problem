@@ -106,8 +106,9 @@ override `quarkus.http.port` anywhere, so it uses the Quarkus default of `8080` 
 run against port `8081` — the root `pom.xml` sets `BACKEND_API_URL=http://localhost:8081/api` for
 both surefire and failsafe.
 
-The only REST endpoints are `GET /api/db/claims` and `GET /api/db/claims/{id}`; everything else goes
-through the chat WebSocket.
+The claims REST API provides `GET /api/db/claims` and `GET /api/db/claims/{id}`. Claim images are
+available through `GET /api/db/claims/{id}/images` (metadata) and
+`GET /api/db/claims/{id}/images/{imageId}` (image bytes); chat goes through the chat WebSocket.
 
 Each claim has a numeric `id` and a separate claim number (`CLM` + 8 digits, e.g. `CLM01000000`). PostgreSQL
 generates the number from its own sequence on insert. Claims also have a category (`Single vehicle`,

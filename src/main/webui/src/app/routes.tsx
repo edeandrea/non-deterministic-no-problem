@@ -1,5 +1,4 @@
 import { NotFound } from '@app/components/NotFound/NotFound';
-import { OriginalApp } from '@app/components/OriginalApp/OriginalApp';
 import { useDocumentTitle } from '@app/utils/useDocumentTitle';
 import * as React from 'react';
 import { Redirect, Route, RouteComponentProps, Switch, useLocation } from 'react-router-dom';
@@ -104,13 +103,6 @@ const routes: AppRouteConfig[] = [
     label: 'Settings',
     path: '#',
     title: 'Settings'
-  },
-  {
-    component: OriginalApp,
-    exact: true,
-    label: 'Original App',
-    path: '/OriginalApp',
-    title: 'Original App',
   },
 ];
 

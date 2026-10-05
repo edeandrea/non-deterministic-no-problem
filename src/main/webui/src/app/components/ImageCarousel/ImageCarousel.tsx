@@ -1,11 +1,10 @@
-import config from '@app/config';
 import * as React from 'react';
 import ImageGallery from "react-image-gallery";
 
 
 interface Image {
-    image_name: string;
-    image_key: string;
+    file_name: string;
+    url: string;
 }
 
 interface ImageCarouselProps {
@@ -14,14 +13,13 @@ interface ImageCarouselProps {
 
 const ImageCarousel: React.FunctionComponent<ImageCarouselProps> = ({ images }) => {
     const transformedImages = images.map(image => ({
-        original: "/images/" + image.image_key,
-        thumbnail: "/images/" + image.image_key,
+        original: image.url,
+        thumbnail: image.url,
         thumbnailClass: "image-gallery-thumbnail",
         originalClass: "image-gallery-original",
-        originalAlt: image.image_key,
-        thumbnailAlt: image.image_key,
+        originalAlt: image.file_name,
+        thumbnailAlt: image.file_name,
     }));
-    console.log("transformed images: " + transformedImages);
     return (
         <ImageGallery items={transformedImages} />
     );

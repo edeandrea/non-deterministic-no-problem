@@ -21,8 +21,10 @@ The Java source is split into two top-level packages representing two distinct c
 
 | Package | Contents |
 |---|---|
-| `org.parasol.claim.model` | `Claim` (Panache entity, table `claims`), `ClaimCategory`, the `@ClaimNumber` / `ClaimNumberGenerator` claim-number generation, `UnknownClaimCategoryException` |
-| `org.parasol.claim.rest` | `ClaimResource` (`/api/db/claims`) |
+| `org.parasol.claim.model` | `Claim` (Panache entity, table `claims`), `ClaimImage` (table `claim_images`), `ClaimImageKind`, `ClaimCategory`, claim-number generation, `UnknownClaimCategoryException` |
+| `org.parasol.claim.rest` | `ClaimResource` (`/api/db/claims`), `ClaimImageResource` (`/api/db/claims/{id}/images`) |
+| `org.parasol.claim.service` | `ClaimImageService` (stores claim images for API and intake use) |
+| `org.parasol.claim.seed` | `ClaimImageSeeder` (seeds images for the six sample claims) |
 | `org.parasol.chat.ai` | `ClaimService` (the chat-bot AI service) |
 | `org.parasol.chat.model` | `ClaimBotQuery`, `ClaimBotQueryResponse` |
 | `org.parasol.notification.service` | `NotificationService` (the `updateClaimStatus` `@Tool`) |
@@ -151,7 +153,9 @@ email ones above plus `DriftDetectionOutputGuardrail`, `SessionSentimentGuardrai
 (Mailpit dev service in dev/test).
 
 **REST:** `ClaimResource` — `GET /api/db/claims`, `GET /api/db/claims/{id}` (Panache entities on
-PostgreSQL).
+PostgreSQL). `ClaimImageResource` — `GET /api/db/claims/{id}/images` returns image metadata and
+`GET /api/db/claims/{id}/images/{imageId}` returns the image bytes with their stored content type.
+Image-endpoint errors use RFC 9457 Problem Details (`application/problem+json`).
 
 **The `Claim` entity** (`org.parasol.claim.model`, table `claims`, JSON in snake_case via `@JsonNaming`):
 - **`id`** is the Panache numeric primary key (`claims_seq`). REST paths, UI routes, `ClaimBotQuery.claimId`
@@ -182,6 +186,8 @@ PostgreSQL).
 - **It omits `claim_number`,** so the column default numbers the rows in insert order (`CLM01000000` … `CLM01005045`).
 - **It uses the enum constant names** for `category`.
 - Dev/test load it by default; `%prod` / `%openshift` load it via `sql-load-script` under drop-and-create.
+- `ClaimImageSeeder` loads the 12 JPEGs from `src/main/resources/seed/claim-images/` into `claim_images`,
+  matching claims by their natural claim number.
 
 **Frontend:** React + TypeScript + PatternFly in `src/main/webui/src/app/`, SPA routing enabled.
 
@@ -499,6 +505,9 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
     hard-coding them.
 - **The number exists only after the insert is flushed.** `persist()` defers the insert, because Panache ids
   come from a pooled sequence. Use `persistAndFlush()` when the number is needed in the same transaction.
+- **The claim-image seeder runs at every application startup.** `%prod` / `%openshift` recreate the schema,
+  so the image table is empty and gets seeded again; the seeder only inserts when that table is empty,
+  looks claims up by claim number, and logs/skips a claim number that is missing.
 - **The claim-number sequence can't be a `@SequenceGenerator`** (spike-verified on Hibernate 7.4.9).
   - **A lone class-level one takes over the `PanacheEntity` id.** This follows the JPA 3.2 default-generator rule:
     there's no `claims_seq`, and ids come from the claim-number sequence.

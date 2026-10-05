@@ -87,6 +87,9 @@ shell variable or a `.env` file both work. The root [`pom.xml`](../../../pom.xml
   - `incident_date` (`YYYY-MM-DD`) and the optional `incident_time` (`HH:mm:ss`, left out when null) are formatted
     for display by [`formatIncident.ts`](./src/app/utils/formatIncident.ts). It parses them by hand rather than with
     `new Date(...)`, which treats a date-only string as UTC midnight and shows the previous day west of UTC.
+  `ClaimDetail` also gets `GET {backend_api_url}/db/claims/{id}/images`; its metadata includes the full
+  image URL used by `ImageCarousel`, which loads bytes from
+  `GET {backend_api_url}/db/claims/{id}/images/{imageId}`.
 * **Chat** — [`Chat.tsx`](./src/app/components/Chat/Chat.tsx) is a WebSocket, not REST. It derives the
   socket URL from the same config value by swapping the scheme and stripping the `/api` suffix:
 
