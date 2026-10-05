@@ -6,12 +6,17 @@ import static org.hamcrest.Matchers.blankOrNullString;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 import jakarta.ws.rs.core.Response.Status;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.parasol.claim.model.Claim;
+import org.parasol.claim.model.ClaimCategory;
 
 import io.quarkus.panache.mock.PanacheMock;
 import io.quarkus.test.junit.QuarkusTest;
@@ -94,17 +99,78 @@ class ClaimResourceTests {
 		PanacheMock.verifyNoMoreInteractions(Claim.class);
 	}
 
+	@ParameterizedTest
+	@EnumSource(ClaimCategory.class)
+	void categoryIsSerializedAsLabel(ClaimCategory category) {
+		var claim = createClaim();
+		claim.category = category;
+
+		PanacheMock.mock(Claim.class);
+		when(Claim.findById(1))
+			.thenReturn(claim);
+
+		var json = get("/api/db/claims/{id}", 1).then()
+			.statusCode(Status.OK.getStatusCode())
+			.contentType(ContentType.JSON)
+			.extract().jsonPath();
+
+		assertThat(json.getString("category"))
+			.isEqualTo(category.label());
+
+		assertThat(json.getObject(".", Claim.class))
+			.extracting(c -> c.category)
+			.isEqualTo(category);
+	}
+
+	@Test
+	void incidentDateAndTimeAreSerialized() {
+		PanacheMock.mock(Claim.class);
+		when(Claim.findById(1))
+			.thenReturn(createClaim());
+
+		var json = get("/api/db/claims/{id}", 1).then()
+			.statusCode(Status.OK.getStatusCode())
+			.contentType(ContentType.JSON)
+			.extract().jsonPath();
+
+		assertThat(json.getMap("."))
+			.containsEntry("incident_date", "1955-01-02")
+			.containsEntry("incident_time", "15:30:00")
+			.doesNotContainKeys("time", "claim_time");
+	}
+
+	@Test
+	void nullIncidentTimeIsOmitted() {
+		var claim = createClaim();
+		claim.incidentTime = null;
+
+		PanacheMock.mock(Claim.class);
+		when(Claim.findById(1))
+			.thenReturn(claim);
+
+		var json = get("/api/db/claims/{id}", 1).then()
+			.statusCode(Status.OK.getStatusCode())
+			.contentType(ContentType.JSON)
+			.extract().jsonPath();
+
+		assertThat(json.getMap("."))
+			.containsEntry("incident_date", "1955-01-02")
+			.doesNotContainKey("incident_time");
+	}
+
 	private static Claim createClaim() {
 		var claim = new Claim();
-		claim.claimNumber = "001";
-		claim.category = "Auto";
+		claim.claimNumber = "CLM01000000";
+		claim.category = ClaimCategory.OTHER;
 		claim.policyNumber = "123";
+		claim.inceptionDate = LocalDate.of(1954, 9, 30);
 		claim.clientName = "client";
 		claim.subject = "collision";
 		claim.body = "body";
 		claim.summary = "Car was damaged in accident";
 		claim.location = "driveway";
-		claim.time = "afternoon";
+		claim.incidentDate = LocalDate.of(1955, 1, 2);
+		claim.incidentTime = LocalTime.of(15, 30);
 		claim.sentiment = "Very bad";
 
 		return claim;

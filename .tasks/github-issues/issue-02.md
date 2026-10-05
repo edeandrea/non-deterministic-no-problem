@@ -30,7 +30,8 @@ prepares for email intake ({{ISSUE_5}}), and is useful on its own:
   - `summary` and `sentiment` stay at 5000 characters. {{ISSUE_5}} adds an output guardrail for them.
 - **Status:** `status` stays free text. The chat's status-update tool accepts arbitrary statuses.
 - **Seed data:** rewrite `import.sql`:
-  - the six claims get the first six sequence values
+  - the six claims get the first six sequence values (the INSERTs omit `claim_number`, so the column default assigns
+    them in insert order)
   - category enum names
   - typed incident date/time derived from each claim's email (e.g. Marty: `1955-01-02 15:30`)
   - `NULL` instead of `''`
@@ -38,18 +39,25 @@ prepares for email intake ({{ISSUE_5}}), and is useful on its own:
 
   Ids, names, bodies and statuses stay unchanged.
 
-## Spike first (open question)
+## Spike outcome (decided)
 
-Decide, with evidence from a throwaway test:
-- **How the number is generated:**
-  - database side: `@ColumnDefault("'CLM' || lpad(nextval('claim_number_seq')::text, 8, '0')")` + `@Generated(event = INSERT)`
-  - or Java side: a `@ValueGenerationType` backed by a `BeforeExecutionGenerator`
-- **How the sequence is created:** by Hibernate schema export under drop-and-create, or by `import.sql`
-  with `DROP SEQUENCE IF EXISTS` / `CREATE SEQUENCE`. The cluster database has a persistent volume, and
-  drop-and-create only drops objects Hibernate knows about.
-- **Two smaller checks:**
-  - confirm the DDL `Length.LONG32` produces on PostgreSQL
-  - confirm reflection-free Jackson serialization (enabled in `application.yml`) honours `@JsonValue` on enums
+Three throwaway spikes on Hibernate ORM 7.4.9 settled the generation approach. The details and evidence are in
+`.tasks/02-gh213-claim-data-model/PLAN.md`.
+- **Chosen:** a database column default, plus a small Hibernate generator that registers the sequence:
+  - `@ColumnDefault("'CLM' || lpad(nextval('claim_number_seq')::text, 8, '0')")`
+  - `@ClaimNumber`, a `@ValueGenerationType` for `ClaimNumberGenerator` (an `OnExecutionGenerator` +
+    `ExportableProducer`)
+- **How it works:**
+  - Inserts use `insert … returning claim_number`, and raw SQL inserts (including `import.sql`) are numbered too.
+  - Hibernate's drop-and-create owns the sequence: `start with 1000000 increment by 1009 maxvalue 99999999`.
+    `maxvalue` turns an 8-digit overflow into an error, instead of `lpad` silently truncating.
+- **Rejected:**
+  - A Java-side `BeforeExecutionGenerator`: it works, but needs a JDBC round trip and doesn't number raw SQL inserts.
+  - A `@SequenceGenerator` for the claim-number sequence: on its own it takes over the `PanacheEntity` id, and
+    with `PanacheEntityBase` an unused generator is never created.
+- **Smaller checks:**
+  - `Length.LONG32` produces `text`.
+  - Reflection-free Jackson honours `@JsonValue` / `@JsonCreator` on the enum.
 
 ## Tests
 
@@ -78,9 +86,8 @@ Decide, with evidence from a throwaway test:
 
 ## Tasks
 
-- [ ] Spike the claim-number generation approach
-- [ ] Rework the `Claim` entity, with tests
-- [ ] Rewrite the seed data
-- [ ] Update the UI (detail date/time, "Other" filter), with Playwright tests
-- [ ] Update the documentation
-- [ ] **Verify:** an independent review, then a real-key `./mvnw verify` by the maintainer
+- [x] Spike the claim-number generation approach
+- [x] Rework the `Claim` entity and rewrite the seed data, with tests
+- [x] Update the UI (detail date/time, "Other" filter), with Playwright tests
+- [x] Update the documentation
+- [x] **Verify:** an independent review, then a real-key `./mvnw verify` by the maintainer

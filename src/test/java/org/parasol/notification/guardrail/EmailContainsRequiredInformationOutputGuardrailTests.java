@@ -27,7 +27,7 @@ import io.quarkiverse.langchain4j.guardrails.NoopChatExecutor;
 @QuarkusTest
 class EmailContainsRequiredInformationOutputGuardrailTests {
 	private static final String JSON = "{\"subject\":\"This is a subject\",\"body\":\"%s\"}";
-	private static final String CLAIM_NUMBER = "CLM195501";
+	private static final String CLAIM_NUMBER = "CLM01000000";
 	private static final String CLAIM_STATUS = "denied";
 	private static final String CLIENT_NAME = "Marty McFly";
 	private static final String EMAIL_TEMPLATE = """

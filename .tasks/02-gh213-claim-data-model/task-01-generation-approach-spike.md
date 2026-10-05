@@ -39,7 +39,7 @@ on insert, and how that sequence is created in every environment.
 
 - Sequence: `INCREMENT BY 1009` (first prime above 1000; the user wanted an increment > 1000),
   starting at a value that keeps an 8-digit `CLM` number (e.g. `START WITH 1000000`). Record the
-  final start value and the resulting first six numbers; task 03 needs them for the seed data.
+  final start value and the resulting first six numbers; task 02 needs them for the seed data.
 - The cluster's PostgreSQL has a persistent volume. Hibernate's `drop-and-create` only drops objects
   it knows about, so an `import.sql`-created sequence must use `DROP SEQUENCE IF EXISTS` / `CREATE SEQUENCE`.
 - The numeric `id` stays the primary key (REST paths, UI routes, `ClaimBotQuery.claimId`, the
@@ -47,6 +47,6 @@ on insert, and how that sequence is created in every environment.
 
 ## Done When
 
-- [ ] `PLAN.md` names the chosen approach, the sequence DDL, and the first six generated claim numbers.
-- [ ] `PLAN.md` records the Hibernate version, the observed DDL for `Length.LONG32`, and whether reflection-free serialization honours `@JsonValue`.
-- [ ] No prototype code remains in the repository.
+- [x] `PLAN.md` names the chosen approach, the sequence DDL, and the first six generated claim numbers.
+- [x] `PLAN.md` records the Hibernate version, the observed DDL for `Length.LONG32`, and whether reflection-free serialization honours `@JsonValue`.
+- [x] No prototype code remains in the repository.

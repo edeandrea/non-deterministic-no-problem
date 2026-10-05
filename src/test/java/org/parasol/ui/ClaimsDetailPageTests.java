@@ -7,6 +7,8 @@ import java.time.Duration;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.parasol.claim.model.Claim;
 
 import io.quarkus.test.junit.QuarkusTest;
@@ -18,7 +20,7 @@ import com.microsoft.playwright.assertions.PlaywrightAssertions;
 import io.quarkiverse.quinoa.testing.QuinoaTestProfiles;
 
 @QuarkusTest
-@TestProfile(QuinoaTestProfiles.Enable.class)
+@TestProfile(QuinoaTestProfiles.EnableAndRunTests.class)
 public class ClaimsDetailPageTests extends PlaywrightTests {
 	@Test
 	void pageLoads() {
@@ -52,6 +54,22 @@ public class ClaimsDetailPageTests extends PlaywrightTests {
 
 		assertThat(getChatResponseText(page)).isNotNull().isPresent();
 		assertThat(getChatResponseLocator(page).count()).isGreaterThanOrEqualTo(2);
+	}
+
+	@ParameterizedTest(name = "[{index}] {arguments}")
+	@CsvSource(delimiter = '|', useHeadersInDisplayName = true, textBlock = """
+		CLAIM_ID | EXPECTED_DATE_AND_TIME
+		1        | January 2, 1955 at 3:30 PM
+		4        | February 3, 2024
+		6        | April 15, 2023 at 12:00 PM
+		""")
+	void showsIncidentDateAndTime(long claimId, String expectedDateAndTime) {
+		var claim = Claim.<Claim>findByIdOptional(claimId)
+			.orElseThrow(() -> new IllegalArgumentException("Seeded claim %d not found".formatted(claimId)));
+		var page = loadPage(claim, "%s_showsIncidentDateAndTime_%d".formatted(getClass().getSimpleName(), claimId));
+
+		PlaywrightAssertions.assertThat(page.getByTestId("incident-date-time"))
+			.hasText(expectedDateAndTime);
 	}
 
 	private static Optional<String> getChatResponseText(Page page) {

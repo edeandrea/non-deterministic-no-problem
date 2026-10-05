@@ -1,4 +1,4 @@
-# Task 04: Update the UI for the New Claim Fields
+# Task 03: Update the UI for the New Claim Fields
 
 **Type:** Code Modification
 
@@ -27,10 +27,10 @@ cover them.
 
 - The JSON property names come from the snake_case naming strategy on `Claim`.
 - `Chat.tsx` sends `inceptionDate` to the chat, not the incident date. Leave that as is.
-- Playwright tests need the Quinoa test profile (`QuinoaTestProfiles.Enable`) and a container runtime.
+- Playwright tests use the Quinoa test profile `QuinoaTestProfiles.EnableAndRunTests` (which also runs the Jest suite) and a container runtime.
 
 ## Done When
 
-- [ ] The detail page shows the incident date/time for a seeded claim, verified by an updated Playwright test.
-- [ ] The category filter offers "Other", and the list test asserts category labels.
-- [ ] `./mvnw -B clean package -DskipTests -Pollama` builds the frontend without errors.
+- [x] The detail page shows the incident date/time for a seeded claim, verified by an updated Playwright test.
+- [x] The category filter offers "Other", and the list test asserts category labels.
+- [x] `./mvnw -B clean package -DskipTests -Pollama` builds the frontend without errors.

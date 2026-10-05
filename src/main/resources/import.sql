@@ -1,5 +1,5 @@
-INSERT INTO claims(id, claim_number, inception_date, category, policy_number, client_name, email_address, subject, body, summary, location, claim_time, sentiment, status)
-    VALUES (1, 'CLM195501', '1954-09-30', 'Multiple vehicle', 'AC-987654321', 'Marty McFly', 'marty.mcfly@email.com','Claim for Recent Car Accident - Policy Number: AC-987654321', '
+INSERT INTO claims(id, inception_date, category, policy_number, client_name, email_address, subject, body, summary, location, incident_date, incident_time, sentiment, status)
+    VALUES (1, '1954-09-30', 'MULTIPLE_VEHICLE', 'AC-987654321', 'Marty McFly', 'marty.mcfly@email.com','Claim for Recent Car Accident - Policy Number: AC-987654321', '
     Dear Parasol Insurance,
 
     I hope this email finds you well. My name is Marty McFly, and I am writing to file a claim for a recent car accident that occurred on January 2nd, 1955, at approximately 3:30 PM. My policy number is AC-987654321.
@@ -35,13 +35,13 @@ INSERT INTO claims(id, claim_number, inception_date, category, policy_number, cl
     Marty has attached necessary documents, such as photos, a police report, and an estimate for repair costs, to his email. He requests prompt attention to the claim and is available at (916) 555-4385 or marty.mcfly@email.com for any additional information or documentation needed.
     ',
     'Intersection of Colima Road and Asuza Avenue in the city of Hill Valley',
-    'January 2nd, 1955, at approximately 3:30 PM',
+    '1955-01-02', '15:30',
     'The sender, Marty McFly, expresses a polite and professional tone in his email. He is respectful and detailed in his description of the car accident and the subsequent steps he took to file a claim. He requests prompt attention to the matter and provides all necessary documentation. Overall, his sentiment is one of being proactive and cooperative in the claims process.',
     'In Process'
     );
 
-INSERT INTO claims(id, claim_number, inception_date, category, policy_number, client_name, email_address, subject, body, summary, location, claim_time, sentiment, status)
-    VALUES (2, 'CLM202402','1954-09-30', 'Multiple vehicle', 'PT-567890', 'John T. Anderson', 'JAnderson@mail.com','Urgent: Unacceptable Delay and Lack of Communication Regarding Claim #XYZ789', '
+INSERT INTO claims(id, inception_date, category, policy_number, client_name, email_address, subject, body, summary, location, incident_date, incident_time, sentiment, status)
+    VALUES (2, '1954-09-30', 'MULTIPLE_VEHICLE', 'PT-567890', 'John T. Anderson', 'JAnderson@mail.com','Urgent: Unacceptable Delay and Lack of Communication Regarding Claim #XYZ789', '
     Dear Parasol Insurances,
 
     I am writing to express my extreme dissatisfaction with the appalling service I have received concerning my recent claim, reference number #XYZ789. The lack of communication and delayed response from your company is utterly unacceptable, and I demand immediate attention to rectify this matter.
@@ -68,12 +68,12 @@ INSERT INTO claims(id, claim_number, inception_date, category, policy_number, cl
     The text is a letter of complaint from John T. Anderson to Parasol Insurances regarding an unresolved car insurance claim, #XYZ789. The incident occurred on January 15, 2024, when Anderson''s vehicle was hit by another driver, Samantha Reynolds, who ran a red light. The accident caused significant damage to Anderson''s car, and he reported the claim immediately, providing all necessary details. However, he has experienced poor communication and a delayed response from Parasol Insurances. Anderson demands an explanation for the delay, transparency, and urgency in handling his claim. He threatens to escalate the matter to regulatory authorities and consider legal action if his concerns are not addressed promptly. Anderson requests a comprehensive update on the status of his claim within the next 48 hours.
     ',
     'Near the intersection of Maple Street and Oak Avenue in Rivertown',
-    'January 15, 2024, at approximately 3:45 PM',
+    '2024-01-15', '15:45',
     'The sender of this claim is expressing extreme dissatisfaction with the handling of their insurance claim by Parasol Insurances. They are frustrated with the lack of communication and the significant delay in processing their claim. The tone of the message is demanding and assertive, with the sender threatening to escalate the matter if their concerns are not addressed promptly.',
     'Processed'
     );
-INSERT INTO claims(id, claim_number, inception_date, category, policy_number, client_name, email_address, subject, body, summary, location, claim_time, sentiment, status)
-    VALUES (3, 'CLM502803', '1954-09-30', 'Multiple vehicle', 'AC-987654', 'Jane Doe', 'jane_doe@email.com','Urgent: Car Accident Claim Assistance Needed', '
+INSERT INTO claims(id, inception_date, category, policy_number, client_name, email_address, subject, body, summary, location, incident_date, incident_time, sentiment, status)
+    VALUES (3, '1954-09-30', 'MULTIPLE_VEHICLE', 'AC-987654', 'Jane Doe', 'jane_doe@email.com','Urgent: Car Accident Claim Assistance Needed', '
     Dear Parasol Inc.,
 
     I hope this email finds you well. I''m writing to, uh, inform you about, well, something that happened recently. It''s, um, about a car accident, and I''m not really sure how to, you know, go about all this. I''m kinda anxious and confused, to be honest.
@@ -97,15 +97,16 @@ INSERT INTO claims(id, claim_number, inception_date, category, policy_number, cl
     Jane Doe
     Policy Number: AC-987654
     ',
-    '',
-    '',
-    '',
-    '',
+    NULL,
+    NULL,
+    '2024-01-15', '15:30',
+    NULL,
     'New'
     );
 
-INSERT INTO claims(id, claim_number, inception_date, category, policy_number, client_name, email_address, subject, body, summary, location, claim_time, sentiment, status)
-    VALUES (4, 'CLM202415', '1954-09-30', 'Single vehicle', 'BK-5165426', 'Dominic Toretto', 'domt@email.com', 'Claim for Car Accident - Policy #: BK-5165426', '
+-- The email for claim 4 only says "last night", so the incident date is a chosen fixed date after the inception date and the time is unknown (NULL).
+INSERT INTO claims(id, inception_date, category, policy_number, client_name, email_address, subject, body, summary, location, incident_date, incident_time, sentiment, status)
+    VALUES (4, '1954-09-30', 'SINGLE_VEHICLE', 'BK-5165426', 'Dominic Toretto', 'domt@email.com', 'Claim for Car Accident - Policy #: BK-5165426', '
     Dear Parasol Insurance Team,
 
     I hope this email finds you well. I''m reaching out to file a claim regarding a recent incident involving my car, which is covered under my policy with Parasol. The accident occurred last night on the streets of Los Angeles, and I wanted to provide you with all the necessary details.
@@ -133,13 +134,13 @@ INSERT INTO claims(id, claim_number, inception_date, category, policy_number, cl
     ',
     'The email is from a customer named Dominic Toretto, requesting to file a claim for a car accident that occurred in Los Angeles. He describes the incident as involving a high-speed chase with another driver named Johnny Tran, who cut through traffic and caused Dominic to take evasive action. Dominic attempted to clear the truck by launching his car off a ramp but ended up crashing into a billboard, causing significant damage to the front end, shattered windows, and possibly a twisted chassis. The sender expresses confidence in Parasol''s ability to handle the claim efficiently due to their long-term loyalty as a customer. They ask for guidance on the next steps to take in the claims process.',
     'The event the claim is related to happened at the intersection of Sunset Boulevard and Vine Street in downtown Los Angeles.',
-    'The event described in the claim text occurred last night (no specific date mentioned) at an intersection in downtown Los Angeles, specifically at Sunset Boulevard and Vine Street. The exact time is not provided in the text.',
+    '2024-02-03', NULL,
     'The person sending the claim, identified as Dominic Toretto, expresses a positive sentiment towards Parasol Insurance and his expectation of them handling his claim efficiently. However, the tone of the email is also boastful and exaggerated, describing an unlikely series of events involving a car accident and a high-speed chase. Despite the unconventional circumstances, Dominic expresses confidence in Parasol''s ability to help him get his car repaired.',
     'Denied'
     );
 
-INSERT INTO claims(id, claim_number, inception_date, category, policy_number, client_name, email_address, subject, body, summary, location, claim_time, sentiment, status)
-    VALUES (5, 'CLM52125', '1954-09-30', 'Multiple vehicle', 'AC-418324', 'Saul Goodman', 'bettercallsaul@email.com', 'Where is My Money? Urgent Attention Needed for My Car Accident Claim', '
+INSERT INTO claims(id, inception_date, category, policy_number, client_name, email_address, subject, body, summary, location, incident_date, incident_time, sentiment, status)
+    VALUES (5, '1954-09-30', 'MULTIPLE_VEHICLE', 'AC-418324', 'Saul Goodman', 'bettercallsaul@email.com', 'Where is My Money? Urgent Attention Needed for My Car Accident Claim', '
     Dear Parasol Insurance Claims Department,
 
     I am absolutely *thrilled* (read: infuriated) to be writing yet another heartfelt missive to the void that is your customer service. My recent car accident claim has vanished into the ether, much like my patience and the professionalism I expected from your company. How about we resolve this before the next ice age?
@@ -160,13 +161,13 @@ INSERT INTO claims(id, claim_number, inception_date, category, policy_number, cl
     ',
     'The text is a letter from a customer named Saul Goodman to the Stoneheart Insurance Claims Department regarding an unresolved car accident claim. The incident occurred on March 28, 2023, at the intersection of 5th Avenue and Main St in Springfield, where Saul''s car was hit by another vehicle that ran a red light. He is frustrated with the lack of progress on his claim, which has been ongoing for over two weeks. Saul demands a thorough review and update within 24 hours, threatening further actions if his request is not met. He attaches relevant documents, including a police report, photos of the incident, and records of calls and emails, to support his claim.',
     'The event the claim is related to happened at the intersection of 5th Avenue and Main St in Springfield.',
-    'The car accident described in the text occurred on March 28, 2023, at around 4:15 PM.',
+    '2023-03-28', '16:15',
     'The sentiment of the person sending this claim is one of frustration and urgency. They are expressing dissatisfaction with the delay in processing their car accident claim and threatening further action if it is not resolved promptly.',
     'In Process'
     );
 
-INSERT INTO claims(id, claim_number, inception_date, category, policy_number, client_name, email_address, subject, body, summary, location, claim_time, sentiment, status)
-    VALUES (6, 'CLM605208', '1954-09-30', 'Multiple vehicle', 'AC-768901', 'Tyrion Lannister', 'tylannister@email.com', 'Urgent Claim Review Required: Collision in King''s Landing', '
+INSERT INTO claims(id, inception_date, category, policy_number, client_name, email_address, subject, body, summary, location, incident_date, incident_time, sentiment, status)
+    VALUES (6, '1954-09-30', 'MULTIPLE_VEHICLE', 'AC-768901', 'Tyrion Lannister', 'tylannister@email.com', 'Urgent Claim Review Required: Collision in King''s Landing', '
     Dear Parasol Insurance Claims Department,
 
     This correspondence is from Tyrion Lannister, currently not in a tavern but rather dealing with the aftermath of an unpleasant vehicular incident. As a man known for resolving conflicts, I find myself ironically embroiled in one that requires your immediate attention.
@@ -185,10 +186,10 @@ INSERT INTO claims(id, claim_number, inception_date, category, policy_number, cl
 
     Attach: Car Damage Photos, Eyewitness Accounts, Incident Report No. KL509
     ',
-    '',
-    '',
-    '',
-    '',
+    NULL,
+    NULL,
+    '2023-04-15', '12:00',
+    NULL,
     'New'
     );
 

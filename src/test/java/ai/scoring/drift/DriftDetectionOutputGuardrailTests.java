@@ -189,7 +189,11 @@ class DriftDetectionOutputGuardrailTests {
 			return Map.of(
 				"quarkus.langchain4j.openai.api-key", "changeme",
 				"quarkus.langchain4j.openai.session-sentiment.api-key", "changeme",
-				"quarkus.langchain4j.openai.judge.api-key", "changeme"
+				"quarkus.langchain4j.openai.judge.api-key", "changeme",
+				// Boot-time Easy RAG ingestion would call the embedding model with the stub key above (401 from OpenAI, or
+				// localhost:11434 under -Pollama-openai) unless a cached easy-rag-embeddings.json happens to exist. This test
+				// doesn't use RAG, and OFF also skips reading/writing that file.
+				"quarkus.langchain4j.easy-rag.ingestion-strategy", "OFF"
 			);
 		}
 	}
