@@ -21,7 +21,7 @@ The Java source is split into two top-level packages representing two distinct c
 
 | Package | Contents |
 |---|---|
-| `org.parasol.claim.model` | `Claim` (Panache entity, table `claims`) |
+| `org.parasol.claim.model` | `Claim` (Panache entity, table `claims`), `ClaimCategory`, the `@ClaimNumber` / `ClaimNumberGenerator` claim-number generation, `UnknownClaimCategoryException` |
 | `org.parasol.claim.rest` | `ClaimResource` (`/api/db/claims`) |
 | `org.parasol.chat.ai` | `ClaimService` (the chat-bot AI service) |
 | `org.parasol.chat.model` | `ClaimBotQuery`, `ClaimBotQueryResponse` |
@@ -105,6 +105,16 @@ npm run build   # production build into dist/
 
 Quinoa builds the frontend as part of the Maven build — you rarely need to run npm directly.
 
+The Jest suite also runs inside the Maven build. The Playwright test classes use
+`@TestProfile(QuinoaTestProfiles.EnableAndRunTests.class)` (`quarkus.quinoa.run-tests=true`), so Quinoa runs
+`npm test` before building the UI, and a failing Jest test fails the `@QuarkusTest` boot. Jest needs the
+`src/main/webui/__mocks__/` stubs for CSS and asset imports, and maps deep
+`@patternfly/react-icons/dist/esm/...` imports to the CommonJS `dist/js/...` build. `jest.config.js` doesn't
+transform `node_modules`, so Jest can't load the ES-module build. `app.test.tsx` renders the app under jsdom with
+no backend, so the axios `GET …/api/db/claims` errors in the Maven/Quinoa output are expected on a green run. The
+snapshot is taken synchronously right after `render(<App />)`, before the claims request settles, so the committed
+snapshot always shows an empty claims table; claim rendering is covered by the Playwright tests, not Jest.
+
 ### CI
 
 `.github/workflows/simple-build-test.yml` runs `./mvnw -B clean verify` on Java 25 across the
@@ -142,6 +152,36 @@ email ones above plus `DriftDetectionOutputGuardrail`, `SessionSentimentGuardrai
 
 **REST:** `ClaimResource` — `GET /api/db/claims`, `GET /api/db/claims/{id}` (Panache entities on
 PostgreSQL).
+
+**The `Claim` entity** (`org.parasol.claim.model`, table `claims`, JSON in snake_case via `@JsonNaming`):
+- **`id`** is the Panache numeric primary key (`claims_seq`). REST paths, UI routes, `ClaimBotQuery.claimId`
+  and the `NotificationService` tool all use it.
+- **`claimNumber`** is a separate `@NaturalId` (`CLM` + 8 digits, unique, not updatable). PostgreSQL
+  generates it on insert:
+  - **The column default** is `@ColumnDefault(ClaimNumberGenerator.COLUMN_DEFAULT)`, which is
+    `'CLM' || lpad(nextval('claim_number_seq')::text, 8, '0')`.
+  - **`@ClaimNumber`** is a `@ValueGenerationType` meta-annotation for `ClaimNumberGenerator`, which is an
+    `OnExecutionGenerator` + `ExportableProducer`. It leaves the column out of the `INSERT`, reads the value
+    back with `insert … returning claim_number`, and registers `claim_number_seq` (`start with 1000000
+    increment by 1009 maxvalue 99999999`) with Hibernate's schema management.
+  - **The first numbers** are `CLM01000000`, `CLM01001009`, `CLM01002018`, …; capacity is about 98,000 claims.
+  - **Lookup:** `Claim.findByClaimNumber(String)` returns `Optional<Claim>` via `session.find(..., KeyType.NATURAL)`.
+- **`category`** is a `ClaimCategory` enum (`SINGLE_VEHICLE`, `MULTIPLE_VEHICLE`, `THEFT`, `OTHER`).
+  - **Database:** stored as the constant name (`@Enumerated(STRING)`, so Hibernate adds a CHECK constraint).
+  - **JSON:** written as the display label ("Single vehicle", …, "Other") via `@JsonValue`.
+  - **Input:** `ClaimCategory.fromValue` (`@JsonCreator`) accepts a label or a constant name, ignoring case,
+    and throws `UnknownClaimCategoryException` otherwise.
+- **`incidentDate`** (`LocalDate`) and **`incidentTime`** (`LocalTime`, nullable) replaced the old free-text
+  `time` / `claim_time`. `ZonedDateTime` was rejected because claim emails rarely state a time zone.
+  The UI formats them with `src/main/webui/src/app/utils/formatIncident.ts`.
+- **Sizes:** `subject`, `body` and `location` are unbounded `text` (`Length.LONG32`; not `@Lob`, which
+  maps to `oid` on PostgreSQL). `summary` and `sentiment` stay `length = 5000`. `status` is free text.
+
+**Seed data:** `src/main/resources/import.sql` seeds six claims (ids 1–6) and ends with
+`ALTER SEQUENCE claims_seq RESTART WITH 7`.
+- **It omits `claim_number`,** so the column default numbers the rows in insert order (`CLM01000000` … `CLM01005045`).
+- **It uses the enum constant names** for `category`.
+- Dev/test load it by default; `%prod` / `%openshift` load it via `sql-load-script` under drop-and-create.
 
 **Frontend:** React + TypeScript + PatternFly in `src/main/webui/src/app/`, SPA routing enabled.
 
@@ -333,7 +373,8 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
 - REST Assured for REST; the websocket chat-routes client (`WebsocketChatRoutes.newClient(...)`)
   for chat tests (`ClaimWebsocketChatBotTests`).
 - Playwright E2E tests in `org.parasol.ui`, extending the `@WithPlaywright` `PlaywrightTests` base
-  class (records video to `target/playwright`).
+  class (records video to `target/playwright`). They use Quinoa's `EnableAndRunTests` profile, which
+  also runs the frontend Jest suite (see Frontend above).
 - `ai.scoring.it.DriftDetectionTests` is annotated with the custom meta-annotation
   `ai.scoring.it.DriftDetectionTest`, which combines `@QuarkusTest` with **four** independent
   enablement conditions, each carrying its own `disabledReason`:
@@ -359,6 +400,13 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   `@BeforeEach` stubs exist. With `OFF` the in-memory store starts empty and `easy-rag-embeddings.json`
   is neither read nor written; queries are still embedded at chat time, so those tests keep a
   1536-dimension `/v1/embeddings` stub.
+- **Easy RAG in stub-key profiles:** the `KeysTestProfile`s (`DriftDetectionOutputGuardrailTests`,
+  `LangfuseDatasetSampleLoaderTests`) set `ingestion-strategy=OFF` too. Under the default profile, boot-time
+  ingestion would call the real OpenAI embeddings API with the `changeme` stub key and fail startup with a
+  401 (`AuthenticationException`); under `-Pollama-openai` it would call an Ollama that may not be running.
+  Under the default profile it only ever passed when a cached `easy-rag-embeddings.json` let `reuse-embeddings`
+  skip ingestion.
+  Neither test uses RAG.
 - **Langfuse is not mocked.** `DriftDetectionOutputGuardrailTests`, `LangfuseDatasetSampleLoaderTests`
   and `LangfuseSessionScoringServiceTests` inject the real `LangfuseOperations` against the Langfuse
   dev service, creating and tearing down real datasets/items around each test. Their fixtures and
@@ -369,7 +417,7 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
 
 ## Conventions
 
-Beyond the global Java/Quarkus style rules in `AGENTS.md`, this repo specifically uses:
+Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo specifically uses:
 
 - **Tabs for indentation**, tab width 2, max line length 180 (see `.editorconfig`). Note
   `insert_final_newline = false`.
@@ -434,6 +482,38 @@ Beyond the global Java/Quarkus style rules in `AGENTS.md`, this repo specificall
   `observation-poll-interval`, `observation-max-wait-time`, `dataset-creation-max-wait-time`).
   If session scores go missing, tune
   these before suspecting the scorer.
+- **Never set `claim_number` on a claim that gets persisted: not in Java, SQL or seeds.** The only exceptions
+  are tests that deliberately exercise the constraint and clean up after themselves (see `ClaimTests`);
+  unpersisted fixtures such as the `PanacheMock` claim in `ClaimResourceTests` are fine.
+  - A value set on a new `Claim` is ignored.
+  - Changing it on a managed claim fails the whole flush (`HibernateException: An immutable natural
+    identifier … was altered`), so other changes in that transaction are lost too.
+  - In raw SQL, an explicit `NULL` violates NOT NULL (it isn't "use the default"), and a hand-picked value
+    can collide with a future `nextval`. Omit the column or write `DEFAULT`.
+- **Claim numbers have gaps and depend on insert order.** A rolled-back insert still uses up its `nextval`,
+  and tests advance the sequence too.
+  - Tests must assert only the format, uniqueness, or the 1009 step between two claims they created
+    themselves, never an absolute number.
+  - Tests must delete or roll back the claims they create. `ClaimsListPageTests` expects exactly six.
+  - Reordering or inserting seed rows renumbers the later seeds, so look claim numbers up instead of
+    hard-coding them.
+- **The number exists only after the insert is flushed.** `persist()` defers the insert, because Panache ids
+  come from a pooled sequence. Use `persistAndFlush()` when the number is needed in the same transaction.
+- **The claim-number sequence can't be a `@SequenceGenerator`** (spike-verified on Hibernate 7.4.9).
+  - **A lone class-level one takes over the `PanacheEntity` id.** This follows the JPA 3.2 default-generator rule:
+    there's no `claims_seq`, and ids come from the claim-number sequence.
+  - **With `PanacheEntityBase` and two generators,** the unused one is never created, so `CREATE TABLE` fails
+    on the column default.
+  - That's why `ClaimNumberGenerator` registers the sequence itself via `ExportableProducer`.
+  - **`@ColumnDefault` can't move onto `@ClaimNumber`:** it's `@Target({FIELD, METHOD})`, and Hibernate reads
+    it only directly from the field.
+- **`lpad` would silently truncate claim numbers past 8 digits.** The sequence's `maxvalue 99999999` turns
+  that into a `nextval: reached maximum value` error instead of wrong, colliding numbers. Don't drop it.
+- **`Claim` inserts aren't JDBC-batched.** Hibernate disables batching for entities with insert-generated
+  values. Claims arrive one at a time, so this doesn't matter.
+- **`ClaimTests` logs two expected WARNs on success.** `ARJUNA012125` with a stack trace comes from
+  `changingClaimNumberFailsTheFlush`, and `HHH000247` / `23505 duplicate key` from
+  `duplicateClaimNumberIsRejected`. Neither is a failure.
 - `NotificationService.sendEmail` deliberately moves the mailer onto `ForkJoinPool.commonPool()`
   with a 15s timeout — the reactive mailer blocks the calling (tool-execution) thread and deadlocks
   otherwise. Likewise `updateStatusIfFound` uses `QuarkusTransaction.joiningExisting()` because the

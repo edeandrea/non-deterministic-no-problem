@@ -1,4 +1,4 @@
-# Task 06: Verify the Data-Model Rework
+# Task 05: Verify the Data-Model Rework
 
 **Type:** Verification
 
@@ -36,5 +36,6 @@ reviewer finds no gaps between code, seed data and docs.
 
 ## Done When
 
-- [ ] Both `test-compile` runs succeed, and the listed suites pass (or fail only for documented secret reasons).
-- [ ] The fresh review has no unresolved BLOCKER or MAJOR findings.
+- [x] Both `test-compile` runs succeed, and the listed suites pass (or fail only for documented secret reasons).
+- [x] The fresh review has no unresolved BLOCKER or MAJOR findings.
+- [x] The maintainer's real-key `./mvnw -B clean verify` and manual UI check pass (confirmed 2026-10-05).

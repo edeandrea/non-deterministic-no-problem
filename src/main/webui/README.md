@@ -42,7 +42,7 @@ These are the scripts actually defined in [`package.json`](./package.json):
 | `start:dev` | webpack dev server (`webpack.dev.js`) |
 | `build` | production build into `dist` (runs `prebuild`: `type-check` + `clean`) |
 | `start` | serve an already-built `dist` with `sirv` on port 8080 |
-| `test`, `test:watch`, `test:coverage` | Jest test suite |
+| `test`, `test:watch`, `test:coverage` | Jest test suite (also run by the Maven build; see below) |
 | `lint` / `eslint` | ESLint over `./src/` |
 | `format` | Prettier over `./src/**/*.{tsx,ts}` |
 | `type-check` | `tsc --noEmit` |
@@ -50,6 +50,23 @@ These are the scripts actually defined in [`package.json`](./package.json):
 | `build:bundle-profile`, `bundle-profile:analyze` | bundle size analysis |
 | `clean` | `rimraf dist` |
 | `dr:surge` | `node dr-surge.js` (deploy-preview helper) |
+
+## Tests
+
+Jest tests live next to the code (`*.test.ts` / `*.test.tsx`).
+- **What they cover:** `src/app/app.test.tsx` renders the whole app against a snapshot in
+  `src/app/__snapshots__/`. `src/app/utils/formatIncident.test.ts` covers the incident date/time formatting.
+- **Run by Maven:** the Playwright `@QuarkusTest`s use Quinoa's `EnableAndRunTests` profile, so Quinoa runs
+  `npm test` during their build, and a failing Jest test fails the Maven test run.
+- **Config:** [`jest.config.js`](./jest.config.js) maps CSS and asset imports to the stubs in
+  [`__mocks__/`](./__mocks__). It also maps deep `@patternfly/react-icons/dist/esm/...` imports to the CommonJS
+  `dist/js/...` build, because Jest doesn't transform `node_modules`.
+- **Updating the snapshot:** after an intentional layout change, run `npx jest -u` and commit the updated snapshot.
+- **No backend under Jest:** `app.test.tsx` renders the app under jsdom with no backend, so the axios
+  `GET …/api/db/claims` errors in the `npm test` and Maven/Quinoa output are expected on a green run. The snapshot
+  is taken synchronously right after `render(<App />)`, before the claims request settles, so it always shows an
+  empty claims table: it checks the page structure (shell, filters, table headers), not claim rendering. Claim
+  rendering is covered by the Playwright tests in `src/test/java/org/parasol/ui/`.
 
 ## Talking to the backend
 
@@ -64,7 +81,12 @@ shell variable or a `.env` file both work. The root [`pom.xml`](../../../pom.xml
 `BACKEND_API_URL=http://localhost:8081/api` for the surefire and failsafe executions.
 
 * **REST** — `ClaimsList` and `ClaimDetail` call `GET {backend_api_url}/db/claims` and
-  `GET {backend_api_url}/db/claims/{id}` with axios.
+  `GET {backend_api_url}/db/claims/{id}` with axios. Claim JSON is snake_case:
+  - `category` is the display label ("Single vehicle", "Multiple vehicle", "Theft", "Other"), which is what the list's
+    category filter matches on.
+  - `incident_date` (`YYYY-MM-DD`) and the optional `incident_time` (`HH:mm:ss`, left out when null) are formatted
+    for display by [`formatIncident.ts`](./src/app/utils/formatIncident.ts). It parses them by hand rather than with
+    `new Date(...)`, which treats a date-only string as UTC midnight and shows the previous day west of UTC.
 * **Chat** — [`Chat.tsx`](./src/app/components/Chat/Chat.tsx) is a WebSocket, not REST. It derives the
   socket URL from the same config value by swapping the scheme and stripping the `/api` suffix:
 

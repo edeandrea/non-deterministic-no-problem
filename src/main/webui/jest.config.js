@@ -21,6 +21,9 @@ module.exports = {
   moduleNameMapper: {
     '\\.(css|less)$': '<rootDir>/__mocks__/styleMock.js',
     "\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$": "<rootDir>/__mocks__/fileMock.js",
+    // Deep icon imports use the ES-module build, which Jest can't load untransformed (node_modules isn't transformed);
+    // point Jest at the CommonJS build that ships alongside it. Webpack still bundles the ES-module build.
+    "^@patternfly/react-icons/dist/esm/(.*)$": "@patternfly/react-icons/dist/js/$1",
     "@app/(.*)": '<rootDir>/src/app/$1'
   },
 

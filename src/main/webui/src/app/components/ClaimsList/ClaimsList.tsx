@@ -155,7 +155,7 @@ const ClaimsList: React.FunctionComponent = () => {
                         <FormSelect
                             value={formSelectValueCategory}
                             onChange={onChangeCategory}
-                            aria-label="FormSelect Input"
+                            aria-label="Filter by category"
                             ouiaId="BasicFormSelectCategory"
                             className="claims-list-filter-select"
                         >
@@ -163,13 +163,14 @@ const ClaimsList: React.FunctionComponent = () => {
                             <FormSelectOption key={1} value="Single vehicle" label="Single vehicle" />
                             <FormSelectOption key={2} value="Multiple vehicle" label="Multiple vehicle" />
                             <FormSelectOption key={3} value="Theft" label="Theft" />
+                            <FormSelectOption key={4} value="Other" label="Other" />
                         </FormSelect>
                     </FlexItem>
                     <FlexItem>
                         <FormSelect
                             value={formSelectValueStatus}
                             onChange={onChangeStatus}
-                            aria-label="FormSelect Input"
+                            aria-label="Filter by status"
                             ouiaId="BasicFormSelectStatus"
                             className="claims-list-filter-select"
                         >

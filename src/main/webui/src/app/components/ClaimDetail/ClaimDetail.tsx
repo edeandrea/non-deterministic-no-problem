@@ -6,6 +6,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionToggle, Breadcrumb
 import axios from 'axios';
 import * as React from 'react';
 import { useParams } from 'react-router-dom';
+import { formatIncident } from '@app/utils/formatIncident';
 import { Chat } from '../Chat/Chat';
 import { ImageCarousel } from '../ImageCarousel/ImageCarousel';
 
@@ -128,7 +129,7 @@ const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
                           <GridItem span={11} className='padding-top-25'>
                             <TextContent>
                               <Text component={TextVariants.h3}>Date and time</Text>
-                              <Text>{claim.time ? claim.time : 'Not processed yet'}</Text>
+                              <Text data-testid='incident-date-time'>{formatIncident(claim.incident_date, claim.incident_time) ?? 'Not processed yet'}</Text>
                             </TextContent>
                           </GridItem>
                           <GridItem span={1} className='padding-top-25'>

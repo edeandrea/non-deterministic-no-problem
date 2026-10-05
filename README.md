@@ -109,6 +109,12 @@ both surefire and failsafe.
 The only REST endpoints are `GET /api/db/claims` and `GET /api/db/claims/{id}`; everything else goes
 through the chat WebSocket.
 
+Each claim has a numeric `id` and a separate claim number (`CLM` + 8 digits, e.g. `CLM01000000`). PostgreSQL
+generates the number from its own sequence on insert. Claims also have a category (`Single vehicle`,
+`Multiple vehicle`, `Theft` or `Other`) and a typed incident date with an optional time.
+`src/main/resources/import.sql` seeds six sample claims. See [CLAUDE.md](CLAUDE.md) for how the claim number
+is generated and the rules around it.
+
 # Langfuse integration
 
 Langfuse's own `LANGFUSE_INIT_*` environment variables cover only basic bootstrapping (org, project,
