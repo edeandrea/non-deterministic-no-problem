@@ -33,7 +33,7 @@ on insert, and how that sequence is created in every environment.
 ## Files/Areas
 
 - A throwaway test under `src/test/java` (deleted afterwards)
-- `src/main/java/org/parasol/model/claim/Claim.java` (read-only here)
+- `src/main/java/org/parasol/claim/model/Claim.java` (read-only here)
 
 ## Key Points
 

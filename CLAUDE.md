@@ -17,6 +17,23 @@ The Java source is split into two top-level packages representing two distinct c
 | `org.parasol` | The insurance claims business application (claims REST API, AI chat bot, email notification, guardrails) |
 | `ai.scoring` | The reusable AI-quality layer (Langfuse integration, session scoring, drift detection) |
 
+`org.parasol` is organised **by domain first, then by layer** inside each domain:
+
+| Package | Contents |
+|---|---|
+| `org.parasol.claim.model` | `Claim` (Panache entity, table `claims`) |
+| `org.parasol.claim.rest` | `ClaimResource` (`/api/db/claims`) |
+| `org.parasol.chat.ai` | `ClaimService` (the chat-bot AI service) |
+| `org.parasol.chat.model` | `ClaimBotQuery`, `ClaimBotQueryResponse` |
+| `org.parasol.notification.service` | `NotificationService` (the `updateClaimStatus` `@Tool`) |
+| `org.parasol.notification.ai` | `GenerateEmailService` |
+| `org.parasol.notification.model` | `Email`, `ClaimInfo` |
+| `org.parasol.notification.guardrail` | The four email output guardrails, their `GenerateEmailOutputGuardrail` base, `PolitenessService`, `StringUtils` |
+
+Dependencies point one way: `chat` → `notification` → `claim`. New features get their own domain
+package with the same kind of layer sub-packages (the planned email intake goes in
+`org.parasol.intake`). Test packages mirror main, plus the test-only `org.parasol.ui` for Playwright.
+
 Supporting docs:
 - `README.md` — build/run instructions, Ollama profiles, Langfuse integration notes
 - `langfuse-evaluation.md` — **the** design document: the three-tier evaluation strategy, Langfuse
@@ -358,9 +375,14 @@ Beyond the global Java/Quarkus style rules in `AGENTS.md`, this repo specificall
   `insert_final_newline = false`.
 - `io.quarkus.logging.Log` static methods (`Log.debugf`, `Log.warnf`) — no `Logger` fields.
 - `@ConfigMapping` interfaces with `@WithDefault` — not `@ConfigProperty` fields.
-- Constructor injection in `ai.scoring`; `org.parasol.ai.NotificationService` still uses `@Inject`
+- Constructor injection in `ai.scoring`; `org.parasol.notification.service.NotificationService` still uses `@Inject`
   fields (legacy — prefer constructor injection for new code).
 - Hand-written fluent builders (e.g. `DriftDetectionException.builder()`), records for value types.
+- **Moving a class to another package is safe; renaming an AI service interface or method is not.**
+  Langfuse dataset names are the AI service span name, `langchain4j.aiservices.<SimpleClassName>.<method>`.
+  Quarkus LangChain4j uses the simple interface name, `AiServiceDatasetSpanProcessor` and `ConversationExchange`
+  copy the span name, and `DriftDetectionOutputGuardrail` rebuilds it from the simple name. A rename
+  orphans the recorded datasets, and drift detection then passes silently.
 - `Optional` chains over null checks and guard-clause early returns.
 
 ## Gotchas

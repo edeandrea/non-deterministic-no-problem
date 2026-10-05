@@ -35,10 +35,10 @@ a category enum, and unbounded text columns. Cover every behaviour with tests.
 
 ## Files/Areas
 
-- `src/main/java/org/parasol/model/claim/Claim.java`
-- `src/main/java/org/parasol/model/claim/ClaimCategory.java` (new)
-- `src/main/java/org/parasol/model/claim/ClaimNumberGenerator.java` (new, if the Java-side approach was chosen)
-- `src/test/java/org/parasol/resources/ClaimResourceTests.java`, plus new entity/generator tests under `src/test/java/org/parasol/model/claim/`
+- `src/main/java/org/parasol/claim/model/Claim.java`
+- `src/main/java/org/parasol/claim/model/ClaimCategory.java` (new)
+- `src/main/java/org/parasol/claim/model/ClaimNumberGenerator.java` (new, if the Java-side approach was chosen)
+- `src/test/java/org/parasol/claim/rest/ClaimResourceTests.java`, plus new entity/generator tests under `src/test/java/org/parasol/claim/model/`
 
 ## Key Points
 

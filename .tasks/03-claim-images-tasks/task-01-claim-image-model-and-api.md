@@ -31,9 +31,9 @@ Store claim images in PostgreSQL and serve them over REST, with tests.
 
 ## Files/Areas
 
-- `src/main/java/org/parasol/model/claim/ClaimImage.java`, `ClaimImageKind.java` (new)
-- `src/main/java/org/parasol/resources/ClaimImageResource.java` (new), or new methods on `ClaimResource`
-- `src/test/java/org/parasol/resources/` (new tests)
+- `src/main/java/org/parasol/claim/model/ClaimImage.java`, `ClaimImageKind.java` (new)
+- `src/main/java/org/parasol/claim/rest/ClaimImageResource.java` (new), or new methods on `ClaimResource`
+- `src/test/java/org/parasol/claim/rest/` (new tests)
 
 ## Key Points
 

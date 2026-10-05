@@ -151,7 +151,7 @@ with the resumed run's `ReviewReady` or `ReviewNeedsInformation` outcome:
 ## Files/Areas
 
 - `src/main/java/org/parasol/intake/ClaimEmailProcessor.java` and supporting classes (new)
-- `src/main/java/org/parasol/model/claim/Claim.java` (`sourceMessageId`, requested items, `intakeConversationId`), a `ClaimCorrespondence` entity
+- `src/main/java/org/parasol/claim/model/Claim.java` (`sourceMessageId`, requested items, `intakeConversationId`), a `ClaimCorrespondence` entity
 - `src/test/java/org/parasol/intake/` (new integration tests)
 
 ## Key Points

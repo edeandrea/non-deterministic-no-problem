@@ -23,6 +23,11 @@ because step 1 bumps the `grafana/otel-lgtm` image).
 with the LLM email classifier (body in `github-issues/issue-07-decision-model-spike.md`; a follow-up
 to step 5, blocked by step 5 and by a quarkus-langchain4j release that ships `quarkus-langchain4j-typesafe`).
 
+**Related, not part of the five-step order:** #222 Repackage `org.parasol` by domain, with layer
+sub-packages (body in `github-issues/issue-08-repackage-by-domain.md`). Housekeeping done before steps 2 and 4,
+which it blocks, so the new classes in steps 2–5 land in the domain-first layout
+(`org.parasol.claim`, `org.parasol.chat`, `org.parasol.notification`, `org.parasol.intake`).
+
 ## Draft issue bodies (for filing on GitHub)
 
 Titles and first lines must not contain closing keywords (`close`, `fix`, `resolve` and their forms);

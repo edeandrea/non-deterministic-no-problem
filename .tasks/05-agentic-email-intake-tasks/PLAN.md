@@ -74,6 +74,7 @@ Edit or create task files and update `## Task Plan`.
 
 ### Overview
 Code in a new package `org.parasol.intake` (with `agent`, `mailbox`, `reply` and `review` sub-packages).
+This follows the domain-first layout of the existing code (`org.parasol.claim`, `org.parasol.chat`, `org.parasol.notification`).
 The existing chat (`ClaimService`, chat scopes, `NotificationService`) stays unchanged.
 
 ```
