@@ -510,8 +510,8 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
 - **The number exists only after the insert is flushed.** `persist()` defers the insert, because Panache ids
   come from a pooled sequence. Use `persistAndFlush()` when the number is needed in the same transaction.
 - **The claim-image seeder runs at every application startup.** `%prod` / `%openshift` recreate the schema,
-  so the image table is empty and gets seeded again; the seeder only inserts when that table is empty,
-  looks claims up by claim number, and logs/skips a claim number that is missing.
+  so the image table is empty and gets seeded again. It looks claims up by claim number, inserts only
+  missing configured images, and logs/skips a claim number that is missing; rerunning it does not add duplicates.
 - **The claim-number sequence can't be a `@SequenceGenerator`** (spike-verified on Hibernate 7.4.9).
   - **A lone class-level one takes over the `PanacheEntity` id.** This follows the JPA 3.2 default-generator rule:
     there's no `claims_seq`, and ids come from the claim-number sequence.

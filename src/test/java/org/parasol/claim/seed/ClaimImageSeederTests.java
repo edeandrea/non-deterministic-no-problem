@@ -51,6 +51,19 @@ class ClaimImageSeederTests {
 	}
 
 	@Test
+	void seedsMissingImagesWhenTheTableIsNotEmpty() {
+		QuarkusTransaction.requiringNew().run(() -> ClaimImage.delete("fileName", "original_car1.jpg"));
+
+		assertThat(ClaimImage.count())
+			.isEqualTo(11);
+
+		QuarkusTransaction.requiringNew().run(claimImageSeeder::seedImages);
+
+		assertThat(ClaimImage.count())
+			.isEqualTo(12);
+	}
+
+	@Test
 	void missingClaimIsSkipped() {
 		var countBefore = ClaimImage.count();
 

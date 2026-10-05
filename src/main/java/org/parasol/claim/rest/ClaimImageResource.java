@@ -1,5 +1,6 @@
 package org.parasol.claim.rest;
 
+import jakarta.persistence.Tuple;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
@@ -11,6 +12,7 @@ import jakarta.ws.rs.core.UriInfo;
 
 import org.parasol.claim.model.Claim;
 import org.parasol.claim.model.ClaimImage;
+import org.parasol.claim.model.ClaimImageKind;
 
 /** REST endpoints for claim image metadata and binary content. */
 @Path("/api/db/claims/{id}/images")
@@ -21,15 +23,27 @@ public class ClaimImageResource {
 	public Response listImages(@PathParam("id") long claimId, @Context UriInfo uriInfo) {
 		var claim = Claim.<Claim>findByIdOptional(claimId);
 		var response = claim
-			.map(foundClaim -> ClaimImage.<ClaimImage>list("claim.id = ?1 order by createdAt, id", foundClaim.id)
+			.map(foundClaim -> ClaimImage.getEntityManager()
+				.createQuery("""
+					select image.id as id, image.kind as kind, image.fileName as fileName, image.contentType as contentType
+					from ClaimImage image
+					where image.claim.id = :claimId
+					order by image.createdAt, image.id
+					""", Tuple.class)
+				.setParameter("claimId", foundClaim.id)
+				.getResultList()
 				.stream()
-				.map(image -> new ClaimImageMetadata(
-					image.id,
-					image.kind,
-					image.fileName,
-					image.contentType,
-					uriInfo.getAbsolutePathBuilder().path(Long.toString(image.id)).build().toString()
-				))
+				.map(image -> {
+					var imageId = image.get("id", Long.class);
+
+					return new ClaimImageMetadata(
+						imageId,
+						image.get("kind", ClaimImageKind.class),
+						image.get("fileName", String.class),
+						image.get("contentType", String.class),
+						uriInfo.getAbsolutePathBuilder().path(imageId.toString()).build().toString()
+					);
+				})
 				.toList())
 			.<Response>map(images -> Response.ok(images).build())
 			.orElseGet(() -> notFound(uriInfo, "Claim %d was not found".formatted(claimId)));

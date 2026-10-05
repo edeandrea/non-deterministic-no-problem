@@ -46,10 +46,8 @@ public class ClaimImageSeeder {
 	}
 
 	void seedImages() {
-		if (ClaimImage.count() == 0) {
-			for (var seedImage : SEED_IMAGES) {
-				seedImage(seedImage);
-			}
+		for (var seedImage : SEED_IMAGES) {
+			seedImage(seedImage);
 		}
 	}
 
@@ -57,15 +55,17 @@ public class ClaimImageSeeder {
 		Claim.findByClaimNumber(seedImage.claimNumber())
 			.ifPresentOrElse(
 				claim -> {
-					var data = readImage(seedImage.fileName());
-					claimImageService.storeImage(
-						claim,
-						seedImage.kind(),
-						seedImage.fileName(),
-						"image/jpeg",
-						data
-					);
-					Log.infof("Seeded %s image %s for claim %s", seedImage.kind(), seedImage.fileName(), seedImage.claimNumber());
+					if (ClaimImage.count("claim.id = ?1 and fileName = ?2 and kind = ?3", claim.id, seedImage.fileName(), seedImage.kind()) == 0) {
+						var data = readImage(seedImage.fileName());
+						claimImageService.storeImage(
+							claim,
+							seedImage.kind(),
+							seedImage.fileName(),
+							"image/jpeg",
+							data
+						);
+						Log.infof("Seeded %s image %s for claim %s", seedImage.kind(), seedImage.fileName(), seedImage.claimNumber());
+					}
 				},
 				() -> Log.warnf("Skipping image %s because claim %s was not found", seedImage.fileName(), seedImage.claimNumber())
 			);
