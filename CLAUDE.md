@@ -23,7 +23,7 @@ The Java source is split into two top-level packages representing two distinct c
 |---|---|
 | `org.parasol.claim.model` | `Claim` (Panache entity, table `claims`), `ClaimImage` (table `claim_images`), `ClaimImageKind`, `ClaimCategory`, claim-number generation, `UnknownClaimCategoryException` |
 | `org.parasol.claim.rest` | `ClaimResource` (`/api/db/claims`), `ClaimImageResource` (`/api/db/claims/{id}/images`) |
-| `org.parasol.claim.service` | `ClaimImageService` (stores claim images for API and intake use) |
+| `org.parasol.claim.persistence` | `ClaimImageRepository` (claim image queries and writes) |
 | `org.parasol.claim.seed` | `ClaimImageSeeder` (seeds images for the six sample claims) |
 | `org.parasol.chat.ai` | `ClaimService` (the chat-bot AI service) |
 | `org.parasol.chat.model` | `ClaimBotQuery`, `ClaimBotQueryResponse` |
@@ -187,11 +187,15 @@ Image-endpoint errors use RFC 9457 Problem Details (`application/problem+json`).
 - **It uses the enum constant names** for `category`.
 - Dev/test load it by default; `%prod` / `%openshift` load it via `sql-load-script` under drop-and-create.
 - `ClaimImageSeeder` loads the 12 JPEGs from `src/main/resources/seed/claim-images/` into `claim_images`,
-  matching claims by their natural claim number.
+  matching the six sample claims by their explicit IDs (1–6), not their generated claim numbers.
 
 **Claim images:** `ClaimImage` links to `Claim.id`; `kind` is `ORIGINAL` (customer photo) or `PROCESSED`
-(annotated damage image). Image bytes use PostgreSQL `bytea` (`byte[]`, not `@Lob`/`oid`). New claims
-do not receive processed images automatically; intake code can use `ClaimImageService.storeImage`.
+(annotated damage image). Image bytes use PostgreSQL `bytea` (`byte[]`, not `@Lob`/`oid`); Hibernate's
+standard mapping is used without a database-specific column definition. `ClaimImageRepository` owns the
+image queries and writes. `GET /api/db/claims/{id}/images` returns metadata and image URLs;
+`GET /api/db/claims/{id}/images/{imageId}` returns the bytes with their stored content type. Both
+endpoints return RFC 9457 Problem Details for missing resources. New claims do not receive processed
+images automatically; intake code can store images through `ClaimImageRepository.storeImage`.
 
 **Frontend:** React + TypeScript + PatternFly in `src/main/webui/src/app/`, SPA routing enabled.
 
@@ -510,8 +514,9 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
 - **The number exists only after the insert is flushed.** `persist()` defers the insert, because Panache ids
   come from a pooled sequence. Use `persistAndFlush()` when the number is needed in the same transaction.
 - **The claim-image seeder runs at every application startup.** `%prod` / `%openshift` recreate the schema,
-  so the image table is empty and gets seeded again. It looks claims up by claim number, inserts only
-  missing configured images, and logs/skips a claim number that is missing; rerunning it does not add duplicates.
+  so the image table is empty and gets seeded again. It looks seeded claims up by their explicit IDs in
+  `import.sql`, inserts only missing configured images, and logs/skips a claim ID that is missing;
+  rerunning it does not add duplicates. Keep those IDs aligned if the sample seed claims change.
 - **The claim-number sequence can't be a `@SequenceGenerator`** (spike-verified on Hibernate 7.4.9).
   - **A lone class-level one takes over the `PanacheEntity` id.** This follows the JPA 3.2 default-generator rule:
     there's no `claims_seq`, and ids come from the claim-number sequence.

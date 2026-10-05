@@ -28,9 +28,7 @@ class ClaimImageSeederTests {
 
 		assertThat(SEEDED_CLAIM_IDS)
 			.allSatisfy(claimId -> {
-				var claim = Claim.<Claim>findByIdOptional(claimId)
-					.map(seedClaim -> Claim.findByClaimNumber(seedClaim.claimNumber).orElseThrow())
-					.orElseThrow();
+				var claim = Claim.<Claim>findByIdOptional(claimId).orElseThrow();
 
 				assertThat(ClaimImage.<ClaimImage>list("claim.id = ?1 and kind = ?2", claim.id, ClaimImageKind.ORIGINAL))
 					.hasSize(1);
@@ -68,7 +66,7 @@ class ClaimImageSeederTests {
 		var countBefore = ClaimImage.count();
 
 		QuarkusTransaction.requiringNew().run(() ->
-			claimImageSeeder.seedImage(new ClaimImageSeeder.SeedImage("CLM99999999", "missing.jpg", ClaimImageKind.ORIGINAL))
+			claimImageSeeder.seedImage(new ClaimImageSeeder.SeedImage(9_999_999L, "missing.jpg", ClaimImageKind.ORIGINAL))
 		);
 
 		assertThat(ClaimImage.count())

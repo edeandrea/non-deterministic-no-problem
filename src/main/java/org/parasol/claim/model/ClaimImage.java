@@ -32,7 +32,7 @@ public class ClaimImage extends PanacheEntity {
 	@Column(nullable = false)
 	public String contentType;
 
-	@Column(nullable = false, columnDefinition = "bytea")
+	@Column(nullable = false)
 	public byte[] data;
 
 	@CreationTimestamp

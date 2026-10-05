@@ -1,6 +1,6 @@
 package org.parasol.claim.rest;
 
-import jakarta.persistence.Tuple;
+import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
@@ -10,40 +10,27 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
 
-import org.parasol.claim.model.Claim;
-import org.parasol.claim.model.ClaimImage;
-import org.parasol.claim.model.ClaimImageKind;
+import org.parasol.claim.persistence.ClaimImageRepository;
 
 /** REST endpoints for claim image metadata and binary content. */
 @Path("/api/db/claims/{id}/images")
 public class ClaimImageResource {
+	@Inject
+	ClaimImageRepository claimImageRepository;
+
 	/** Lists a claim's images without returning their binary content. */
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
 	public Response listImages(@PathParam("id") long claimId, @Context UriInfo uriInfo) {
-		var claim = Claim.<Claim>findByIdOptional(claimId);
-		var response = claim
-			.map(foundClaim -> ClaimImage.getEntityManager()
-				.createQuery("""
-					select image.id as id, image.kind as kind, image.fileName as fileName, image.contentType as contentType
-					from ClaimImage image
-					where image.claim.id = :claimId
-					order by image.createdAt, image.id
-					""", Tuple.class)
-				.setParameter("claimId", foundClaim.id)
-				.getResultList()
-				.stream()
-				.map(image -> {
-					var imageId = image.get("id", Long.class);
-
-					return new ClaimImageMetadata(
-						imageId,
-						image.get("kind", ClaimImageKind.class),
-						image.get("fileName", String.class),
-						image.get("contentType", String.class),
-						uriInfo.getAbsolutePathBuilder().path(imageId.toString()).build().toString()
-					);
-				})
+		var response = claimImageRepository.listForClaim(claimId)
+			.map(images -> images.stream()
+				.map(image -> new ClaimImageMetadata(
+					image.id(),
+					image.kind(),
+					image.fileName(),
+					image.contentType(),
+					uriInfo.getAbsolutePathBuilder().path(Long.toString(image.id())).build().toString()
+				))
 				.toList())
 			.<Response>map(images -> Response.ok(images).build())
 			.orElseGet(() -> notFound(uriInfo, "Claim %d was not found".formatted(claimId)));
@@ -56,12 +43,11 @@ public class ClaimImageResource {
 	@Path("/{imageId}")
 	@Produces(MediaType.WILDCARD)
 	public Response getImage(@PathParam("id") long claimId, @PathParam("imageId") long imageId, @Context UriInfo uriInfo) {
-		var image = ClaimImage.<ClaimImage>find("id = ?1 and claim.id = ?2", imageId, claimId)
-			.firstResultOptional();
+		var image = claimImageRepository.findContentForClaim(claimId, imageId);
 
 		var response = image
-			.map(foundImage -> Response.ok(foundImage.data)
-				.type(foundImage.contentType)
+			.map(foundImage -> Response.ok(foundImage.data())
+				.type(foundImage.contentType())
 				.header("X-Content-Type-Options", "nosniff")
 				.build())
 			.orElseGet(() -> notFound(uriInfo, "Image %d was not found for claim %d".formatted(imageId, claimId)));

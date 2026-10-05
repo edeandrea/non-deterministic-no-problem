@@ -15,9 +15,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.parasol.claim.model.Claim;
 import org.parasol.claim.model.ClaimCategory;
-import org.parasol.claim.model.ClaimImage;
 import org.parasol.claim.model.ClaimImageKind;
-import org.parasol.claim.service.ClaimImageService;
+import org.parasol.claim.persistence.ClaimImageRepository;
 
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
@@ -27,7 +26,7 @@ class ClaimImageResourceTests {
 	private static final byte[] IMAGE_DATA = { 0, 1, 2, 3, (byte) 255 };
 
 	@Inject
-	ClaimImageService claimImageService;
+	ClaimImageRepository claimImageRepository;
 
 	private long claimId;
 	private long otherClaimId;
@@ -40,10 +39,10 @@ class ClaimImageResourceTests {
 	@AfterEach
 	void cleanUp() {
 		QuarkusTransaction.requiringNew().run(() -> {
-			ClaimImage.delete("claim.id = ?1", claimId);
+			claimImageRepository.delete("claim.id = ?1", claimId);
 			Claim.deleteById(claimId);
 			if (otherClaimId != 0) {
-				ClaimImage.delete("claim.id = ?1", otherClaimId);
+				claimImageRepository.delete("claim.id = ?1", otherClaimId);
 				Claim.deleteById(otherClaimId);
 			}
 		});
@@ -135,7 +134,7 @@ class ClaimImageResourceTests {
 			.containsEntry("status", 404)
 			.containsEntry("detail", "Claim 9999999 was not found");
 
-		var existingImageId = ClaimImage.<ClaimImage>findAll()
+		var existingImageId = claimImageRepository.findAll()
 			.firstResultOptional()
 			.orElseThrow()
 			.id;
@@ -179,7 +178,7 @@ class ClaimImageResourceTests {
 
 	private long storeImage(ClaimImageKind kind, String fileName, String contentType, byte[] data) {
 		return QuarkusTransaction.requiringNew().call(() ->
-			claimImageService.storeImage(Claim.findById(claimId), kind, fileName, contentType, data).id
+			claimImageRepository.storeImage(Claim.findById(claimId), kind, fileName, contentType, data).id
 		);
 	}
 }

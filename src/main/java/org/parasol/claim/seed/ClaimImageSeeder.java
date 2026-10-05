@@ -7,12 +7,9 @@ import java.util.List;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
-import jakarta.transaction.Transactional;
 
-import org.parasol.claim.model.Claim;
-import org.parasol.claim.model.ClaimImage;
 import org.parasol.claim.model.ClaimImageKind;
-import org.parasol.claim.service.ClaimImageService;
+import org.parasol.claim.persistence.ClaimImageRepository;
 
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.StartupEvent;
@@ -20,27 +17,26 @@ import io.quarkus.runtime.StartupEvent;
 @ApplicationScoped
 public class ClaimImageSeeder {
 	private static final List<SeedImage> SEED_IMAGES = List.of(
-		new SeedImage("CLM01000000", "original_car1.jpg", ClaimImageKind.ORIGINAL),
-		new SeedImage("CLM01000000", "car1-processed.jpg", ClaimImageKind.PROCESSED),
-		new SeedImage("CLM01001009", "original_car2.jpg", ClaimImageKind.ORIGINAL),
-		new SeedImage("CLM01001009", "car2-processed.jpg", ClaimImageKind.PROCESSED),
-		new SeedImage("CLM01002018", "original_car3.jpg", ClaimImageKind.ORIGINAL),
-		new SeedImage("CLM01002018", "car3-processed.jpg", ClaimImageKind.PROCESSED),
-		new SeedImage("CLM01003027", "original_car4.jpg", ClaimImageKind.ORIGINAL),
-		new SeedImage("CLM01003027", "car4-processed.jpg", ClaimImageKind.PROCESSED),
-		new SeedImage("CLM01004036", "original_car5.jpg", ClaimImageKind.ORIGINAL),
-		new SeedImage("CLM01004036", "car5-processed.jpg", ClaimImageKind.PROCESSED),
-		new SeedImage("CLM01005045", "original_car6.jpg", ClaimImageKind.ORIGINAL),
-		new SeedImage("CLM01005045", "car6-processed.jpg", ClaimImageKind.PROCESSED)
+		new SeedImage(1L, "original_car1.jpg", ClaimImageKind.ORIGINAL),
+		new SeedImage(1L, "car1-processed.jpg", ClaimImageKind.PROCESSED),
+		new SeedImage(2L, "original_car2.jpg", ClaimImageKind.ORIGINAL),
+		new SeedImage(2L, "car2-processed.jpg", ClaimImageKind.PROCESSED),
+		new SeedImage(3L, "original_car3.jpg", ClaimImageKind.ORIGINAL),
+		new SeedImage(3L, "car3-processed.jpg", ClaimImageKind.PROCESSED),
+		new SeedImage(4L, "original_car4.jpg", ClaimImageKind.ORIGINAL),
+		new SeedImage(4L, "car4-processed.jpg", ClaimImageKind.PROCESSED),
+		new SeedImage(5L, "original_car5.jpg", ClaimImageKind.ORIGINAL),
+		new SeedImage(5L, "car5-processed.jpg", ClaimImageKind.PROCESSED),
+		new SeedImage(6L, "original_car6.jpg", ClaimImageKind.ORIGINAL),
+		new SeedImage(6L, "car6-processed.jpg", ClaimImageKind.PROCESSED)
 	);
 
-	private final ClaimImageService claimImageService;
+	private final ClaimImageRepository claimImageRepository;
 
-	ClaimImageSeeder(ClaimImageService claimImageService) {
-		this.claimImageService = claimImageService;
+	ClaimImageSeeder(ClaimImageRepository claimImageRepository) {
+		this.claimImageRepository = claimImageRepository;
 	}
 
-	@Transactional
 	void onStart(@Observes StartupEvent event) {
 		seedImages();
 	}
@@ -52,23 +48,25 @@ public class ClaimImageSeeder {
 	}
 
 	void seedImage(SeedImage seedImage) {
-		Claim.findByClaimNumber(seedImage.claimNumber())
-			.ifPresentOrElse(
-				claim -> {
-					if (ClaimImage.count("claim.id = ?1 and fileName = ?2 and kind = ?3", claim.id, seedImage.fileName(), seedImage.kind()) == 0) {
-						var data = readImage(seedImage.fileName());
-						claimImageService.storeImage(
-							claim,
-							seedImage.kind(),
-							seedImage.fileName(),
-							"image/jpeg",
-							data
-						);
-						Log.infof("Seeded %s image %s for claim %s", seedImage.kind(), seedImage.fileName(), seedImage.claimNumber());
-					}
-				},
-				() -> Log.warnf("Skipping image %s because claim %s was not found", seedImage.fileName(), seedImage.claimNumber())
-			);
+		if (!claimImageRepository.claimExists(seedImage.claimId())) {
+			Log.warnf("Skipping image %s because claim id %d was not found", seedImage.fileName(), seedImage.claimId());
+			return;
+		}
+
+		var result = claimImageRepository.storeSeedImageIfAbsent(
+			seedImage.claimId(),
+			seedImage.kind(),
+			seedImage.fileName(),
+			"image/jpeg",
+			readImage(seedImage.fileName())
+		);
+
+		if (result == ClaimImageRepository.SeedResult.CREATED) {
+			Log.infof("Seeded %s image %s for claim id %d", seedImage.kind(), seedImage.fileName(), seedImage.claimId());
+		}
+		else if (result == ClaimImageRepository.SeedResult.CLAIM_NOT_FOUND) {
+			Log.warnf("Skipping image %s because claim id %d was not found", seedImage.fileName(), seedImage.claimId());
+		}
 	}
 
 	private byte[] readImage(String fileName) {
@@ -86,6 +84,6 @@ public class ClaimImageSeeder {
 		}
 	}
 
-	record SeedImage(String claimNumber, String fileName, ClaimImageKind kind) {
+	record SeedImage(long claimId, String fileName, ClaimImageKind kind) {
 	}
 }
