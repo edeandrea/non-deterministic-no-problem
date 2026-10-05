@@ -52,6 +52,8 @@ jobs:
       - name: "build-test-jvm-java${{ matrix.java }}-${{ matrix.ai-provider }}"
         env:
           OPENAI_API_KEY: change-me
+          COHERE_API_KEY: change-me
+          GEMINI_API_KEY: change-me
         run: |
           ./mvnw -B clean verify \
             -P${{ matrix.ai-provider }} \
