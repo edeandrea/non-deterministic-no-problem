@@ -58,14 +58,14 @@ record the answers before the design (task 02) is written and before any feature
       isn't turned off (the root's memory id, or `"default"`?), and whether entries pile up. Confirm that
       `NoChatMemoryProviderSupplier` on every sub-agent sends each LLM call with no history.
 - Record every answer, with the evidence (test name, observed output, versions used), in
-  `.tasks/05-agentic-email-intake-tasks/spike-results.md`, and summarise the answers in `PLAN.md` →
+  `.tasks/05-gh216-agentic-email-intake/spike-results.md`, and summarise the answers in `PLAN.md` →
   Shared Context → Spike Results. The task 02 design cites them as evidence.
 - Remove the worktree afterwards. Keep the local branch, unpushed, for reference.
 
 ## Files/Areas
 
 - A separate git worktree on a throwaway local branch (`pom.xml` version bump and agentic dependency, scratch test package); never merged or pushed
-- `.tasks/05-agentic-email-intake-tasks/spike-results.md` (new), `PLAN.md` → Spike Results
+- `.tasks/05-gh216-agentic-email-intake/spike-results.md` (new), `PLAN.md` → Spike Results
 
 ## Key Points
 

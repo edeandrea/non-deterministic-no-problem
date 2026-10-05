@@ -6,8 +6,8 @@ Replace Mailpit with GreenMail (SMTP + IMAP) and the Roundcube webmail. The pair
 `compose-devservices.yml`, used by dev mode and **all** tests, and mirrored in the Kubernetes
 manifests. Fourth of five issues; see `.tasks/claim-intake-roadmap.md`.
 
-**Plan File:** `.tasks/04-greenmail-roundcube-tasks/PLAN.md`
-**Tasks Directory:** `.tasks/04-greenmail-roundcube-tasks/`
+**Plan File:** `.tasks/04-gh215-greenmail-roundcube/PLAN.md`
+**Tasks Directory:** `.tasks/04-gh215-greenmail-roundcube/`
 
 ## Execution Steps
 
@@ -15,7 +15,7 @@ manifests. Fourth of five issues; see `.tasks/claim-intake-roadmap.md`.
 Find the next incomplete task, and read the key decisions and notes left by earlier agents.
 
 ### 2. Understand Your Task
-Read your task file in `.tasks/04-greenmail-roundcube-tasks/task-XX-*.md`: Goal, Key Points, Done When.
+Read your task file in `.tasks/04-gh215-greenmail-roundcube/task-XX-*.md`: Goal, Key Points, Done When.
 
 ### 3. Execute the Task
 - Follow the global rules in `AGENTS.md`.

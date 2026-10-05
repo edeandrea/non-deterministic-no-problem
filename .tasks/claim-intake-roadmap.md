@@ -9,11 +9,11 @@ Filed on GitHub as **#212–#216** (bodies in `github-issues/`, numbers in `gith
 
 | # | Issue (GitHub title) | Plan | Depends on |
 |---|---|---|---|
-| 1 | Upgrade quarkus-langchain4j and other dependencies to the latest stable versions | [`01-dependency-upgrades-tasks/PLAN.md`](01-dependency-upgrades-tasks/PLAN.md) | — |
-| 2 | Rework the claim data model: sequence-generated claim numbers and typed fields | [`02-claim-data-model-tasks/PLAN.md`](02-claim-data-model-tasks/PLAN.md) | 1 |
-| 3 | Serve claim images from the backend instead of bundled frontend assets | [`03-claim-images-tasks/PLAN.md`](03-claim-images-tasks/PLAN.md) | 2 (both edit `ClaimDetail.tsx` and the seed data) |
-| 4 | Replace Mailpit with GreenMail and Roundcube webmail | [`04-greenmail-roundcube-tasks/PLAN.md`](04-greenmail-roundcube-tasks/PLAN.md) | 1 |
-| 5 | Agentic email claim intake and triage | [`05-agentic-email-intake-tasks/PLAN.md`](05-agentic-email-intake-tasks/PLAN.md) | 1, 2, 3, 4 |
+| 1 | Upgrade quarkus-langchain4j and other dependencies to the latest stable versions | [`01-gh212-dependency-upgrades/PLAN.md`](01-gh212-dependency-upgrades/PLAN.md) | — |
+| 2 | Rework the claim data model: sequence-generated claim numbers and typed fields | [`02-gh213-claim-data-model/PLAN.md`](02-gh213-claim-data-model/PLAN.md) | 1 |
+| 3 | Serve claim images from the backend instead of bundled frontend assets | [`03-gh214-claim-images/PLAN.md`](03-gh214-claim-images/PLAN.md) | 2 (both edit `ClaimDetail.tsx` and the seed data) |
+| 4 | Replace Mailpit with GreenMail and Roundcube webmail | [`04-gh215-greenmail-roundcube/PLAN.md`](04-gh215-greenmail-roundcube/PLAN.md) | 1 |
+| 5 | Agentic email claim intake and triage | [`05-gh216-agentic-email-intake/PLAN.md`](05-gh216-agentic-email-intake/PLAN.md) | 1, 2, 3, 4 |
 
 **Related, not part of the five-step order:** #218 Clean up the Grafana AI dashboard
 (body in `github-issues/issue-06-grafana-dashboard.md`; independent of steps 2–5, blocked by step 1

@@ -15,8 +15,8 @@ implementation tasks (03 onwards).** The spike (task 01) and the design (task 02
 `main` is still on quarkus-langchain4j **1.13.1** and the spike verified only **1.14.1** (langchain4j-agentic
 1.20.2-beta30). #213, #214 and #215 must land after it, in the existing order, before task 03 starts.
 
-**Plan File:** `.tasks/05-agentic-email-intake-tasks/PLAN.md`
-**Tasks Directory:** `.tasks/05-agentic-email-intake-tasks/`
+**Plan File:** `.tasks/05-gh216-agentic-email-intake/PLAN.md`
+**Tasks Directory:** `.tasks/05-gh216-agentic-email-intake/`
 
 ## Execution Steps
 
@@ -24,7 +24,7 @@ implementation tasks (03 onwards).** The spike (task 01) and the design (task 02
 Find the next incomplete task, and read the key decisions, spike results and notes left by earlier agents.
 
 ### 2. Understand Your Task
-Read your task file in `.tasks/05-agentic-email-intake-tasks/task-XX-*.md`: Goal, Key Points, Done When.
+Read your task file in `.tasks/05-gh216-agentic-email-intake/task-XX-*.md`: Goal, Key Points, Done When.
 
 ### 3. Execute the Task
 - Follow the global rules in `AGENTS.md` (coding style, AssertJ, records, `Optional`, constructor injection, commit rules, documentation policy).

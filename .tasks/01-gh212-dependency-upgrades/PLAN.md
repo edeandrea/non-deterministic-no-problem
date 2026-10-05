@@ -6,8 +6,8 @@ Bring quarkus-langchain4j and every other dependency, plugin, container image, r
 action to its latest **stable** release, before any feature work starts. This is the first of five
 issues; see `.tasks/claim-intake-roadmap.md`.
 
-**Plan File:** `.tasks/01-dependency-upgrades-tasks/PLAN.md`
-**Tasks Directory:** `.tasks/01-dependency-upgrades-tasks/`
+**Plan File:** `.tasks/01-gh212-dependency-upgrades/PLAN.md`
+**Tasks Directory:** `.tasks/01-gh212-dependency-upgrades/`
 
 ## Execution Steps
 
@@ -15,7 +15,7 @@ issues; see `.tasks/claim-intake-roadmap.md`.
 Find the next incomplete task, and read the key decisions and notes left by earlier agents.
 
 ### 2. Understand Your Task
-Read your task file in `.tasks/01-dependency-upgrades-tasks/task-XX-*.md`:
+Read your task file in `.tasks/01-gh212-dependency-upgrades/task-XX-*.md`:
 - **Goal**: what you're trying to achieve
 - **Key Points**: things to watch out for
 - **Done When**: the acceptance criteria

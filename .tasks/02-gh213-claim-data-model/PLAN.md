@@ -10,8 +10,8 @@ Rework the `Claim` model:
 
 Then update the seed data, UI, tests and docs to match. Second of five issues; see `.tasks/claim-intake-roadmap.md`.
 
-**Plan File:** `.tasks/02-claim-data-model-tasks/PLAN.md`
-**Tasks Directory:** `.tasks/02-claim-data-model-tasks/`
+**Plan File:** `.tasks/02-gh213-claim-data-model/PLAN.md`
+**Tasks Directory:** `.tasks/02-gh213-claim-data-model/`
 
 ## Execution Steps
 
@@ -19,7 +19,7 @@ Then update the seed data, UI, tests and docs to match. Second of five issues; s
 Find the next incomplete task, and read the key decisions and notes left by earlier agents.
 
 ### 2. Understand Your Task
-Read your task file in `.tasks/02-claim-data-model-tasks/task-XX-*.md`: Goal, Key Points, Done When.
+Read your task file in `.tasks/02-gh213-claim-data-model/task-XX-*.md`: Goal, Key Points, Done When.
 
 ### 3. Execute the Task
 - Follow the global rules in `AGENTS.md` (coding style, AssertJ, commit rules, documentation policy).
