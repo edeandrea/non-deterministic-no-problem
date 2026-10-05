@@ -6,6 +6,7 @@ Placeholders `{{ISSUE_1}}` … `{{ISSUE_5}}` must be replaced with the real issu
 once the issues exist. `{{ISSUE_6}}` (used in `issue-05.md`) is the Grafana dashboard issue,
 `issue-06-grafana-dashboard.md`, whose body has no placeholders. `{{ISSUE_7}}` (used in
 `issue-00-tracking.md`) is the decision-model spike issue, `issue-07-decision-model-spike.md`, whose body
-has no placeholders.
+has no placeholders. `{{ISSUE_8}}` (also used in `issue-00-tracking.md`) is the repackaging issue,
+`issue-08-repackage-by-domain.md`, whose body has no placeholders.
 
 Results (numbers + URLs) are recorded in `created.md`.

@@ -24,7 +24,7 @@ Every mail-related test reads mail from GreenMail, and `quarkus-mailpit-testing`
 
 ## Files/Areas
 
-- `src/test/java/org/parasol/ai/NotificationServiceTests.java`
+- `src/test/java/org/parasol/notification/service/NotificationServiceTests.java`
 - `src/test/java/org/parasol/testing/GreenMailMailbox.java` (new; choose a fitting package)
 - `pom.xml`
 

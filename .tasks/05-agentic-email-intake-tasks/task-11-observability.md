@@ -161,7 +161,7 @@ Tests assert all of this.
 - `src/main/java/org/parasol/intake/` (watcher, processor and reply sender instrumentation)
 - `src/main/java/org/parasol/intake/agent/ClaimsMailboxAgent.java` (`@AgentListenerSupplier`; the dev-only monitor mechanism)
 - `src/main/java/org/parasol/intake/review/ClaimReviewService.java` (review span + link)
-- `src/main/java/org/parasol/model/claim/Claim.java` (`intakeTraceparent` and `intakeConversationId`, if not already added in task 08)
+- `src/main/java/org/parasol/claim/model/Claim.java` (`intakeTraceparent` and `intakeConversationId`, if not already added in task 08)
 - `src/main/resources/application.yml` (`%test` Langfuse switch)
 - `src/test/java/ai/scoring/langfuse/session/LangfuseSessionScoringServiceTests.java` (profile override)
 - `src/test/java/org/parasol/intake/observability/` (new tests), `pom.xml` (`opentelemetry-sdk-testing`, test scope)

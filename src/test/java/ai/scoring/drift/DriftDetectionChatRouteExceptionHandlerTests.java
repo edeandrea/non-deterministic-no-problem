@@ -18,7 +18,7 @@ import jakarta.inject.Inject;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.parasol.model.claim.ClaimBotQuery;
+import org.parasol.chat.model.ClaimBotQuery;
 
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.junit.QuarkusTest;

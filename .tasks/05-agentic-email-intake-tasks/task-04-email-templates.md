@@ -55,7 +55,7 @@ component and covered by rendering tests.
 
 - `src/main/resources/templates/` (new Qute templates)
 - `src/main/java/org/parasol/intake/reply/` (new)
-- `src/main/java/org/parasol/ai/GenerateEmailService.java` (shared sign-off)
+- `src/main/java/org/parasol/notification/ai/GenerateEmailService.java` (shared sign-off)
 - `src/test/java/org/parasol/intake/reply/` (new)
 
 ## Key Points

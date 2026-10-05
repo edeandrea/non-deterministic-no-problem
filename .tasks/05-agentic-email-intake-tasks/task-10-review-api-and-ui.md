@@ -58,9 +58,9 @@ information from the customer. The decision resumes the paused workflow.
 
 ## Files/Areas
 
-- `src/main/java/org/parasol/resources/ClaimReviewResource.java` (new), plus request/response records
+- `src/main/java/org/parasol/intake/review/rest/ClaimReviewResource.java` (new), plus request/response records
 - `src/main/webui/src/app/components/ClaimsList/ClaimsList.tsx`, `src/main/webui/src/app/components/ClaimDetail/ClaimDetail.tsx`
-- `src/test/java/org/parasol/resources/`, `src/test/java/org/parasol/ui/`
+- `src/test/java/org/parasol/intake/review/rest/`, `src/test/java/org/parasol/ui/`
 
 ## Key Points
 

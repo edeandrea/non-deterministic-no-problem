@@ -92,7 +92,7 @@ not an approval.
 
 - `src/main/java/org/parasol/intake/review/`: `ClaimReviewAgent`, `ReviewDecision`, the decision router and its outcome agents, `ClaimReviewService`, exceptions (new)
 - `src/main/java/org/parasol/intake/agent/`: workflow wiring
-- `src/main/java/org/parasol/model/claim/Claim.java` (`reviewRunId`, `@Version`)
+- `src/main/java/org/parasol/claim/model/Claim.java` (`reviewRunId`, `@Version`)
 - `src/test/java/org/parasol/intake/review/` (new)
 
 ## Key Points

@@ -25,8 +25,8 @@ every environment.
 ## Files/Areas
 
 - `src/main/resources/seed/claim-images/` (moved images)
-- `src/main/java/org/parasol/model/claim/ClaimImageSeeder.java` (new; any sensible package)
-- `src/test/java/org/parasol/...` (new tests)
+- `src/main/java/org/parasol/claim/seed/ClaimImageSeeder.java` (new; any sensible sub-package of `org.parasol.claim`)
+- `src/test/java/org/parasol/claim/...` (new tests)
 
 ## Key Points
 

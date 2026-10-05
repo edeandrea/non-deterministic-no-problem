@@ -62,7 +62,7 @@ These are preparatory schema changes for the email intake (issue 5), and they're
 consistent claim numbers, real dates instead of prose, and categories that match the UI filter.
 
 ### Project Context
-- `src/main/java/org/parasol/model/claim/Claim.java` is a Panache entity (`PanacheEntity`, numeric `id`).
+- `src/main/java/org/parasol/claim/model/Claim.java` is a Panache entity (`PanacheEntity`, numeric `id`).
   JSON uses snake_case via `@JsonNaming(SnakeCaseStrategy.class)`.
 - `src/main/resources/import.sql` seeds six claims (ids 1–6) and restarts `claims_seq` at 7. It's
   loaded in dev/test by default, and in `%prod`/`%openshift` via `sql-load-script`.
