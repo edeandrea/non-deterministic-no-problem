@@ -45,6 +45,6 @@ Store claim images in PostgreSQL and serve them over REST, with tests.
 
 ## Done When
 
-- [ ] Both endpoints exist, and the OpenAPI document (`/q/openapi`) lists them.
-- [ ] Tests for every case listed above pass.
-- [ ] `./mvnw -B clean test-compile -Pollama` succeeds.
+- [x] Both endpoints exist, and the OpenAPI document (`/q/openapi`) lists them.
+- [x] Tests for every case listed above pass.
+- [x] `./mvnw -B clean test-compile -Pollama` succeeds.

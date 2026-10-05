@@ -34,6 +34,6 @@ The docs describe backend-served images, and an independent review confirms code
 
 ## Done When
 
-- [ ] No document claims the claims endpoints are the only REST endpoints, or that images are bundled frontend assets.
-- [ ] Both `test-compile` runs succeed, and the image/UI suites pass (or fail only for documented secret reasons).
+- [x] No document claims the claims endpoints are the only REST endpoints, or that images are bundled frontend assets.
+- [x] Both `test-compile` runs succeed, and the image/UI suites pass (or fail only for documented secret reasons).
 - [ ] The fresh review has no unresolved BLOCKER or MAJOR findings.

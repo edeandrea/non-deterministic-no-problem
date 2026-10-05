@@ -16,14 +16,7 @@ import io.quarkus.test.junit.QuarkusTest;
 
 @QuarkusTest
 class ClaimImageSeederTests {
-	private static final List<String> SEEDED_CLAIM_NUMBERS = List.of(
-		"CLM01000000",
-		"CLM01001009",
-		"CLM01002018",
-		"CLM01003027",
-		"CLM01004036",
-		"CLM01005045"
-	);
+	private static final List<Long> SEEDED_CLAIM_IDS = List.of(1L, 2L, 3L, 4L, 5L, 6L);
 
 	@Inject
 	ClaimImageSeeder claimImageSeeder;
@@ -33,9 +26,10 @@ class ClaimImageSeederTests {
 		assertThat(ClaimImage.count())
 			.isEqualTo(12);
 
-		assertThat(SEEDED_CLAIM_NUMBERS)
-			.allSatisfy(claimNumber -> {
-				var claim = Claim.findByClaimNumber(claimNumber)
+		assertThat(SEEDED_CLAIM_IDS)
+			.allSatisfy(claimId -> {
+				var claim = Claim.<Claim>findByIdOptional(claimId)
+					.map(seedClaim -> Claim.findByClaimNumber(seedClaim.claimNumber).orElseThrow())
 					.orElseThrow();
 
 				assertThat(ClaimImage.<ClaimImage>list("claim.id = ?1 and kind = ?2", claim.id, ClaimImageKind.ORIGINAL))

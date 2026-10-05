@@ -39,5 +39,5 @@ every environment.
 
 ## Done When
 
-- [ ] The images live under the backend resource folder, and a startup with an empty table seeds 12 images.
-- [ ] The idempotency and missing-claim tests pass.
+- [x] The images live under the backend resource folder, and a startup with an empty table seeds 12 images.
+- [x] The idempotency and missing-claim tests pass.

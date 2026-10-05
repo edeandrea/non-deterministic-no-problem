@@ -42,9 +42,9 @@ Edit or create task files and update `## Task Plan`.
 
 ## Task Plan
 
-- [ ] [task-01-claim-image-model-and-api.md](task-01-claim-image-model-and-api.md): Claim image model and REST API
-- [ ] [task-02-seed-images.md](task-02-seed-images.md): Seed the existing claim images
-- [ ] [task-03-ui-and-cleanup.md](task-03-ui-and-cleanup.md): UI reads images from the API; remove OriginalApp
+- [x] [task-01-claim-image-model-and-api.md](task-01-claim-image-model-and-api.md): Claim image model and REST API
+- [x] [task-02-seed-images.md](task-02-seed-images.md): Seed the existing claim images
+- [x] [task-03-ui-and-cleanup.md](task-03-ui-and-cleanup.md): UI reads images from the API; remove OriginalApp
 - [ ] [task-04-docs-and-verification.md](task-04-docs-and-verification.md): Documentation and verification
 
 ---
@@ -55,6 +55,9 @@ Edit or create task files and update `## Task Plan`.
 Today `ClaimDetail.tsx` builds image paths from the claim id (`original_car${id}.jpg`, `car${id}-processed.jpg`).
 Those files reach `dist/` only because the legacy `OriginalApp.tsx` imports them, so every claim with
 id > 6 shows broken images. Issue 5's email intake will store customer photos, which needs a backend store.
+
+### Implementation Outcome
+`ClaimImage` now stores image bytes in PostgreSQL and serves metadata and image content through claim-nested REST endpoints; the empty-table startup seeder resolves claims by claim number and skips missing claims. The UI now uses API-provided URLs, and the legacy page and unused assets are removed; API, seeder, Jest, Playwright, clean-compilation, package-build, and diagram-render checks have passed.
 
 ### Project Context
 - `src/main/webui/src/app/components/ClaimDetail/ClaimDetail.tsx` (lines ~24–25 build the paths) and `ImageCarousel.tsx` (prefixes `/images/`).

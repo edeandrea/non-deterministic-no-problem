@@ -113,7 +113,6 @@ in [`webpack.common.js`](./webpack.common.js):
 * `@assets/*` → PatternFly's `@patternfly/react-core/dist/styles/assets/*`
 
 ```js
-import loader from '@app/assets/images/loader.gif';
 import imgSrc from '@assets/images/g_sizing.png';
 ```
 

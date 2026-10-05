@@ -93,6 +93,21 @@ class ClaimImageResourceTests {
 	}
 
 	@Test
+	void publishesImageEndpointsInOpenApi() {
+		var paths = get("/q/openapi?format=json").then()
+			.statusCode(Status.OK.getStatusCode())
+			.extract()
+			.jsonPath()
+			.getMap("paths");
+
+		assertThat(paths)
+			.containsKeys(
+				"/api/db/claims/{id}/images",
+				"/api/db/claims/{id}/images/{imageId}"
+			);
+	}
+
+	@Test
 	void storesAndReturnsImageBytesWithContentType() {
 		var imageId = storeImage(ClaimImageKind.ORIGINAL, "photo.png", "image/png", IMAGE_DATA);
 
@@ -119,6 +134,19 @@ class ClaimImageResourceTests {
 			.containsEntry("title", "Not Found")
 			.containsEntry("status", 404)
 			.containsEntry("detail", "Claim 9999999 was not found");
+
+		var existingImageId = ClaimImage.<ClaimImage>findAll()
+			.firstResultOptional()
+			.orElseThrow()
+			.id;
+		var unknownClaimImageResponse = get("/api/db/claims/{id}/images/{imageId}", 9_999_999, existingImageId).then()
+			.statusCode(Status.NOT_FOUND.getStatusCode())
+			.contentType("application/problem+json")
+			.extract()
+			.response();
+
+		assertThat(unknownClaimImageResponse.jsonPath().getInt("status"))
+			.isEqualTo(Status.NOT_FOUND.getStatusCode());
 	}
 
 	@Test

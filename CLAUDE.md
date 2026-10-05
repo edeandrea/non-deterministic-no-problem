@@ -189,6 +189,10 @@ Image-endpoint errors use RFC 9457 Problem Details (`application/problem+json`).
 - `ClaimImageSeeder` loads the 12 JPEGs from `src/main/resources/seed/claim-images/` into `claim_images`,
   matching claims by their natural claim number.
 
+**Claim images:** `ClaimImage` links to `Claim.id`; `kind` is `ORIGINAL` (customer photo) or `PROCESSED`
+(annotated damage image). Image bytes use PostgreSQL `bytea` (`byte[]`, not `@Lob`/`oid`). New claims
+do not receive processed images automatically; intake code can use `ClaimImageService.storeImage`.
+
 **Frontend:** React + TypeScript + PatternFly in `src/main/webui/src/app/`, SPA routing enabled.
 
 ### AI quality layer — `ai.scoring`
