@@ -7,9 +7,10 @@ import java.util.List;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
+import jakarta.transaction.Transactional;
 
+import org.parasol.claim.model.ClaimImage;
 import org.parasol.claim.model.ClaimImageKind;
-import org.parasol.claim.persistence.ClaimImagePersistence;
 
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.StartupEvent;
@@ -31,12 +32,7 @@ public class ClaimImageSeeder {
 		new SeedImage(6L, "car6-processed.jpg", ClaimImageKind.PROCESSED)
 	);
 
-	private final ClaimImagePersistence claimImagePersistence;
-
-	ClaimImageSeeder(ClaimImagePersistence claimImagePersistence) {
-		this.claimImagePersistence = claimImagePersistence;
-	}
-
+	@Transactional
 	void onStart(@Observes StartupEvent event) {
 		seedImages();
 	}
@@ -48,12 +44,12 @@ public class ClaimImageSeeder {
 	}
 
 	void seedImage(SeedImage seedImage) {
-		if (!claimImagePersistence.claimExists(seedImage.claimId())) {
+		if (!ClaimImage.claimExists(seedImage.claimId())) {
 			Log.warnf("Skipping image %s because claim id %d was not found", seedImage.fileName(), seedImage.claimId());
 			return;
 		}
 
-		var result = claimImagePersistence.storeSeedImageIfAbsent(
+		var result = ClaimImage.storeSeedImageIfAbsent(
 			seedImage.claimId(),
 			seedImage.kind(),
 			seedImage.fileName(),
@@ -61,10 +57,10 @@ public class ClaimImageSeeder {
 			readImage(seedImage.fileName())
 		);
 
-		if (result == ClaimImagePersistence.SeedResult.CREATED) {
+		if (result == ClaimImage.SeedResult.CREATED) {
 			Log.infof("Seeded %s image %s for claim id %d", seedImage.kind(), seedImage.fileName(), seedImage.claimId());
 		}
-		else if (result == ClaimImagePersistence.SeedResult.CLAIM_NOT_FOUND) {
+		else if (result == ClaimImage.SeedResult.CLAIM_NOT_FOUND) {
 			Log.warnf("Skipping image %s because claim id %d was not found", seedImage.fileName(), seedImage.claimId());
 		}
 	}

@@ -7,7 +7,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
-import jakarta.inject.Inject;
 import jakarta.ws.rs.core.Response.Status;
 
 import org.junit.jupiter.api.AfterEach;
@@ -17,7 +16,6 @@ import org.parasol.claim.model.Claim;
 import org.parasol.claim.model.ClaimCategory;
 import org.parasol.claim.model.ClaimImage;
 import org.parasol.claim.model.ClaimImageKind;
-import org.parasol.claim.persistence.ClaimImagePersistence;
 
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
@@ -25,9 +23,6 @@ import io.quarkus.test.junit.QuarkusTest;
 @QuarkusTest
 class ClaimImageResourceTests {
 	private static final byte[] IMAGE_DATA = { 0, 1, 2, 3, (byte) 255 };
-
-	@Inject
-	ClaimImagePersistence claimImagePersistence;
 
 	private long claimId;
 	private long otherClaimId;
@@ -179,7 +174,7 @@ class ClaimImageResourceTests {
 
 	private long storeImage(ClaimImageKind kind, String fileName, String contentType, byte[] data) {
 		return QuarkusTransaction.requiringNew().call(() ->
-			claimImagePersistence.storeImage(Claim.findById(claimId), kind, fileName, contentType, data).id
+			ClaimImage.storeImage(Claim.findById(claimId), kind, fileName, contentType, data).id
 		);
 	}
 }

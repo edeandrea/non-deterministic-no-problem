@@ -23,7 +23,6 @@ The Java source is split into two top-level packages representing two distinct c
 |---|---|
 | `org.parasol.claim.model` | `Claim` (Panache entity, table `claims`), `ClaimImage` (table `claim_images`), `ClaimImageKind`, `ClaimCategory`, claim-number generation, `UnknownClaimCategoryException` |
 | `org.parasol.claim.rest` | `ClaimResource` (`/api/db/claims`), `ClaimImageResource` (`/api/db/claims/{id}/images`) |
-| `org.parasol.claim.persistence` | `ClaimImagePersistence` (claim image queries and writes via `EntityManager`) |
 | `org.parasol.claim.seed` | `ClaimImageSeeder` (seeds images for the six sample claims) |
 | `org.parasol.chat.ai` | `ClaimService` (the chat-bot AI service) |
 | `org.parasol.chat.model` | `ClaimBotQuery`, `ClaimBotQueryResponse` |
@@ -191,11 +190,11 @@ Image-endpoint errors use RFC 9457 Problem Details (`application/problem+json`).
 
 **Claim images:** `ClaimImage` links to `Claim.id`; `kind` is `ORIGINAL` (customer photo) or `PROCESSED`
 (annotated damage image). Image bytes use PostgreSQL `bytea` (`byte[]`, not `@Lob`/`oid`); Hibernate's
-standard mapping is used without a database-specific column definition. `ClaimImagePersistence` owns the
-image queries and writes. `GET /api/db/claims/{id}/images` returns metadata and image URLs;
+standard mapping is used without a database-specific column definition. `ClaimImage` owns its Panache
+Active Record queries and writes. `GET /api/db/claims/{id}/images` returns metadata and image URLs;
 `GET /api/db/claims/{id}/images/{imageId}` returns the bytes with their stored content type. Both
 endpoints return RFC 9457 Problem Details for missing resources. New claims do not receive processed
-images automatically; intake code can store images through `ClaimImagePersistence.storeImage`.
+images automatically; intake code can store images through `ClaimImage.storeImage`.
 
 **Frontend:** React + TypeScript + PatternFly in `src/main/webui/src/app/`, SPA routing enabled.
 
