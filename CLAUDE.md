@@ -568,9 +568,9 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
   - **Seed data never fails startup.** An image whose claim doesn't exist, or whose resource file is missing,
     unreadable or empty, is logged (WARN, with the reason) and skipped, and the rest are still seeded. A file is read
     only when it's about to be inserted.
-  - Each run ends with an INFO summary of every outcome's count. `seed` also returns those counts as a `SeedResult`;
-    startup ignores it, but tests need it, since "already present" and "claim not found" leave nothing in the database
-    to check.
+  - `seed` does the work and returns the count of each outcome as a `SeedResult`; the `StartupEvent` observer logs it
+    as one INFO summary. Tests assert the same `SeedResult`, which is how they check "already present" and "claim not
+    found" (those leave nothing in the database).
   - Empty files are skipped before `store`: `ClaimImage.data` is `@NotEmpty`, and a violation at flush would roll
     back the whole run.
   - It runs in one transaction from a `StartupEvent` observer, so an unexpected database error still aborts boot.

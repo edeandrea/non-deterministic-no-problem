@@ -49,7 +49,16 @@ class ClaimImageSeeder {
 	);
 
 	void onStart(@Observes StartupEvent event) {
-		seed(SEED_IMAGES);
+		var result = seed(SEED_IMAGES);
+
+		Log.infof(
+			"Processed %d seed claim images: %d inserted, %d already present, %d claim not found, %d file missing/unreadable/empty",
+			result.total(),
+			result.inserted(),
+			result.alreadyPresent(),
+			result.claimNotFound(),
+			result.imageUnreadable()
+		);
 	}
 
 	/**
@@ -57,7 +66,7 @@ class ClaimImageSeeder {
 	 * seeded.
 	 *
 	 * @param seedImages the images to seed
-	 * @return the count of each outcome, which is also logged as a one-line summary
+	 * @return the count of each outcome
 	 */
 	@Transactional
 	SeedResult seed(List<SeedImage> seedImages) {
@@ -65,23 +74,12 @@ class ClaimImageSeeder {
 			.map(this::seedIfMissing)
 			.collect(Collectors.groupingBy(Function.identity(), () -> new EnumMap<>(SeedOutcome.class), Collectors.counting()));
 
-		var result = new SeedResult(
+		return new SeedResult(
 			outcomes.getOrDefault(SeedOutcome.INSERTED, 0L),
 			outcomes.getOrDefault(SeedOutcome.ALREADY_PRESENT, 0L),
 			outcomes.getOrDefault(SeedOutcome.CLAIM_NOT_FOUND, 0L),
 			outcomes.getOrDefault(SeedOutcome.IMAGE_UNREADABLE, 0L)
 		);
-
-		Log.infof(
-			"Processed %d seed claim images: %d inserted, %d already present, %d claim not found, %d file missing/unreadable/empty",
-			seedImages.size(),
-			result.inserted(),
-			result.alreadyPresent(),
-			result.claimNotFound(),
-			result.imageUnreadable()
-		);
-
-		return result;
 	}
 
 	private SeedOutcome seedIfMissing(SeedImage seedImage) {
@@ -137,8 +135,7 @@ class ClaimImageSeeder {
 	}
 
 	/**
-	 * What one {@link #seed(List)} run did. Startup only logs it; tests assert it, because "already present" and "claim
-	 * not found" leave nothing in the database to check.
+	 * What one {@link #seed(List)} run did. Startup logs it as a one-line summary.
 	 *
 	 * @param inserted images inserted
 	 * @param alreadyPresent images the claim already had
@@ -146,6 +143,14 @@ class ClaimImageSeeder {
 	 * @param imageUnreadable images skipped because their resource file is missing, unreadable or empty
 	 */
 	record SeedResult(long inserted, long alreadyPresent, long claimNotFound, long imageUnreadable) {
+		/**
+		 * The number of images processed.
+		 *
+		 * @return the sum of every outcome
+		 */
+		long total() {
+			return this.inserted + this.alreadyPresent + this.claimNotFound + this.imageUnreadable;
+		}
 	}
 
 	private enum SeedOutcome {

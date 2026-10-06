@@ -156,7 +156,9 @@ class ClaimImageSeederTests {
 		);
 
 		assertThat(this.seeder.seed(seedImages))
-			.isEqualTo(new SeedResult(1, 1, 1, 1));
+			.isEqualTo(new SeedResult(1, 1, 1, 1))
+			.extracting(SeedResult::total)
+			.isEqualTo(4L);
 	}
 
 	private List<String> testClaimImageFileNames() {
