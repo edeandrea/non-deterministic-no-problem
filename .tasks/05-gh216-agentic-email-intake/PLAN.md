@@ -11,9 +11,16 @@ A short design document (workflow, claim-state and agent-topology diagrams) was 
 Last of five issues; see `.tasks/claim-intake-roadmap.md`. **Issues 1–4 must be complete before the
 implementation tasks (03 onwards).** The spike (task 01) and the design (task 02) ran ahead of them.
 
-**Prerequisites for task 03+ (as of the design gate):** #212 must be merged (PR #219 is still open), because
-`main` is still on quarkus-langchain4j **1.13.1** and the spike verified only **1.14.1** (langchain4j-agentic
-1.20.2-beta30). #213, #214 and #215 must land after it, in the existing order, before task 03 starts.
+**Prerequisites for task 03+ — all satisfied (updated 2026-10-06).** Issues #212–#215 have landed, in
+order: #212 via PR #219 (`2575c10`), #213 via #224, #214 via #225, #215 via #230. `main` is now on
+quarkus-langchain4j **1.14.1** / Quarkus **3.40.1**, matching what the task 01 spike verified
+(langchain4j-agentic 1.20.2-beta30). **Nothing in the issue queue blocks task 03 any more.**
+
+**But task 03 is gated on task 01b, not on the issue queue.** The quarkus-flow spike (task 01b) decides
+whether the durable human-in-the-loop machinery is built the way the merged design describes. It must
+produce a verdict *before* task 03 commits to a scope store and *before* task 07 is written. See
+**Flow Spike Results (task 01b)** under Shared Context, then
+[`spike-results-flow.md`](spike-results-flow.md) → *Resuming this spike*.
 
 **Plan File:** `.tasks/05-gh216-agentic-email-intake/PLAN.md`
 **Tasks Directory:** `.tasks/05-gh216-agentic-email-intake/`
@@ -55,6 +62,7 @@ Edit or create task files and update `## Task Plan`.
 
 - [x] [task-01-agentic-spike.md](task-01-agentic-spike.md): Agentic module spike (runs first, throwaway)
 - [x] [task-02-design-and-review.md](task-02-design-and-review.md): Design document and review gate
+- [~] [task-01b-flow-spike.md](task-01b-flow-spike.md): quarkus-flow spike (throwaway; decides task 07) — **IN PROGRESS, suspended**
 - [ ] [task-03-intake-config-and-mailbox.md](task-03-intake-config-and-mailbox.md): Intake configuration and claims mailbox
 - [ ] [task-04-email-templates.md](task-04-email-templates.md): Qute reply templates and sender
 - [ ] [task-05-extraction-agents.md](task-05-extraction-agents.md): Claim extraction agents
@@ -67,6 +75,11 @@ Edit or create task files and update `## Task Plan`.
 - [ ] [task-12-roundcube-e2e.md](task-12-roundcube-e2e.md): Roundcube end-to-end test
 - [ ] [task-13-demo-and-docs.md](task-13-demo-and-docs.md): Demo guide and documentation
 - [ ] [task-14-verification.md](task-14-verification.md): Verification
+
+> **Ordering: task 01b blocks tasks 03 and 07.** It is in progress and suspended. Do **not** start task 03
+> (it would commit to the `DatabaseAgenticScopeStore` design) or write task 07 until 01b has recorded a
+> verdict here. Everything else in the issue queue is already unblocked. Resume at
+> [`spike-results-flow.md`](spike-results-flow.md) → *Resuming this spike*.
 
 ---
 
@@ -374,6 +387,62 @@ Full evidence, the executive summary and the per-question answers (Q1–Q19) are
   - `MonitoredAgent` with `setMaxRetainedSessions(0)` still keeps every suspended run in `ongoingExecutions`, and
     an abandoned review leaks forever.
   - Leaf agents are CDI singletons shared across roots, so give each leaf exactly one root.
+
+### Flow Spike Results (task 01b) — IN PROGRESS
+Full evidence in [`spike-results-flow.md`](spike-results-flow.md). **Suspended mid-spike; no verdict yet.**
+
+> **Picking this up?** Start at [`spike-results-flow.md`](spike-results-flow.md) → *Resuming this spike*.
+> The worktree `../non-deterministic-no-problem-spike-flow` and branch `spike/flow-hitl` **already exist
+> on this machine**, with the pom patch committed as `c3ab343` (local only, never pushed) — nothing needs
+> recreating. First action is step 1: finish the gate by adding one `@SequenceAgent` and booting a
+> `@QuarkusTest` (~15 min).
+
+- **Why:** [quarkus-flow](https://docs.quarkiverse.io/quarkus-flow/dev/index.html) would replace exactly the
+  workaround half of the merged design — `DatabaseAgenticScopeStore` + entity, the
+  `AgenticScopePersister.setStore` registrar, the startup self-test, the `ShutdownEvent` reset, the
+  `allowDeserializationType` allowlist, the hand-rolled replay, **and both internal-API touch points**
+  (`SuspendedResponse`, `DefaultAgenticScope`) — plus the hand-rolled observability of spike items 12–18.
+- **Setup:** worktree `…-spike-flow`, branch `spike/flow-hitl` (local, unpushed) from `main` @ `8ed467d`.
+  Flow **1.1.3** (latest release; **no 1.2.0 final exists** — latest prerelease is 1.2.0.CR3).
+- **Gate: PASSED so far, at 3.40.1 / 1.14.1 with no downgrade.**
+  - `test-compile` and a full `package` (augmentation) both `BUILD SUCCESS`.
+  - Flow 1.1.3 + serverlessworkflow 7.32.1.Final coexist with quarkus-langchain4j **1.14.1** /
+    langchain4j-agentic **1.20.2-beta30**; the BOM import wins, so nothing is dragged back to 1.13.3.
+  - **The skew is low-risk:** `quarkus-flow-langchain4j-deployment` scans Jandex itself and couples to
+    exactly **one** build item, `DetectedAiAgentBuildItem`, which is **API-identical** between 1.13.3 and
+    1.14.1 (`javap` verified), plus one runtime class, `AgenticSystemTopology`.
+  - Its `quarkus-langchain4j-ollama-deployment` dependency is **test**-scoped, so it does not leak here.
+  - **Still open:** the augmentation ran with no `@SequenceAgent` present, so the agentic-translation path
+    did not execute. One `@SequenceAgent` + a booting `@QuarkusTest` finishes the gate.
+- **The review contract looks preservable** — the three questions flagged as possible blockers all have
+  API-level answers: `WorkflowStatus.WAITING` + `PersistenceInstanceReader.find(def, id)` +
+  `PersistenceWorkflowInfo.tasks()` for the "waiting at task Y" check (C8);
+  `WorkflowInstance.cancel()` for superseding, so the `toAny` workaround is a fallback not a requirement
+  (C9); and `dataAs(Class, predicate)` for business-key correlation, keeping `Claim.reviewRunId`
+  meaningful (C10). One check closes all three: whether `PersistenceInstanceReader` is CDI-injectable in
+  `quarkus-flow-jpa`.
+- **Unproven and load-bearing:** A1 (can `function(...)` be followed by `emitJson`/`listen`/
+  `switchWhenOrElse` in one task list), A3 (in-process `publish` wakes it **and** completed tasks are
+  skipped), A4 (**pivotal** — is a crash *inside* the agentic subflow resumable, or does the whole task
+  re-run all four LLM calls), B6 (survives a genuine restart).
+- **Two corrections to the pre-settled research:**
+  1. *"Never re-executes completed tasks"* is **not** in `persistence.html` — it only says execution
+     resumes "from its last recorded checkpoint". That makes A4 more load-bearing, not less.
+  2. Neither the persistence nor the correlation docs document any query/cancel API; the API inventory
+     found them anyway (above).
+- **Langfuse typing is not a cost to price.** The user owns the `quarkus-langfuse` extension and
+  `ai.scoring` is an explicit staging area for logic to be generalized upstream (Flow, langchain4j,
+  quarkus-langfuse), with `AiServiceDatasetSpanProcessor` as the in-repo precedent for stamping
+  attributes onto spans the app does not own. D12/D13 become "where does the fix live", not "is this a
+  blocker". D11 must still confirm the leaf `langchain4j.aiservices.<Agent>.<method>` naming empirically,
+  because the dataset-name invariant degrades **silently**.
+- **Decision criteria (unchanged):** adopt only if the gate passes with no downgrade, A1–A3 and B6 work,
+  and C8 has an answer or the `404`/`409` contract survives another way. Otherwise keep the merged design
+  and file an upstream ask for **Flow implementing `AgenticScopeStore` / `AgenticScopePersister`**, which
+  would replace only `DatabaseAgenticScopeStore` and leave the merged design's shape intact.
+- **Standing note, independent of the verdict:** every current profile wipes durable state on boot
+  (`drop-and-create` in `%prod`/`%openshift`, Dev Services defaults elsewhere), so the merged design's
+  own scope table does not survive a restart either. Design doc step 8 does not hold today. Raise on #216.
 
 #### Changes required in later tasks
 **Applied to tasks 03–14 at the design gate.** Two items were adjusted when applied: the task-03 store
