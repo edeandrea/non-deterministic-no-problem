@@ -194,7 +194,7 @@ const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
                                 <Text component={TextVariants.h3}>Body:</Text>
                                 <div className='display-linebreak'>{claim.body}</div>
                                 <Text component={TextVariants.h3}>Attached images:</Text>
-                                {originalImages.length > 0
+                                {(originalImages.length > 0)
                                   ? <Grid><GridItem span={4}><ImageCarousel images={originalImages} /></GridItem></Grid>
                                   : 'No images attached'}
                               </TextContent>
@@ -212,7 +212,7 @@ const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
           <GridItem span={4}>
             <Card isRounded={true} className='width-100'>
               <CardBody>
-                {panelImages.length > 0 ? <ImageCarousel images={panelImages} /> : 'No images attached'}
+                {(panelImages.length > 0) ? <ImageCarousel images={panelImages} /> : 'No images attached'}
               </CardBody>
             </Card>
           </GridItem>

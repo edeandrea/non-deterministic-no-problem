@@ -2,6 +2,7 @@ package org.parasol.claim.model;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import jakarta.persistence.Basic;
 import jakarta.persistence.Column;
@@ -23,7 +24,6 @@ import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntity;
-import io.quarkus.panache.common.Parameters;
 import io.quarkus.panache.common.Sort;
 
 /**
@@ -91,7 +91,7 @@ public class ClaimImage extends PanacheEntity {
 	 * @throws ClaimImageNotFoundException if the claim has no image with that id (including when the claim doesn't exist)
 	 */
 	public static ClaimImage findForClaim(long claimId, long imageId) {
-		return ClaimImage.<ClaimImage>find("id = :imageId and claim.id = :claimId", Parameters.with("imageId", imageId).and("claimId", claimId))
+		return ClaimImage.<ClaimImage>find("id = :imageId and claim.id = :claimId", Map.of("imageId", imageId, "claimId", claimId))
 			.firstResultOptional()
 			.orElseThrow(() -> new ClaimImageNotFoundException(claimId, imageId));
 	}
@@ -105,7 +105,7 @@ public class ClaimImage extends PanacheEntity {
 	 * @return {@code true} if such an image exists
 	 */
 	public static boolean hasImage(Claim claim, ClaimImageKind kind, String fileName) {
-		return count("claim = :claim and kind = :kind and fileName = :fileName", Parameters.with("claim", claim).and("kind", kind).and("fileName", fileName)) > 0;
+		return count("claim = :claim and kind = :kind and fileName = :fileName", Map.of("claim", claim, "kind", kind, "fileName", fileName)) > 0;
 	}
 
 	/**

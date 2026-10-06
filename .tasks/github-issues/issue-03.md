@@ -21,7 +21,8 @@ this to store customer photos.
   - `GET /api/db/claims/{id}/images` returns a metadata list (record DTO, no binary data). A claim with no images gets an empty list.
   - `GET /api/db/claims/{id}/images/{imageId}` returns the raw bytes with the stored content type.
   - **RFC 9457 Problem Details:** 404 for an unknown claim, an unknown image, or an image that belongs to another claim.
-- **Service method** to store an image for a claim ({{ISSUE_5}} reuses it).
+- **A method** to store an image for a claim ({{ISSUE_5}} reuses it): the Active Record `ClaimImage.store`, with an
+  allow-list of image content types.
 - **Startup seeder:**
   - Moves the 12 images used by the six seeded claims into backend resources.
   - On every start, inserts any of them that are missing, looking claims up by their **explicit ids (1–6) from

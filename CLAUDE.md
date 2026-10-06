@@ -21,9 +21,9 @@ The Java source is split into two top-level packages representing two distinct c
 
 | Package | Contents |
 |---|---|
-| `org.parasol.claim.model` | `Claim` (Panache entity, table `claims`), `ClaimImage` (table `claim_images`), `ClaimImageKind`, `ClaimCategory`, claim-number generation, `UnknownClaimCategoryException` |
-| `org.parasol.claim.rest` | `ClaimResource` (`/api/db/claims`), `ClaimImageResource` (`/api/db/claims/{id}/images`) |
-| `org.parasol.claim.seed` | `ClaimImageSeeder` (seeds images for the six sample claims) |
+| `org.parasol.claim.model` | `Claim` (Panache entity, table `claims`), `ClaimImage` (table `claim_images`), `ClaimImageKind`, `ClaimImageContentType`, `ClaimCategory`, claim-number generation, the domain exceptions (`ClaimNotFoundException`, `ClaimImageNotFoundException`, `UnknownClaimCategoryException`, `UnsupportedClaimImageContentTypeException`) |
+| `org.parasol.claim.rest` | `ClaimResource` (`/api/db/claims`), `ClaimImageResource` (`/api/db/claims/{id}/images`), `ClaimImageMetadata` DTO + `ClaimImageMapper` (MapStruct), `ClaimExceptionMappers` (Problem Details) |
+| `org.parasol.claim.seed` | `ClaimImageSeeder` (attaches the sample images to the six seeded claims) |
 | `org.parasol.chat.ai` | `ClaimService` (the chat-bot AI service) |
 | `org.parasol.chat.model` | `ClaimBotQuery`, `ClaimBotQueryResponse` |
 | `org.parasol.notification.service` | `NotificationService` (the `updateClaimStatus` `@Tool`) |
@@ -151,10 +151,17 @@ email ones above plus `DriftDetectionOutputGuardrail`, `SessionSentimentGuardrai
 `Claim` Panache entity → `GenerateEmailService` produces the email → sent via Quarkus Mailer
 (Mailpit dev service in dev/test).
 
-**REST:** `ClaimResource` — `GET /api/db/claims`, `GET /api/db/claims/{id}` (Panache entities on
-PostgreSQL). `ClaimImageResource` — `GET /api/db/claims/{id}/images` returns image metadata and
-`GET /api/db/claims/{id}/images/{imageId}` returns the image bytes with their stored content type.
-Image-endpoint errors use RFC 9457 Problem Details (`application/problem+json`).
+**REST:**
+- `ClaimResource`: `GET /api/db/claims`, `GET /api/db/claims/{id}` (returns the Panache entities directly; a
+  missing claim is a `204`, unchanged by #214).
+- `ClaimImageResource`: `GET /api/db/claims/{id}/images` (metadata list, oldest first) and
+  `GET /api/db/claims/{id}/images/{imageId}` (the bytes, with the stored content type and
+  `X-Content-Type-Options: nosniff`). The resource holds no queries; it calls `ClaimImage` and maps to
+  `ClaimImageMetadata` with `ClaimImageMapper`.
+- **Errors:** domain exceptions are mapped once, by `ClaimExceptionMappers` (Quarkus `@ServerExceptionMapper`), to RFC
+  9457 Problem Details (`application/problem+json`, `type: about:blank`, `instance` = request path).
+  `ClaimNotFoundException` and `ClaimImageNotFoundException` are `404`. An image that exists but belongs to another
+  claim is the same `404` as an unknown image.
 
 **The `Claim` entity** (`org.parasol.claim.model`, table `claims`, JSON in snake_case via `@JsonNaming`):
 - **`id`** is the Panache numeric primary key (`claims_seq`). REST paths, UI routes, `ClaimBotQuery.claimId`
@@ -185,16 +192,32 @@ Image-endpoint errors use RFC 9457 Problem Details (`application/problem+json`).
 - **It omits `claim_number`,** so the column default numbers the rows in insert order (`CLM01000000` … `CLM01005045`).
 - **It uses the enum constant names** for `category`.
 - Dev/test load it by default; `%prod` / `%openshift` load it via `sql-load-script` under drop-and-create.
-- `ClaimImageSeeder` loads the 12 JPEGs from `src/main/resources/seed/claim-images/` into `claim_images`,
-  matching the six sample claims by their explicit IDs (1–6), not their generated claim numbers.
+- `ClaimImageSeeder` attaches the 12 JPEGs in `src/main/resources/seed/claim-images/` to the six sample claims,
+  matched by their explicit ids (1–6), not their generated claim numbers. See Gotchas.
 
-**Claim images:** `ClaimImage` links to `Claim.id`; `kind` is `ORIGINAL` (customer photo) or `PROCESSED`
-(annotated damage image). Image bytes use PostgreSQL `bytea` (`byte[]`, not `@Lob`/`oid`); Hibernate's
-standard mapping is used without a database-specific column definition. `ClaimImage` owns its Panache
-Active Record queries and writes. `GET /api/db/claims/{id}/images` returns metadata and image URLs;
-`GET /api/db/claims/{id}/images/{imageId}` returns the bytes with their stored content type. Both
-endpoints return RFC 9457 Problem Details for missing resources. New claims do not receive processed
-images automatically; intake code can store images through `ClaimImage.storeImage`.
+**Claim images** (`ClaimImage`, table `claim_images`):
+- **Persistence is Active Record, like `Claim`:** `listForClaim(claimId)` (throws `ClaimNotFoundException`),
+  `findForClaim(claimId, imageId)` (throws `ClaimImageNotFoundException`; always matches claim **and** image id),
+  `hasImage(claim, kind, fileName)` and `store(claim, kind, fileName, contentType, data)`. #216's intake stores
+  attachments through `store`. Image ids are table-wide `PanacheEntity` ids.
+- **`kind`** is `ORIGINAL` (customer photo) or `PROCESSED` (annotated damage image). New claims never get processed
+  images.
+- **`contentType` is an allow-list,** the `ClaimImageContentType` enum (JPEG, PNG, GIF, WebP; stored as the constant name,
+  JSON and `Content-Type` use the media type). Resolve an outside media type with `ClaimImageContentType.find` /
+  `fromMediaType` (accepts aliases like `image/jpg` and ignores parameters). Never widen it to `image/*`: the endpoint
+  serves the bytes back on the app's own origin, so `image/svg+xml` or `text/html` would be stored XSS.
+- **`data`** is `byte[]` with `@Column(length = Length.LONG32)`, which is `bytea` on PostgreSQL (`@Lob` would be an
+  `oid` large object; `ClaimImageTests` checks the column type). It's `@Basic(fetch = LAZY)` (Hibernate bytecode
+  enhancement), so listing images never reads the bytes.
+- **Validation:** `@NotNull` / `@NotBlank` / `@NotEmpty` fail the flush with a `ConstraintViolationException` (empty
+  data, blank file name).
+- **The `claim_id` foreign key is `on delete cascade`** (`@OnDelete`) and indexed, so deleting a claim deletes its
+  images; tests only need `Claim.deleteById`.
+- **Image URLs are root-relative** (`/api/db/claims/{id}/images/{imageId}`), built by `ClaimImageMapper` from the
+  resource's `@Path`s. `%openshift` terminates TLS at the route and doesn't enable proxy forwarding, so a URL built
+  from the request would come out as `http://`. The UI resolves it against `backend_api_url`'s origin.
+- **`ClaimImageMapper`** is MapStruct (`mapstruct-processor` on the compiler's `annotationProcessorPaths`) with the
+  `JAKARTA_CDI` component model. It only reads metadata fields, so it never triggers the lazy `data` load.
 
 **Frontend:** React + TypeScript + PatternFly in `src/main/webui/src/app/`, SPA routing enabled.
 
@@ -427,6 +450,16 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   `api().scoresV3()`) — that is test-fixture code that predates the operations layer covering those
   domains, not a gap in the layer.
 - AssertJ + Awaitility; Mockito is attached as a `-javaagent` in the surefire/failsafe config.
+- **Claim image tests:** `ClaimImageTests` (entity, `@TestTransaction`), `ClaimImageResourceTests` (REST and Problem
+  Details), `ClaimImageContentTypeTests` (allow-list, no Quarkus), `ClaimImageSeederTests` and the Playwright
+  `ClaimImagesPageTests`.
+  - Fixtures that the endpoints must see are committed with `QuarkusTransaction.requiringNew()` and removed with
+    `Claim.deleteById` (cascades to images).
+  - Seeder tests that insert or delete images do it on a claim of their own, never on the seeded claims that other
+    classes (e.g. `ClaimImagesPageTests`) rely on.
+  - Call Panache statics through a lambda in `assertThatThrownBy(() -> ClaimImage.flush())`: a method reference
+    (`ClaimImage::flush`) bypasses Panache's enhancement and throws "did you forget to annotate your entity with
+    @Entity?".
 
 ## Conventions
 
@@ -512,10 +545,16 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
     hard-coding them.
 - **The number exists only after the insert is flushed.** `persist()` defers the insert, because Panache ids
   come from a pooled sequence. Use `persistAndFlush()` when the number is needed in the same transaction.
-- **The claim-image seeder runs at every application startup.** `%prod` / `%openshift` recreate the schema,
-  so the image table is empty and gets seeded again. It looks seeded claims up by their explicit IDs in
-  `import.sql`, inserts only missing configured images, and logs/skips a claim ID that is missing;
-  rerunning it does not add duplicates. Keep those IDs aligned if the sample seed claims change.
+- **`ClaimImageSeeder` runs on every start and re-inserts any missing configured image.**
+  - Every profile currently recreates the schema on each boot (`%prod` / `%openshift` set `drop-and-create`; dev/test
+    get it from Dev Services), so in practice each boot inserts all 12 ("Seeded 12 of 12 claim images"). The
+    re-insert-missing path matters for a persistent schema, and `ClaimImageSeederTests` covers it by calling `seed`
+    directly; a second run inserts nothing.
+  - **It matches the sample claims by their explicit ids in `import.sql`** (claim numbers are generated, so they can't
+    be listed). Keep `SEED_IMAGES` aligned if the seed claims change.
+  - A missing claim is logged and skipped. A missing **resource file** fails startup (`SeedImageNotFoundException`),
+    because it's a packaging bug. A file is read only when it's about to be inserted.
+  - It runs in one transaction from a `StartupEvent` observer, so a failure aborts boot.
 - **The claim-number sequence can't be a `@SequenceGenerator`** (spike-verified on Hibernate 7.4.9).
   - **A lone class-level one takes over the `PanacheEntity` id.** This follows the JPA 3.2 default-generator rule:
     there's no `claims_seq`, and ids come from the claim-number sequence.

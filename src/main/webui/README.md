@@ -87,9 +87,13 @@ shell variable or a `.env` file both work. The root [`pom.xml`](../../../pom.xml
   - `incident_date` (`YYYY-MM-DD`) and the optional `incident_time` (`HH:mm:ss`, left out when null) are formatted
     for display by [`formatIncident.ts`](./src/app/utils/formatIncident.ts). It parses them by hand rather than with
     `new Date(...)`, which treats a date-only string as UTC midnight and shows the previous day west of UTC.
-  `ClaimDetail` also gets `GET {backend_api_url}/db/claims/{id}/images`; its metadata includes the full
-  image URL used by `ImageCarousel`, which loads bytes from
-  `GET {backend_api_url}/db/claims/{id}/images/{imageId}`.
+  - `ClaimDetail` also gets `GET {backend_api_url}/db/claims/{id}/images`. Each entry's `url` is root-relative
+    (`/api/db/claims/{id}/images/{imageId}`); `imageSource` in [`claimImages.ts`](./src/app/utils/claimImages.ts)
+    resolves it against the origin of `backend_api_url`, so the bytes come from the same server as the rest of the API.
+    The Documents tab shows the `ORIGINAL` images; the right-hand panel shows the `PROCESSED` ones, otherwise the
+    originals, otherwise "No images attached" (`imagesToDisplay`).
+  - Both requests are aborted when the claim id changes, so a slow response for the previous claim can't overwrite the
+    current one.
 * **Chat** — [`Chat.tsx`](./src/app/components/Chat/Chat.tsx) is a WebSocket, not REST. It derives the
   socket URL from the same config value by swapping the scheme and stripping the `/api` suffix:
 

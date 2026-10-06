@@ -80,6 +80,13 @@ merges keep `main` clean). Copilot's asset moves, `OriginalApp` removal and most
   `isHidden` inverted (shown when "collapsed"); it now starts expanded with the attached images. `file-loader` removed
   from `package.json`. `ClaimImagesPageTests` (3) uses auto-waiting Playwright assertions; the production bundle
   ships only `images/favicon.svg`.
+- **Task 04 (agent part done; maintainer steps open):** docs updated (`CLAUDE.md`, `README.md`,
+  `src/main/webui/README.md`, a #216 plan note to resolve attachment types through `ClaimImageContentType`, and
+  superseded notes in the #213 plan). `clean test-compile` passes for `-Pollama` and the default profile. A full
+  `-Pollama` verify ran 157 tests with 2 errors, both the known environment baselines
+  (`NotificationServiceTests.emailSendsWhenUserExists`, `LangfuseSessionScoringServiceTests:182`); every claim, image
+  and UI suite passed. A fresh review found no BLOCKER; its one MAJOR (stale "by claim number" in task-04) and the
+  relevant MINOR/NITs were fixed. Open: the maintainer's real-key verify and manual check (task stays unticked).
 
 ### Project Context
 - `src/main/webui/src/app/components/ClaimDetail/ClaimDetail.tsx` (lines ~24–25 build the paths) and `ImageCarousel.tsx` (prefixes `/images/`).
