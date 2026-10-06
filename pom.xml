@@ -22,7 +22,6 @@
 		<quarkus.platform.version>3.40.1</quarkus.platform.version>
 		<quarkus.langfuse.version>0.7.2</quarkus.langfuse.version>
 		<surefire-plugin.version>3.6.0</surefire-plugin.version>
-		<quarkus.mailpit.version>2.1.2</quarkus.mailpit.version>
 	</properties>
 	<dependencyManagement>
 		<dependencies>
@@ -106,11 +105,6 @@
 		<dependency>
 			<groupId>io.quarkus</groupId>
 			<artifactId>quarkus-mailer</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>io.quarkiverse.mailpit</groupId>
-			<artifactId>quarkus-mailpit</artifactId>
-			<version>${quarkus.mailpit.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>io.quarkus</groupId>
@@ -207,9 +201,8 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>io.quarkiverse.mailpit</groupId>
-			<artifactId>quarkus-mailpit-testing</artifactId>
-			<version>${quarkus.mailpit.version}</version>
+			<groupId>org.eclipse.angus</groupId>
+			<artifactId>angus-mail</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
@@ -277,6 +270,8 @@
 						<java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
 						<maven.home>${maven.home}</maven.home>
 						<quarkus.class-loading.parent-first-artifacts>ai.djl:api,ai.djl.huggingface:tokenizers,net.java.dev.jna:jna</quarkus.class-loading.parent-first-artifacts>
+						<!-- Never start Roundcube (the 'webmail' Compose profile) in tests, whatever the Quarkus config profile -->
+						<quarkus.compose.devservices.profiles>none</quarkus.compose.devservices.profiles>
 					</systemPropertyVariables>
 					<environmentVariables>
 						<BACKEND_API_URL>http://localhost:8081/api</BACKEND_API_URL>
@@ -301,6 +296,8 @@
 						<native.image.path>${project.build.directory}/${project.build.finalName}-runner</native.image.path>
 						<java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
 						<maven.home>${maven.home}</maven.home>
+						<!-- Never start Roundcube (the 'webmail' Compose profile) in tests, whatever the Quarkus config profile -->
+						<quarkus.compose.devservices.profiles>none</quarkus.compose.devservices.profiles>
 					</systemPropertyVariables>
 					<environmentVariables>
 						<BACKEND_API_URL>http://localhost:8081/api</BACKEND_API_URL>

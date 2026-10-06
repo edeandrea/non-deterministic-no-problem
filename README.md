@@ -73,9 +73,13 @@ The full rationale, including which Langfuse platform gaps drove each tier, is i
 
 - **Java 25**
 - **Maven** — use the included wrapper (`./mvnw`); no separate install needed
-- **A container runtime** (Docker or Podman). The Quarkus extensions on the classpath start Dev
-  Services for PostgreSQL, Langfuse, Mailpit and LGTM (Grafana/Loki/Tempo/Prometheus) automatically in
-  dev and test mode
+- **A container runtime** (Docker or Podman) **with Compose**. The Quarkus extensions on the classpath
+  start Dev Services for PostgreSQL, Langfuse and LGTM (Grafana/Loki/Tempo/Prometheus) automatically in
+  dev and test mode. The mail stack (GreenMail, plus the Roundcube webmail in dev mode) comes from
+  `compose-devservices.yml` through Compose Dev Services, which run `docker compose` or `podman compose`.
+  With Podman, `podman compose` needs a Compose provider installed (`docker-compose` or `podman-compose`).
+  Without Compose, every test fails at startup with `The config property parasol.mail.imap-port is required`,
+  because GreenMail's ports never get mapped into the config
 - **API keys**, depending on what you want to exercise:
 
 | Variable | Needed for |
@@ -99,9 +103,14 @@ Then:
 - **Application**: http://localhost:8080
 - **Swagger UI**: http://localhost:8080/q/swagger-ui (always included, even outside dev mode)
 - **Quarkus Dev UI**: http://localhost:8080/q/dev-ui
+- **Roundcube webmail**: http://localhost:8000. Log in as any address with any password (for example
+  `marty.mcfly@email.com`) to read the claim status emails the app sends. Port 8000 is fixed, so dev mode
+  fails to start if something else is using it
 
-Dev Services bring up PostgreSQL, Langfuse, Mailpit and LGTM for you automatically. The
-application does not
+Dev Services bring up PostgreSQL, Langfuse and LGTM for you automatically, and Compose Dev Services
+start GreenMail (SMTP + IMAP) and Roundcube from `compose-devservices.yml`, under every AI profile.
+GreenMail keeps mail in memory, so restarting dev mode empties every inbox. Tests start GreenMail
+only, never Roundcube. The application does not
 override `quarkus.http.port` anywhere, so it uses the Quarkus default of `8080` in dev mode. Tests
 run against port `8081` — the root `pom.xml` sets `BACKEND_API_URL=http://localhost:8081/api` for
 both surefire and failsafe.

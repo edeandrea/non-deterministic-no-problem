@@ -11,9 +11,9 @@ data:
   quarkus.datasource.jdbc.url: jdbc:postgresql://non-deterministic-db:5432/non_deterministic
   quarkus.otel.exporter.otlp.endpoint: http://lgtm:4318
   quarkus.otel.exporter.otlp.protocol: http/protobuf
-  quarkus.mailer.host: mailpit
+  quarkus.mailer.host: greenmail
   quarkus.mailer.mock: "false"
-  quarkus.mailer.port: "1025"
+  quarkus.mailer.port: "3025"
 ---
 apiVersion: v1
 kind: Secret
@@ -33,17 +33,6 @@ data:
   POSTGRES_DB: bm9uX2RldGVybWluaXN0aWM=
   POSTGRES_USER: bm9uX2RldGVybWluaXN0aWM=
   POSTGRES_PASSWORD: bm9uX2RldGVybWluaXN0aWM=
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: mailpit-data-pvc
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 3Gi
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -190,89 +179,142 @@ spec:
     kind: Service
     name: lgtm
 ---
+# Mail stack, mirroring compose-devservices.yml (same images, same environment).
+# GreenMail: SMTP (3025) + IMAP (3143) + REST API (8080), auth disabled, mailboxes auto-created.
+# Mail is kept in memory only, so a pod restart loses it. Internal only: no Route.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mailpit
+  name: greenmail
+  labels:
+    app.kubernetes.io/part-of: parasol-insurance
 spec:
   replicas: 1
   selector:
     matchLabels:
-      name: mailpit
+      name: greenmail
   template:
     metadata:
       labels:
-        name: mailpit
+        name: greenmail
     spec:
       containers:
-        - name: mailpit
-          image: axllent/mailpit:v1.24.2
+        - name: greenmail
+          image: docker.io/greenmail/standalone:2.1.14
           ports:
-            - containerPort: 1025
-            - containerPort: 8025
-          env:
-            - name: MP_MAX_MESSAGES
-              value: "500"
-            - name: MP_SMTP_RELAY_ALL
-              value: "false"
-            - name: MP_SMTP_RELAY_ALLOW_INSECURE
-              value: "false"
-            - name: MP_SMTP_RELAY_AUTH
-              value: none
-            - name: MP_SMTP_RELAY_PORT
-              value: "25"
-            - name: MP_SMTP_RELAY_STARTTLS
-              value: "false"
-            - name: MP_SMTP_RELAY_TLS
-              value: "false"
-            - name: MP_VERBOSE
-              value: "true"
-            - name: MP_DATABASE
-              value: /data/mailpit.db
+            - containerPort: 3025
+              name: smtp
+            - containerPort: 3143
+              name: imap
+            - containerPort: 8080
+              name: api
+          readinessProbe:
+            httpGet:
+              path: /api/service/readiness
+              port: api
           resources:
             limits:
-              memory: 128Mi
+              memory: 512Mi
             requests:
-              memory: 32Mi
-          volumeMounts:
-            - mountPath: /data
-              name: data
-      volumes:
-        - name: data
-          persistentVolumeClaim:
-            claimName: mailpit-data-pvc
+              memory: 256Mi
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: mailpit
+  name: greenmail
 spec:
   ports:
-    - port: 1025
+    - port: 3025
       protocol: TCP
-      targetPort: 1025
+      targetPort: smtp
       name: smtp
-    - port: 8025
+    - port: 3143
       protocol: TCP
-      targetPort: 8025
-      name: ui
+      targetPort: imap
+      name: imap
+    - port: 8080
+      protocol: TCP
+      targetPort: api
+      name: api
   selector:
-    name: mailpit
+    name: greenmail
+  type: ClusterIP
+---
+# Roundcube webmail: log in as any address with any password. Sends and reads mail through greenmail only.
+# Runs under OpenShift's restricted SCC (arbitrary UID) because ROUNDCUBEMAIL_DB_DIR points its SQLite DB at a
+# writable path; /var/roundcube is owned by www-data. Sessions and settings are lost on a pod restart.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: roundcube
+  labels:
+    app.kubernetes.io/part-of: parasol-insurance
+  annotations:
+    app.openshift.io/connects-to: greenmail
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: roundcube
+  template:
+    metadata:
+      labels:
+        name: roundcube
+    spec:
+      containers:
+        - name: roundcube
+          image: docker.io/roundcube/roundcubemail:1.7.4-apache-nonroot
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: ROUNDCUBEMAIL_DEFAULT_HOST
+              value: greenmail
+            - name: ROUNDCUBEMAIL_DEFAULT_PORT
+              value: "3143"
+            - name: ROUNDCUBEMAIL_SMTP_SERVER
+              value: greenmail
+            - name: ROUNDCUBEMAIL_SMTP_PORT
+              value: "3025"
+            - name: ROUNDCUBEMAIL_DB_DIR
+              value: /tmp/roundcube-db
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: roundcube
+spec:
+  ports:
+    - port: 8000
+      protocol: TCP
+      targetPort: http
+      name: http
+  selector:
+    name: roundcube
   type: ClusterIP
 ---
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: mailpit
+  name: roundcube
 spec:
   port:
-    targetPort: ui
+    targetPort: http
   tls:
     insecureEdgeTerminationPolicy: Redirect
     termination: edge
   to:
     kind: Service
-    name: mailpit
+    name: roundcube
 ---
 apiVersion: route.openshift.io/v1
 kind: Route

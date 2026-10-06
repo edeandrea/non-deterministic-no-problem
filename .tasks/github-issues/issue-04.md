@@ -63,9 +63,9 @@ Roundcube inbox right away.
 
 ## Tasks
 
-- [ ] Compose mail stack and mailer config (spike + build)
-- [ ] Migrate the mail tests to GreenMail
-- [ ] Kubernetes manifests and deploy script (client-side validated)
+- [x] Compose mail stack and mailer config (spike + build)
+- [x] Migrate the mail tests to GreenMail
+- [x] Kubernetes manifests and deploy script (client-side validated)
 - [ ] **Documentation and verification:** an independent review, then a dev-mode and cluster check by the maintainer
 
 ## Acceptance criteria

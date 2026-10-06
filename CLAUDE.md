@@ -33,7 +33,8 @@ The Java source is split into two top-level packages representing two distinct c
 
 Dependencies point one way: `chat` → `notification` → `claim`. New features get their own domain
 package with the same kind of layer sub-packages (the planned email intake goes in
-`org.parasol.intake`). Test packages mirror main, plus the test-only `org.parasol.ui` for Playwright.
+`org.parasol.intake`). Test packages mirror main, plus the test-only `org.parasol.ui` for Playwright
+and `org.parasol.testing.mail` for the GreenMail helper.
 
 Supporting docs:
 - `README.md` — build/run instructions, Ollama profiles, Langfuse integration notes
@@ -89,6 +90,18 @@ All Maven commands run from the repository root via the wrapper.
 # Run the built app outside dev mode
 java -Dquarkus.profile=ollama,prod -jar target/quarkus-app/quarkus-run.jar
 ```
+
+**Every dev-mode run starts the mail stack** from `compose-devservices.yml` (Compose Dev Services):
+GreenMail (SMTP/IMAP/REST API on random host ports) and the Roundcube webmail on
+http://localhost:8000 (log in as any address, any password). That holds under the default, `-Pollama`
+and `-Pollama-openai` profiles alike. Dev Services follow the dev *launch mode*, not the config profile,
+and the Ollama Maven profiles run `quarkus:dev` as `<ai>,prod`, so `quarkus.compose.devservices.profiles:
+webmail` (which enables Roundcube) and `quarkus.mailer.mock: false` / `host: localhost` sit at root level
+in `application.yml` rather than in `%dev`. Tests get GreenMail only: `%test` blanks the Compose profile, and
+surefire/failsafe also set `quarkus.compose.devservices.profiles=none`, because a test whose config profile doesn't
+include `test` (`DriftTestProfile` returns `drift`, `-Dquarkus.test.profile=drift`) would otherwise start Roundcube on
+port 8000.
+GreenMail keeps mail in memory, so restarting dev mode (or a test run) empties every mailbox.
 
 ### Diagrams
 
@@ -179,7 +192,8 @@ email ones above plus `DriftDetectionOutputGuardrail`, `SessionSentimentGuardrai
 
 **Email flow:** the chat bot calls the `NotificationService.updateClaimStatus` tool → updates the
 `Claim` Panache entity → `GenerateEmailService` produces the email → sent via Quarkus Mailer
-(Mailpit dev service in dev/test).
+(GreenMail from `compose-devservices.yml` in dev/test; readable in Roundcube in dev mode). On OpenShift both run
+from `src/main/kubernetes/dependencies.yml` (see OpenShift deployment).
 
 **REST:** the REST layer never serializes entities. Resources hold no queries; they call the Active Record methods
 and map to DTO records with `ClaimMapper`.
@@ -412,14 +426,33 @@ The two Ollama profiles are **not** equivalent:
 
 | Profile | Purpose |
 |---|---|
-| `dev` | Only `datasource.dev-ui.allow-sql` + `mailer.mock: false`. The LGTM, Mailpit, PostgreSQL and Langfuse dev services do run in dev mode, but they come from the extensions' own Dev Services defaults, not from this profile block |
-| `test` | Observability + Langfuse init/session scoring disabled |
+| `dev` | Only `datasource.dev-ui.allow-sql`. The LGTM, PostgreSQL and Langfuse dev services do run in dev mode, but they come from the extensions' own Dev Services defaults, not from this profile block. The GreenMail/Roundcube mail stack and `mailer.mock: false` are root-level config (see Commands) |
+| `test` | Observability + Langfuse init/session scoring disabled; `compose.devservices.profiles` blanked so Roundcube doesn't start |
 | `ollama` | Local Ollama via the Ollama extension; OpenAI/Cohere keys stubbed to `changeme`; Langfuse session scoring + startup init disabled |
 | `ollama-openai` | Local Ollama via the OpenAI client (`base-url: http://localhost:11434/v1`); no key stubs, no `quarkus.aiscoring` overrides |
 | `drift` | Parent `langfuse-ocp`; sets `quarkus.aiscoring.interaction-mode: drift-detection` |
 | `langfuse-ocp` | Points at a deployed Langfuse instance; disables OTLP export and LGTM |
 | `instana` | Exports OTLP to Instana instead of LGTM |
 | `prod`, `openshift` | Schema drop-and-create + `import.sql`; OpenShift deployment config |
+
+### OpenShift deployment
+
+`deploy-to-openshift.sh` installs Langfuse (Helm), applies `src/main/kubernetes/dependencies.yml`, then builds and
+deploys the app with `-Dquarkus.profile=openshift`. It ends by printing the Roundcube Route URL.
+
+- **`dependencies.yml`** holds PostgreSQL, LGTM and the mail stack, plus the `parasol-app-config` ConfigMap the app
+  reads (`quarkus.mailer.host: greenmail`, port `3025`).
+- **The mail stack mirrors `compose-devservices.yml`:** same images and tags, same environment variables. Change
+  both together.
+  - **GreenMail** is internal only (ClusterIP Service for SMTP 3025, IMAP 3143 and the API on 8080; no Route). It keeps
+    mail in memory, so a pod restart loses every mailbox. That's deliberate: GreenMail has no persistent store
+    (`greenmail.preload.dir` only loads `.eml` files at startup), and claim data lives in PostgreSQL anyway.
+  - **Roundcube** is exposed through an edge-TLS Route; log in as any address with any password. It runs under the
+    restricted SCC (arbitrary UID) only because `ROUNDCUBEMAIL_DB_DIR=/tmp/roundcube-db` moves its SQLite DB off the
+    `www-data`-owned `/var/roundcube`. There is no volume, so sessions and settings are lost on restart.
+- The app's `app.openshift.io/connects-to` annotation (`%openshift` in `application.yml`) names **Deployments**, not
+  Services: `non-deterministic-db,grafana-lgtm,greenmail,langfuse-web` (the LGTM Service is `lgtm`, its Deployment
+  `grafana-lgtm`). Roundcube's Deployment carries its own `connects-to: greenmail`.
 
 ### Environment variables
 
@@ -451,7 +484,8 @@ Traces are also exported to Langfuse via the `quarkus-langfuse` extension.
 
 ## Testing
 
-Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/scoring/...`.
+Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/scoring/...`, plus the test-only
+`org.parasol.testing.mail` (GreenMail helper) and `org.parasol.ui` (Playwright).
 
 - `@QuarkusTest` + `@InjectMock`/`@InjectSpy` + `dev.langchain4j.test.guardrail.GuardrailAssertions`
   for guardrail tests.
@@ -526,6 +560,22 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   `api().scoresV3()`) — that is test-fixture code that predates the operations layer covering those
   domains, not a gap in the layer.
 - AssertJ + Awaitility; Mockito is attached as a `-javaagent` in the surefire/failsafe config.
+- **Mail tests read the real GreenMail** from `compose-devservices.yml` (every test run starts it) through the
+  injectable `org.parasol.testing.mail.GreenMailMailbox` bean. There is no mail mock.
+  - **Reading is IMAP** (Angus Mail, test scope, version from the Quarkus BOM): `messages(address)` reads one INBOX,
+    `awaitMessage(address, atMost)` polls with Awaitility and returns the first message, and `allMessages()` reads
+    every known user's INBOX. Messages come back as the `ReceivedEmail` record (`from`, `to`, `subject`, decoded
+    `body` with `\r\n` line endings). Plain-text mail only: anything else throws `MailboxAccessException`.
+  - **Purging and listing users is the GreenMail REST API** (`POST /api/mail/purge`, `GET /api/user`), because IMAP
+    only sees one mailbox at a time. The API returns messages only as raw MIME, which is why reading doesn't use it.
+  - **Auth is disabled,** so any password logs in and an unknown address is just an empty INBOX (no error). IMAP
+    logins and deliveries create users; purging removes mail, not users.
+  - Host and ports are `@ConfigProperty` constructor parameters: `quarkus.mailer.host`, plus `parasol.mail.imap-port`
+    and `parasol.mail.greenmail-api-port`, which the Compose labels map in. Test code injects config properties
+    directly; the `@ConfigMapping` convention is for main code.
+  - **Purge in `@BeforeEach`,** not `@AfterEach`, so mail from other test classes can't leak into "no email sent"
+    assertions (`NotificationServiceTests.assertNoEmailSent` checks `allMessages()` is empty).
+  - `GreenMailMailboxTests` covers the helper with the app's own `Mailer`, no LLM: mailbox isolation and purge.
 - **Claim image tests:** `ClaimImageTests` (entity, `@TestTransaction`), `ClaimImageResourceTests` (REST and Problem
   Details), `ClaimImageContentTypeTests` (allow-list, no Quarkus), `ClaimImageSeederTests` and the Playwright
   `ClaimImagesPageTests`.

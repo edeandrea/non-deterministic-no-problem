@@ -1,14 +1,14 @@
 package org.parasol.notification.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.awaitility.Awaitility.await;
+import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
 
 import java.time.Duration;
-import java.util.Optional;
+import java.util.List;
 
 import jakarta.inject.Inject;
 
-import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -16,30 +16,27 @@ import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.parasol.claim.model.Claim;
 import org.parasol.notification.ai.GenerateEmailService;
+import org.parasol.testing.mail.GreenMailMailbox;
+import org.parasol.testing.mail.ReceivedEmail;
 
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 
-import io.quarkiverse.mailpit.test.InjectMailbox;
-import io.quarkiverse.mailpit.test.Mailbox;
-import io.quarkiverse.mailpit.test.WithMailbox;
-import io.quarkiverse.mailpit.test.model.Message;
-
 @QuarkusTest
-@WithMailbox
 class NotificationServiceTests {
 	private static final Duration WAIT_DURATION = Duration.ofMinutes(5);
 
-	@InjectMailbox
-	Mailbox mailbox;
+	@Inject
+	GreenMailMailbox mailbox;
 
 	@Inject
 	NotificationService emailService;
 
-	@AfterEach
-	void afterEach() {
-		this.mailbox.clear();
+	// Before rather than after each test, so mail left over by other test classes can't leak into the assertions
+	@BeforeEach
+	void purgeMail() {
+		this.mailbox.purge();
 	}
 
 	@Test
@@ -68,26 +65,11 @@ class NotificationServiceTests {
 				.isNotNull()
 				.isEqualTo(NotificationService.NOTIFICATION_SUCCESS, claim.emailAddress, claim.claimNumber, status);
 
-			await()
-				.atMost(WAIT_DURATION)
-				.until(() -> findFirstMessage().isPresent());
-
-			// Find the message in Mailpit
-			var message = findFirstMessage();
-
-			// Assert the message has the correct subject & email address
-			assertThat(message)
-				.isNotNull()
-				.get()
-				.extracting(m -> m.getTo().getFirst().getAddress())
-				.isEqualTo(claim.emailAddress);
-
-			// Assert that the message has the correct info in the body
-			assertThat(message.get().getText().strip())
-				.isNotNull();
-
-			assertThat(message.get().getText().strip().replaceAll("\r\n", "\n"))
-				.isNotNull()
+			// Read it from the claimant's GreenMail INBOX
+			assertThat(this.mailbox.awaitMessage(claim.emailAddress, WAIT_DURATION))
+				.returns(NotificationService.MESSAGE_FROM, ReceivedEmail::from)
+				.returns(List.of(claim.emailAddress), ReceivedEmail::to)
+				.extracting(message -> message.body().strip().replace("\r\n", "\n"), STRING)
 				.startsWith(GenerateEmailService.EMAIL_STARTING.strip())
 				.endsWith(GenerateEmailService.EMAIL_ENDING.strip())
 				.contains(claim.clientName)
@@ -127,13 +109,9 @@ class NotificationServiceTests {
 		assertNoEmailSent();
 	}
 
+	// The send is synchronous (NotificationService awaits the mailer), so any email would already be in GreenMail
 	private void assertNoEmailSent() {
-		assertThat(findFirstMessage())
-			.isNotNull()
-			.isNotPresent();
-	}
-
-	private Optional<Message> findFirstMessage() {
-		return Optional.ofNullable(this.mailbox.findFirst(NotificationService.MESSAGE_FROM));
+		assertThat(this.mailbox.allMessages())
+			.isEmpty();
 	}
 }
