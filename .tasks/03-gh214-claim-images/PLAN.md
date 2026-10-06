@@ -67,7 +67,7 @@ merges keep `main` clean). Copilot's asset moves, `OriginalApp` removal and most
 - **Task 01:** `ClaimImage` (Active Record: `listForClaim`, `findForClaim`, `hasImage`, `store`) with an allow-listed
   `ClaimImageContentType` enum, lazily loaded `bytea` data (`Length.LONG32`), an `on delete cascade` foreign key and an
   index on `claim_id`. `ClaimImageResource` has no queries; `ClaimNotFoundException` / `ClaimImageNotFoundException` are
-  mapped once to Problem Details by `ClaimExceptionMappers` (`@ServerExceptionMapper`). `ClaimImageMapper` (MapStruct
+  mapped once to Problem Details by `ClaimExceptionMappers` (`@ServerExceptionMapper`). `ClaimMapper` (MapStruct
   1.6.3, `JAKARTA_CDI`) builds the DTO with a root-relative URL. Tests: `ClaimImageTests` (9, incl. the `bytea` column
   check), `ClaimImageResourceTests` (8), `ClaimImageContentTypeTests` (21).
 - **Task 02:** `ClaimImageSeeder` matches the sample claims by id, re-inserts any missing image on every start, checks
@@ -106,6 +106,11 @@ merges keep `main` clean). Copilot's asset moves, `OriginalApp` removal and most
   resource holds no queries and builds no error responses; domain not-found exceptions are mapped once to Problem
   Details (a Quarkus `@ServerExceptionMapper` is allowed, maintainer decision).
 - Entity → DTO mapping uses MapStruct with the Jakarta CDI component model (maintainer decision; latest stable).
+- **`ClaimResource` is decoupled too** (maintainer decision during PR #225 review, reversing the original "unchanged"
+  decision): it returns a `ClaimDetails` record through the same `ClaimMapper`, so no entity is serialized and #216's
+  internal `Claim` columns can't leak into the API. The JSON stays identical; a missing claim becomes a Problem Details
+  `404` (was an empty `204`). JsonViews were considered and rejected: the bytes endpoint isn't JSON, the image `url`
+  isn't an entity field, and an entity would expose every new column by default.
 - Kinds: `ORIGINAL` (customer photos) and `PROCESSED` (annotated). New claims never get processed images.
 - Remove `OriginalApp.tsx` and every asset nothing else references.
 - Error responses use RFC 9457 Problem Details.

@@ -22,7 +22,7 @@ The Java source is split into two top-level packages representing two distinct c
 | Package | Contents |
 |---|---|
 | `org.parasol.claim.model` | `Claim` (Panache entity, table `claims`), `ClaimImage` (table `claim_images`), `ClaimImageKind`, `ClaimImageContentType`, `ClaimCategory`, claim-number generation, the domain exceptions (`ClaimNotFoundException`, `ClaimImageNotFoundException`, `UnknownClaimCategoryException`, `UnsupportedClaimImageContentTypeException`) |
-| `org.parasol.claim.rest` | `ClaimResource` (`/api/db/claims`), `ClaimImageResource` (`/api/db/claims/{id}/images`), `ClaimImageMetadata` DTO + `ClaimImageMapper` (MapStruct), `ClaimExceptionMappers` (Problem Details) |
+| `org.parasol.claim.rest` | `ClaimResource` (`/api/db/claims`), `ClaimImageResource` (`/api/db/claims/{id}/images`), the `ClaimDetails` / `ClaimImageMetadata` DTOs + `ClaimMapper` (MapStruct), `ClaimExceptionMappers` (Problem Details) |
 | `org.parasol.claim.seed` | `ClaimImageSeeder` (attaches the sample images to the six seeded claims) |
 | `org.parasol.chat.ai` | `ClaimService` (the chat-bot AI service) |
 | `org.parasol.chat.model` | `ClaimBotQuery`, `ClaimBotQueryResponse` |
@@ -151,19 +151,24 @@ email ones above plus `DriftDetectionOutputGuardrail`, `SessionSentimentGuardrai
 `Claim` Panache entity → `GenerateEmailService` produces the email → sent via Quarkus Mailer
 (Mailpit dev service in dev/test).
 
-**REST:**
-- `ClaimResource`: `GET /api/db/claims`, `GET /api/db/claims/{id}` (returns the Panache entities directly; a
-  missing claim is a `204`, unchanged by #214).
-- `ClaimImageResource`: `GET /api/db/claims/{id}/images` (metadata list, oldest first) and
+**REST:** the REST layer never serializes entities. Resources hold no queries; they call the Active Record methods
+and map to DTO records with `ClaimMapper`.
+- `ClaimResource`: `GET /api/db/claims`, `GET /api/db/claims/{id}` return `ClaimDetails`. A missing claim is a
+  Problem Details `404` (`Claim.findExisting` throws `ClaimNotFoundException`); before #214 it was an empty `204`.
+- `ClaimImageResource`: `GET /api/db/claims/{id}/images` (`ClaimImageMetadata` list, oldest first) and
   `GET /api/db/claims/{id}/images/{imageId}` (the bytes, with the stored content type and
-  `X-Content-Type-Options: nosniff`). The resource holds no queries; it calls `ClaimImage` and maps to
-  `ClaimImageMetadata` with `ClaimImageMapper`.
+  `X-Content-Type-Options: nosniff`).
+- **The DTOs are the API contract.** `ClaimDetails` lists every field the UI reads, in snake_case
+  (`@JsonNaming` on the record; `category` is the label via `ClaimCategory`'s `@JsonValue`; nulls are omitted by the
+  global `serialization-inclusion: non-empty`). A new `Claim` column (e.g. #216's `reviewRunId`, `intakeTraceparent`,
+  `intakeConversationId`, `version`) stays out of the API until it's added to the DTO; `ClaimResourceTests` pins the
+  exact JSON.
 - **Errors:** domain exceptions are mapped once, by `ClaimExceptionMappers` (Quarkus `@ServerExceptionMapper`), to RFC
   9457 Problem Details (`application/problem+json`, `type: about:blank`, `instance` = request path).
   `ClaimNotFoundException` and `ClaimImageNotFoundException` are `404`. An image that exists but belongs to another
   claim is the same `404` as an unknown image.
 
-**The `Claim` entity** (`org.parasol.claim.model`, table `claims`, JSON in snake_case via `@JsonNaming`):
+**The `Claim` entity** (`org.parasol.claim.model`, table `claims`; serialized only through `ClaimDetails`):
 - **`id`** is the Panache numeric primary key (`claims_seq`). REST paths, UI routes, `ClaimBotQuery.claimId`
   and the `NotificationService` tool all use it.
 - **`claimNumber`** is a separate `@NaturalId` (`CLM` + 8 digits, unique, not updatable). PostgreSQL
@@ -213,11 +218,14 @@ email ones above plus `DriftDetectionOutputGuardrail`, `SessionSentimentGuardrai
   data, blank file name).
 - **The `claim_id` foreign key is `on delete cascade`** (`@OnDelete`) and indexed, so deleting a claim deletes its
   images; tests only need `Claim.deleteById`.
-- **Image URLs are root-relative** (`/api/db/claims/{id}/images/{imageId}`), built by `ClaimImageMapper` from the
+- **Image URLs are root-relative** (`/api/db/claims/{id}/images/{imageId}`), built by `ClaimMapper` from the
   resource's `@Path`s. `%openshift` terminates TLS at the route and doesn't enable proxy forwarding, so a URL built
   from the request would come out as `http://`. The UI resolves it against `backend_api_url`'s origin.
-- **`ClaimImageMapper`** is MapStruct (`mapstruct-processor` on the compiler's `annotationProcessorPaths`) with the
-  `JAKARTA_CDI` component model. It only reads metadata fields, so it never triggers the lazy `data` load.
+- **`ClaimMapper`** is MapStruct (`mapstruct-processor` on the compiler's `annotationProcessorPaths`) with the
+  `JAKARTA_CDI` component model, one mapper for the claim aggregate (`Claim` → `ClaimDetails`, `ClaimImage` →
+  `ClaimImageMetadata`). `unmappedTargetPolicy = ERROR` fails the build if a DTO field has no source; unmapped entity
+  fields are ignored on purpose. The image mapping only reads metadata fields, so it never triggers the lazy `data`
+  load.
 
 **Frontend:** React + TypeScript + PatternFly in `src/main/webui/src/app/`, SPA routing enabled.
 

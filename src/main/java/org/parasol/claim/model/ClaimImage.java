@@ -77,9 +77,7 @@ public class ClaimImage extends PanacheEntity {
 	 * @throws ClaimNotFoundException if there's no claim with that id
 	 */
 	public static List<ClaimImage> listForClaim(long claimId) {
-		return Claim.<Claim>findByIdOptional(claimId)
-			.map(claim -> ClaimImage.<ClaimImage>list("claim", Sort.by("createdAt").and("id"), claim))
-			.orElseThrow(() -> new ClaimNotFoundException(claimId));
+		return ClaimImage.list("claim", Sort.by("createdAt").and("id"), Claim.findExisting(claimId));
 	}
 
 	/**

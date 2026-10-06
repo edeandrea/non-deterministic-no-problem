@@ -43,7 +43,10 @@ this to store customer photos.
 
 - Images are stored in the database. No object storage, no filesystem.
 - New claims never get "processed" images.
-- The existing `ClaimResource` contract (it returns entities) is unchanged in this issue.
+- ~~The existing `ClaimResource` contract (it returns entities) is unchanged in this issue.~~ Changed during review
+  (maintainer decision on PR #225): `ClaimResource` returns a `ClaimDetails` DTO through the same MapStruct mapper, so
+  the REST layer never serializes entities before #216 adds internal columns to `Claim`. The JSON is unchanged; a
+  missing claim is now a Problem Details `404` instead of an empty `204`.
 
 ## Tests
 

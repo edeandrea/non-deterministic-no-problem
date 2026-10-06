@@ -44,7 +44,9 @@ Store claim images in PostgreSQL and serve them over REST, with tests.
 ## Key Points
 
 - `ClaimResource` today returns entities directly (`Claim.listAll()`). Don't change that contract in
-  this issue. Only the new image endpoints use DTOs.
+  this issue. Only the new image endpoints use DTOs. *(Reversed during review, maintainer decision on PR #225:
+  `ClaimResource` now returns a `ClaimDetails` DTO via `ClaimMapper` with unchanged JSON; a missing claim is a Problem
+  Details `404` instead of `204`.)*
 - Problem Details: the API currently has no error handling. Check whether Quarkus REST ships an RFC
   9457 mapper in the version from issue 1; otherwise add a minimal `ExceptionMapper` producing `application/problem+json`.
 - Tests that create images or claims must delete them afterwards (`ClaimsListPageTests` expects exactly 6 claims).

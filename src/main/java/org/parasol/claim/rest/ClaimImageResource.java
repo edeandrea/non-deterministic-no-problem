@@ -18,9 +18,9 @@ import org.parasol.claim.model.ClaimImage;
  */
 @Path("/api/db/claims/{id}/images")
 public class ClaimImageResource {
-	private final ClaimImageMapper mapper;
+	private final ClaimMapper mapper;
 
-	ClaimImageResource(ClaimImageMapper mapper) {
+	ClaimImageResource(ClaimMapper mapper) {
 		this.mapper = mapper;
 	}
 

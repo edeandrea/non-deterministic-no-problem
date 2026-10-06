@@ -108,8 +108,9 @@ both surefire and failsafe.
 
 The claims REST API provides `GET /api/db/claims` and `GET /api/db/claims/{id}`. Claim images are stored in
 PostgreSQL and served by `GET /api/db/claims/{id}/images` (metadata, with a relative URL per image) and
-`GET /api/db/claims/{id}/images/{imageId}` (the image bytes). A missing claim or image on the image endpoints returns
-an RFC 9457 Problem Details `404` (`application/problem+json`). Chat goes through the chat WebSocket.
+`GET /api/db/claims/{id}/images/{imageId}` (the image bytes). The endpoints return DTOs rather than the database
+entities, and a missing claim or image is an RFC 9457 Problem Details `404` (`application/problem+json`). Chat goes
+through the chat WebSocket.
 
 Each claim has a numeric `id` and a separate claim number (`CLM` + 8 digits, e.g. `CLM01000000`). PostgreSQL
 generates the number from its own sequence on insert. Claims also have a category (`Single vehicle`,
