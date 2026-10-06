@@ -9,11 +9,12 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 
 import org.parasol.claim.model.Claim;
+import org.parasol.claim.model.ClaimNotFoundException;
 
 /**
  * Claims. Returns {@link ClaimDetails} DTOs rather than the entity. A missing claim surfaces as a
- * {@link org.parasol.claim.model.ClaimNotFoundException}, which {@link ClaimExceptionMappers} turns into an RFC 9457
- * Problem Details {@code 404}.
+ * {@link ClaimNotFoundException}, which {@link ClaimExceptionMappers} turns into an RFC 9457 Problem Details
+ * {@code 404}.
  */
 @Produces(MediaType.APPLICATION_JSON)
 @Path("/api/db/claims")
@@ -43,6 +44,8 @@ public class ClaimResource {
 	@GET
 	@Path("/{id}")
 	public ClaimDetails getone(@PathParam("id") long id) {
-		return this.mapper.toDetails(Claim.findExisting(id));
+		return Claim.<Claim>findByIdOptional(id)
+			.map(this.mapper::toDetails)
+			.orElseThrow(() -> new ClaimNotFoundException(id));
 	}
 }

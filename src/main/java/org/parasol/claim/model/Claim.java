@@ -67,15 +67,4 @@ public class Claim extends PanacheEntity {
 			.map(number -> getSession().find(Claim.class, number, KeyType.NATURAL));
 	}
 
-	/**
-	 * Finds a claim that must exist.
-	 *
-	 * @param id the claim id
-	 * @return the claim
-	 * @throws ClaimNotFoundException if there's no claim with that id
-	 */
-	public static Claim findExisting(long id) {
-		return Claim.<Claim>findByIdOptional(id)
-			.orElseThrow(() -> new ClaimNotFoundException(id));
-	}
 }

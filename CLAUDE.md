@@ -154,7 +154,8 @@ email ones above plus `DriftDetectionOutputGuardrail`, `SessionSentimentGuardrai
 **REST:** the REST layer never serializes entities. Resources hold no queries; they call the Active Record methods
 and map to DTO records with `ClaimMapper`.
 - `ClaimResource`: `GET /api/db/claims`, `GET /api/db/claims/{id}` return `ClaimDetails`. A missing claim is a
-  Problem Details `404` (`Claim.findExisting` throws `ClaimNotFoundException`); before #214 it was an empty `204`.
+  Problem Details `404` (the resource throws `ClaimNotFoundException` when `findByIdOptional` is empty); before #214 it
+  was an empty `204`.
   The UI's claim detail page shows "Claim not found" for it (`ClaimImagesPageTests.unknownClaimSaysTheClaimDoesNotExist`).
 - `ClaimImageResource`: `GET /api/db/claims/{id}/images` (`ClaimImageMetadata` list, oldest first) and
   `GET /api/db/claims/{id}/images/{imageId}` (the bytes, with the stored content type and

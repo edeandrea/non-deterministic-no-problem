@@ -8,6 +8,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import jakarta.ws.rs.core.Response.Status;
 
@@ -16,7 +17,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.parasol.claim.model.Claim;
 import org.parasol.claim.model.ClaimCategory;
-import org.parasol.claim.model.ClaimNotFoundException;
 
 import io.quarkus.panache.mock.PanacheMock;
 import io.quarkus.test.junit.QuarkusTest;
@@ -24,10 +24,9 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import io.restassured.path.json.JsonPath;
 
-// Most tests mock Claim's static Panache methods (Claim.findExisting is stubbed directly, including to throw
-// ClaimNotFoundException), so they never touch the database. getAllSomeFound and getOneFound pin the exact JSON: an
-// entity column that isn't in ClaimDetails can't leak into the API. missingClaimIsNotFoundAgainstTheDatabase runs
-// the real lookup.
+// Most tests mock Claim's static Panache methods, so they never touch the database. getAllSomeFound and getOneFound pin
+// the exact JSON: an entity column that isn't in ClaimDetails can't leak into the API.
+// missingClaimIsNotFoundAgainstTheDatabase runs the real lookup.
 @QuarkusTest
 class ClaimResourceTests {
 	private static final long CLAIM_ID = 42L;
@@ -87,8 +86,8 @@ class ClaimResourceTests {
 	@Test
 	void getOneFound() {
 		PanacheMock.mock(Claim.class);
-		when(Claim.findExisting(CLAIM_ID))
-			.thenReturn(createClaim());
+		when(Claim.findByIdOptional(CLAIM_ID))
+			.thenReturn(Optional.of(createClaim()));
 
 		var claim = getJson("/api/db/claims/{id}", CLAIM_ID)
 			.getMap(".");
@@ -96,15 +95,15 @@ class ClaimResourceTests {
 		assertThat(claim)
 			.isEqualTo(EXPECTED_JSON);
 
-		PanacheMock.verify(Claim.class).findExisting(CLAIM_ID);
+		PanacheMock.verify(Claim.class).findByIdOptional(CLAIM_ID);
 		PanacheMock.verifyNoMoreInteractions(Claim.class);
 	}
 
 	@Test
 	void getOneNotFoundIsProblemDetails() {
 		PanacheMock.mock(Claim.class);
-		when(Claim.findExisting(CLAIM_ID))
-			.thenThrow(new ClaimNotFoundException(CLAIM_ID));
+		when(Claim.findByIdOptional(CLAIM_ID))
+			.thenReturn(Optional.empty());
 
 		var problem = get("/api/db/claims/{id}", CLAIM_ID).then()
 			.statusCode(Status.NOT_FOUND.getStatusCode())
@@ -135,7 +134,6 @@ class ClaimResourceTests {
 			.isEqualTo("Claim -1 was not found");
 	}
 
-
 	@ParameterizedTest
 	@EnumSource(ClaimCategory.class)
 	void categoryIsSerializedAsLabel(ClaimCategory category) {
@@ -143,8 +141,8 @@ class ClaimResourceTests {
 		claim.category = category;
 
 		PanacheMock.mock(Claim.class);
-		when(Claim.findExisting(CLAIM_ID))
-			.thenReturn(claim);
+		when(Claim.findByIdOptional(CLAIM_ID))
+			.thenReturn(Optional.of(claim));
 
 		assertThat(getJson("/api/db/claims/{id}", CLAIM_ID).getString("category"))
 			.isEqualTo(category.label());
@@ -156,8 +154,8 @@ class ClaimResourceTests {
 		claim.incidentTime = null;
 
 		PanacheMock.mock(Claim.class);
-		when(Claim.findExisting(CLAIM_ID))
-			.thenReturn(claim);
+		when(Claim.findByIdOptional(CLAIM_ID))
+			.thenReturn(Optional.of(claim));
 
 		assertThat(getJson("/api/db/claims/{id}", CLAIM_ID).getMap("."))
 			.containsEntry("incident_date", "1955-01-02")
