@@ -467,7 +467,10 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   Details), `ClaimImageContentTypeTests` (allow-list, no Quarkus), `ClaimImageSeederTests` and the Playwright
   `ClaimImagesPageTests`.
   - Fixtures that the endpoints must see are committed with `QuarkusTransaction.requiringNew()` and removed with
-    `Claim.deleteById` (cascades to images).
+    `Claim.deleteById` (cascades to images). `@TestTransaction` doesn't work for these: REST Assured calls the endpoint
+    over HTTP, on another thread with its own transaction, so it can't see the test's uncommitted rows (verified: a
+    claim persisted and flushed in a `@TestTransaction` is a `404` to the endpoint). `@TestTransaction` is fine for
+    tests that only call the model directly (`ClaimImageTests`, `ClaimTests`).
   - Seeder tests that insert or delete images do it on a claim of their own, never on the seeded claims that other
     classes (e.g. `ClaimImagesPageTests`) rely on.
   - Call Panache statics through a lambda in `assertThatThrownBy(() -> ClaimImage.flush())`: a method reference

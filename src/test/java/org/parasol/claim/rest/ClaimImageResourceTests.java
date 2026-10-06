@@ -23,8 +23,10 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 
-// The endpoints run in their own transactions, so fixtures are committed with QuarkusTransaction.requiringNew() and
-// deleted afterwards (ClaimsListPageTests expects exactly the 6 seeded claims). Deleting a claim deletes its images.
+// Not @TestTransaction: REST Assured calls the endpoint over HTTP, so it runs on another thread in its own transaction
+// and can't see the test's uncommitted rows (a claim persisted in a @TestTransaction is a 404 to the endpoint). Fixtures
+// are therefore committed with QuarkusTransaction.requiringNew() and deleted afterwards (ClaimsListPageTests expects
+// exactly the 6 seeded claims). Deleting a claim deletes its images.
 @QuarkusTest
 class ClaimImageResourceTests {
 	private static final byte[] JPEG_DATA = { (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0, 1, 2 };
