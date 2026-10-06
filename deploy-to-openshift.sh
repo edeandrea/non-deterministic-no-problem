@@ -61,3 +61,6 @@ oc apply -f src/main/kubernetes/dependencies.yml
   -Dquarkus.kubernetes.deploy=true \
   -Dquarkus.profile=openshift \
   -Dquarkus.container-image.group=$(oc project -q)
+
+echo
+echo "Roundcube webmail (log in as any address, any password): https://$(oc get route roundcube -o jsonpath='{.spec.host}')"

@@ -89,7 +89,7 @@ rectangle "ai.scoring — AI quality layer\n<i>how we test a non-deterministic s
 
 database "<$database>\nLangfuse\n<i>traces · sessions · datasets · scores</i>\n<i>Gemini judge runs inside Langfuse</i>" as Langfuse #F3E5F5
 database "PostgreSQL\n<i>claims</i>" as DB
-component "<$envelope>\nSMTP (Mailpit)" as Mail #FFFFFF
+component "<$envelope>\nGreenMail\n<i>SMTP + IMAP</i>\n<i>read in the Roundcube webmail</i>" as Mail #FFFFFF
 
 ' =====================================================================
 ' FLOWS

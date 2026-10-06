@@ -1,0 +1,35 @@
+# Mail stack for dev mode and tests, started by Quarkus Compose Dev Services.
+# - greenmail: SMTP (3025) + IMAP (3143) + REST API (8080), auth disabled, mailboxes auto-created, mail kept in memory.
+#   Started in dev mode and in every test run, on random host ports mapped into the app's config by the labels below.
+# - roundcube: browser webmail on http://localhost:8000, only in dev mode (the 'webmail' Compose profile, enabled at
+#   root level in application.yml so it applies under every AI profile). Never in tests: surefire/failsafe set
+#   quarkus.compose.devservices.profiles=none whatever the config profile, and %test blanks it for IDE/continuous-testing
+#   runs. Sends and reads mail through greenmail only. Host port 8000 is fixed, so it must be free when dev mode starts.
+services:
+  greenmail:
+    image: docker.io/greenmail/standalone:2.1.14
+    ports:
+      - '3025'
+      - '3143'
+      - '8080'
+    labels:
+      io.quarkus.devservices.compose.wait_for.logs: .*Starting GreenMail API server.*
+      io.quarkus.devservices.compose.config_map.port.3025: quarkus.mailer.port
+      io.quarkus.devservices.compose.config_map.port.3143: parasol.mail.imap-port
+      io.quarkus.devservices.compose.config_map.port.8080: parasol.mail.greenmail-api-port
+
+  roundcube:
+    image: docker.io/roundcube/roundcubemail:1.7.4-apache-nonroot
+    profiles:
+      - webmail
+    depends_on:
+      - greenmail
+    ports:
+      - '8000:8000'
+    environment:
+      ROUNDCUBEMAIL_DEFAULT_HOST: greenmail
+      ROUNDCUBEMAIL_DEFAULT_PORT: "3143"
+      ROUNDCUBEMAIL_SMTP_SERVER: greenmail
+      ROUNDCUBEMAIL_SMTP_PORT: "3025"
+      # Keep the SQLite DB somewhere writable when running under an arbitrary UID (OpenShift restricted SCC)
+      ROUNDCUBEMAIL_DB_DIR: /tmp/roundcube-db

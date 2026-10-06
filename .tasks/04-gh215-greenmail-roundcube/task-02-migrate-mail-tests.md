@@ -37,6 +37,6 @@ Every mail-related test reads mail from GreenMail, and `quarkus-mailpit-testing`
 
 ## Done When
 
-- [ ] No test imports `io.quarkiverse.mailpit`, and `quarkus-mailpit-testing` is gone from `pom.xml`.
-- [ ] `NotificationServiceTests` reads GreenMail. Its no-email tests and the new isolation test pass under `-Pollama`.
-- [ ] `./mvnw -B clean test-compile -Pollama` succeeds.
+- [x] No test imports `io.quarkiverse.mailpit`, and `quarkus-mailpit-testing` is gone from `pom.xml`.
+- [x] `NotificationServiceTests` reads GreenMail. Its no-email tests and the new isolation test pass under `-Pollama`.
+- [x] `./mvnw -B clean test-compile -Pollama` succeeds.

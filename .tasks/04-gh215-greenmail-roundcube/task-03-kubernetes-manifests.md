@@ -38,6 +38,6 @@ Route; GreenMail stays internal.
 
 ## Done When
 
-- [ ] `dependencies.yml` has no Mailpit resources, and does have the GreenMail and Roundcube resources described.
-- [ ] Client-side validation of `dependencies.yml` passes.
-- [ ] The `connects-to` annotation and the deploy script are updated.
+- [x] `dependencies.yml` has no Mailpit resources, and does have the GreenMail and Roundcube resources described.
+- [x] Client-side validation of `dependencies.yml` passes.
+- [x] The `connects-to` annotation and the deploy script are updated.

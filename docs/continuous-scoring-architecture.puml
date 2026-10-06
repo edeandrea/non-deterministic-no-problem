@@ -102,7 +102,7 @@ rectangle "<$database>\nLangfuse" as Langfuse #F3E5F5 {
 	component "<$brain>\nGoogle Gemini\n<i>gemini-2.5-flash</i>\n<i>LLM-as-a-judge runs HERE,</i>\n<i>never called by the app</i>" as Gemini <<InLangfuse>> #FCE4EC
 }
 
-component "<$envelope>\nMailpit / SMTP" as Mail #FFFFFF
+component "<$envelope>\nGreenMail (SMTP + IMAP)\n<i>read in the Roundcube webmail</i>" as Mail #FFFFFF
 
 package "Observability Stack (LGTM Dev Service)" {
 	component "<$otel>\nOpenTelemetry Collector" as OTel #FFF3E0

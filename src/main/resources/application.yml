@@ -174,8 +174,21 @@ quarkus:
         model-id: snowflake-arctic-embed
 
   # Mail
+  # Send through GreenMail from compose-devservices.yml (the port is mapped in by the compose labels).
+  # Set at root rather than %dev so it also applies when dev mode runs as <ai>,prod (-Pollama / -Pollama-openai)
+  # host: Compose Dev Services publish GreenMail's ports on the container runtime's host and can't map the host name
+  # into config, so this assumes a local Docker/Podman. GreenMailMailbox (tests) reuses it for IMAP and the REST API.
+  # Kubernetes overrides it with the greenmail Service (parasol-app-config ConfigMap)
   mailer:
     tls: false
+    mock: false
+    host: localhost
+
+  # Also start Roundcube (http://localhost:8000) from compose-devservices.yml in dev mode, whatever the
+  # config profile (Dev Services follow the launch mode, so this has no effect in prod). Turned off in %test
+  compose:
+    devservices:
+      profiles: webmail
 
   # HTTP
   http:
@@ -302,8 +315,6 @@ quarkus:
     datasource:
       dev-ui:
         allow-sql: true
-    mailer:
-      mock: false
 
 # Dev and test modes config
 '%dev,test':
@@ -329,6 +340,12 @@ quarkus:
 # test mode config
 '%test':
   quarkus:
+    # GreenMail only in tests, no Roundcube. Covers IDE runs and continuous testing; Maven builds also force
+    # quarkus.compose.devservices.profiles=none from surefire/failsafe, which covers config profiles without 'test'
+    compose:
+      devservices:
+        profiles: ""
+
     aiscoring:
       langfuse:
         evaluation:
@@ -385,4 +402,4 @@ quarkus:
           termination: edge
           insecure-edge-termination-policy: Redirect
       annotations:
-        "app.openshift.io/connects-to": non-deterministic-db,lgtm,mailpit,langfuse-web
+        "app.openshift.io/connects-to": non-deterministic-db,grafana-lgtm,greenmail,langfuse-web
