@@ -48,6 +48,10 @@ class ClaimImageResourceTests {
 
 	@AfterEach
 	void deleteClaims() {
+		// Manual cleanup instead of @TestTransaction rollback: the fixtures had to be committed so the endpoint (called over
+		// HTTP, in its own transaction) could see them, so nothing rolls them back. Leftover claims would break other
+		// classes; ClaimsListPageTests expects exactly the 6 seeded claims.
+		// Deleting the claims is enough: the claim_images foreign key is ON DELETE CASCADE, so their images go too.
 		QuarkusTransaction.requiringNew().run(() -> {
 			Claim.deleteById(this.claimId);
 			Claim.deleteById(this.otherClaimId);
