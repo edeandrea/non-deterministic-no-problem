@@ -47,7 +47,7 @@ class ClaimResourceTests {
 		LocalDate.of(1955, 1, 2),
 		LocalTime.of(15, 30),
 		"Very bad",
-		"wrong@example.com",
+		"client@example.com",
 		"New"
 	);
 
