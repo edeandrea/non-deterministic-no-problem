@@ -185,10 +185,14 @@ java -Dquarkus.profile=ollama-openai,prod -jar target/quarkus-app/quarkus-run.ja
 ```
 
 Both Ollama profiles redirect only the three business chat models — `parasol-chat`,
-`generate-email`, `politeness` — plus the embedding model to a local Ollama (`llama3.2:latest` and
+`generate-email`, `politeness` — plus the embedding model to a local Ollama (`granite4:micro` and
 `snowflake-arctic-embed` respectively). The two Cohere-backed models, `session-sentiment` and
 `judge`, are **not** redirected: they keep the OpenAI provider pointed at
 `https://api.cohere.ai/compatibility/v1`.
+
+`granite4:micro` is a 3B Apache-2.0 model with tool calling and no reasoning mode, picked because
+the chat bot invokes a tool and the email guardrails parse structured JSON. Pull it before your
+first Ollama run: `ollama pull granite4:micro && ollama pull snowflake-arctic-embed`.
 
 The two profiles differ in what else they touch:
 
@@ -207,6 +211,12 @@ CI runs `./mvnw -B clean verify` across both profiles with only a stubbed
 `OPENAI_API_KEY: change-me`. That works because `verify` activates the `%test` profile, which is
 where `score-session: false` and `initialize-on-startup: false` come from — not from the Ollama
 profiles.
+
+Ollama itself is a GitHub service container on `localhost:11434`, with the two models pulled before
+the build. Both profiles reach it: `%ollama-openai` points there already, and `%ollama` falls back
+to the Ollama extension's default `base-url` because CI passes
+`-Dquarkus.langchain4j.ollama.devservices.enabled=false`. That flag is the only CI-specific setting
+— the model id lives in `application.yml`, so CI and local runs use the same model.
 
 # Further reading
 

@@ -122,6 +122,19 @@ snapshot always shows an empty claims table; claim rendering is covered by the P
 `ollama` and `ollama-openai` profiles. CI has no real OpenAI/Cohere/Gemini credentials, so **any new
 test must pass under the Ollama profiles**.
 
+**CI supplies Ollama as a GitHub service container,** `ollama/ollama` on `localhost:11434`, with
+`granite4:micro` and `snowflake-arctic-embed` pulled in a step before the build. Both profiles reach
+it: `%ollama-openai` points there explicitly, and `%ollama` falls back to the Ollama extension's
+default `base-url` because the workflow passes
+`-Dquarkus.langchain4j.ollama.devservices.enabled=false`. That flag is the **only** CI-specific
+config — everything else, including the model id, is in `application.yml`, so local runs and CI
+exercise the same thing.
+
+Don't re-enable the Dev Service in CI. It recreates its container once per augmentation (ten times
+in a full `verify`) and shuts the previous one down, so an app whose build-time config captured an
+earlier container's ephemeral port boots against a dead address. That was a `Connection refused` at
+startup for every `@QuarkusTest` without a Dev-Service-free profile.
+
 ## Architecture
 
 ### Business application — `org.parasol`
@@ -359,7 +372,7 @@ switching between the default and the Ollama profiles.
 
 The two Ollama profiles are **not** equivalent:
 - `%ollama` switches `parasol-chat`, `generate-email`, `politeness` and the embedding model to
-  `provider: ollama` (`llama3.2:latest`, embeddings `snowflake-arctic-embed`), stubs
+  `provider: ollama` (`granite4:micro`, embeddings `snowflake-arctic-embed`), stubs
   `quarkus.langchain4j.openai.api-key` plus the `session-sentiment` and `judge` API keys to
   `changeme`, and disables Langfuse session scoring + startup initialization. Note
   `session-sentiment` and `judge` keep `provider: openai` pointed at the Cohere-compatible
@@ -434,6 +447,17 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   nests `DriftTestProfile implements QuarkusTestProfile`, which returns the `drift` config profile.
   Practical consequence: these tests need the `drift` profile **and** real OpenAI *and* Cohere keys,
   so they can never run in CI, which only supplies a stubbed `OPENAI_API_KEY=change-me`.
+- `NotificationServiceTests.emailSendsWhenUserExists` is `@DisabledIfSystemProperty(named =
+  "quarkus.test.profile", matches = ".*ollama.*")` — so it runs under the default profile
+  (`gpt-5-mini`) but not under either Ollama profile, in CI or locally. It is the only test that
+  drives the real `GenerateEmailService` through all four output guardrails, and the small Ollama
+  models don't clear them on the first attempt: a later guardrail calls `reprompt()` after
+  `GenerateEmailOutputGuardrail`'s JSON extraction already rewrote the output, and LangChain4j
+  rejects that with `Retry or reprompt is not allowed after a rewritten output`. **That is a latent
+  composition problem in the guardrail chain, not a property of any one model** — four guardrails
+  that each both rewrite (via `JsonExtractorOutputGuardrail`) and reprompt cannot compose, and it
+  surfaces whenever the model's email fails a later check. It reproduced identically with
+  `llama3.2:latest` before the move to `granite4:micro`.
 - **Mocking LLM calls:** the Quarkus WireMock dev service (`@ConnectWireMock` + an injected
   `WireMock`). A `QuarkusTestProfile` repoints every relevant `quarkus.langchain4j.openai.*.base-url`
   (including `parasol-chat`, `session-sentiment`, `judge`) at
@@ -442,6 +466,15 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   `@BeforeEach`; there are no WireMock mapping files. (`src/test/resources` only holds
   `seed/claim-images/empty-for-tests.jpg`, an empty file for `ClaimImageSeederTests`; WireMock reads only its
   `mappings/` and `__files/` subdirectories, so it's unaffected.)
+- **A WireMock-backed profile must also pin the provider.** Redirecting `...openai.*.base-url` is
+  not enough: `%ollama` sets `quarkus.langchain4j.parasol-chat.chat-model.provider: ollama` (and the
+  same for `embedding-model`), so under `-Pollama` the request never goes near the OpenAI client and
+  the stub is silently bypassed — the test then runs against a real model and inherits its
+  non-determinism. Every mocking profile therefore also sets
+  `quarkus.langchain4j.parasol-chat.chat-model.provider=openai` and
+  `quarkus.langchain4j.embedding-model.provider=openai`. They look redundant under the default
+  profile; they are not. This is what made `LangfuseSessionScoringServiceTests` flaky — llama3.2
+  decided to call `updateClaimStatus`, which produced a second `GENERATION`.
 - **Easy RAG in WireMock-backed profiles:** a profile that repoints the default
   `quarkus.langchain4j.openai.base-url` at WireMock (`DriftDetectionChatRouteExceptionHandlerTests`,
   `LangfuseSessionScoringServiceTests`) also sets `quarkus.langchain4j.easy-rag.ingestion-strategy=OFF`.
