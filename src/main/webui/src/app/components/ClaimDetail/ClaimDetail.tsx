@@ -7,19 +7,12 @@ import axios from 'axios';
 import * as React from 'react';
 import { useParams } from 'react-router-dom';
 import { formatIncident } from '@app/utils/formatIncident';
+import { ClaimImage, imagesToDisplay } from '@app/utils/claimImages';
 import { Chat } from '../Chat/Chat';
 import { ImageCarousel } from '../ImageCarousel/ImageCarousel';
 
 
 interface ClaimProps { }
-
-interface ClaimImage {
-  id: number;
-  kind: 'ORIGINAL' | 'PROCESSED';
-  file_name: string;
-  content_type: string;
-  url: string;
-}
 
 const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
 
@@ -29,27 +22,31 @@ const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
   const [images, setImages] = React.useState<ClaimImage[]>([]);
 
   React.useEffect(() => {
+    // Aborting on cleanup stops a slow response for the previous claim from overwriting the current one
+    const controller = new AbortController();
     setClaim({});
     setImages([]);
 
-    axios.get(config.backend_api_url + `/db/claims/${claim_id}`)
+    axios.get(config.backend_api_url + `/db/claims/${claim_id}`, { signal: controller.signal })
       .then((response) => setClaim(response.data))
       .catch(error => {
-        console.error(error);
+        if (!axios.isCancel(error)) {
+          console.error(error);
+        }
       });
 
-    axios.get(config.backend_api_url + `/db/claims/${claim_id}/images`)
+    axios.get<ClaimImage[]>(config.backend_api_url + `/db/claims/${claim_id}/images`, { signal: controller.signal })
       .then((response) => setImages(response.data))
       .catch(error => {
-        console.error(error);
-        setImages([]);
+        if (!axios.isCancel(error)) {
+          console.error(error);
+        }
       });
 
+    return () => controller.abort();
   }, [claim_id]);
 
-  const originalImages = images.filter(image => image.kind === 'ORIGINAL');
-  const processedImages = images.filter(image => image.kind === 'PROCESSED');
-  const displayImages = processedImages.length > 0 ? processedImages : originalImages;
+  const { originalImages, panelImages } = imagesToDisplay(images);
 
   // Tabs control
   const [activeTabKey, setActiveTabKey] = React.useState<string | number>(0);
@@ -63,7 +60,8 @@ const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
   };
 
   // Accordion toggle
-  const [expanded, setExpanded] = React.useState(['']);
+  // The original claim content (with its attached images) starts expanded
+  const [expanded, setExpanded] = React.useState(['claim-toggle1']);
 
   const toggle = (id) => {
     const index = expanded.indexOf(id);
@@ -189,7 +187,7 @@ const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
                               id="claim-toggle1">
                               Original claim content
                             </AccordionToggle>
-                            <AccordionContent id="claim-content1" isHidden={expanded.includes('claim-toggle1')}>
+<AccordionContent id="claim-content1" isHidden={!expanded.includes('claim-toggle1')}>
                               <TextContent>
                                 <Text component={TextVariants.h3}>Subject:</Text>
                                 {claim.subject}
@@ -214,7 +212,7 @@ const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
           <GridItem span={4}>
             <Card isRounded={true} className='width-100'>
               <CardBody>
-                {displayImages.length > 0 ? <ImageCarousel images={displayImages} /> : 'No images attached'}
+                {panelImages.length > 0 ? <ImageCarousel images={panelImages} /> : 'No images attached'}
               </CardBody>
             </Card>
           </GridItem>

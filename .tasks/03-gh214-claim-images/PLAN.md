@@ -44,7 +44,7 @@ Edit or create task files and update `## Task Plan`.
 
 - [x] [task-01-claim-image-model-and-api.md](task-01-claim-image-model-and-api.md): Claim image model and REST API
 - [x] [task-02-seed-images.md](task-02-seed-images.md): Seed the existing claim images
-- [ ] [task-03-ui-and-cleanup.md](task-03-ui-and-cleanup.md): UI reads images from the API; remove OriginalApp
+- [x] [task-03-ui-and-cleanup.md](task-03-ui-and-cleanup.md): UI reads images from the API; remove OriginalApp
 - [ ] [task-04-docs-and-verification.md](task-04-docs-and-verification.md): Documentation and verification
 
 ---
@@ -74,6 +74,12 @@ merges keep `main` clean). Copilot's asset moves, `OriginalApp` removal and most
   the claim once (log and skip if missing) and reads a file only when inserting it. A missing resource file fails
   startup (`SeedImageNotFoundException`), since that's a packaging bug. `ClaimImageSeederTests` (6) never touch the
   shared seed data: inserts and deletes happen on a claim each test creates.
+- **Task 03:** `ClaimDetail` aborts both requests when the claim id changes (stale-response race), and the image logic
+  lives in `utils/claimImages.ts` (`imagesToDisplay`, `imageSource` resolves the relative URL against
+  `backend_api_url`'s origin; Jest-tested). Pre-existing bug fixed: the "Original claim content" accordion had its
+  `isHidden` inverted (shown when "collapsed"); it now starts expanded with the attached images. `file-loader` removed
+  from `package.json`. `ClaimImagesPageTests` (3) uses auto-waiting Playwright assertions; the production bundle
+  ships only `images/favicon.svg`.
 
 ### Project Context
 - `src/main/webui/src/app/components/ClaimDetail/ClaimDetail.tsx` (lines ~24–25 build the paths) and `ImageCarousel.tsx` (prefixes `/images/`).

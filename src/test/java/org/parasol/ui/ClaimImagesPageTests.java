@@ -1,89 +1,80 @@
 package org.parasol.ui;
 
-import static io.restassured.RestAssured.get;
-import static org.assertj.core.api.Assertions.assertThat;
-
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Map;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.parasol.claim.model.Claim;
 import org.parasol.claim.model.ClaimCategory;
 import org.parasol.claim.model.ClaimImage;
+import org.parasol.claim.model.ClaimImageKind;
 
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 
+import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.assertions.PlaywrightAssertions;
 import com.microsoft.playwright.options.AriaRole;
 import io.quarkiverse.quinoa.testing.QuinoaTestProfiles;
 
+// The claim without images is created for the test and deleted afterwards (ClaimsListPageTests expects exactly the 6
+// seeded claims). The seeded claim's images come from ClaimImageSeeder.
 @QuarkusTest
 @TestProfile(QuinoaTestProfiles.EnableAndRunTests.class)
 public class ClaimImagesPageTests extends PlaywrightTests {
+	private static final long SEEDED_CLAIM_ID = 1L;
+
 	private Long testClaimId;
 
 	@AfterEach
-	void cleanUp() {
-		if (testClaimId != null) {
-			QuarkusTransaction.requiringNew().run(() -> {
-				ClaimImage.delete("claim.id = ?1", testClaimId);
-				Claim.deleteById(testClaimId);
-			});
+	void deleteTestClaim() {
+		if (this.testClaimId != null) {
+			QuarkusTransaction.requiringNew().run(() -> Claim.deleteById(this.testClaimId));
 		}
 	}
 
 	@Test
-	void seededClaimImagesAreLoadedFromTheApi() {
-		var claim = Claim.<Claim>findByIdOptional(1L)
-			.orElseThrow();
-		var imageMetadata = get("/api/db/claims/{id}/images", claim.id)
-			.then()
-			.statusCode(200)
-			.extract()
-			.jsonPath()
-			.getList(".", Map.class);
-		var imageUrls = imageMetadata.stream()
-			.map(image -> (String) image.get("url"))
-			.toList();
+	void seededClaimShowsItsImagesFromTheApi() {
+		var originalUrl = imageUrl(SEEDED_CLAIM_ID, ClaimImageKind.ORIGINAL);
+		var processedUrl = imageUrl(SEEDED_CLAIM_ID, ClaimImageKind.PROCESSED);
+		var page = loadPage("ClaimDetail/%d".formatted(SEEDED_CLAIM_ID), "%s_seededClaimShowsItsImagesFromTheApi".formatted(getClass().getSimpleName()));
 
-		var page = loadPage("ClaimDetail/%d".formatted(claim.id), "%s_seededClaimImages".formatted(getClass().getSimpleName()));
-		page.getByRole(AriaRole.TAB, new Page.GetByRoleOptions().setName("Documents")).click();
+		// The right-hand panel shows the processed image
+		PlaywrightAssertions.assertThat(galleryImage(page, processedUrl))
+			.isVisible();
 
-		assertThat(imageMetadata)
-			.extracting(image -> image.get("kind"))
-			.containsExactlyInAnyOrder("ORIGINAL", "PROCESSED");
-		imageUrls.forEach(imageUrl ->
-			assertThat(page.locator("img.image-gallery-image[src='%s']".formatted(imageUrl)).count())
-				.isPositive()
-		);
+		openAttachedImages(page);
+
+		// The Documents tab shows the original image
+		PlaywrightAssertions.assertThat(galleryImage(page, originalUrl))
+			.isVisible();
+
+		PlaywrightAssertions.assertThat(page.getByText("No images attached"))
+			.hasCount(0);
 	}
 
 	@Test
-	void claimWithoutImagesShowsEmptyMessagesInBothPanels() {
-		testClaimId = QuarkusTransaction.requiringNew().call(() -> {
+	void claimWithoutImagesSaysSoInBothPlaces() {
+		this.testClaimId = QuarkusTransaction.requiringNew().call(() -> {
 			var claim = new Claim();
 			claim.category = ClaimCategory.OTHER;
 			claim.inceptionDate = LocalDate.of(2020, 1, 1);
 			claim.incidentDate = LocalDate.of(2024, 1, 1);
-			claim.persistAndFlush();
+			claim.persist();
 
 			return claim.id;
 		});
 
-		var page = loadPage("ClaimDetail/%d".formatted(testClaimId), "%s_claimWithoutImages".formatted(getClass().getSimpleName()));
-		page.getByRole(AriaRole.TAB, new Page.GetByRoleOptions().setName("Documents")).click();
+		var page = loadPage("ClaimDetail/%d".formatted(this.testClaimId), "%s_claimWithoutImagesSaysSoInBothPlaces".formatted(getClass().getSimpleName()));
+		openAttachedImages(page);
 
-		assertThat(page.getByText("No images attached").all())
-			.hasSize(2);
-		PlaywrightAssertions.assertThat(page.getByText("No images attached").first())
-			.isVisible();
-		PlaywrightAssertions.assertThat(page.getByText("No images attached").last())
-			.isVisible();
+		PlaywrightAssertions.assertThat(page.getByText("No images attached"))
+			.hasCount(2);
+
+		PlaywrightAssertions.assertThat(page.locator("img.image-gallery-image"))
+			.hasCount(0);
 	}
 
 	@Test
@@ -92,5 +83,29 @@ public class ClaimImagesPageTests extends PlaywrightTests {
 
 		PlaywrightAssertions.assertThat(page.getByText("404 Page not found"))
 			.isVisible();
+	}
+
+	// The "Original claim content" accordion starts expanded, so its attached images show once the tab is open
+	private static void openAttachedImages(Page page) {
+		page.getByRole(AriaRole.TAB, new Page.GetByRoleOptions().setName("Documents")).click();
+
+		PlaywrightAssertions.assertThat(page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Original claim content")))
+			.hasAttribute("aria-expanded", "true");
+	}
+
+	// The gallery renders the image's root-relative API path resolved against the backend origin
+	private static Locator galleryImage(Page page, String imageUrl) {
+		return page.locator("img.image-gallery-image")
+			.and(page.locator("[src$='%s']".formatted(imageUrl)));
+	}
+
+	private static String imageUrl(long claimId, ClaimImageKind kind) {
+		var imageId = QuarkusTransaction.requiringNew().call(() -> ClaimImage.listForClaim(claimId).stream()
+			.filter(image -> image.kind == kind)
+			.findFirst()
+			.map(image -> image.id)
+			.orElseThrow(() -> new IllegalStateException("Seeded claim %d has no %s image".formatted(claimId, kind))));
+
+		return "/api/db/claims/%d/images/%d".formatted(claimId, imageId);
 	}
 }
