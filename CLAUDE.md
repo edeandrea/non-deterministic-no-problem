@@ -93,7 +93,8 @@ java -Dquarkus.profile=ollama,prod -jar target/quarkus-app/quarkus-run.jar
 
 **Every dev-mode run starts the mail stack** from `compose-devservices.yml` (Compose Dev Services):
 GreenMail (SMTP/IMAP/REST API on random host ports) and the Roundcube webmail on
-http://localhost:8000 (log in as any address, any password). That holds under the default, `-Pollama`
+http://localhost:8000 (log in as any address, any password; README "Reading the emails" lists the seeded claimants'
+mailboxes and how to trigger a status email). That holds under the default, `-Pollama`
 and `-Pollama-openai` profiles alike. Dev Services follow the dev *launch mode*, not the config profile,
 and the Ollama Maven profiles run `quarkus:dev` as `<ai>,prod`, so `quarkus.compose.devservices.profiles:
 webmail` (which enables Roundcube) and `quarkus.mailer.mock: false` / `host: localhost` sit at root level

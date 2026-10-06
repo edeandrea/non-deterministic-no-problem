@@ -104,8 +104,9 @@ Then:
 - **Swagger UI**: http://localhost:8080/q/swagger-ui (always included, even outside dev mode)
 - **Quarkus Dev UI**: http://localhost:8080/q/dev-ui
 - **Roundcube webmail**: http://localhost:8000. Log in as any address with any password (for example
-  `marty.mcfly@email.com`) to read the claim status emails the app sends. Port 8000 is fixed, so dev mode
-  fails to start if something else is using it
+  `marty.mcfly@email.com`) to read the claim status emails the app sends (see
+  [Reading the emails](#reading-the-emails)). Port 8000 is fixed, so dev mode fails to start if something
+  else is using it
 
 Dev Services bring up PostgreSQL, Langfuse and LGTM for you automatically, and Compose Dev Services
 start GreenMail (SMTP + IMAP) and Roundcube from `compose-devservices.yml`, under every AI profile.
@@ -114,6 +115,38 @@ only, never Roundcube. The application does not
 override `quarkus.http.port` anywhere, so it uses the Quarkus default of `8080` in dev mode. Tests
 run against port `8081` — the root `pom.xml` sets `BACKEND_API_URL=http://localhost:8081/api` for
 both surefire and failsafe.
+
+### Reading the emails
+
+When the chat bot is explicitly asked to update a claim's status, the app emails the claimant from
+`noreply@parasol.com`. To read that email:
+
+1. Open http://localhost:8000.
+2. Log in with the claimant's email address as the username and **any** password (GreenMail has
+   authentication turned off). There's no server to pick.
+3. Open the Inbox, and refresh it if the email arrives after you've logged in.
+
+The seeded claims (`src/main/resources/import.sql`) belong to these claimants:
+
+| Claim id | Claimant | Mailbox |
+|---|---|---|
+| 1 | Marty McFly | `marty.mcfly@email.com` |
+| 2 | John T. Anderson | `JAnderson@mail.com` |
+| 3 | Jane Doe | `jane_doe@email.com` |
+| 4 | Dominic Toretto | `domt@email.com` |
+| 5 | Saul Goodman | `bettercallsaul@email.com` |
+| 6 | Tyrion Lannister | `tylannister@email.com` |
+
+For example, log in as `marty.mcfly@email.com`, then ask the chat bot to update claim 1's status to
+"Approved". The email shows up in Marty's Inbox.
+
+- **Any address works.** Logging in as an address that has never received mail just shows an empty
+  Inbox, not an error.
+- **One mailbox per browser session.** To switch, log out (top right) and log in as another address,
+  or use a private window to keep a second mailbox open alongside.
+- **Mail you send from Roundcube also stays inside GreenMail.** It never leaves your machine, so you can
+  write to any address, including another seeded claimant.
+- **Mail lives in memory only,** so restarting dev mode empties every mailbox.
 
 The claims REST API provides `GET /api/db/claims` and `GET /api/db/claims/{id}`. Claim images are stored in
 PostgreSQL and served by `GET /api/db/claims/{id}/images` (metadata, with a relative URL per image) and
