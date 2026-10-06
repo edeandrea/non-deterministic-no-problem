@@ -156,6 +156,23 @@ startup for every `@QuarkusTest` without a Dev-Service-free profile.
 `EmailContainsRequiredInformationOutputGuardrail`, `EmailStartsAppropriatelyOutputGuardrail`,
 `EmailEndsAppropriatelyOutputGuardrail`, `PolitenessOutputGuardrail`.
 
+**None of them may report success by rewriting the output** — that was [#228](https://github.com/edeandrea/non-deterministic-no-problem/issues/228).
+`JsonExtractorOutputGuardrail.validate` returns `successWith(json, value)` unconditionally, which is a
+rewrite, and `OutputGuardrailExecutor.handleFatalResult` refuses any retry or reprompt once something
+earlier in the chain has rewritten (`"Retry or reprompt is not allowed after a rewritten output"`). With
+four of them chained, only the *first* could ever reprompt. So the base deliberately does **not** use the
+inherited `validate`: it exposes `extractEmail(AiMessage)` (parse, no rewrite) and `invalidJson(AiMessage)`,
+and each guardrail returns `success()` or `reprompt(...)`. `super.validate(...)` is still inherited and
+still rewrites — don't call it. `EmailOutputGuardrailChainTests` is the guard; it drives the real
+`OutputGuardrailExecutor`, and every `guardrailSuccess` unit test asserts plain `Result.SUCCESS` rather
+than `SUCCESS_WITH_RESULT`.
+
+Nothing here needs the rewrite: Quarkus and LangChain4j **already** extract JSON from surrounding prose on
+the AI service return path (`PojoOutputParser` → `JsonParsingUtils.extractAndParseJson`, plus
+`QuarkusJsonCodecFactory`'s own first-`{`-to-last-`}` regex). What `JsonExtractorOutputGuardrail` still
+buys here is its deliberately strict plain `ObjectMapper` and a reprompt — rather than an escaping
+`OutputParsingException` — when the output can't be parsed.
+
 The project has **seven guardrail classes in total and they are all output guardrails** — the four
 email ones above plus `DriftDetectionOutputGuardrail`, `SessionSentimentGuardrail` and
 `EvaluatorResultOutputGuardrail`. There are **zero input guardrails**.
@@ -372,7 +389,15 @@ switching between the default and the Ollama profiles.
 
 The two Ollama profiles are **not** equivalent:
 - `%ollama` switches `parasol-chat`, `generate-email`, `politeness` and the embedding model to
-  `provider: ollama` (`granite4:micro`, embeddings `snowflake-arctic-embed`), stubs
+  `provider: ollama` (`granite4:micro`, embeddings `snowflake-arctic-embed`) — **except
+  `generate-email`, which uses `qwen3:4b` with `model-options.think: false`**, because it is the
+  only model measured to reproduce `EMAIL_ENDING` verbatim for
+  `EmailEndsAppropriatelyOutputGuardrail`, and qwen3 reasons by default (~6k tokens per email
+  versus ~140 with thinking off). Note `%ollama-openai` does **not** inherit this: all three of its
+  `model-name`s interpolate from `quarkus.langchain4j.ollama.parasol-chat.chat-model.model-id`, not
+  from their own, so changing `generate-email`'s id moves only the Ollama-native leg. That is
+  deliberate — `model-options.think` has no equivalent on the OpenAI-compatible endpoint. It also
+  stubs
   `quarkus.langchain4j.openai.api-key` plus the `session-sentiment` and `judge` API keys to
   `changeme`, and disables Langfuse session scoring + startup initialization. Note
   `session-sentiment` and `judge` keep `provider: openai` pointed at the Cohere-compatible
@@ -448,16 +473,21 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   Practical consequence: these tests need the `drift` profile **and** real OpenAI *and* Cohere keys,
   so they can never run in CI, which only supplies a stubbed `OPENAI_API_KEY=change-me`.
 - `NotificationServiceTests.emailSendsWhenUserExists` is `@DisabledIfSystemProperty(named =
-  "quarkus.test.profile", matches = ".*ollama.*")` — so it runs under the default profile
-  (`gpt-5-mini`) but not under either Ollama profile, in CI or locally. It is the only test that
-  drives the real `GenerateEmailService` through all four output guardrails, and the small Ollama
-  models don't clear them on the first attempt: a later guardrail calls `reprompt()` after
-  `GenerateEmailOutputGuardrail`'s JSON extraction already rewrote the output, and LangChain4j
-  rejects that with `Retry or reprompt is not allowed after a rewritten output`. **That is a latent
-  composition problem in the guardrail chain, not a property of any one model** — four guardrails
-  that each both rewrite (via `JsonExtractorOutputGuardrail`) and reprompt cannot compose, and it
-  surfaces whenever the model's email fails a later check. It reproduced identically with
-  `llama3.2:latest` before the move to `granite4:micro`.
+  "quarkus.test.profile", matches = ".*ollama-openai.*")` — it runs everywhere **except** the
+  `%ollama-openai` leg. It is the only test that drives the real `GenerateEmailService` through all
+  four output guardrails end to end. **The gate is model capability, not the #228 guardrail bug,
+  which is fixed** (`EmailOutputGuardrailChainTests` covers that).
+  `EmailEndsAppropriatelyOutputGuardrail` requires the body to end with
+  `GenerateEmailService.EMAIL_ENDING` **verbatim**, and most small models reflow it — `granite4:micro`
+  collapses the three disclaimer lines onto one and adds a space after `"Sincerely,"`, so the
+  guardrail reprompts until max-retries. Measured identical for `llama3.2:latest`, `ministral-3:3b`
+  and `qwen2.5:3b`. `qwen3:4b` is the one that reproduces it (5/5 runs), which is why
+  `generate-email` uses it under `%ollama` — see the Models section. `%ollama-openai` can't follow:
+  it reaches Ollama over the OpenAI-compatible endpoint, where `model-options.think` doesn't exist,
+  and a thinking qwen3 spends ~6k tokens per email (minutes on a 4 vCPU runner). `qwen3:4b-instruct`
+  was tried and rejected: its 256K context blows the test's 5-minute transaction budget even at
+  `num-ctx=8192`. **Don't re-enable the last leg by relaxing the guardrail** — the system prompt and
+  the reprompt both say "EXACTLY as it appears below", and enforcing that is the point of the demo.
 - **Mocking LLM calls:** the Quarkus WireMock dev service (`@ConnectWireMock` + an injected
   `WireMock`). A `QuarkusTestProfile` repoints every relevant `quarkus.langchain4j.openai.*.base-url`
   (including `parasol-chat`, `session-sentiment`, `judge`) at

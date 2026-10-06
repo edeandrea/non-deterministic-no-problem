@@ -29,7 +29,8 @@ class EmailEndsAppropriatelyOutputGuardrailTests {
 		var aiMessage = AiMessage.from(json);
 
 		assertThat(this.guardrail.validate(aiMessage))
-			.isSuccessful();
+			// Plain SUCCESS, not SUCCESS_WITH_RESULT: a rewrite here would block every later guardrail reprompting (#228)
+			.hasResult(Result.SUCCESS);
 	}
 
 	@Test

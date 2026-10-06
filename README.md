@@ -191,8 +191,21 @@ Both Ollama profiles redirect only the three business chat models — `parasol-c
 `https://api.cohere.ai/compatibility/v1`.
 
 `granite4:micro` is a 3B Apache-2.0 model with tool calling and no reasoning mode, picked because
-the chat bot invokes a tool and the email guardrails parse structured JSON. Pull it before your
-first Ollama run: `ollama pull granite4:micro && ollama pull snowflake-arctic-embed`.
+the chat bot invokes a tool and the email guardrails parse structured JSON.
+
+Under `-Pollama`, `generate-email` is the exception: it uses `qwen3:4b` with reasoning turned off.
+`EmailEndsAppropriatelyOutputGuardrail` requires the email to end with the standard closing block
+**verbatim**, and `granite4:micro` reflows it — as do `llama3.2`, `ministral-3:3b` and
+`qwen2.5:3b` — so the guardrail reprompts until it gives up. `qwen3:4b` reproduces it. Reasoning is
+disabled because qwen3 otherwise spends roughly 6,000 thinking tokens per email instead of ~140.
+`-Pollama-openai` keeps `granite4:micro` throughout: it reaches Ollama over the OpenAI-compatible
+endpoint, which has no equivalent switch for reasoning.
+
+Pull all three before your first Ollama run:
+
+```bash
+ollama pull granite4:micro && ollama pull qwen3:4b && ollama pull snowflake-arctic-embed
+```
 
 The two profiles differ in what else they touch:
 
