@@ -81,12 +81,21 @@ shell variable or a `.env` file both work. The root [`pom.xml`](../../../pom.xml
 `BACKEND_API_URL=http://localhost:8081/api` for the surefire and failsafe executions.
 
 * **REST** — `ClaimsList` and `ClaimDetail` call `GET {backend_api_url}/db/claims` and
-  `GET {backend_api_url}/db/claims/{id}` with axios. Claim JSON is snake_case:
+  `GET {backend_api_url}/db/claims/{id}` with axios. Claim JSON is snake_case (the backend's `ClaimDetails` DTO). An
+  unknown id is a Problem Details `404`; `ClaimDetail` then shows a "Claim not found" page with a link back to the
+  list (`isNotFound` in [`httpErrors.ts`](./src/app/utils/httpErrors.ts)) instead of an empty claim:
   - `category` is the display label ("Single vehicle", "Multiple vehicle", "Theft", "Other"), which is what the list's
     category filter matches on.
   - `incident_date` (`YYYY-MM-DD`) and the optional `incident_time` (`HH:mm:ss`, left out when null) are formatted
     for display by [`formatIncident.ts`](./src/app/utils/formatIncident.ts). It parses them by hand rather than with
     `new Date(...)`, which treats a date-only string as UTC midnight and shows the previous day west of UTC.
+  - `ClaimDetail` also gets `GET {backend_api_url}/db/claims/{id}/images`. Each entry's `url` is root-relative
+    (`/api/db/claims/{id}/images/{imageId}`); `imageSource` in [`claimImages.ts`](./src/app/utils/claimImages.ts)
+    resolves it against the origin of `backend_api_url`, so the bytes come from the same server as the rest of the API.
+    The Documents tab shows the `ORIGINAL` images; the right-hand panel shows the `PROCESSED` ones, otherwise the
+    originals, otherwise "No images attached" (`imagesToDisplay`).
+  - Both requests are aborted when the claim id changes, so a slow response for the previous claim can't overwrite the
+    current one.
 * **Chat** — [`Chat.tsx`](./src/app/components/Chat/Chat.tsx) is a WebSocket, not REST. It derives the
   socket URL from the same config value by swapping the scheme and stripping the `/api` suffix:
 
@@ -110,7 +119,6 @@ in [`webpack.common.js`](./webpack.common.js):
 * `@assets/*` → PatternFly's `@patternfly/react-core/dist/styles/assets/*`
 
 ```js
-import loader from '@app/assets/images/loader.gif';
 import imgSrc from '@assets/images/g_sizing.png';
 ```
 

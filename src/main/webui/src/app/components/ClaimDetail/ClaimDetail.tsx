@@ -2,11 +2,14 @@ import config from '@app/config';
 import { faCalendarDays, faCommentDots, faFaceSmile, faFileLines } from '@fortawesome/free-regular-svg-icons';
 import { faCaretDown, faLocationDot, faRectangleList, faShieldHalved, faUser } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { Accordion, AccordionContent, AccordionItem, AccordionToggle, Breadcrumb, BreadcrumbItem, Button, Card, CardBody, Divider, Flex, FlexItem, Grid, GridItem, Label, Page, PageSection, Tab, Tabs, TabTitleText, Text, TextContent, TextVariants, Title } from '@patternfly/react-core';
+import { Accordion, AccordionContent, AccordionItem, AccordionToggle, Breadcrumb, BreadcrumbItem, Button, Card, CardBody, Divider, EmptyState, EmptyStateBody, EmptyStateFooter, EmptyStateHeader, EmptyStateIcon, Flex, FlexItem, Grid, GridItem, Label, Page, PageSection, Tab, Tabs, TabTitleText, Text, TextContent, TextVariants, Title } from '@patternfly/react-core';
+import { ExclamationTriangleIcon } from '@patternfly/react-icons';
 import axios from 'axios';
 import * as React from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { formatIncident } from '@app/utils/formatIncident';
+import { ClaimImage, imagesToDisplay } from '@app/utils/claimImages';
+import { isNotFound } from '@app/utils/httpErrors';
 import { Chat } from '../Chat/Chat';
 import { ImageCarousel } from '../ImageCarousel/ImageCarousel';
 
@@ -18,22 +21,40 @@ const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
   // Claims data
   const { claim_id } = useParams<{ claim_id: string }>();
   const [claim, setClaim] = React.useState<any>({});
+  const [images, setImages] = React.useState<ClaimImage[]>([]);
+  const [claimNotFound, setClaimNotFound] = React.useState<boolean>(false);
 
   React.useEffect(() => {
-    axios.get(config.backend_api_url + `/db/claims/${claim_id}`)
-      .then((response) => {
-        response.data.original_images = [{image_name: `images/original_car${claim_id}.jpg`, image_key: `src/app/assets/images/original_car${claim_id}.jpg`, claim_id: `${claim_id}`}];
-        response.data.processed_images = [{image_name: `images/car${claim_id}-processed.jpg`, image_key: `src/app/assets/images/car${claim_id}-processed.jpg`, claim_id: `${claim_id}`}];
-        //image_name, image_key, claim_id
-        console.log(`images for ${claim_id}`);
-        console.log(response.data);
-        setClaim(response.data);
-      })
+    // Aborting on cleanup stops a slow response for the previous claim from overwriting the current one
+    const controller = new AbortController();
+    setClaim({});
+    setImages([]);
+    setClaimNotFound(false);
+
+    axios.get(config.backend_api_url + `/db/claims/${claim_id}`, { signal: controller.signal })
+      .then((response) => setClaim(response.data))
       .catch(error => {
-        console.error(error);
+        if (isNotFound(error)) {
+          setClaimNotFound(true);
+        }
+        else if (!axios.isCancel(error)) {
+          console.error(error);
+        }
       });
 
+    // An unknown claim 404s here too; the not-found page above already covers it
+    axios.get<ClaimImage[]>(config.backend_api_url + `/db/claims/${claim_id}/images`, { signal: controller.signal })
+      .then((response) => setImages(response.data))
+      .catch(error => {
+        if (!isNotFound(error) && !axios.isCancel(error)) {
+          console.error(error);
+        }
+      });
+
+    return () => controller.abort();
   }, [claim_id]);
+
+  const { originalImages, panelImages } = imagesToDisplay(images);
 
   // Tabs control
   const [activeTabKey, setActiveTabKey] = React.useState<string | number>(0);
@@ -47,7 +68,8 @@ const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
   };
 
   // Accordion toggle
-  const [expanded, setExpanded] = React.useState(['']);
+  // The original claim content (with its attached images) starts expanded
+  const [expanded, setExpanded] = React.useState(['claim-toggle1']);
 
   const toggle = (id) => {
     const index = expanded.indexOf(id);
@@ -69,6 +91,24 @@ const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
         'Denied': 'red',
         'In Process': 'gold'
     };
+
+  if (claimNotFound) {
+    return (
+      <Page>
+        <PageSection>
+          <EmptyState variant="full" data-testid="claim-not-found">
+            <EmptyStateHeader titleText="Claim not found" icon={<EmptyStateIcon icon={ExclamationTriangleIcon} />} headingLevel="h1" />
+            <EmptyStateBody>
+              There&apos;s no claim with id {claim_id}. It may have been deleted, or the link may be wrong.
+            </EmptyStateBody>
+            <EmptyStateFooter>
+              <Button variant="primary" component={(props) => <Link {...props} to="/ClaimsList" />}>Back to claims</Button>
+            </EmptyStateFooter>
+          </EmptyState>
+        </PageSection>
+      </Page>
+    );
+  }
 
   return (
     <Page>
@@ -173,14 +213,16 @@ const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
                               id="claim-toggle1">
                               Original claim content
                             </AccordionToggle>
-                            <AccordionContent id="claim-content1" isHidden={expanded.includes('claim-toggle1')}>
+<AccordionContent id="claim-content1" isHidden={!expanded.includes('claim-toggle1')}>
                               <TextContent>
                                 <Text component={TextVariants.h3}>Subject:</Text>
                                 {claim.subject}
                                 <Text component={TextVariants.h3}>Body:</Text>
                                 <div className='display-linebreak'>{claim.body}</div>
                                 <Text component={TextVariants.h3}>Attached images:</Text>
-                                {claim && claim.original_images && <Grid><GridItem span={4}><ImageCarousel images={claim.original_images} /></GridItem></Grid>}
+                                {(originalImages.length > 0)
+                                  ? <Grid><GridItem span={4}><ImageCarousel images={originalImages} /></GridItem></Grid>
+                                  : 'No images attached'}
                               </TextContent>
                             </AccordionContent>
                           </AccordionItem>
@@ -196,7 +238,7 @@ const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
           <GridItem span={4}>
             <Card isRounded={true} className='width-100'>
               <CardBody>
-                {(claim && claim.processed_images) ? <ImageCarousel images={claim.processed_images} /> : 'No images attached'}
+                {(panelImages.length > 0) ? <ImageCarousel images={panelImages} /> : 'No images attached'}
               </CardBody>
             </Card>
           </GridItem>

@@ -193,7 +193,8 @@ Capacity before overflowing 8 digits: about 98,000 claims.
    … was altered`. The **whole flush fails**, so other changes in that transaction (e.g. a status update) are lost too. That's the
    right default; just don't touch the field.
 7. **Seed numbers depend on insert order** now that seeds omit the column. Reordering or inserting a seed row renumbers the later
-   ones. #214 seeds images by claim number, so it must look numbers up and never hard-code them.
+   ones. #214 seeds images by claim number, so it must look numbers up and never hard-code them. *(Superseded in #214:
+   the seeded claims are matched by their explicit ids instead; see `.tasks/03-gh214-claim-images/PLAN.md`.)*
 8. **PostgreSQL-specific default** (`::text`, `lpad`, `nextval`). All environments are PostgreSQL, so that's fine. Not verified:
    with a migration tool like Flyway instead of drop-and-create, `ExportableProducer` would do nothing and the sequence DDL would
    have to be hand-written.

@@ -74,20 +74,6 @@ module.exports = (env) => {
         {
           test: /\.(jpg|jpeg|png|gif)$/i,
           include: [
-            path.resolve(__dirname, 'src/app/assets/images'),
-          ],
-          use:
-            {
-              loader: 'file-loader',
-              options: {
-                name: '[path][name].[ext]',
-                outputPath: 'images',
-              }
-            },
-        },
-        {
-          test: /\.(jpg|jpeg|png|gif)$/i,
-          include: [
             //path.resolve(__dirname, 'src'),
             path.resolve(__dirname, 'node_modules/patternfly'),
             path.resolve(__dirname, 'node_modules/@patternfly/patternfly/assets/images'),

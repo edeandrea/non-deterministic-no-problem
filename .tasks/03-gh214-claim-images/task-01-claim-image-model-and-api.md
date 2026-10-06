@@ -22,7 +22,13 @@ Store claim images in PostgreSQL and serve them over REST, with tests.
     - 404 for an unknown claim, or an image that doesn't belong to the claim
     - `200` with an empty list for a claim with no images
 - Expose the image metadata as a record DTO; don't return the entity.
-- Add a small service method to store an image for a claim. Issue 5's intake reuses it.
+- Add a small service method to store an image for a claim. Issue 5's intake reuses it. (Done as the Active Record
+  method `ClaimImage.store`; persistence stays on the entity, like `Claim`.)
+- Restrict stored content types to an allow-list of image formats (`ClaimImageContentType`). The endpoint serves the
+  bytes back with that type, so an arbitrary type (`text/html`, `image/svg+xml`) would be stored XSS once #216 stores
+  email attachments.
+- Image URLs in the metadata are root-relative (`/api/db/claims/{id}/images/{imageId}`). `%openshift` terminates TLS
+  at the route without proxy forwarding, so an absolute URL built from the request would come out as `http://`.
 - **Tests:**
   - list for a claim with images and without
   - fetch bytes with the correct content type
@@ -38,13 +44,15 @@ Store claim images in PostgreSQL and serve them over REST, with tests.
 ## Key Points
 
 - `ClaimResource` today returns entities directly (`Claim.listAll()`). Don't change that contract in
-  this issue. Only the new image endpoints use DTOs.
+  this issue. Only the new image endpoints use DTOs. *(Reversed during review, maintainer decision on PR #225:
+  `ClaimResource` now returns a `ClaimDetails` DTO via `ClaimMapper` with unchanged JSON; a missing claim is a Problem
+  Details `404` instead of `204`.)*
 - Problem Details: the API currently has no error handling. Check whether Quarkus REST ships an RFC
   9457 mapper in the version from issue 1; otherwise add a minimal `ExceptionMapper` producing `application/problem+json`.
 - Tests that create images or claims must delete them afterwards (`ClaimsListPageTests` expects exactly 6 claims).
 
 ## Done When
 
-- [ ] Both endpoints exist, and the OpenAPI document (`/q/openapi`) lists them.
-- [ ] Tests for every case listed above pass.
-- [ ] `./mvnw -B clean test-compile -Pollama` succeeds.
+- [x] Both endpoints exist, and the OpenAPI document (`/q/openapi`) lists them.
+- [x] Tests for every case listed above pass.
+- [x] `./mvnw -B clean test-compile -Pollama` succeeds.

@@ -10,8 +10,8 @@ The docs describe backend-served images, and an independent review confirms code
 
 - Update the documentation:
   - **`CLAUDE.md`:** in Architecture, mention `ClaimImage` and the image endpoints. In REST, change "the only
-    REST endpoints are …" to list them. In Gotchas, explain that the seeder looks claims up by claim
-    number and runs on every cluster start.
+    REST endpoints are …" to list them. In Gotchas, explain that the seeder looks the sample claims up by their
+    explicit ids (not claim numbers, which are generated) and runs on every start, re-inserting missing images.
   - **`README.md`:** the statement that the only REST endpoints are `GET /api/db/claims` and `GET /api/db/claims/{id}`.
   - **`src/main/webui/README.md`:** any mention of image assets or `OriginalApp`.
   - **`docs/*.puml`:** if the REST surface or the frontend appears, update and re-render with `./docs/render-diagrams.sh`.
@@ -34,6 +34,8 @@ The docs describe backend-served images, and an independent review confirms code
 
 ## Done When
 
-- [ ] No document claims the claims endpoints are the only REST endpoints, or that images are bundled frontend assets.
-- [ ] Both `test-compile` runs succeed, and the image/UI suites pass (or fail only for documented secret reasons).
-- [ ] The fresh review has no unresolved BLOCKER or MAJOR findings.
+- [x] No document claims the claims endpoints are the only REST endpoints, or that images are bundled frontend assets.
+- [x] Both `test-compile` runs succeed, and the image/UI suites pass (or fail only for documented secret reasons).
+- [x] The fresh review has no unresolved BLOCKER or MAJOR findings.
+- [x] **Maintainer:** real-key `./mvnw verify` (default profile). Passed (maintainer, 2026-10-05).
+- [ ] **Maintainer:** manual check: every seeded claim's images in both panels; restart and confirm no duplicates.

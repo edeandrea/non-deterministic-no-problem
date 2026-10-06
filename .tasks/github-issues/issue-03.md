@@ -7,7 +7,7 @@ Claim images are currently static frontend files. `ClaimDetail.tsx` builds `orig
 images. Store the images in PostgreSQL and serve them over REST. Email intake ({{ISSUE_5}}) also needs
 this to store customer photos.
 
-**Depends on** {{ISSUE_2}}: seed images are attached by claim number, and both issues change `ClaimDetail.tsx`.
+**Depends on** {{ISSUE_2}}: both issues change the claim model and `ClaimDetail.tsx`.
 
 ## Changes
 
@@ -21,10 +21,12 @@ this to store customer photos.
   - `GET /api/db/claims/{id}/images` returns a metadata list (record DTO, no binary data). A claim with no images gets an empty list.
   - `GET /api/db/claims/{id}/images/{imageId}` returns the raw bytes with the stored content type.
   - **RFC 9457 Problem Details:** 404 for an unknown claim, an unknown image, or an image that belongs to another claim.
-- **Service method** to store an image for a claim ({{ISSUE_5}} reuses it).
+- **A method** to store an image for a claim ({{ISSUE_5}} reuses it): the Active Record `ClaimImage.store`, with an
+  allow-list of image content types.
 - **Startup seeder:**
   - Moves the 12 images used by the six seeded claims into backend resources.
-  - Inserts them when the table is empty, looking claims up by **claim number**.
+  - On every start, inserts any of them that are missing, looking claims up by their **explicit ids (1–6) from
+    `import.sql`**. Claim numbers are generated, so they can't be listed in the seeder.
   - Idempotent. Logs and skips a missing claim instead of failing startup. This matters because `%prod`/`%openshift` recreate the schema on every start.
 - **UI:**
   - `ClaimDetail.tsx` fetches the image list.
@@ -41,7 +43,10 @@ this to store customer photos.
 
 - Images are stored in the database. No object storage, no filesystem.
 - New claims never get "processed" images.
-- The existing `ClaimResource` contract (it returns entities) is unchanged in this issue.
+- ~~The existing `ClaimResource` contract (it returns entities) is unchanged in this issue.~~ Changed during review
+  (maintainer decision on PR #225): `ClaimResource` returns a `ClaimDetails` DTO through the same MapStruct mapper, so
+  the REST layer never serializes entities before #216 adds internal columns to `Claim`. The JSON is unchanged; a
+  missing claim is now a Problem Details `404` instead of an empty `204`.
 
 ## Tests
 
@@ -50,7 +55,7 @@ this to store customer photos.
   - fetching bytes with the correct content type
   - each 404 case
   - store, then fetch
-- **Seeder:** seeds 12 images; is idempotent; skips a missing claim without failing.
+- **Seeder:** seeds 12 images; is idempotent; re-inserts a missing image; skips a missing claim without failing.
 - **Playwright:**
   - a seeded claim shows both images, served from the API
   - a claim without images shows "No images attached"

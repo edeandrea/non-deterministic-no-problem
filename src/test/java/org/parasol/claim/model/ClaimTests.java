@@ -111,6 +111,7 @@ class ClaimTests {
 			.isEmpty();
 	}
 
+
 	@Test
 	void duplicateClaimNumberIsRejected() {
 		var seededNumber = seededClaim(1L).claimNumber;

@@ -85,6 +85,8 @@ The entity and seed changes are one task (merged from the old tasks 02 and 03). 
 - **Gaps are normal** (rollbacks burn values), so never assert absolute or contiguous numbers, only the format and the increment between two inserts made by the same test.
 - **Tests that persist claims must delete what they create.** `ClaimsListPageTests` expects exactly 6.
 - **#214 seeds images by claim number,** so it must look numbers up and never hard-code them. Reordering seed rows renumbers them.
+  *(Superseded in #214: the maintainer chose to match the seeded claims by their explicit ids instead; see
+  `.tasks/03-gh214-claim-images/PLAN.md`.)*
 - **Coding rules (`CODE_STANDARDS.md`):** `Optional` over null, `var`, AssertJ chains, one statement per line. The Panache public-field style stays.
 
 ## Done When

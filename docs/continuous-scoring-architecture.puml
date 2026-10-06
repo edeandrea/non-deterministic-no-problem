@@ -61,6 +61,7 @@ rectangle "<$quarkus>\nParasol Application (single Quarkus container)" as App <<
 		component "<$robot>\nGenerateEmailService\n<i>model: generate-email</i>\n<i>4 output guardrails</i>" as GenEmail
 		component "<$robot>\nPolitenessService\n<i>model: politeness</i>\n<i>called from a guardrail</i>" as Politeness
 		component "ClaimResource\n<i>GET /api/db/claims[/{id}]</i>" as ClaimResource
+		component "ClaimImageResource\n<i>GET /api/db/claims/{id}/images[/{imageId}]</i>" as ClaimImageResource
 	}
 
 	' ---------------- EVALUATION LAYER: ai.scoring ----------------
@@ -94,7 +95,7 @@ together {
 	component "<$brain>\nCohere\n<i>command-r7b-12-2024 via</i>\n<i>api.cohere.ai/compatibility/v1</i>" as Cohere #FFFFFF
 }
 
-database "<$postgresql>\nPostgreSQL\n<i>claims</i>" as DB
+database "<$postgresql>\nPostgreSQL\n<i>claims · claim_images</i>" as DB
 
 rectangle "<$database>\nLangfuse" as Langfuse #F3E5F5 {
 	component "Traces · sessions · datasets · scores" as LangfuseCore
@@ -113,8 +114,10 @@ package "Observability Stack (LGTM Dev Service)" {
 ' =====================================================================
 User -down-> ClaimService : WebSocket /_chat/routes\nroute "chat"
 User -down-> ClaimResource : HTTPS GET
+User -down-> ClaimImageResource : HTTPS GET\nmetadata + image bytes
 
 ClaimResource -down-> DB : Panache
+ClaimImageResource -down-> DB : Panache\nmetadata + bytea
 Notification -down-> DB : update status\n<i>joiningExisting tx</i>
 
 ClaimService -right-> Notification : tool call

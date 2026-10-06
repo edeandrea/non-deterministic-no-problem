@@ -361,19 +361,6 @@ exports[`App tests should render default App component 1`] = `
                 Settings
               </a>
             </li>
-            <li
-              class="pf-v5-c-nav__item navitem-flex"
-              data-ouia-component-id="OUIA-Generated-NavItem-10"
-              data-ouia-component-type="PF5/NavItem"
-              data-ouia-safe="true"
-            >
-              <a
-                class="pf-v5-c-nav__link"
-                href="/OriginalApp"
-              >
-                Original App
-              </a>
-            </li>
           </ul>
         </nav>
       </div>

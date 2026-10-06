@@ -190,7 +190,10 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
     the reviewer's decision by optimistic locking on the claim (`@Version`): a losing decision gets a 409,
     a losing reply re-reads the claim (user decision).
   - A claim `In Process` or later gets an AI-written status answer only, and is **never** updated.
-- **Photos:** optional. `image/*` attachments are stored as `ORIGINAL`. If none arrive, the reply says photos can be sent.
+- **Photos:** optional. Image attachments are stored as `ORIGINAL` via `ClaimImage.store`. Only the formats in #214's
+  `ClaimImageContentType` allow-list (JPEG, PNG, GIF, WebP) count as images: resolve the attachment's media type with
+  `ClaimImageContentType.find`. Anything else, including `image/svg+xml`, is a non-image attachment (stored-XSS risk).
+  If none arrive, the reply says photos can be sent.
   Non-image or oversized attachments are skipped and mentioned. New claims get no processed images.
 - **Idempotency:** a unique stored `Message-ID`. Replies carry `Auto-Submitted: auto-replied`, and
   inbound auto-replies and self-sent mail are skipped.

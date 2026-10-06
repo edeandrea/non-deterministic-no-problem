@@ -30,7 +30,9 @@ information from the customer. The decision resumes the paused workflow.
     - 400 for an invalid body
   - The missing items (`MissingItem` enum: incident description, incident date, location, category)
     are exposed with display labels so the UI can draw the checklist.
-  - Expose the claim's `version` in the claim DTO so the UI can send it back.
+  - Expose the claim's `version` in the claim DTO so the UI can send it back. (#214 introduced that DTO,
+    `org.parasol.claim.rest.ClaimDetails`, mapped by `ClaimMapper`: add the field to the record. New internal `Claim`
+    columns stay out of the API unless they're added there.)
 - **Tracing:** the resume runs in a **new trace**: a `claim-intake review-decision` SERVER span with a span link to
   the intake trace context stored on the claim (`intakeTraceparent`, task 08). Task 11 adds the attributes and tests.
   `decide` reads the claim's `intakeConversationId` (task 08) and makes it current as `gen_ai.conversation.id` baggage before
