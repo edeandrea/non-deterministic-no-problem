@@ -21,7 +21,6 @@ import org.parasol.claim.rest.ClaimExceptionMappings.ProblemDetail;
 import io.quarkus.panache.mock.PanacheMock;
 import io.quarkus.test.junit.QuarkusTest;
 
-import io.restassured.common.mapper.TypeRef;
 import io.restassured.http.ContentType;
 import io.restassured.path.json.JsonPath;
 
@@ -96,7 +95,10 @@ class ClaimResourceTests {
 		when(Claim.findByIdOptional(CLAIM_ID))
 			.thenReturn(Optional.of(createClaim()));
 
-		// Exactly these snake_case keys: the UI reads them, and an entity column not in ClaimDetails can't leak in
+		// Deliberately raw JSON, not getObject(".", ClaimDetails.class): the record serializes and deserializes through the
+		// same @JsonNaming, so a round-trip passes even if the keys change (e.g. clientName instead of client_name) and the
+		// UI breaks. Only the raw keys show the wire format. Exactly these snake_case keys: the UI reads them, and an entity
+		// column not in ClaimDetails can't leak in. The typed comparison is in getOneFound / getAllSomeFound.
 		assertThat(getJson("/api/db/claims/{id}", CLAIM_ID).getMap(".").keySet())
 			.containsExactlyInAnyOrder(
 				"id",
@@ -166,7 +168,8 @@ class ClaimResourceTests {
 			.statusCode(Status.OK.getStatusCode())
 			.contentType(ContentType.JSON)
 			.extract()
-			.as(new TypeRef<>() { });
+			.jsonPath()
+			.getList(".", ClaimDetails.class);
 	}
 
 	private static ClaimDetails getClaim() {
@@ -174,7 +177,8 @@ class ClaimResourceTests {
 			.statusCode(Status.OK.getStatusCode())
 			.contentType(ContentType.JSON)
 			.extract()
-			.as(ClaimDetails.class);
+			.jsonPath()
+			.getObject(".", ClaimDetails.class);
 	}
 
 	private static JsonPath getJson(String path, Object... pathParams) {

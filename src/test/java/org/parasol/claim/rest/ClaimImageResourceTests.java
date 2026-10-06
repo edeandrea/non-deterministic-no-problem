@@ -21,7 +21,6 @@ import org.parasol.claim.rest.ClaimExceptionMappings.ProblemDetail;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 
-import io.restassured.common.mapper.TypeRef;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 
@@ -80,7 +79,10 @@ class ClaimImageResourceTests {
 			.extract()
 			.jsonPath();
 
-		// Exactly these snake_case keys: the UI reads them, and the image bytes are never part of the listing
+		// Deliberately raw JSON, not getList(".", ClaimImageMetadata.class): the record serializes and deserializes through
+		// the same @JsonNaming, so a round-trip passes even if the keys change (e.g. fileName instead of file_name) and the
+		// UI breaks. Only the raw keys show the wire format. Exactly these snake_case keys: the UI reads them, and the image
+		// bytes are never part of the listing. The typed comparison is in listsImageMetadataOldestFirstWithoutBytes.
 		assertThat(json.getMap("[0]").keySet())
 			.containsExactlyInAnyOrder("id", "kind", "file_name", "content_type", "url");
 	}
@@ -153,7 +155,8 @@ class ClaimImageResourceTests {
 			.statusCode(Status.OK.getStatusCode())
 			.contentType(ContentType.JSON)
 			.extract()
-			.as(new TypeRef<>() { });
+			.jsonPath()
+			.getList(".", ClaimImageMetadata.class);
 	}
 
 	private static String imageUrl(long claimId, long imageId) {
