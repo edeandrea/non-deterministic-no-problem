@@ -95,7 +95,7 @@ class ClaimResourceTests {
 		when(Claim.findByIdOptional(CLAIM_ID))
 			.thenReturn(Optional.of(createClaim()));
 
-		// Deliberately raw JSON, not getObject(".", ClaimDetails.class): the record serializes and deserializes through the
+		// Deliberately raw JSON, not as(ClaimDetails.class): the record serializes and deserializes through the
 		// same @JsonNaming, so a round-trip passes even if the keys change (e.g. clientName instead of client_name) and the
 		// UI breaks. Only the raw keys show the wire format. Exactly these snake_case keys: the UI reads them, and an entity
 		// column not in ClaimDetails can't leak in. The typed comparison is in getOneFound / getAllSomeFound.
@@ -177,8 +177,7 @@ class ClaimResourceTests {
 			.statusCode(Status.OK.getStatusCode())
 			.contentType(ContentType.JSON)
 			.extract()
-			.jsonPath()
-			.getObject(".", ClaimDetails.class);
+			.as(ClaimDetails.class);
 	}
 
 	private static JsonPath getJson(String path, Object... pathParams) {
@@ -194,8 +193,7 @@ class ClaimResourceTests {
 			.statusCode(Status.NOT_FOUND.getStatusCode())
 			.contentType(ClaimExceptionMappings.PROBLEM_JSON)
 			.extract()
-			.jsonPath()
-			.getObject(".", ProblemDetail.class);
+			.as(ProblemDetail.class);
 	}
 
 	private static ProblemDetail notFound(String detail, String instance) {

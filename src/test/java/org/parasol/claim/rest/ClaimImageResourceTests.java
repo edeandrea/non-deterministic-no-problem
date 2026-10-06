@@ -168,8 +168,7 @@ class ClaimImageResourceTests {
 			.statusCode(Status.NOT_FOUND.getStatusCode())
 			.contentType(ClaimExceptionMappings.PROBLEM_JSON)
 			.extract()
-			.jsonPath()
-			.getObject(".", ProblemDetail.class);
+			.as(ProblemDetail.class);
 
 		assertThat(problem)
 			.isEqualTo(new ProblemDetail("about:blank", "Not Found", Status.NOT_FOUND.getStatusCode(), expectedDetail, expectedInstance));
