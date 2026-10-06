@@ -4,7 +4,7 @@ import static io.restassured.RestAssured.get;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.LocalDate;
-import java.util.Map;
+import java.util.List;
 
 import jakarta.ws.rs.core.Response.Status;
 
@@ -16,10 +16,12 @@ import org.parasol.claim.model.ClaimCategory;
 import org.parasol.claim.model.ClaimImage;
 import org.parasol.claim.model.ClaimImageContentType;
 import org.parasol.claim.model.ClaimImageKind;
+import org.parasol.claim.rest.ClaimExceptionMappings.ProblemDetail;
 
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 
+import io.restassured.common.mapper.TypeRef;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 
@@ -27,6 +29,8 @@ import io.restassured.response.Response;
 // and can't see the test's uncommitted rows (a claim persisted in a @TestTransaction is a 404 to the endpoint). Fixtures
 // are therefore committed with QuarkusTransaction.requiringNew() and deleted afterwards (ClaimsListPageTests expects
 // exactly the 6 seeded claims). Deleting a claim deletes its images.
+// Responses are compared as ClaimImageMetadata / ProblemDetail records; metadataJsonFieldNames pins the wire format
+// (snake_case keys, no image bytes), which a record round-trip can't see.
 @QuarkusTest
 class ClaimImageResourceTests {
 	private static final byte[] JPEG_DATA = { (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0, 1, 2 };
@@ -55,42 +59,31 @@ class ClaimImageResourceTests {
 		var original = storeImage(this.claimId, ClaimImageKind.ORIGINAL, "original.jpg", ClaimImageContentType.JPEG, JPEG_DATA);
 		var processed = storeImage(this.claimId, ClaimImageKind.PROCESSED, "processed.png", ClaimImageContentType.PNG, PNG_DATA);
 
-		var images = get("/api/db/claims/{id}/images", this.claimId).then()
-			.statusCode(Status.OK.getStatusCode())
-			.contentType(ContentType.JSON)
-			.extract()
-			.jsonPath()
-			.getList(".", Map.class);
-
-		assertThat(images)
+		assertThat(listImages(this.claimId))
 			.containsExactly(
-				Map.of(
-					"id", (int) original,
-					"kind", "ORIGINAL",
-					"file_name", "original.jpg",
-					"content_type", "image/jpeg",
-					"url", "/api/db/claims/%d/images/%d".formatted(this.claimId, original)
-				),
-				Map.of(
-					"id", (int) processed,
-					"kind", "PROCESSED",
-					"file_name", "processed.png",
-					"content_type", "image/png",
-					"url", "/api/db/claims/%d/images/%d".formatted(this.claimId, processed)
-				)
+				new ClaimImageMetadata(original, ClaimImageKind.ORIGINAL, "original.jpg", "image/jpeg", imageUrl(this.claimId, original)),
+				new ClaimImageMetadata(processed, ClaimImageKind.PROCESSED, "processed.png", "image/png", imageUrl(this.claimId, processed))
 			);
 	}
 
 	@Test
-	void listsNothingForAClaimWithoutImages() {
-		var images = get("/api/db/claims/{id}/images", this.claimId).then()
+	void metadataJsonFieldNames() {
+		storeImage(this.claimId, ClaimImageKind.ORIGINAL, "original.jpg", ClaimImageContentType.JPEG, JPEG_DATA);
+
+		var json = get("/api/db/claims/{id}/images", this.claimId).then()
 			.statusCode(Status.OK.getStatusCode())
 			.contentType(ContentType.JSON)
 			.extract()
-			.jsonPath()
-			.getList(".");
+			.jsonPath();
 
-		assertThat(images)
+		// Exactly these snake_case keys: the UI reads them, and the image bytes are never part of the listing
+		assertThat(json.getMap("[0]").keySet())
+			.containsExactlyInAnyOrder("id", "kind", "file_name", "content_type", "url");
+	}
+
+	@Test
+	void listsNothingForAClaimWithoutImages() {
+		assertThat(listImages(this.claimId))
 			.isEmpty();
 	}
 
@@ -151,22 +144,28 @@ class ClaimImageResourceTests {
 			.containsKeys("/api/db/claims/{id}/images", "/api/db/claims/{id}/images/{imageId}");
 	}
 
+	private static List<ClaimImageMetadata> listImages(long claimId) {
+		return get("/api/db/claims/{id}/images", claimId).then()
+			.statusCode(Status.OK.getStatusCode())
+			.contentType(ContentType.JSON)
+			.extract()
+			.as(new TypeRef<>() { });
+	}
+
+	private static String imageUrl(long claimId, long imageId) {
+		return "/api/db/claims/%d/images/%d".formatted(claimId, imageId);
+	}
+
 	private static void assertProblem(Response response, String expectedDetail, String expectedInstance) {
 		var problem = response.then()
 			.statusCode(Status.NOT_FOUND.getStatusCode())
-			.contentType("application/problem+json")
+			.contentType(ClaimExceptionMappings.PROBLEM_JSON)
 			.extract()
 			.jsonPath()
-			.getMap(".");
+			.getObject(".", ProblemDetail.class);
 
 		assertThat(problem)
-			.containsExactlyInAnyOrderEntriesOf(Map.of(
-				"type", "about:blank",
-				"title", "Not Found",
-				"status", Status.NOT_FOUND.getStatusCode(),
-				"detail", expectedDetail,
-				"instance", expectedInstance
-			));
+			.isEqualTo(new ProblemDetail("about:blank", "Not Found", Status.NOT_FOUND.getStatusCode(), expectedDetail, expectedInstance));
 	}
 
 	private static long createClaim() {

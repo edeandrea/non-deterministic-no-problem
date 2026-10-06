@@ -7,7 +7,6 @@ import static org.mockito.Mockito.when;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import jakarta.ws.rs.core.Response.Status;
@@ -17,37 +16,39 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.parasol.claim.model.Claim;
 import org.parasol.claim.model.ClaimCategory;
+import org.parasol.claim.rest.ClaimExceptionMappings.ProblemDetail;
 
 import io.quarkus.panache.mock.PanacheMock;
 import io.quarkus.test.junit.QuarkusTest;
 
+import io.restassured.common.mapper.TypeRef;
 import io.restassured.http.ContentType;
 import io.restassured.path.json.JsonPath;
 
-// Most tests mock Claim's static Panache methods, so they never touch the database. getAllSomeFound and getOneFound pin
-// the exact JSON: an entity column that isn't in ClaimDetails can't leak into the API.
-// missingClaimIsNotFoundAgainstTheDatabase runs the real lookup.
+// Most tests mock Claim's static Panache methods, so they never touch the database; missingClaimIsNotFoundAgainstTheDatabase
+// runs the real lookup. Responses are compared as ClaimDetails / ProblemDetail records. The JSON-level tests
+// (jsonFieldNames, categoryIsSerializedAsLabel, nullIncidentTimeIsOmitted) pin the wire format the UI reads, which a
+// record round-trip can't see: the same @JsonNaming drives both serialization and deserialization.
 @QuarkusTest
 class ClaimResourceTests {
 	private static final long CLAIM_ID = 42L;
 
-	// Every field the API exposes, with the JSON names and formats the UI reads
-	private static final Map<String, Object> EXPECTED_JSON = Map.ofEntries(
-		Map.entry("id", (int) CLAIM_ID),
-		Map.entry("claim_number", "CLM01000000"),
-		Map.entry("category", "Other"),
-		Map.entry("policy_number", "123"),
-		Map.entry("inception_date", "1954-09-30"),
-		Map.entry("client_name", "client"),
-		Map.entry("subject", "collision"),
-		Map.entry("body", "body"),
-		Map.entry("summary", "Car was damaged in accident"),
-		Map.entry("location", "driveway"),
-		Map.entry("incident_date", "1955-01-02"),
-		Map.entry("incident_time", "15:30:00"),
-		Map.entry("sentiment", "Very bad"),
-		Map.entry("email_address", "client@example.com"),
-		Map.entry("status", "New")
+	private static final ClaimDetails EXPECTED = new ClaimDetails(
+		CLAIM_ID,
+		"CLM01000000",
+		ClaimCategory.OTHER,
+		"123",
+		LocalDate.of(1954, 9, 30),
+		"client",
+		"collision",
+		"body",
+		"Car was damaged in accident",
+		"driveway",
+		LocalDate.of(1955, 1, 2),
+		LocalTime.of(15, 30),
+		"Very bad",
+		"wrong@example.com",
+		"New"
 	);
 
 	@Test
@@ -56,10 +57,7 @@ class ClaimResourceTests {
 		when(Claim.listAll())
 			.thenReturn(List.of());
 
-		var claims = getJson("/api/db/claims")
-			.getList(".");
-
-		assertThat(claims)
+		assertThat(getClaims())
 			.isEmpty();
 
 		PanacheMock.verify(Claim.class).listAll();
@@ -72,12 +70,8 @@ class ClaimResourceTests {
 		when(Claim.listAll())
 			.thenReturn(List.of(createClaim()));
 
-		var claims = getJson("/api/db/claims")
-			.getList(".", Map.class);
-
-		assertThat(claims)
-			.singleElement()
-			.isEqualTo(EXPECTED_JSON);
+		assertThat(getClaims())
+			.containsExactly(EXPECTED);
 
 		PanacheMock.verify(Claim.class).listAll();
 		PanacheMock.verifyNoMoreInteractions(Claim.class);
@@ -89,14 +83,38 @@ class ClaimResourceTests {
 		when(Claim.findByIdOptional(CLAIM_ID))
 			.thenReturn(Optional.of(createClaim()));
 
-		var claim = getJson("/api/db/claims/{id}", CLAIM_ID)
-			.getMap(".");
-
-		assertThat(claim)
-			.isEqualTo(EXPECTED_JSON);
+		assertThat(getClaim())
+			.isEqualTo(EXPECTED);
 
 		PanacheMock.verify(Claim.class).findByIdOptional(CLAIM_ID);
 		PanacheMock.verifyNoMoreInteractions(Claim.class);
+	}
+
+	@Test
+	void jsonFieldNames() {
+		PanacheMock.mock(Claim.class);
+		when(Claim.findByIdOptional(CLAIM_ID))
+			.thenReturn(Optional.of(createClaim()));
+
+		// Exactly these snake_case keys: the UI reads them, and an entity column not in ClaimDetails can't leak in
+		assertThat(getJson("/api/db/claims/{id}", CLAIM_ID).getMap(".").keySet())
+			.containsExactlyInAnyOrder(
+				"id",
+				"claim_number",
+				"category",
+				"policy_number",
+				"inception_date",
+				"client_name",
+				"subject",
+				"body",
+				"summary",
+				"location",
+				"incident_date",
+				"incident_time",
+				"sentiment",
+				"email_address",
+				"status"
+			);
 	}
 
 	@Test
@@ -105,33 +123,14 @@ class ClaimResourceTests {
 		when(Claim.findByIdOptional(CLAIM_ID))
 			.thenReturn(Optional.empty());
 
-		var problem = get("/api/db/claims/{id}", CLAIM_ID).then()
-			.statusCode(Status.NOT_FOUND.getStatusCode())
-			.contentType("application/problem+json")
-			.extract()
-			.jsonPath()
-			.getMap(".");
-
-		assertThat(problem)
-			.containsExactlyInAnyOrderEntriesOf(Map.of(
-				"type", "about:blank",
-				"title", "Not Found",
-				"status", Status.NOT_FOUND.getStatusCode(),
-				"detail", "Claim %d was not found".formatted(CLAIM_ID),
-				"instance", "/api/db/claims/%d".formatted(CLAIM_ID)
-			));
+		assertThat(getProblem("/api/db/claims/{id}", CLAIM_ID))
+			.isEqualTo(notFound("Claim %d was not found".formatted(CLAIM_ID), "/api/db/claims/%d".formatted(CLAIM_ID)));
 	}
 
 	@Test
 	void missingClaimIsNotFoundAgainstTheDatabase() {
-		var problem = get("/api/db/claims/{id}", -1L).then()
-			.statusCode(Status.NOT_FOUND.getStatusCode())
-			.contentType("application/problem+json")
-			.extract()
-			.jsonPath();
-
-		assertThat(problem.getString("detail"))
-			.isEqualTo("Claim -1 was not found");
+		assertThat(getProblem("/api/db/claims/{id}", -1L))
+			.isEqualTo(notFound("Claim -1 was not found", "/api/db/claims/-1"));
 	}
 
 	@ParameterizedTest
@@ -162,12 +161,41 @@ class ClaimResourceTests {
 			.doesNotContainKey("incident_time");
 	}
 
+	private static List<ClaimDetails> getClaims() {
+		return get("/api/db/claims").then()
+			.statusCode(Status.OK.getStatusCode())
+			.contentType(ContentType.JSON)
+			.extract()
+			.as(new TypeRef<>() { });
+	}
+
+	private static ClaimDetails getClaim() {
+		return get("/api/db/claims/{id}", CLAIM_ID).then()
+			.statusCode(Status.OK.getStatusCode())
+			.contentType(ContentType.JSON)
+			.extract()
+			.as(ClaimDetails.class);
+	}
+
 	private static JsonPath getJson(String path, Object... pathParams) {
 		return get(path, pathParams).then()
 			.statusCode(Status.OK.getStatusCode())
 			.contentType(ContentType.JSON)
 			.extract()
 			.jsonPath();
+	}
+
+	private static ProblemDetail getProblem(String path, Object... pathParams) {
+		return get(path, pathParams).then()
+			.statusCode(Status.NOT_FOUND.getStatusCode())
+			.contentType(ClaimExceptionMappings.PROBLEM_JSON)
+			.extract()
+			.jsonPath()
+			.getObject(".", ProblemDetail.class);
+	}
+
+	private static ProblemDetail notFound(String detail, String instance) {
+		return new ProblemDetail("about:blank", "Not Found", Status.NOT_FOUND.getStatusCode(), detail, instance);
 	}
 
 	private static Claim createClaim() {

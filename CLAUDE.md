@@ -163,8 +163,8 @@ and map to DTO records with `ClaimMapper`.
 - **The DTOs are the API contract.** `ClaimDetails` lists every field the UI reads, in snake_case
   (`@JsonNaming` on the record; `category` is the label via `ClaimCategory`'s `@JsonValue`; nulls are omitted by the
   global `serialization-inclusion: non-empty`). A new `Claim` column (e.g. #216's `reviewRunId`, `intakeTraceparent`,
-  `intakeConversationId`, `version`) stays out of the API until it's added to the DTO; `ClaimResourceTests` pins the
-  exact JSON.
+  `intakeConversationId`, `version`) stays out of the API until it's added to the DTO; `ClaimResourceTests.jsonFieldNames`
+  pins the exact set of JSON keys.
 - **Errors:** domain exceptions are mapped once, by `ClaimExceptionMappings` (Quarkus `@ServerExceptionMapper`), to RFC
   9457 Problem Details (`application/problem+json`, `type: about:blank`, `instance` = request path).
   `ClaimNotFoundException` and `ClaimImageNotFoundException` are `404`. An image that exists but belongs to another
@@ -473,6 +473,10 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
     tests that only call the model directly (`ClaimImageTests`, `ClaimTests`).
   - Seeder tests that insert or delete images do it on a claim of their own, never on the seeded claims that other
     classes (e.g. `ClaimImagesPageTests`) rely on.
+  - **REST tests compare responses as the DTO / `ProblemDetail` records** (`.as(...)` / `getObject(...)` then
+    `isEqualTo`), not as `Map`s. A record round-trip can't see the wire format, since the same `@JsonNaming` serializes
+    and deserializes, so each class keeps small JSON-level tests for that: the exact key set (`jsonFieldNames`,
+    `metadataJsonFieldNames`), the category label and an omitted null `incident_time`.
   - Call Panache statics through a lambda in `assertThatThrownBy(() -> ClaimImage.flush())`: a method reference
     (`ClaimImage::flush`) bypasses Panache's enhancement and throws "did you forget to annotate your entity with
     @Entity?".
