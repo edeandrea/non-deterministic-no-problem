@@ -204,7 +204,8 @@ and map to DTO records with `ClaimMapper`.
 
 **Claim images** (`ClaimImage`, table `claim_images`):
 - **Persistence is Active Record, like `Claim`:** `listForClaim(claimId)` (throws `ClaimNotFoundException`),
-  `findForClaim(claimId, imageId)` (throws `ClaimImageNotFoundException`; always matches claim **and** image id),
+  `findForClaim(claimId, imageId)` (returns `Optional`; always matches claim **and** image id, so another claim's
+  image is empty; `ClaimImageResource` throws `ClaimImageNotFoundException` for the 404),
   `hasImage(claim, kind, fileName)` and `store(claim, kind, fileName, contentType, data)`. #216's intake stores
   attachments through `store`. Image ids are table-wide `PanacheEntity` ids.
 - **`kind`** is `ORIGINAL` (customer photo) or `PROCESSED` (annotated damage image). New claims never get processed

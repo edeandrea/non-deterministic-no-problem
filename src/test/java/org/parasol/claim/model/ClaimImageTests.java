@@ -77,11 +77,10 @@ class ClaimImageTests {
 		ClaimImage.flush();
 
 		assertThat(ClaimImage.findForClaim(claim.id, image.id))
-			.isSameAs(image);
+			.containsSame(image);
 
-		assertThatThrownBy(() -> ClaimImage.findForClaim(otherClaim.id, image.id))
-			.isInstanceOf(ClaimImageNotFoundException.class)
-			.hasMessage("Image %d was not found for claim %d", image.id, otherClaim.id);
+		assertThat(ClaimImage.findForClaim(otherClaim.id, image.id))
+			.isEmpty();
 	}
 
 	@Test
@@ -89,11 +88,8 @@ class ClaimImageTests {
 	void unknownImageIdIsNotFound() {
 		var claim = newClaim();
 
-		assertThatThrownBy(() -> ClaimImage.findForClaim(claim.id, -1L))
-			.isInstanceOf(ClaimImageNotFoundException.class)
-			.hasMessage("Image -1 was not found for claim %d", claim.id)
-			.extracting("claimId", "imageId")
-			.containsExactly(claim.id, -1L);
+		assertThat(ClaimImage.findForClaim(claim.id, -1L))
+			.isEmpty();
 	}
 
 	@Test
@@ -103,9 +99,8 @@ class ClaimImageTests {
 		var image = ClaimImage.store(claim, ClaimImageKind.ORIGINAL, "photo.jpg", ClaimImageContentType.JPEG, IMAGE_DATA);
 		ClaimImage.flush();
 
-		assertThatThrownBy(() -> ClaimImage.findForClaim(-1L, image.id))
-			.isInstanceOf(ClaimImageNotFoundException.class)
-			.hasMessage("Image %d was not found for claim -1", image.id);
+		assertThat(ClaimImage.findForClaim(-1L, image.id))
+			.isEmpty();
 	}
 
 	@Test

@@ -11,6 +11,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
 import org.parasol.claim.model.ClaimImage;
+import org.parasol.claim.model.ClaimImageNotFoundException;
 
 /**
  * Claim images: metadata and image bytes. Missing claims and images surface as domain exceptions that
@@ -47,11 +48,11 @@ public class ClaimImageResource {
 	@Path("/{imageId}")
 	@Produces(MediaType.WILDCARD)
 	public Response getImage(@PathParam("id") long claimId, @PathParam("imageId") long imageId) {
-		var image = ClaimImage.findForClaim(claimId, imageId);
-
-		return Response.ok(image.data, image.contentType.mediaType())
-			.header("X-Content-Type-Options", "nosniff")
-			.header(HttpHeaders.CONTENT_DISPOSITION, "inline")
-			.build();
+		return ClaimImage.findForClaim(claimId, imageId)
+			.map(image -> Response.ok(image.data, image.contentType.mediaType())
+				.header("X-Content-Type-Options", "nosniff")
+				.header(HttpHeaders.CONTENT_DISPOSITION, "inline")
+				.build())
+			.orElseThrow(() -> new ClaimImageNotFoundException(claimId, imageId));
 	}
 }

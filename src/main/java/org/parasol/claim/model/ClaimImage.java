@@ -3,6 +3,7 @@ package org.parasol.claim.model;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import jakarta.persistence.Basic;
 import jakarta.persistence.Column;
@@ -87,13 +88,11 @@ public class ClaimImage extends PanacheEntity {
 	 *
 	 * @param claimId the claim id
 	 * @param imageId the image id
-	 * @return the image
-	 * @throws ClaimImageNotFoundException if the claim has no image with that id (including when the claim doesn't exist)
+	 * @return the image, or empty if the claim has no image with that id (including when the claim doesn't exist)
 	 */
-	public static ClaimImage findForClaim(long claimId, long imageId) {
+	public static Optional<ClaimImage> findForClaim(long claimId, long imageId) {
 		return ClaimImage.<ClaimImage>find("id = :imageId and claim.id = :claimId", Map.of("imageId", imageId, "claimId", claimId))
-			.firstResultOptional()
-			.orElseThrow(() -> new ClaimImageNotFoundException(claimId, imageId));
+			.firstResultOptional();
 	}
 
 	/**
