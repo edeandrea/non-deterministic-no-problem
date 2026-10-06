@@ -560,15 +560,17 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
   come from a pooled sequence. Use `persistAndFlush()` when the number is needed in the same transaction.
 - **`ClaimImageSeeder` runs on every start and re-inserts any missing configured image.**
   - Every profile currently recreates the schema on each boot (`%prod` / `%openshift` set `drop-and-create`; dev/test
-    get it from Dev Services), so in practice each boot inserts all 12 ("Seeded 12 of 12 claim images (0 already
-    present, 0 skipped)"). The
-    re-insert-missing path matters for a persistent schema, and `ClaimImageSeederTests` covers it by calling `seed`
-    directly; a second run inserts nothing.
+    get it from Dev Services), so in practice each boot inserts all 12 ("Processed 12 seed claim images: 12 inserted,
+    0 already present, 0 claim not found, 0 file missing/unreadable/empty"). The re-insert-missing path matters for a
+    persistent schema, and `ClaimImageSeederTests` covers it by calling `seed` directly; a second run inserts nothing.
   - **It matches the sample claims by their explicit ids in `import.sql`** (claim numbers are generated, so they can't
     be listed). Keep `SEED_IMAGES` aligned if the seed claims change.
   - **Seed data never fails startup.** An image whose claim doesn't exist, or whose resource file is missing,
-    unreadable or empty, is logged (WARN, with the reason) and skipped, and the rest are still seeded. `seed` returns
-    a `SeedResult` with the counts per outcome. A file is read only when it's about to be inserted.
+    unreadable or empty, is logged (WARN, with the reason) and skipped, and the rest are still seeded. A file is read
+    only when it's about to be inserted.
+  - Each run ends with an INFO summary of every outcome's count. `seed` also returns those counts as a `SeedResult`;
+    startup ignores it, but tests need it, since "already present" and "claim not found" leave nothing in the database
+    to check.
   - Empty files are skipped before `store`: `ClaimImage.data` is `@NotEmpty`, and a violation at flush would roll
     back the whole run.
   - It runs in one transaction from a `StartupEvent` observer, so an unexpected database error still aborts boot.

@@ -57,7 +57,7 @@ class ClaimImageSeeder {
 	 * seeded.
 	 *
 	 * @param seedImages the images to seed
-	 * @return how many images were inserted, already present or skipped
+	 * @return the count of each outcome, which is also logged as a one-line summary
 	 */
 	@Transactional
 	SeedResult seed(List<SeedImage> seedImages) {
@@ -72,7 +72,14 @@ class ClaimImageSeeder {
 			outcomes.getOrDefault(SeedOutcome.IMAGE_UNREADABLE, 0L)
 		);
 
-		Log.infof("Seeded %d of %d claim images (%d already present, %d skipped)", result.inserted(), seedImages.size(), result.alreadyPresent(), result.skipped());
+		Log.infof(
+			"Processed %d seed claim images: %d inserted, %d already present, %d claim not found, %d file missing/unreadable/empty",
+			seedImages.size(),
+			result.inserted(),
+			result.alreadyPresent(),
+			result.claimNotFound(),
+			result.imageUnreadable()
+		);
 
 		return result;
 	}
@@ -130,7 +137,8 @@ class ClaimImageSeeder {
 	}
 
 	/**
-	 * What one {@link #seed(List)} run did.
+	 * What one {@link #seed(List)} run did. Startup only logs it; tests assert it, because "already present" and "claim
+	 * not found" leave nothing in the database to check.
 	 *
 	 * @param inserted images inserted
 	 * @param alreadyPresent images the claim already had
@@ -138,9 +146,6 @@ class ClaimImageSeeder {
 	 * @param imageUnreadable images skipped because their resource file is missing, unreadable or empty
 	 */
 	record SeedResult(long inserted, long alreadyPresent, long claimNotFound, long imageUnreadable) {
-		long skipped() {
-			return this.claimNotFound + this.imageUnreadable;
-		}
 	}
 
 	private enum SeedOutcome {
