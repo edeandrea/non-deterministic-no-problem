@@ -293,6 +293,11 @@ class LangfuseSessionScoringServiceTests {
 				Map.entry("quarkus.aiscoring.langfuse.evaluation.session.score-session", "true"),
 				Map.entry("quarkus.aiscoring.langfuse.evaluation.session.create-dataset-on-session-close", "true"),
 				Map.entry("quarkus.otel.exporter.otlp.enabled", "true"),
+				// Pin the provider: %ollama switches these two to `ollama`, which would route the chat path around the
+				// WireMock stubs below and into a real model. That model can decide to call updateClaimStatus on its own,
+				// adding a second GENERATION and breaking this test's single-exchange assertions.
+				Map.entry("quarkus.langchain4j.parasol-chat.chat-model.provider", "openai"),
+				Map.entry("quarkus.langchain4j.embedding-model.provider", "openai"),
 				Map.entry("quarkus.langchain4j.openai.api-key", "changeme"),
 				Map.entry("quarkus.langchain4j.openai.base-url", WIREMOCK_URL),
 				Map.entry("quarkus.langchain4j.openai.parasol-chat.api-key", "changeme"),

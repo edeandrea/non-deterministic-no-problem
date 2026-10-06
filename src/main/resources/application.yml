@@ -141,27 +141,27 @@ quarkus:
       parasol-chat:
         timeout: 600s
         chat-model:
-          model-id: llama3.2:latest
+          model-id: granite4:micro
           temperature: 0.3
       generate-email:
         timeout: 600s
         chat-model:
-          model-id: llama3.2:latest
+          model-id: granite4:micro
           temperature: 0.3
       politeness:
         timeout: 600s
         chat-model:
-          model-id: llama3.2:latest
+          model-id: granite4:micro
           temperature: 0.3
       session-sentiment:
         timeout: 600s
         chat-model:
-          model-id: llama3.2:latest
+          model-id: granite4:micro
           temperature: 0
       judge:
         timeout: 600s
         chat-model:
-          model-id: llama3.2:latest
+          model-id: granite4:micro
           temperature: 0
       embedding-model:
         model-id: snowflake-arctic-embed

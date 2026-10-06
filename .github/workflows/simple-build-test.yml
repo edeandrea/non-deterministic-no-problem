@@ -39,8 +39,30 @@ jobs:
           - ollama
           - ollama-openai
     name: "jvm-build-test-${{ matrix.java }}-${{ matrix.ai-provider }}"
+    # Both Ollama profiles expect an Ollama on localhost:11434: %ollama-openai points its base-url
+    # there explicitly, and %ollama falls back to the same default once the extension's Dev Service
+    # is disabled below. One service container serves both, instead of the Dev Service recreating a
+    # container per augmentation and leaving earlier builds pointed at a dead port.
+    services:
+      ollama:
+        image: ollama/ollama
+        ports:
+          - 11434:11434
+        options: --name ollama --rm
     steps:
       - uses: actions/checkout@v7
+
+      - name: Pull Ollama models
+        run: |
+          # `ollama serve` races an immediate pull, so wait for the API before asking for anything
+          for _ in {1..30}; do
+            curl -sf http://localhost:11434/api/tags > /dev/null && break
+            sleep 2
+          done
+          docker exec ollama bash -c "\
+            ollama pull granite4:micro && \
+            ollama pull snowflake-arctic-embed && \
+            ollama ls"
 
       - name: Setup Java ${{ matrix.java }}
         uses: actions/setup-java@v6
@@ -58,4 +80,5 @@ jobs:
           ./mvnw -B clean verify \
             -P${{ matrix.ai-provider }} \
             -Dquarkus.http.host=0.0.0.0 \
-            -Dmaven.compiler.release=${{ matrix.java }}
+            -Dmaven.compiler.release=${{ matrix.java }} \
+            -Dquarkus.langchain4j.ollama.devservices.enabled=false

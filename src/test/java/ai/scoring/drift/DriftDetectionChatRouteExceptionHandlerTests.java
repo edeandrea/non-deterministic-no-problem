@@ -147,6 +147,11 @@ class DriftDetectionChatRouteExceptionHandlerTests {
 		@Override
 		public Map<String, String> getConfigOverrides() {
 			return Map.ofEntries(
+				// Pin the provider: %ollama switches these two to `ollama`, which would route the chat path around the
+				// WireMock stubs below and into a real model. Don't remove these as redundant - without them this test
+				// only mocks the LLM under the default and %ollama-openai profiles.
+				Map.entry("quarkus.langchain4j.parasol-chat.chat-model.provider", "openai"),
+				Map.entry("quarkus.langchain4j.embedding-model.provider", "openai"),
 				// Point every model the chat path touches at WireMock
 				Map.entry("quarkus.langchain4j.openai.api-key", "changeme"),
 				Map.entry("quarkus.langchain4j.openai.base-url", WIREMOCK_URL),
