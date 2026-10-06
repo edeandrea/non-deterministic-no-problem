@@ -8,6 +8,7 @@
 		<assertj.version>3.27.7</assertj.version>
 		<compiler-plugin.version>3.16.0</compiler-plugin.version>
 		<dependency-plugin.version>3.11.0</dependency-plugin.version>
+		<mapstruct.version>1.6.3</mapstruct.version>
 		<maven.compiler.release>25</maven.compiler.release>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -158,6 +159,11 @@
 			<artifactId>quarkus-smallrye-fault-tolerance</artifactId>
 		</dependency>
 		<dependency>
+			<groupId>org.mapstruct</groupId>
+			<artifactId>mapstruct</artifactId>
+			<version>${mapstruct.version}</version>
+		</dependency>
+		<dependency>
 			<groupId>io.quarkus</groupId>
 			<artifactId>quarkus-junit</artifactId>
 			<scope>test</scope>
@@ -253,6 +259,13 @@
 				<version>${compiler-plugin.version}</version>
 				<configuration>
 					<parameters>true</parameters>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>org.mapstruct</groupId>
+							<artifactId>mapstruct-processor</artifactId>
+							<version>${mapstruct.version}</version>
+						</path>
+					</annotationProcessorPaths>
 				</configuration>
 			</plugin>
 			<plugin>

@@ -1,63 +1,57 @@
 package org.parasol.claim.rest;
 
+import java.util.List;
+
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.UriInfo;
 
 import org.parasol.claim.model.ClaimImage;
 
-/** REST endpoints for claim image metadata and binary content. */
+/**
+ * Claim images: metadata and image bytes. Missing claims and images surface as domain exceptions that
+ * {@link ClaimExceptionMappers} turns into RFC 9457 Problem Details.
+ */
 @Path("/api/db/claims/{id}/images")
 public class ClaimImageResource {
-	/** Lists a claim's images without returning their binary content. */
-	@GET
-	@Produces(MediaType.APPLICATION_JSON)
-	public Response listImages(@PathParam("id") long claimId, @Context UriInfo uriInfo) {
-		var response = ClaimImage.listForClaim(claimId)
-			.map(images -> images.stream()
-				.map(image -> new ClaimImageMetadata(
-					image.id(),
-					image.kind(),
-					image.fileName(),
-					image.contentType(),
-					uriInfo.getAbsolutePathBuilder().path(Long.toString(image.id())).build().toString()
-				))
-				.toList())
-			.<Response>map(images -> Response.ok(images).build())
-			.orElseGet(() -> notFound(uriInfo, "Claim %d was not found".formatted(claimId)));
+	private final ClaimImageMapper mapper;
 
-		return response;
+	ClaimImageResource(ClaimImageMapper mapper) {
+		this.mapper = mapper;
 	}
 
-	/** Returns image bytes when the image belongs to the requested claim. */
+	/**
+	 * Lists a claim's images, oldest first, without their bytes.
+	 *
+	 * @param claimId the claim id
+	 * @return the image metadata; empty if the claim has no images
+	 */
+	@GET
+	@Produces(MediaType.APPLICATION_JSON)
+	public List<ClaimImageMetadata> listImages(@PathParam("id") long claimId) {
+		return this.mapper.toMetadata(ClaimImage.listForClaim(claimId), claimId);
+	}
+
+	/**
+	 * Returns an image's bytes with its stored content type.
+	 *
+	 * @param claimId the claim id
+	 * @param imageId the image id
+	 * @return the image bytes
+	 */
 	@GET
 	@Path("/{imageId}")
 	@Produces(MediaType.WILDCARD)
-	public Response getImage(@PathParam("id") long claimId, @PathParam("imageId") long imageId, @Context UriInfo uriInfo) {
-		var image = ClaimImage.findContentForClaim(claimId, imageId);
+	public Response getImage(@PathParam("id") long claimId, @PathParam("imageId") long imageId) {
+		var image = ClaimImage.findForClaim(claimId, imageId);
 
-		var response = image
-			.map(foundImage -> Response.ok(foundImage.data())
-				.type(foundImage.contentType())
-				.header("X-Content-Type-Options", "nosniff")
-				.build())
-			.orElseGet(() -> notFound(uriInfo, "Image %d was not found for claim %d".formatted(imageId, claimId)));
-
-		return response;
-	}
-
-	private static Response notFound(UriInfo uriInfo, String detail) {
-		return Response.status(Response.Status.NOT_FOUND)
-			.type("application/problem+json")
-			.entity(new ProblemDetail("about:blank", "Not Found", Response.Status.NOT_FOUND.getStatusCode(), detail, uriInfo.getPath()))
+		return Response.ok(image.data, image.contentType.mediaType())
+			.header("X-Content-Type-Options", "nosniff")
+			.header(HttpHeaders.CONTENT_DISPOSITION, "inline")
 			.build();
-	}
-
-	private record ProblemDetail(String type, String title, int status, String detail, String instance) {
 	}
 }

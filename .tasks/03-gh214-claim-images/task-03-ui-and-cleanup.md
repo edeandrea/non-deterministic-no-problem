@@ -36,6 +36,6 @@ message. Remove the legacy `OriginalApp` page and the assets nothing uses any mo
 
 ## Done When
 
-- [x] No frontend code builds image paths from the claim id.
-- [x] `OriginalApp.tsx`, its route and the unused assets are gone, and `./mvnw -B clean package -DskipTests -Pollama` builds the frontend.
-- [x] The Playwright tests above pass.
+- [ ] No frontend code builds image paths from the claim id.
+- [ ] `OriginalApp.tsx`, its route and the unused assets are gone, and `./mvnw -B clean package -DskipTests -Pollama` builds the frontend.
+- [ ] The Playwright tests above pass.

@@ -22,7 +22,13 @@ Store claim images in PostgreSQL and serve them over REST, with tests.
     - 404 for an unknown claim, or an image that doesn't belong to the claim
     - `200` with an empty list for a claim with no images
 - Expose the image metadata as a record DTO; don't return the entity.
-- Add a small service method to store an image for a claim. Issue 5's intake reuses it.
+- Add a small service method to store an image for a claim. Issue 5's intake reuses it. (Done as the Active Record
+  method `ClaimImage.store`; persistence stays on the entity, like `Claim`.)
+- Restrict stored content types to an allow-list of image formats (`ClaimImageContentType`). The endpoint serves the
+  bytes back with that type, so an arbitrary type (`text/html`, `image/svg+xml`) would be stored XSS once #216 stores
+  email attachments.
+- Image URLs in the metadata are root-relative (`/api/db/claims/{id}/images/{imageId}`). `%openshift` terminates TLS
+  at the route without proxy forwarding, so an absolute URL built from the request would come out as `http://`.
 - **Tests:**
   - list for a claim with images and without
   - fetch bytes with the correct content type
