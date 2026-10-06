@@ -1,7 +1,6 @@
 package org.parasol.claim.seed;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.time.LocalDate;
@@ -18,7 +17,7 @@ import org.parasol.claim.model.ClaimImage;
 import org.parasol.claim.model.ClaimImageContentType;
 import org.parasol.claim.model.ClaimImageKind;
 import org.parasol.claim.seed.ClaimImageSeeder.SeedImage;
-import org.parasol.claim.seed.ClaimImageSeeder.SeedImageNotFoundException;
+import org.parasol.claim.seed.ClaimImageSeeder.SeedResult;
 
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
@@ -26,6 +25,7 @@ import io.quarkus.test.junit.QuarkusTest;
 // The startup run seeds the six sample claims; these tests only read those images. Tests that insert or delete images
 // do it on a claim of their own, created and deleted around each test (deleting a claim deletes its images), so the
 // shared seed data used by other test classes is never modified.
+// src/test/resources/seed/claim-images/empty-for-tests.jpg is an empty, test-only resource for the empty-file case.
 @QuarkusTest
 class ClaimImageSeederTests {
 	private static final long UNKNOWN_CLAIM_ID = -1L;
@@ -85,7 +85,7 @@ class ClaimImageSeederTests {
 	@Test
 	void seedingAgainInsertsNothing() {
 		assertThat(this.seeder.seed(ClaimImageSeeder.SEED_IMAGES))
-			.isZero();
+			.isEqualTo(new SeedResult(0, 12, 0, 0));
 	}
 
 	@Test
@@ -93,38 +93,78 @@ class ClaimImageSeederTests {
 		var seedImages = List.of(new SeedImage(this.testClaimId, ClaimImageKind.ORIGINAL, "original_car1.jpg"));
 
 		assertThat(this.seeder.seed(seedImages))
-			.isOne();
+			.isEqualTo(new SeedResult(1, 0, 0, 0));
 
 		assertThat(this.seeder.seed(seedImages))
-			.isZero();
+			.isEqualTo(new SeedResult(0, 1, 0, 0));
 
 		QuarkusTransaction.requiringNew().run(() -> ClaimImage.listForClaim(this.testClaimId).forEach(ClaimImage::delete));
 
 		assertThat(this.seeder.seed(seedImages))
-			.isOne();
+			.isEqualTo(new SeedResult(1, 0, 0, 0));
 
-		assertThat(QuarkusTransaction.requiringNew().call(() -> ClaimImage.listForClaim(this.testClaimId)))
-			.singleElement()
-			.extracting(image -> image.fileName)
-			.isEqualTo("original_car1.jpg");
+		assertThat(testClaimImageFileNames())
+			.containsExactly("original_car1.jpg");
 	}
 
 	@Test
 	void skipsAMissingClaimWithoutReadingItsFile() {
-		// The file doesn't exist either: if the seeder tried to read it, the call would throw
+		// The file doesn't exist either: if the seeder tried to read it, the outcome would be IMAGE_UNREADABLE
 		var seedImages = List.of(new SeedImage(UNKNOWN_CLAIM_ID, ClaimImageKind.ORIGINAL, "does-not-exist.jpg"));
 
 		assertThat(this.seeder.seed(seedImages))
-			.isZero();
+			.isEqualTo(new SeedResult(0, 0, 1, 0));
 	}
 
 	@Test
-	void missingResourceFileFails() {
-		var seedImages = List.of(new SeedImage(this.testClaimId, ClaimImageKind.ORIGINAL, "does-not-exist.jpg"));
+	void skipsAMissingFileAndSeedsTheRest() {
+		var seedImages = List.of(
+			new SeedImage(this.testClaimId, ClaimImageKind.ORIGINAL, "does-not-exist.jpg"),
+			new SeedImage(this.testClaimId, ClaimImageKind.ORIGINAL, "original_car1.jpg"),
+			new SeedImage(this.testClaimId, ClaimImageKind.PROCESSED, "car1-processed.jpg")
+		);
 
-		assertThatThrownBy(() -> this.seeder.seed(seedImages))
-			.isInstanceOf(SeedImageNotFoundException.class)
-			.hasMessage("Seed image resource /seed/claim-images/does-not-exist.jpg was not found");
+		assertThat(this.seeder.seed(seedImages))
+			.isEqualTo(new SeedResult(2, 0, 0, 1));
+
+		assertThat(testClaimImageFileNames())
+			.containsExactlyInAnyOrder("original_car1.jpg", "car1-processed.jpg");
+	}
+
+	@Test
+	void skipsAnEmptyFileAndSeedsTheRest() {
+		// An empty file would fail the @NotEmpty check at flush and roll back the whole run, so it's skipped up front
+		var seedImages = List.of(
+			new SeedImage(this.testClaimId, ClaimImageKind.ORIGINAL, "empty-for-tests.jpg"),
+			new SeedImage(this.testClaimId, ClaimImageKind.ORIGINAL, "original_car1.jpg")
+		);
+
+		assertThat(this.seeder.seed(seedImages))
+			.isEqualTo(new SeedResult(1, 0, 0, 1));
+
+		assertThat(testClaimImageFileNames())
+			.containsExactly("original_car1.jpg");
+	}
+
+	@Test
+	void countsEveryOutcomeInOneRun() {
+		var seedImages = List.of(
+			new SeedImage(1L, ClaimImageKind.ORIGINAL, "original_car1.jpg"),
+			new SeedImage(this.testClaimId, ClaimImageKind.ORIGINAL, "original_car1.jpg"),
+			new SeedImage(UNKNOWN_CLAIM_ID, ClaimImageKind.ORIGINAL, "original_car1.jpg"),
+			new SeedImage(this.testClaimId, ClaimImageKind.PROCESSED, "does-not-exist.jpg")
+		);
+
+		assertThat(this.seeder.seed(seedImages))
+			.isEqualTo(new SeedResult(1, 1, 1, 1))
+			.extracting(SeedResult::skipped)
+			.isEqualTo(2L);
+	}
+
+	private List<String> testClaimImageFileNames() {
+		return QuarkusTransaction.requiringNew().call(() -> ClaimImage.listForClaim(this.testClaimId).stream()
+			.map(image -> image.fileName)
+			.toList());
 	}
 
 	private static byte[] resourceBytes(String fileName) throws IOException {

@@ -71,9 +71,10 @@ merges keep `main` clean). Copilot's asset moves, `OriginalApp` removal and most
   1.6.3, `JAKARTA_CDI`) builds the DTO with a root-relative URL. Tests: `ClaimImageTests` (9, incl. the `bytea` column
   check), `ClaimImageResourceTests` (8), `ClaimImageContentTypeTests` (21).
 - **Task 02:** `ClaimImageSeeder` matches the sample claims by id, re-inserts any missing image on every start, checks
-  the claim once (log and skip if missing) and reads a file only when inserting it. A missing resource file fails
-  startup (`SeedImageNotFoundException`), since that's a packaging bug. `ClaimImageSeederTests` (6) never touch the
-  shared seed data: inserts and deletes happen on a claim each test creates.
+  the claim once (log and skip if missing) and reads a file only when inserting it. A missing, unreadable or empty
+  resource file is also logged and skipped (maintainer decision on PR #225; it used to fail startup), so one bad image
+  never stops the others. `seed` returns a `SeedResult` with per-outcome counts. `ClaimImageSeederTests` (8) never
+  touch the shared seed data: inserts and deletes happen on a claim each test creates.
 - **Task 03:** `ClaimDetail` aborts both requests when the claim id changes (stale-response race), and the image logic
   lives in `utils/claimImages.ts` (`imagesToDisplay`, `imageSource` resolves the relative URL against
   `backend_api_url`'s origin; Jest-tested). Pre-existing bug fixed: the "Original claim content" accordion had its

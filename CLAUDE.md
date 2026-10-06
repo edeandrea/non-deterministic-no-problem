@@ -439,7 +439,9 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   (including `parasol-chat`, `session-sentiment`, `judge`) at
   `http://localhost:${quarkus.wiremock.devservices.port}/v1`, then stubs the
   OpenAI-compatible `/chat/completions` endpoint. Stubs are registered programmatically in
-  `@BeforeEach` — there is no `src/test/resources` directory.
+  `@BeforeEach`; there are no WireMock mapping files. (`src/test/resources` only holds
+  `seed/claim-images/empty-for-tests.jpg`, an empty file for `ClaimImageSeederTests`; WireMock reads only its
+  `mappings/` and `__files/` subdirectories, so it's unaffected.)
 - **Easy RAG in WireMock-backed profiles:** a profile that repoints the default
   `quarkus.langchain4j.openai.base-url` at WireMock (`DriftDetectionChatRouteExceptionHandlerTests`,
   `LangfuseSessionScoringServiceTests`) also sets `quarkus.langchain4j.easy-rag.ingestion-strategy=OFF`.
@@ -558,14 +560,18 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
   come from a pooled sequence. Use `persistAndFlush()` when the number is needed in the same transaction.
 - **`ClaimImageSeeder` runs on every start and re-inserts any missing configured image.**
   - Every profile currently recreates the schema on each boot (`%prod` / `%openshift` set `drop-and-create`; dev/test
-    get it from Dev Services), so in practice each boot inserts all 12 ("Seeded 12 of 12 claim images"). The
+    get it from Dev Services), so in practice each boot inserts all 12 ("Seeded 12 of 12 claim images (0 already
+    present, 0 skipped)"). The
     re-insert-missing path matters for a persistent schema, and `ClaimImageSeederTests` covers it by calling `seed`
     directly; a second run inserts nothing.
   - **It matches the sample claims by their explicit ids in `import.sql`** (claim numbers are generated, so they can't
     be listed). Keep `SEED_IMAGES` aligned if the seed claims change.
-  - A missing claim is logged and skipped. A missing **resource file** fails startup (`SeedImageNotFoundException`),
-    because it's a packaging bug. A file is read only when it's about to be inserted.
-  - It runs in one transaction from a `StartupEvent` observer, so a failure aborts boot.
+  - **Seed data never fails startup.** An image whose claim doesn't exist, or whose resource file is missing,
+    unreadable or empty, is logged (WARN, with the reason) and skipped, and the rest are still seeded. `seed` returns
+    a `SeedResult` with the counts per outcome. A file is read only when it's about to be inserted.
+  - Empty files are skipped before `store`: `ClaimImage.data` is `@NotEmpty`, and a violation at flush would roll
+    back the whole run.
+  - It runs in one transaction from a `StartupEvent` observer, so an unexpected database error still aborts boot.
 - **The claim-number sequence can't be a `@SequenceGenerator`** (spike-verified on Hibernate 7.4.9).
   - **A lone class-level one takes over the `PanacheEntity` id.** This follows the JPA 3.2 default-generator rule:
     there's no `claims_seq`, and ids come from the claim-number sequence.
