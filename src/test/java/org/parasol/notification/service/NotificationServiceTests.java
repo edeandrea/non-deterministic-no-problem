@@ -45,12 +45,15 @@ class NotificationServiceTests {
 	@Test
 	@DisabledIfSystemProperty(
 		named = "quarkus.test.profile",
-		matches = ".*ollama.*",
+		matches = ".*ollama-openai.*",
 		disabledReason = """
-			Needs a model whose email satisfies all four output guardrails on the first attempt. The small Ollama models \
-			don't: the email fails a later guardrail, which then calls reprompt() after GenerateEmailOutputGuardrail's \
-			JSON extraction already rewrote the output, and LangChain4j rejects that with "Retry or reprompt is not \
-			allowed after a rewritten output". Still runs under the default profile against gpt-5-mini."""
+			Needs a model that reproduces GenerateEmailService.EMAIL_ENDING verbatim, or \
+			EmailEndsAppropriatelyOutputGuardrail reprompts until max-retries. %ollama gives generate-email qwen3:4b \
+			with thinking off, which does reproduce it. %ollama-openai can't: it reaches Ollama through the \
+			OpenAI-compatible endpoint, where model-options.think isn't available, and qwen3:4b spends ~6k reasoning \
+			tokens per email - minutes on a CI runner. It keeps parasol-chat's granite4:micro, which reflows the \
+			closing block (so do llama3.2, ministral-3:3b and qwen2.5:3b). Runs everywhere else, including the \
+			default profile against gpt-5-mini. This is NOT #228, which is fixed - see EmailOutputGuardrailChainTests."""
 	)
 	void emailSendsWhenUserExists() {
 		QuarkusTransaction.begin(QuarkusTransaction.beginOptions().timeout((int) WAIT_DURATION.toSeconds()));

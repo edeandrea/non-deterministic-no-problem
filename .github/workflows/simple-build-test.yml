@@ -59,8 +59,11 @@ jobs:
             curl -sf http://localhost:11434/api/tags > /dev/null && break
             sleep 2
           done
+          # qwen3:4b is only used by generate-email under %ollama - it's the one model measured to reproduce
+          # EMAIL_ENDING verbatim for EmailEndsAppropriatelyOutputGuardrail. See application.yml.
           docker exec ollama bash -c "\
             ollama pull granite4:micro && \
+            ollama pull qwen3:4b && \
             ollama pull snowflake-arctic-embed && \
             ollama ls"
 

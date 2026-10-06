@@ -146,8 +146,15 @@ quarkus:
       generate-email:
         timeout: 600s
         chat-model:
-          model-id: granite4:micro
+          # Not granite4:micro like the others: EmailEndsAppropriatelyOutputGuardrail needs EMAIL_ENDING reproduced
+          # verbatim, and granite4:micro (like llama3.2, ministral-3:3b and qwen2.5:3b) reflows it - it collapses the
+          # three disclaimer lines onto one - so the guardrail reprompts until max-retries. qwen3:4b reproduces it.
+          model-id: qwen3:4b
           temperature: 0.3
+          model-options:
+            # qwen3 reasons by default: ~6k thinking tokens per email, which is minutes on a CI runner. Off, it's ~140.
+            # This only reaches the Ollama-native API, which is why %ollama-openai stays on parasol-chat's model id.
+            think: false
       politeness:
         timeout: 600s
         chat-model:

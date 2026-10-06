@@ -3,7 +3,6 @@ package org.parasol.notification.guardrail;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import org.parasol.notification.ai.GenerateEmailService;
-import org.parasol.notification.model.Email;
 
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.guardrail.OutputGuardrailResult;
@@ -19,16 +18,10 @@ public class EmailEndsAppropriatelyOutputGuardrail extends GenerateEmailOutputGu
 
 	@Override
 	public OutputGuardrailResult validate(AiMessage responseFromLLM) {
-		var result = super.validate(responseFromLLM);
-
-		if (result.isSuccess()) {
-			var email = (Email) result.successfulResult();
-
-			return email.body().endsWith(GenerateEmailService.EMAIL_ENDING) ?
-			       result :
-			       reprompt(REPROMPT_MESSAGE, REPROMPT_PROMPT);
-		}
-
-		return result;
+		return extractEmail(responseFromLLM)
+			.map(email -> email.body().endsWith(GenerateEmailService.EMAIL_ENDING) ?
+			              success() :
+			              reprompt(REPROMPT_MESSAGE, REPROMPT_PROMPT))
+			.orElseGet(() -> invalidJson(responseFromLLM));
 	}
 }

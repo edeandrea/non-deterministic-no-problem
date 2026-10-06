@@ -24,48 +24,54 @@ public class EmailContainsRequiredInformationOutputGuardrail extends GenerateEma
 
 	@Override
 	public OutputGuardrailResult validate(OutputGuardrailRequest request) {
-		var result = super.validate(request);
-
-		if (result.isSuccess()) {
-			var email = (Email) result.successfulResult();
-			var claimInfo = Optional.ofNullable(request.requestParams().variables())
-			                        .map(vars -> (ClaimInfo) vars.get("claimInfo"))
-			                        .orElse(null);
-
-			if (claimInfo != null) {
-				if (!claimInfo.clientName().isBlank() && !email.body().contains(claimInfo.clientName())) {
-					return reprompt(CLIENT_NAME_NOT_FOUND_MESSAGE, CLIENT_NAME_NOT_FOUND_PROMPT.formatted(claimInfo.clientName()));
-				}
-
-				if (!claimInfo.claimNumber().isBlank() && !StringUtils.containsIgnoreCase(email.body(), claimInfo.claimNumber())) {
-					return reprompt(CLAIM_NUMBER_NOT_FOUND_MESSAGE, CLAIM_NUMBER_NOT_FOUND_PROMPT.formatted(claimInfo.claimNumber()));
-				}
-
-				if (!claimInfo.claimStatus().isBlank() && !StringUtils.containsIgnoreCase(email.body(), claimInfo.claimStatus())) {
-					return reprompt(CLAIM_STATUS_NOT_FOUND_MESSAGE, CLAIM_STATUS_NOT_FOUND_PROMPT.formatted(claimInfo.claimStatus()));
-				}
-			}
-		}
-
-		return result;
+		return validate(request.responseFromLLM().aiMessage(), claimInfoOf(request));
 	}
 
 	@Override
 	public OutputGuardrailResult validate(AiMessage responseFromLLM) {
-		var result = super.validate(responseFromLLM);
+		return validate(responseFromLLM, Optional.empty());
+	}
 
-		if (result.isSuccess()) {
-			var email = (Email) result.successfulResult();
+	private OutputGuardrailResult validate(AiMessage responseFromLLM, Optional<ClaimInfo> claimInfo) {
+		return extractEmail(responseFromLLM)
+			.map(email -> validateEmail(email, claimInfo))
+			.orElseGet(() -> invalidJson(responseFromLLM));
+	}
 
-			if ((email.subject() == null) || email.subject().isBlank()) {
-				return reprompt(REPROMPT_MESSAGE.formatted("subject"), REPROMPT_PROMPT.formatted("subject"));
-			}
-
-			if ((email.body() == null) || email.body().isBlank()) {
-				return reprompt(REPROMPT_MESSAGE.formatted("body"), REPROMPT_PROMPT.formatted("body"));
-			}
+	private OutputGuardrailResult validateEmail(Email email, Optional<ClaimInfo> claimInfo) {
+		if ((email.subject() == null) || email.subject().isBlank()) {
+			return reprompt(REPROMPT_MESSAGE.formatted("subject"), REPROMPT_PROMPT.formatted("subject"));
 		}
 
-		return result;
+		if ((email.body() == null) || email.body().isBlank()) {
+			return reprompt(REPROMPT_MESSAGE.formatted("body"), REPROMPT_PROMPT.formatted("body"));
+		}
+
+		return claimInfo
+			.map(info -> validateClaimInfo(email, info))
+			.orElseGet(this::success);
+	}
+
+	private OutputGuardrailResult validateClaimInfo(Email email, ClaimInfo claimInfo) {
+		if (!claimInfo.clientName().isBlank() && !email.body().contains(claimInfo.clientName())) {
+			return reprompt(CLIENT_NAME_NOT_FOUND_MESSAGE, CLIENT_NAME_NOT_FOUND_PROMPT.formatted(claimInfo.clientName()));
+		}
+
+		if (!claimInfo.claimNumber().isBlank() && !StringUtils.containsIgnoreCase(email.body(), claimInfo.claimNumber())) {
+			return reprompt(CLAIM_NUMBER_NOT_FOUND_MESSAGE, CLAIM_NUMBER_NOT_FOUND_PROMPT.formatted(claimInfo.claimNumber()));
+		}
+
+		if (!claimInfo.claimStatus().isBlank() && !StringUtils.containsIgnoreCase(email.body(), claimInfo.claimStatus())) {
+			return reprompt(CLAIM_STATUS_NOT_FOUND_MESSAGE, CLAIM_STATUS_NOT_FOUND_PROMPT.formatted(claimInfo.claimStatus()));
+		}
+
+		return success();
+	}
+
+	private static Optional<ClaimInfo> claimInfoOf(OutputGuardrailRequest request) {
+		return Optional.ofNullable(request.requestParams().variables())
+			.map(variables -> variables.get("claimInfo"))
+			.filter(ClaimInfo.class::isInstance)
+			.map(ClaimInfo.class::cast);
 	}
 }
