@@ -22,7 +22,7 @@ The Java source is split into two top-level packages representing two distinct c
 | Package | Contents |
 |---|---|
 | `org.parasol.claim.model` | `Claim` (Panache entity, table `claims`), `ClaimImage` (table `claim_images`), `ClaimImageKind`, `ClaimImageContentType`, `ClaimCategory`, claim-number generation, the domain exceptions (`ClaimNotFoundException`, `ClaimImageNotFoundException`, `UnknownClaimCategoryException`, `UnsupportedClaimImageContentTypeException`) |
-| `org.parasol.claim.rest` | `ClaimResource` (`/api/db/claims`), `ClaimImageResource` (`/api/db/claims/{id}/images`), the `ClaimDetails` / `ClaimImageMetadata` DTOs + `ClaimMapper` (MapStruct), `ClaimExceptionMappers` (Problem Details) |
+| `org.parasol.claim.rest` | `ClaimResource` (`/api/db/claims`), `ClaimImageResource` (`/api/db/claims/{id}/images`), the `ClaimDetails` / `ClaimImageMetadata` DTOs + `ClaimMapper` (MapStruct), `ClaimExceptionMappings` (Problem Details) |
 | `org.parasol.claim.seed` | `ClaimImageSeeder` (attaches the sample images to the six seeded claims) |
 | `org.parasol.chat.ai` | `ClaimService` (the chat-bot AI service) |
 | `org.parasol.chat.model` | `ClaimBotQuery`, `ClaimBotQueryResponse` |
@@ -165,7 +165,7 @@ and map to DTO records with `ClaimMapper`.
   global `serialization-inclusion: non-empty`). A new `Claim` column (e.g. #216's `reviewRunId`, `intakeTraceparent`,
   `intakeConversationId`, `version`) stays out of the API until it's added to the DTO; `ClaimResourceTests` pins the
   exact JSON.
-- **Errors:** domain exceptions are mapped once, by `ClaimExceptionMappers` (Quarkus `@ServerExceptionMapper`), to RFC
+- **Errors:** domain exceptions are mapped once, by `ClaimExceptionMappings` (Quarkus `@ServerExceptionMapper`), to RFC
   9457 Problem Details (`application/problem+json`, `type: about:blank`, `instance` = request path).
   `ClaimNotFoundException` and `ClaimImageNotFoundException` are `404`. An image that exists but belongs to another
   claim is the same `404` as an unknown image.

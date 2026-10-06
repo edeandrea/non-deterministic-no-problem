@@ -15,7 +15,7 @@ import org.parasol.claim.model.ClaimImageNotFoundException;
 
 /**
  * Claim images: metadata and image bytes. Missing claims and images surface as domain exceptions that
- * {@link ClaimExceptionMappers} turns into RFC 9457 Problem Details.
+ * {@link ClaimExceptionMappings} turns into RFC 9457 Problem Details.
  */
 @Path("/api/db/claims/{id}/images")
 public class ClaimImageResource {

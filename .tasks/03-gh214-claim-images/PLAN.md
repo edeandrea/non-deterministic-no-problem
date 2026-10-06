@@ -67,7 +67,7 @@ merges keep `main` clean). Copilot's asset moves, `OriginalApp` removal and most
 - **Task 01:** `ClaimImage` (Active Record: `listForClaim`, `findForClaim`, `hasImage`, `store`) with an allow-listed
   `ClaimImageContentType` enum, lazily loaded `bytea` data (`Length.LONG32`), an `on delete cascade` foreign key and an
   index on `claim_id`. `ClaimImageResource` has no queries; `ClaimNotFoundException` / `ClaimImageNotFoundException` are
-  mapped once to Problem Details by `ClaimExceptionMappers` (`@ServerExceptionMapper`). `ClaimMapper` (MapStruct
+  mapped once to Problem Details by `ClaimExceptionMappings` (`@ServerExceptionMapper`). `ClaimMapper` (MapStruct
   1.6.3, `JAKARTA_CDI`) builds the DTO with a root-relative URL. Tests: `ClaimImageTests` (9, incl. the `bytea` column
   check), `ClaimImageResourceTests` (8), `ClaimImageContentTypeTests` (21).
 - **Task 02:** `ClaimImageSeeder` matches the sample claims by id, re-inserts any missing image on every start, checks

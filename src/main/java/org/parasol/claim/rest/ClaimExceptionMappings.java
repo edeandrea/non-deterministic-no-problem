@@ -11,7 +11,7 @@ import org.parasol.claim.model.ClaimNotFoundException;
 /**
  * Maps the claim domain's exceptions to RFC 9457 Problem Details ({@code application/problem+json}) for every endpoint.
  */
-class ClaimExceptionMappers {
+class ClaimExceptionMappings {
 	static final String PROBLEM_JSON = "application/problem+json";
 
 	@ServerExceptionMapper

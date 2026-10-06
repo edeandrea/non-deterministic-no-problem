@@ -13,7 +13,7 @@ import org.parasol.claim.model.ClaimNotFoundException;
 
 /**
  * Claims. Returns {@link ClaimDetails} DTOs rather than the entity. A missing claim surfaces as a
- * {@link ClaimNotFoundException}, which {@link ClaimExceptionMappers} turns into an RFC 9457 Problem Details
+ * {@link ClaimNotFoundException}, which {@link ClaimExceptionMappings} turns into an RFC 9457 Problem Details
  * {@code 404}.
  */
 @Produces(MediaType.APPLICATION_JSON)
