@@ -86,7 +86,8 @@ merges keep `main` clean). Copilot's asset moves, `OriginalApp` removal and most
   `-Pollama` verify ran 157 tests with 2 errors, both the known environment baselines
   (`NotificationServiceTests.emailSendsWhenUserExists`, `LangfuseSessionScoringServiceTests:182`); every claim, image
   and UI suite passed. A fresh review found no BLOCKER; its one MAJOR (stale "by claim number" in task-04) and the
-  relevant MINOR/NITs were fixed. Open: the maintainer's real-key verify and manual check (task stays unticked).
+  relevant MINOR/NITs were fixed. The maintainer's real-key verify passed. Open: the maintainer's manual check (task
+  stays unticked until then).
 
 ### Project Context
 - `src/main/webui/src/app/components/ClaimDetail/ClaimDetail.tsx` (lines ~24–25 build the paths) and `ImageCarousel.tsx` (prefixes `/images/`).
