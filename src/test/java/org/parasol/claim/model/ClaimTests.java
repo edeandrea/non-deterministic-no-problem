@@ -112,6 +112,26 @@ class ClaimTests {
 	}
 
 	@Test
+	@TestTransaction
+	void findExistingReturnsTheClaim() {
+		var claim = newClaim();
+		claim.persistAndFlush();
+
+		assertThat(Claim.findExisting(claim.id))
+			.isSameAs(claim);
+	}
+
+	@Test
+	@TestTransaction
+	void findExistingFailsForAnUnknownId() {
+		assertThatThrownBy(() -> Claim.findExisting(-1L))
+			.isInstanceOf(ClaimNotFoundException.class)
+			.hasMessage("Claim -1 was not found")
+			.extracting("claimId")
+			.isEqualTo(-1L);
+	}
+
+	@Test
 	void duplicateClaimNumberIsRejected() {
 		var seededNumber = seededClaim(1L).claimNumber;
 

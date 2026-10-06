@@ -25,6 +25,7 @@ import io.quarkiverse.quinoa.testing.QuinoaTestProfiles;
 @TestProfile(QuinoaTestProfiles.EnableAndRunTests.class)
 public class ClaimImagesPageTests extends PlaywrightTests {
 	private static final long SEEDED_CLAIM_ID = 1L;
+	private static final long UNKNOWN_CLAIM_ID = 999_999L;
 
 	private Long testClaimId;
 
@@ -75,6 +76,27 @@ public class ClaimImagesPageTests extends PlaywrightTests {
 
 		PlaywrightAssertions.assertThat(page.locator("img.image-gallery-image"))
 			.hasCount(0);
+	}
+
+	@Test
+	void unknownClaimSaysTheClaimDoesNotExist() {
+		var page = loadPage("ClaimDetail/%d".formatted(UNKNOWN_CLAIM_ID), "%s_unknownClaimSaysTheClaimDoesNotExist".formatted(getClass().getSimpleName()));
+		var notFound = page.getByTestId("claim-not-found");
+
+		PlaywrightAssertions.assertThat(notFound.getByRole(AriaRole.HEADING, new Locator.GetByRoleOptions().setName("Claim not found")))
+			.isVisible();
+
+		PlaywrightAssertions.assertThat(notFound)
+			.containsText("There's no claim with id %d".formatted(UNKNOWN_CLAIM_ID));
+
+		// None of the claim detail page is rendered
+		PlaywrightAssertions.assertThat(page.getByRole(AriaRole.TAB, new Page.GetByRoleOptions().setName("Documents")))
+			.hasCount(0);
+
+		notFound.getByRole(AriaRole.LINK, new Locator.GetByRoleOptions().setName("Back to claims")).click();
+
+		PlaywrightAssertions.assertThat(page)
+			.hasURL(getUrl("ClaimsList"));
 	}
 
 	@Test

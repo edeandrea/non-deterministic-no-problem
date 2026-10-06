@@ -86,6 +86,30 @@ class ClaimImageTests {
 
 	@Test
 	@TestTransaction
+	void unknownImageIdIsNotFound() {
+		var claim = newClaim();
+
+		assertThatThrownBy(() -> ClaimImage.findForClaim(claim.id, -1L))
+			.isInstanceOf(ClaimImageNotFoundException.class)
+			.hasMessage("Image -1 was not found for claim %d", claim.id)
+			.extracting("claimId", "imageId")
+			.containsExactly(claim.id, -1L);
+	}
+
+	@Test
+	@TestTransaction
+	void imageOfAnUnknownClaimIsNotFound() {
+		var claim = newClaim();
+		var image = ClaimImage.store(claim, ClaimImageKind.ORIGINAL, "photo.jpg", ClaimImageContentType.JPEG, IMAGE_DATA);
+		ClaimImage.flush();
+
+		assertThatThrownBy(() -> ClaimImage.findForClaim(-1L, image.id))
+			.isInstanceOf(ClaimImageNotFoundException.class)
+			.hasMessage("Image %d was not found for claim -1", image.id);
+	}
+
+	@Test
+	@TestTransaction
 	void hasImageMatchesClaimKindAndFileName() {
 		var claim = newClaim();
 		ClaimImage.store(claim, ClaimImageKind.ORIGINAL, "photo.jpg", ClaimImageContentType.JPEG, IMAGE_DATA);

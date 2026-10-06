@@ -81,8 +81,9 @@ shell variable or a `.env` file both work. The root [`pom.xml`](../../../pom.xml
 `BACKEND_API_URL=http://localhost:8081/api` for the surefire and failsafe executions.
 
 * **REST** — `ClaimsList` and `ClaimDetail` call `GET {backend_api_url}/db/claims` and
-  `GET {backend_api_url}/db/claims/{id}` with axios. Claim JSON is snake_case (the backend's `ClaimDetails` DTO; an
-  unknown id is a Problem Details `404`):
+  `GET {backend_api_url}/db/claims/{id}` with axios. Claim JSON is snake_case (the backend's `ClaimDetails` DTO). An
+  unknown id is a Problem Details `404`; `ClaimDetail` then shows a "Claim not found" page with a link back to the
+  list (`isNotFound` in [`httpErrors.ts`](./src/app/utils/httpErrors.ts)) instead of an empty claim:
   - `category` is the display label ("Single vehicle", "Multiple vehicle", "Theft", "Other"), which is what the list's
     category filter matches on.
   - `incident_date` (`YYYY-MM-DD`) and the optional `incident_time` (`HH:mm:ss`, left out when null) are formatted

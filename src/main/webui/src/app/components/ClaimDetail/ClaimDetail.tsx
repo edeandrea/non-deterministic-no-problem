@@ -2,12 +2,14 @@ import config from '@app/config';
 import { faCalendarDays, faCommentDots, faFaceSmile, faFileLines } from '@fortawesome/free-regular-svg-icons';
 import { faCaretDown, faLocationDot, faRectangleList, faShieldHalved, faUser } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { Accordion, AccordionContent, AccordionItem, AccordionToggle, Breadcrumb, BreadcrumbItem, Button, Card, CardBody, Divider, Flex, FlexItem, Grid, GridItem, Label, Page, PageSection, Tab, Tabs, TabTitleText, Text, TextContent, TextVariants, Title } from '@patternfly/react-core';
+import { Accordion, AccordionContent, AccordionItem, AccordionToggle, Breadcrumb, BreadcrumbItem, Button, Card, CardBody, Divider, EmptyState, EmptyStateBody, EmptyStateFooter, EmptyStateHeader, EmptyStateIcon, Flex, FlexItem, Grid, GridItem, Label, Page, PageSection, Tab, Tabs, TabTitleText, Text, TextContent, TextVariants, Title } from '@patternfly/react-core';
+import { ExclamationTriangleIcon } from '@patternfly/react-icons';
 import axios from 'axios';
 import * as React from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { formatIncident } from '@app/utils/formatIncident';
 import { ClaimImage, imagesToDisplay } from '@app/utils/claimImages';
+import { isNotFound } from '@app/utils/httpErrors';
 import { Chat } from '../Chat/Chat';
 import { ImageCarousel } from '../ImageCarousel/ImageCarousel';
 
@@ -20,25 +22,31 @@ const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
   const { claim_id } = useParams<{ claim_id: string }>();
   const [claim, setClaim] = React.useState<any>({});
   const [images, setImages] = React.useState<ClaimImage[]>([]);
+  const [claimNotFound, setClaimNotFound] = React.useState<boolean>(false);
 
   React.useEffect(() => {
     // Aborting on cleanup stops a slow response for the previous claim from overwriting the current one
     const controller = new AbortController();
     setClaim({});
     setImages([]);
+    setClaimNotFound(false);
 
     axios.get(config.backend_api_url + `/db/claims/${claim_id}`, { signal: controller.signal })
       .then((response) => setClaim(response.data))
       .catch(error => {
-        if (!axios.isCancel(error)) {
+        if (isNotFound(error)) {
+          setClaimNotFound(true);
+        }
+        else if (!axios.isCancel(error)) {
           console.error(error);
         }
       });
 
+    // An unknown claim 404s here too; the not-found page above already covers it
     axios.get<ClaimImage[]>(config.backend_api_url + `/db/claims/${claim_id}/images`, { signal: controller.signal })
       .then((response) => setImages(response.data))
       .catch(error => {
-        if (!axios.isCancel(error)) {
+        if (!isNotFound(error) && !axios.isCancel(error)) {
           console.error(error);
         }
       });
@@ -83,6 +91,24 @@ const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
         'Denied': 'red',
         'In Process': 'gold'
     };
+
+  if (claimNotFound) {
+    return (
+      <Page>
+        <PageSection>
+          <EmptyState variant="full" data-testid="claim-not-found">
+            <EmptyStateHeader titleText="Claim not found" icon={<EmptyStateIcon icon={ExclamationTriangleIcon} />} headingLevel="h1" />
+            <EmptyStateBody>
+              There&apos;s no claim with id {claim_id}. It may have been deleted, or the link may be wrong.
+            </EmptyStateBody>
+            <EmptyStateFooter>
+              <Button variant="primary" component={(props) => <Link {...props} to="/ClaimsList" />}>Back to claims</Button>
+            </EmptyStateFooter>
+          </EmptyState>
+        </PageSection>
+      </Page>
+    );
+  }
 
   return (
     <Page>
