@@ -20,7 +20,7 @@ if (Auto-reply, self-sent, or a\nMessage-ID already processed?) then (yes)
 else (no)
   :Record the Message-ID; move the email to processing;
   :Match the email to a claim (code, not the LLM):\nclaim number in subject or body, then reply headers;
-  :Start one workflow run for the email\n(the watcher doesn't wait; a claim's emails\nrun in order, different claims in parallel);
+  :Start one workflow run for the email\n(the watcher doesn't wait; a sender's emails\nrun in order, different senders in parallel);
   note right
     Everything below, apart from the claims
     processor's look-over, is that run's steps
@@ -28,7 +28,9 @@ else (no)
   end note
   if (Claim matched, but the sender isn't\nthe claim's email address?) then (yes)
     :Reply: no matching claim\n(no details; write from the claim's\naddress or include the claim number);
-  else (no)
+  elseif (No claim matched, and the sender\nhas pending claims: does the LLM say\nwhich one it's about?) then (can't tell)
+    :Reply: which claim?\n(lists the sender's pending claim\nnumbers; nothing created or changed);
+  else (one of them → handled as matched;\nnew incident or no pending claims → unmatched)
     :Agents classify: new claim / follow-up / not a claim;
     note right
       The matched claim wins: an email matched to

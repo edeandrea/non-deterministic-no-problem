@@ -26,14 +26,19 @@ A claim is **pending** while it is `Pending Information` or `Pending Review`. Ea
 workflow run**, and the steps below are that run's steps.
 
 1. A watcher (IMAP IDLE) receives the email, records its `Message-ID`, moves it to a `processing` folder
-   and starts its run **without waiting for it**. Runs for different claims go in parallel. Emails for the
-   same claim go in order: while that claim's run is still working, the next email waits behind it.
+   and starts its run **without waiting for it**. Runs for different customers go in parallel. One
+   customer's emails go in order: while their previous run is still working, the next email waits behind
+   it.
 2. Auto-replies, self-sent mail and duplicates (same `Message-ID`) are filed without a reply, and no run
    starts.
 3. Code (not the LLM) matches the email to a claim: a claim number in the subject or body, then the
    reply headers. Only the claim's own email address may match it; anyone else gets the "no matching
    claim" reply, which gives no details and asks them to write from the claim's address or include
-   the claim number. A reply to a `Pending Review` claim will **cancel** that claim's waiting run (step 6).
+   the claim number. If nothing matched but the sender has pending claims, the run first asks an LLM
+   whether the email is about one of them (checked in code against those claims only). If it is, the email
+   is handled as a follow-up on that claim; if it's a new incident, as a new claim; if it can't tell, the
+   customer gets a "which claim?" reply listing their pending claim numbers, and nothing changes. A reply
+   to a `Pending Review` claim will **cancel** that claim's waiting run (step 6).
 4. The agents classify the email as a new claim, a follow-up or not a claim. **The matched claim wins:**
    a matched email is a follow-up on that claim, whatever the label. Without a match the label decides;
    an unmatched "follow-up" gets the "no matching claim" reply, and nothing is created or changed.
@@ -90,9 +95,16 @@ and are never updated. Intake never sets `New`.
 (`IntakeReplySender`, Qute templates), and file the email. For a complete claim, a `listen` step then
 waits for a `REVIEW_DECIDED` event for that claim, and a `switch` applies the decision. Flow's Dev UI
 draws the workflow as a diagram. `ClaimIntakeStarter` does the checks before a run (loop and duplicate checks,
-claim match, sender check), keeps each claim's emails in order, and starts the run; nothing waits for it.
+claim match, sender check), keeps each sender's emails in order, and starts the run; nothing waits for
+it. Ordering by sender covers ordering by claim, because a claim only ever matches its own address.
 The app runs as a **single replica**: cancelling a run and delivering the decision event both happen
 in-process.
+
+**Resolving the claim.** Before the agents, a `resolveClaim` step handles an email that code couldn't
+match but whose sender has pending claims. `ClaimResolver` (an LLM service, not part of the agent
+topology) gets the email and those claims (number, short summary, what we asked for) and answers one of
+them, a new claim, or unsure; code accepts only a claim from that list. It only ever offers the sender
+their own claims, so the "which claim?" reply leaks nothing even if `From:` is spoofed.
 
 **The agents** are one workflow step. `ClaimsMailboxAgent` is the root (a sequence), called with the
 email, the matched claim (or none) and the claim's history:

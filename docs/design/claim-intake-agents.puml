@@ -25,13 +25,15 @@ database "PostgreSQL\nclaims, photos;\nFlow: running and waiting runs" as DB
 
 package "Parasol app" {
   component "ClaimsInboxWatcher\nIMAP IDLE; records the Message-ID,\nmoves the email to processing" as W <<app>>
-  component "ClaimIntakeStarter\nskips auto-replies, self-sent mail\nand duplicates; matches the claim\nand checks the sender (code);\nkeeps a claim's emails in order;\nstarts one run (doesn't wait)" as S <<app>>
+  component "ClaimIntakeStarter\nskips auto-replies, self-sent mail\nand duplicates; matches the claim\nand checks the sender (code);\nkeeps a sender's emails in order;\nstarts one run (doesn't wait)" as S <<app>>
   component "Failure listener\nfailed run → failed folder,\nprocessing-problem reply" as FL <<app>>
   component "Review REST API\nPOST /api/db/claims/{id}/review-decisions\nchecks the run is waiting;\npublishes REVIEW_DECIDED" as RR <<app>>
   component "IntakeReplySender\nQute templates" as RS <<app>>
 
   package "ClaimIntakeFlow: one quarkus-flow workflow per email (steps do the side effects)" as FLOW {
     component "wrong sender?\n→ no-matching-claim reply" as F1 <<step>>
+    component "resolveClaim\nno match, sender has pending claims:\nwhich one? (or 'which claim?' reply)" as F1b <<step>>
+    component "ClaimResolver\npicks one of the sender's\npending claims, new, or unsure\n(checked in code)" as CR <<LLM>>
     component "runAgents" as F2 <<step>>
     component "policy check\n(code)" as F3 <<step>>
     component "supersede: cancel the\nclaim's waiting run" as F3b <<step>>
@@ -61,7 +63,9 @@ Customer --> GM : email (Roundcube)
 GM --> W : new mail
 W --> S
 S --> F1 : start a run (Message-ID,\nmatched claim, sender check,\nconversation id)
-F1 --> F2
+F1 --> F1b
+F1b --> CR
+F1b --> F2
 F2 --> ROOT : email, matched claim (or none),\nclaim history
 C --> ROUTER : email type
 ROUTER --> EX : matched pending claim,\nor no match + new claim
