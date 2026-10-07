@@ -457,8 +457,8 @@ CONSUMER span and much of spike items 12–18.
    for why and for the ranked options. Softer than it looks — no scoring tier is affected, the user owns
    `quarkus-langfuse`, `ai.scoring` is the staging area, and `AiServiceDatasetSpanProcessor` is the
    precedent — but it is work, not a freebie.
-3. **Durable state needs a schema strategy.** B6 only works because the spike overrode schema management.
-   See the standing note.
+3. ~~**Durable state needs a schema strategy.**~~ Withdrawn: durable state across restarts isn't a
+   requirement (user decision). See *Durable state across restarts: not a requirement*.
 4. **`application_id` = `quarkus.application.name`** is load-bearing and should be pinned explicitly.
 
 ---
@@ -577,31 +577,372 @@ Options 3 and 4 are fallbacks.
    the checkpoint exists; B6 did not exercise this path. **Decide before relying on fine-grained resume** —
    worst case is the merged design's behaviour (re-run the task), which is acceptable.
 2. **D15 across a restart.** Is auto-restore a linked span, as the ADR claims? Unobservable in-JVM.
-3. **D14** — `fork` OTel/MDC propagation, if a parallel branch is introduced.
+3. **D14** — partly answered by the follow-up (F4): Flow's own fork task spans nest correctly; the leaf
+   AI-service spans inside a fork are roots, as everywhere else. MDC was not checked.
 4. **Concurrency.** Every spike test ran one instance at a time. Dataset/instance creation under concurrent
    intake is untested, and `idempotency-correlation.html` explicitly says singleton behaviour is the
    application's job ("a database lock or lease").
 5. **1.2.0 final.** Re-check before committing; only `1.2.0.CR3` exists today.
-6. **The three trace islands** — needs a decision, options on record in
+6. **The three trace islands** — filed upstream as quarkus-flow#1056 (see F4); the local decision is open, options on record in
    [§ Open issue: the three trace islands](#open-issue-the-three-trace-islands). Legibility, not
    correctness: no scoring tier and not the dataset-name invariant is affected. Start with the one-line
    diagnostic.
 
 ---
 
-## Standing note: durable state is wiped on boot in every profile
+## Upstream issues filed
+
+Three quarkus-flow bugs found by these spikes are filed upstream. Each has a standalone runnable reproducer in
+[edeandrea/quarkus-flow-reproducers](https://github.com/edeandrea/quarkus-flow-reproducers) (Java 21+, no API keys, no
+network, no containers). All three reproduce on **1.1.3 and 1.2.0.CR3**.
+
+| Issue | Bug | Found in |
+|---|---|---|
+| [quarkus-flow#1056](https://github.com/quarkiverse/quarkus-flow/issues/1056) | Task spans are never current in task bodies, and generated agentic sub-workflows always start a new trace (the trace islands) | D13, F4 |
+| [quarkus-flow#1057](https://github.com/quarkiverse/quarkus-flow/issues/1057) | `@ParallelExecutor` on a `@ParallelAgent` throws `UnsupportedOperationException` on first use | F5 |
+| [quarkus-flow#1058](https://github.com/quarkiverse/quarkus-flow/issues/1058) | `cancel()` on a waiting instance loses the workflow's `workflow.execute` span | F3 |
+
+The standalone reproducer sharpened #1058: it loses the span on **10 of 10** cancels, not 4 of 5 as these spikes logged, so
+it's systematic, not a race.
+
+---
+
+## Follow-up spike 2: the conversation id on every span (task 11's grouping)
+
+**STATUS: COMPLETE. Feasible without baggage** (whether baggage could work too is open; see below). Every span of an intake run, across all of Flow's thread
+hops, carries the run's `gen_ai.conversation.id`, with no leaking between 8 concurrent runs. Only Flow's own
+persistence spans are left without one. Branch `spike/flow-conversation-id` (local, unpushed), commit `66db1e7`.
+20 tests (task 01b's, the b1 follow-up's and these 2) pass under both `-Pollama` and `-Pollama-openai`.
+
+**Why this was needed:** quarkus-flow#1056 splits one run into separate traces, so the plan's fallback was to
+group them in Langfuse by `gen_ai.conversation.id` (Langfuse maps it to the session id). But the plan stamped it
+from OTel baggage, and baggage is lost at exactly the hops that split the trace.
+
+**Baggage is worse than lost: it leaks.** The first version made the id current as baggage before starting each
+run. One run at a time was perfect. With 8 concurrent runs, Flow's persistence spans (which start as roots on
+pool threads) carried **other runs' ids** (one id on 85 of them, another on 8) or none, so some pool thread was
+left with stale baggage. **(Diagnosed in follow-up spike 3: Quarkus bug quarkus#54354, fixed by quarkus PR #56805, not in 3.40.1.)** The quarkus-langfuse span processor also stamps the id from baggage, so the same
+mis-attribution would reach Langfuse. **The cause is not established.** That version's own `AgentListener` made
+baggage current in `beforeAgentInvocation` and closed it in `after`, so the leak may be the spike's own doing
+rather than Flow's. Properly propagated context (captured on submit, restored and cleared after) shouldn't leak, so
+"don't use baggage" is not a proven conclusion; the data approach below is simply the one that's proven to work.
+
+**What works** (`Spike3ConversationIdSpanProcessor`, `Spike3ConversationFlowListener`,
+`Spike3ConversationAgentListener`, `Spike3StepContext`). The id travels as data, never as ambient context:
+
+1. **Our workflow's input carries the id.** A Flow `WorkflowExecutionListener` (priority 0, so it runs before
+   quarkus-flow-opentelemetry's) maps each workflow instance id to the conversation id at `onWorkflowStarted`.
+   It reads it from our input record, or, for a **generated agentic sub-workflow**, from the agentic scope that
+   is its input. It removes the entry on completed/failed/cancelled.
+2. **The agentic root takes the id as an argument** (`process(@V("conversationId") …, …)`), so it's in the
+   agentic scope. A CDI `AgentListener` bean pushes it onto a per-thread stack in `beforeAgentInvocation` and
+   pops it in `after`/`onError`. LangChain4j calls both on the same thread as the agent call, including the
+   parallel branches, which run on virtual threads.
+3. **A `SpanProcessor` stamps the id in `onStart`:** from the in-process parent span (cascade, like
+   `AiServiceDatasetSpanProcessor`), else from the instance map via `flow.workflow.instance.id` (Flow's own
+   spans), else from the agent-call stack (the root `langchain4j.aiservices.*` span of each agent call).
+4. **Our own steps** run their body inside the task-08 helper (Flow's task span made current), so an AI service
+   called directly from a step (the status answer) is parented under the step and inherits the id by cascade.
+
+**Measured** (one run = 22 non-persistence spans: 3 Flow workflows, 7 tasks, 4 AI-service calls with their
+`completion` and HTTP spans):
+- one run: all 22 carry the id;
+- 8 concurrent runs: exactly 22 spans per id, for each of the 8 ids, and no trace mixes ids;
+- Flow's persistence spans (~58 per run: `INSERT/UPDATE/DELETE/SELECT` on `workflow_instance_entity` /
+  `task_info_entity`) get **no** id, because they are roots with neither a parent nor a Flow instance attribute.
+
+**What this does and doesn't fix:**
+- **Langfuse:** one session per claim becomes possible, assuming Langfuse maps the attribute to the session id
+  as planned. Not checked against a live Langfuse here (span export is off in tests).
+- **Trace trees:** still split (#1056). A run is still several traces, plus one trace root per persistence
+  statement. That's noise in Tempo and Langfuse. Turning off JDBC tracing for Flow's tables, or dropping those
+  spans, is for task 11 to decide.
+- **The agent listener's stack** is a ThreadLocal. It's balanced by construction (it pushes on every call and
+  pops on after/error), but it's the one piece that should get a test of its own in task 11.
+- **Chat baggage:** the chat's `ConversationalBaggageHandler` still uses baggage, and quarkus-langfuse stamps
+  from it. If that baggage ever leaks onto a Flow pool thread, an intake span could get a chat id. Not observed,
+  not tested; worth one assertion in task 11.
+
+---
+
+## Follow-up spike 3: why baggage leaked (the carrier decision)
+
+**STATUS: COMPLETE. The leak is a Quarkus bug, already fixed upstream; baggage is the right carrier once the fix
+ships.** Branch `spike/flow-baggage` (local, unpushed), commit `c28e09d`, test `Spike4BaggageTests`.
+
+**The leak isn't Flow's and wasn't the spike's.** A test with no Flow at all reproduces it: submit 32 tasks with
+distinct baggage to the injected `ManagedExecutor` (each sees its own id, 32/32), then submit tasks from a caller
+with **no** baggage. Those tasks see **earlier tasks' ids** on the threads that ran them. The common pool doesn't
+(always `null`). Submitting from an explicit `Context.root()` doesn't either.
+
+**Cause: [quarkusio/quarkus#54354](https://github.com/quarkusio/quarkus/issues/54354)** ("Leak context propagation
+when using the quarkus-opentelemetry extension", open). In 3.40.1, `OpenTelemetryMpContextPropagationProvider`
+attaches the captured context in `begin()`, but `endContext()` only restores the thread's previous context when
+that previous context had a **recording span**. A pool thread starts with no span, so nothing is restored, and the
+task's context, baggage included, stays on the thread for the next task. Its `clearedContext` is a no-op, too.
+
+**Fix: [quarkusio/quarkus#56805](https://github.com/quarkusio/quarkus/pull/56805)** ("Fix clearedContext in
+OpenTelemetryMpContextPropagationProvider"), merged to `main` 2026-09-22, milestone **4.0.0.Beta1**, labelled
+`triage/backport-3.40`. **Not in 3.40.1**, and not on the `3.40` branch yet.
+
+**Verified:** shadowing that one class with the verbatim upstream version on the test classpath (spike only):
+
+| | 3.40.1 as shipped | with the #56805 fix |
+|---|---|---|
+| ManagedExecutor tasks submitted with no baggage | see earlier tasks' ids | all `null` |
+| second batch of 8 runs: spans carrying a first-batch id | **81 / 118** (two runs), all Flow persistence | **0** |
+
+Same on `-Pollama` and `-Pollama-openai`.
+
+**What baggage alone covers (with the fix), set only where a run starts, no other context code:** 8 concurrent
+runs, **0** traces mixing ids, **0** foreign ids. Each run's main workflow, its steps and an AI service called from
+a step carry the id (9 of the run's 22 spans), and so do most of Flow's persistence spans of the main workflow.
+**Missing:** the generated agentic sub-workflows and everything under them (classify, the parallel fork, the two
+extraction agents and their HTTP spans). That's the `supplyAsync` hop in `FlowPlanner` from
+[quarkus-flow#1056](https://github.com/quarkiverse/quarkus-flow/issues/1056), which runs on the common pool with
+no propagation. It's context going missing, not leaking.
+
+**A `CallableTaskProxyBuilder` (Flow's per-call-task hook, registered through a
+`WorkflowApplicationBuilderCustomizer` bean) can make each task's context current with no code in the steps.** It
+wrapped all 54 call tasks and cut traces from 56 to 40. But it can't reach the sub-workflows, for the same
+`supplyAsync` reason. **So the Flow adapter's real job is that one hop**, and the clean place to fix it is upstream
+(#1056).
+
+**Decision input for the generic design:**
+- **Carrier: baggage.** It's the OTel standard, crosses HTTP and messaging, and needs no framework knowledge. It's
+  correct once the Quarkus propagation fix ships.
+- **Until then:** either take the 3.40 backport when it lands, wait for 4.0, or work around it. A root-restoring
+  executor in the Flow adapter would fix Flow's own pool. The data-carrying approach from spike 2 also works, but
+  it's the one that needs framework-specific code everywhere.
+- **The Flow adapter's remaining job:** carry the context across `FlowPlanner`'s `supplyAsync` (needs #1056 or a
+  workaround), and optionally the call-task proxy for our own steps.
+
+**Decided (user, 2026-10-07):** baggage is the carrier, the data approach is dropped, and quarkus#54354 is worked
+around until the fix ships. The workaround has to sit at the context-propagation level, in the generic core: the
+leaked ids above were all on persistence spans, which run on quarkus-flow-jpa's own `ManagedExecutor`, so a wrapper
+around Flow's executor alone wouldn't have caught them. The workaround is proven in follow-up spike 4.
+
+---
+
+## Follow-up spike 4: the quarkus#54354 workaround
+
+**STATUS: COMPLETE. Works on 3.40.1 without overriding any Quarkus class.** Branch `spike/flow-baggage-guard`
+(local, unpushed), class `Spike5OtelContextLeakGuard`, tests in `Spike4BaggageTests`.
+
+**How it works.** MicroProfile Context Propagation lets an app add its own `ThreadContextProvider` through
+`META-INF/services`, as long as its context type is unique. (SmallRye rejects a second `"OpenTelemetry"` provider, so
+it can't replace Quarkus's.) This one captures nothing. It records the OTel context that was current on the
+submitting thread, and when the task ends on a worker thread it checks whether that exact context is still current.
+If so, nothing restored the thread, so it attaches `Context.root()`.
+
+**Why the order of providers doesn't matter.** SmallRye ends providers in reverse order of a `HashSet`, so the order
+isn't defined. Both orders are safe:
+- *Quarkus's provider ends first:* either it restored the previous context (current ≠ captured, the guard does
+  nothing) or it didn't (current = captured, the guard resets).
+- *The guard ends first:* current = captured, so it resets. Quarkus's provider then restores a previous context that
+  had a recording span, or does nothing.
+
+**What it leaves alone:**
+- tasks run inline on the submitting thread (it compares threads);
+- Vert.x duplicated contexts, where Quarkus keeps the OTel context per request and the bug doesn't apply;
+- a thread with its own span and baggage that runs a contextual task inline. Tested: the thread keeps both.
+
+**Measured** (3.40.1, `-Pollama` and `-Pollama-openai`, the same on both):
+
+| | 3.40.1 | 3.40.1 + guard | 3.40.1 + upstream fix (spike 3) |
+|---|---|---|---|
+| `ManagedExecutor` tasks submitted with no baggage | see earlier tasks' ids | all `null` (3 of 3 repeats) | all `null` |
+| second batch of 8 runs: spans carrying a first-batch id | 81 / 118 | **0** | 0 |
+| 8 concurrent runs: traces mixing ids | 0 | 0 | 0 |
+
+It reset about 100 worker threads per 128 tasks, which is how often the leak happens in this test.
+
+**No side effects on the rest of the app (with a gap).** The full `./mvnw test` on the default profile (what CI runs),
+with and without the guard, gave the **same result**: 198 tests, 0 failures, 4 errors, 96 skipped, with the same
+classes failing. None of it is the guard:
+- `ClaimWebsocketChatBotTests`, `ClaimImagesPageTests` and the boot-failed skips call the real OpenAI with the stubbed
+  key (401).
+- `SpikeRestartPhase1/2Tests` need an external Postgres on port 55432 (task 01b's restart spike).
+
+**The gap:** the suites that were skipped for lack of a real OpenAI key, including the chat paths that use baggage
+today, did **not** run with the guard. Building the core task means running them with a real key.
+
+**Delete it when** quarkusio/quarkus#56805 ships (4.0, or the 3.40 backport). Spike 3's
+`managedExecutorPropagationIsClean` is the regression test: on a fixed Quarkus it passes without the guard.
+
+---
+
+## Durable state across restarts: not a requirement (user decision)
 
 `%prod` and `%openshift` set `schema-management.strategy: drop-and-create`, and dev/test take the Dev
-Services default. **Any durable-state table is wiped on boot** — so "the paused run survives restarts"
-(design doc step 8) does not hold in *any* current profile, for the merged design's scope table or for
-Flow's three tables.
+Services default, so every boot wipes Flow's three tables along with everything else. B6 only passed
+because `SpikeRestartTestProfile` overrode the strategy.
 
-This is now demonstrated, not theorised: B6 **only** passes because `SpikeRestartTestProfile` overrides the
-strategy, and the first attempt (`update` against a virgin external database) failed outright with
-`relation "claims" does not exist`. Adopting Flow does not create this problem and does not fix it; it adds
-three more tables to the same drop. **Raise on #216 independently of this verdict** — a real review gate
-needs a persistent schema and a migration story (Flow's docs recommend Flyway, and ship DDL for
-PostgreSQL among others).
+**This is intended, not a gap** (user decision, 2026-10-07). This is a demo app, and every restart already
+reseeds the claims from `import.sql` and empties GreenMail's in-memory mailboxes. A waiting review that
+survived a restart would point at a claim and an email thread that no longer exist, so losing it with
+everything else is the consistent behaviour. **No Flyway, no schema strategy, no separate issue.**
+Consequences:
+
+- `quarkus-flow-jpa` stays: it creates its tables under the existing schema management at no cost, every
+  spike test ran with it, and `PersistenceInstanceReader` backs the review's `404`/`409` check.
+- The design doc's step 8 ("survives restarts") is corrected to "kept in PostgreSQL while the app runs".
+- Task 14's restart test (external Postgres, two JVMs) is dropped: B6 already proved the Flow guarantee.
+- Pinning `quarkus.application.name` is nice-to-have (one line), not load-bearing.
+
+---
+
+## Follow-up spike: the whole intake as one workflow (option b1)
+
+**STATUS: COMPLETE. Option b1 is feasible**, with one design change (no `@ParallelExecutor`) and one
+small engine bug to work around.
+
+The user chose to model the **whole intake** as one Flow workflow (b), with the agentic root kept as a
+single task (b1), rather than wrapping only the review in Flow (a). This spike checks the four parts of
+b1 that task 01b never exercised.
+
+- **Branch:** `spike/flow-workflow` (local, unpushed), from `spike/flow-hitl`, worktree
+  `…-spike-flow`. Commit `a7a2a62`. Same versions as above.
+- **Code:** `src/test/java/org/parasol/spike/flow/Spike2*`. `Spike2IntakeFlowTests` (6 tests).
+- **Result:** 18 tests (the 12 CI-shaped ones from task 01b plus these 6) pass under **both** `-Pollama`
+  and `-Pollama-openai`.
+
+`Spike2IntakeFlow` is a cut-down b1 intake:
+
+```
+supersede → runAgents → routeOutcome ─ not a claim ─→ replyNotAClaim → END
+   (cancel         │                └─ claim ──────→ markPendingReview → waitReview (LISTEN)
+    old run)       │                                   → routeDecision → markInProcess | markPendingInformation → END
+                   └─ Spike2IntakeAgents: @SequenceAgent(classifier, @ConditionalAgent(@ParallelAgent(details, summary), notAClaim))
+```
+
+### F1 — the design's real topology as one Flow task: **YES**
+
+Sequence → conditional → parallel, the same nesting as `ClaimsMailboxAgent` → `EmailRouter` →
+`ClaimExtractionWorkflow`. Flow's compiler turns **each** composite into its own generated workflow
+(`spike2-intake-agents`, `spike2-router-workflow`, `spike2-extraction-workflow`). The parallel one is a
+real Flow `fork` (`do/0/parallel/branch/0/extractDetails-0` and `…/1/summarize-1` start in the same
+millisecond on different threads).
+
+Measured by per-agent WireMock markers (`[[classify]]` etc.):
+- claim email: classifier 1, details 1, summary 1, not-a-claim 0. Then `Pending Review` and a wait.
+- not-a-claim email: classifier 1, not-a-claim 1, details 0, summary 0. The run ends with no wait.
+- resume after the decision: **zero** further LLM calls (3 in total).
+
+So `@ActivationCondition` routing works under Flow's translation, including a composite (the parallel
+agent) as a branch.
+
+### F5 — `@ParallelExecutor` is **not supported** under Flow: **design change**
+
+Found while checking F1, because the design puts a context-propagating `@ParallelExecutor` on
+`ClaimExtractionWorkflow` (task 01 Q17). With one present, **every** run fails:
+
+```
+CreationException: Error creating synthetic bean […]:
+  UnsupportedOperationException: Changing the default WorkflowApplication executor is not supported at this time.
+```
+
+The cause is `FlowParallelAgentService.executor(Executor)`, which throws unconditionally. It's raised
+lazily, when the root bean is first created, so the build and boot both succeed and the failure only
+shows up on the first email. (Seen under `-Pollama-openai`; the class was then reverted.)
+
+**Consequence:** drop `@ParallelExecutor` from the design. Flow runs fork branches on its own executor
+(Quarkus's `ManagedExecutor`, via `QuarkusManagedExecutorServiceFactory`). The annotation's only job was
+keeping the OTel context inside the parallel branches, and under Flow the leaf AI-service spans are roots
+whatever the executor (F4), so nothing is lost. Filed upstream as [quarkiverse/quarkus-flow#1057](https://github.com/quarkiverse/quarkus-flow/issues/1057) (the failure is lazy).
+
+### F2 — the watcher handoff: **YES**, with a CDI listener
+
+A one-email-at-a-time watcher can't wait for a review that takes days. `Spike2HandoffListener`, a CDI
+`WorkflowExecutionListener` bean (Flow binds it automatically, via
+`WorkflowApplicationCreator.injectCustomListeners`), completes a per-instance future on the first
+`onWorkflowStatusChanged` to `WAITING`, `COMPLETED`, `CANCELLED` or `FAULTED`. The claim run hands off at
+`WAITING` while its own completion is still open. The not-a-claim run hands off at `COMPLETED`.
+
+**F2b — the "WAITING" signal is slightly early.** `ListenExecutor.internalExecute` sets `WAITING`
+*before* `buildInfo` registers its event consumer. In the first test run, the very first workflow in a
+fresh JVM published its decision the moment the handoff fired, and the decision was lost (the run never
+woke; a 30 s timeout). That fits the source, but I didn't prove it was the cause. A dedicated test then
+published immediately on `WAITING` 10 times per profile and lost **0 of 10**, so at worst it's a narrow
+race. That doesn't matter for production, where a human clicks
+much later. But it matters for tests, and for any automated decision. The tests now use
+`publishUntilWoken` (re-publish every 250 ms until the run leaves `WAITING`; the `listen` consumes one
+event, and extra copies are ignored).
+
+### F3 — a reply supersedes the waiting review, from inside the new run: **YES**
+
+The new run's first task calls `definition().activeInstance(oldId).map(WorkflowInstance::cancel)`. Cancel
+returns `true`, the old run becomes `CANCELLED`, its `waitReview` task is cancelled, and its completion
+future completes exceptionally. Afterwards:
+
+- the old run leaves **0** instance and **0** task rows (E19 holds for a cancel from inside a task too);
+- one decision for the claim reaches **only** the live run. Both runs correlate on the same claim id, so
+  this proves the cancelled run's event registration is really gone;
+- side effects are exactly `Pending Review`, `Pending Review`, `Pending Information`.
+
+**Two cautions:**
+- `activeInstance(id)` only finds runs **in this JVM**. That's fine under the "durable state isn't a
+  requirement" decision. Otherwise, `PersistenceInstanceReader.find` would be the cross-restart route.
+- **Engine bug in `cancel()`, not specific to cancelling from a task:** in each full run, 4 of the 5
+  cancels (including task 01b's, which cancel from the test thread) log `No instrumentation context was
+  found`, and the cancelled run's `workflow.execute` span is **never exported**; its
+  `task.execute waitReview` span is. (The standalone reproducer loses it 10 of 10 times.) Likely cause, from the source: `cancel()` cancels the `listen` future,
+  the instance's `whenComplete(cleanUp)` closes and clears the instance metadata (closing
+  `WorkflowInstrumentationContext` ends the open task spans), and only then does `onWorkflowCancelled`
+  reach the OTel listener, which finds no context and returns without ending the workflow span. It's
+  cosmetic (one missing span per superseded run); filed upstream as [quarkiverse/quarkus-flow#1058](https://github.com/quarkiverse/quarkus-flow/issues/1058).
+
+**One unexplained failure, not reproduced.** In the first test run, the cancelled run's own instance
+row (queried by its id) was still there 10 s after the cancel. In the three later runs (`-Pollama` twice,
+`-Pollama-openai` once), the per-instance row dump shows 0 instance and 0 task rows 3 s after the cancel.
+I don't know what differed. Treat it as open: task 08's "no rows left after a supersede" test is the
+place to catch it if it's real.
+
+### F4 — the trace-island diagnostic: **cause (a), plus structural cause (b)**
+
+The one-line diagnostic, inside the `runAgents` task body:
+
+```
+current-span-in-task-body = 0000000000000000   (invalid: no span is current)
+flow-task-span            = 093fc698f58c7268   (task.execute runAgents exists, on the same thread)
+```
+
+**So Flow creates the task span but never makes it current while the task body runs** (cause (a)). It
+has nothing to do with threads: the body runs on `executor-thread-2` either way. The Flow source shows
+why. `OTelWorkflowExecutionListener` starts spans from lifecycle events and keeps them in instance
+metadata, and nothing ever calls `makeCurrent()`.
+
+**And re-entering Flow's span from the task body works for the first hop.** `quarkus-flow-opentelemetry`
+exposes the span through public static accessors
+(`WorkflowInstrumentationContext.getWorkflowInstrumentationContext(instanceData)
+.getTaskInstanceContext(jsonPointer, iteration, retryAttempt).getStartSpan()`). Wrapping the agent call in
+`taskSpan.storeInContext(Context.current()).makeCurrent()`:
+
+```
+plain:      langchain4j.aiservices.Spike2ClassifierAgent.classify   parent=0000000000000000  (own trace)
+reentered:  langchain4j.aiservices.Spike2ClassifierAgent.classify   parent=task.execute runAgents  (same trace)
+```
+
+**But the generated subflows are always roots** (cause (b)), and nothing in the task body can reach
+them. `workflow.execute spike2-intake-agents`, `…-router-workflow` and `…-extraction-workflow` each start
+a new trace, even when re-entered. `FlowPlanner.firstAction` starts each one with
+`CompletableFuture.supplyAsync(instance::start)`, a thread hop with no context. And only the first
+leaf (`classify`) joins, because it runs on the re-entered calling thread. The later leaves are driven
+by the subflow's planner. One b1 claim run therefore produces **seven** separate traces: the main
+workflow, three generated subflows, and one per AI-service call. Re-entering brings that down to **six**.
+(Inside each subflow the Flow task spans are correctly nested, including the fork:
+`task.execute summarize-1` → `task.execute parallel`. That partly answers D14.)
+
+**Consequence for task 11:** option 1 (an app-owned root span) only reaches the first hop, and option 3
+(re-entering the context) is the same thing. **Option 2, grouping by `gen_ai.conversation.id` in Langfuse,
+is the one that covers every island**, because it's an attribute, not parenting. The project's own
+`ConversationIdSpanProcessor` (already planned in task 11) stamps it from baggage. That needs baggage
+to be current on every thread, which is exactly what fails here, so the processor has to read it from
+somewhere that survives the hops. That's not designed or tested yet; it's the main open question for
+task 11. Option 5 (upstream: make task spans current while the task body runs, and propagate context into
+the generated subflows) is filed as
+[quarkiverse/quarkus-flow#1056](https://github.com/quarkiverse/quarkus-flow/issues/1056), checked against
+`main` @ `9ba5347` (the relevant classes are unchanged from 1.1.3).
 
 ---
 
@@ -611,9 +952,13 @@ PostgreSQL among others).
 cd /Users/edeandre/workspaces/demos/non-deterministic-no-problem-spike-flow   # worktree removed; recreate from the branch
 export OPENAI_API_KEY=change-me COHERE_API_KEY=change-me
 
-# the 12 CI-shaped tests, both legs
+# the 12 CI-shaped tests, both legs (branch spike/flow-hitl)
 ./mvnw -B -Pollama        test -Dtest='SpikeFlow*Tests' -Dquarkus.quinoa.enabled=false
 ./mvnw -B -Pollama-openai test -Dtest='SpikeFlow*Tests' -Dquarkus.quinoa.enabled=false
+
+# the b1 follow-up (branch spike/flow-workflow): 18 tests, both legs
+./mvnw -B -Pollama        test -Dtest='SpikeFlow*Tests,Spike2*Tests' -Dquarkus.quinoa.enabled=false
+./mvnw -B -Pollama-openai test -Dtest='SpikeFlow*Tests,Spike2*Tests' -Dquarkus.quinoa.enabled=false
 
 # B6 needs an external Postgres and two JVMs
 podman run -d --name spike-flow-pg -p 55432:5432 \

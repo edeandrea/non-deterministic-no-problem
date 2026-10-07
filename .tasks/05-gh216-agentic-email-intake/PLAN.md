@@ -62,7 +62,7 @@ Edit or create task files and update `## Task Plan`.
 
 - [x] [task-01-agentic-spike.md](task-01-agentic-spike.md): Agentic module spike (runs first, throwaway)
 - [x] [task-02-design-and-review.md](task-02-design-and-review.md): Design document and review gate
-- [x] [task-01b-flow-spike.md](task-01b-flow-spike.md): quarkus-flow spike (throwaway; decided task 07) — **verdict: ADOPT**
+- [x] [task-01b-flow-spike.md](task-01b-flow-spike.md): quarkus-flow spike (throwaway; decided task 07) — **verdict: ADOPT**; follow-up (b1, whole intake as one workflow) **feasible**
 - [ ] [task-03-intake-config-and-mailbox.md](task-03-intake-config-and-mailbox.md): Intake configuration and claims mailbox
 - [ ] [task-04-email-templates.md](task-04-email-templates.md): Qute reply templates and sender
 - [ ] [task-05-extraction-agents.md](task-05-extraction-agents.md): Claim extraction agents
@@ -229,11 +229,37 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
     - The id is a per-claim UUID (not the claim number, which doesn't exist when the first spans start; no PII),
       minted for unmatched emails and stored on the claim (`intakeConversationId`) when a claim is created; follow-ups and
       the review decision reuse it (tasks 07, 08, 10).
-    - It's set via OTel baggage made current before the root / review-decision span (as the chat's
-      `ConversationalBaggageHandler` does), and a project-owned `ConversationIdSpanProcessor` copies it onto every
-      span, so it works with the Langfuse processor off (`%test`) and for Tempo/LGTM (task 11).
+    - **Carrier: baggage** (as the chat's `ConversationalBaggageHandler` does; user decision, 2026-10-07). The
+      carry-as-data approach from follow-up spike 2 is **dropped**. Follow-up spike 3 traced the leak to
+      quarkus#54354 (fixed by quarkus#56805, not yet in 3.40.x).
+    - **Workaround until the fix ships (user decision, 2026-10-07):** one clearly named class linking quarkus#54354,
+      deleted when the fix lands. **It belongs in the generic core, not the Flow adapter:** the bug is in Quarkus's
+      context propagation, so every `ManagedExecutor` leaks. The leaked ids in spike 3 were all on Flow's
+      persistence spans, which run on quarkus-flow-jpa's own `ManagedExecutor`, not on Flow's
+      `ExecutorServiceFactory`. (Flow also injects its executor factory by concrete class, so it can't be swapped
+      cleanly.) **Proven (follow-up spike 4):** an extra MicroProfile `ThreadContextProvider` of its own context type,
+      registered through `META-INF/services`, which resets a pool thread to `Context.root()` when a task ends with
+      the propagated context still current. No Quarkus class is overridden. Either way a project-owned `ConversationIdSpanProcessor` stamps the id onto every span, so it works
+      with the Langfuse processor off (`%test`) and for Tempo/LGTM (task 11).
     - Tier-2 session scoring doesn't apply (it's triggered only by `ChatScopeEnded`); the tier-1 judge still scores
-      every intake LLM call.
+      every intake LLM call. *(Revisit with the generic design below: once session scoring listens for
+      `ConversationEndedEvent`, the intake could fire it when a claim leaves the intake states.)*
+  - **Generic conversation context (user decision, 2026-10-07).** The conversation concept is application-agnostic and
+    will move to a separate library, so it's designed as one now, staged in `ai.scoring.conversation`:
+    - **Core** (OTel API only): a `ConversationContext` API to start, read and run code within a conversation, a
+      `ConversationIdSpanProcessor` stamping `gen_ai.conversation.id` on every span, and the conversation lifecycle
+      **CDI events**, starting with `ConversationEndedEvent` (the conversation id).
+    - **Adapters**, each only translating one framework's lifecycle into the core: chat scopes (today's
+      `ConversationalBaggageHandler`, which fires `ConversationEndedEvent` on `ChatScopeEnded`), quarkus-flow (restores
+      the context at Flow's thread hops, owns the "make the task span current" helper) and LangChain4j agentic (an
+      `AgentListener`).
+    - **Consumers react to the events and never call an adapter:** session scoring becomes a single
+      `@ObservesAsync ConversationEndedEvent` listener, instead of `ConversationalBaggageHandler` calling
+      `SessionScoringService` directly. Any number of places can fire the event; there's one listener.
+    - **No mixing:** the intake workflow only says which conversation a run belongs to, with no span code in any step.
+      The core never depends on an adapter, and adapters never depend on each other.
+    - **The Flow adapter's job:** carry the context across `FlowPlanner`'s `supplyAsync` (quarkus-flow#1056) and,
+      through a `CallableTaskProxyBuilder`, make each task's context current so steps need no helper.
   - `IntakeMetrics` registers the `claim.intake.*` meters, with no high-cardinality tags (no claim numbers, `Message-ID`s or addresses).
   - Intake log lines carry the trace id.
   - Intake LLM calls **are** scored by the tier-1 Langfuse judge (user decision).
@@ -333,9 +359,7 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
 - **Design doc:** `docs/design/email-claim-intake.md`, now on `main`.
   - **PR:** [#220](https://github.com/edeandrea/non-deterministic-no-problem/pull/220), **merged** at `ec1ca14`
     (2026-10-02) with no review feedback: the design was approved as-is, so the **gate is passed**.
-  - The remote branch `design/email-claim-intake` was deleted on merge. The local branch and the worktree
-    `../non-deterministic-no-problem-design-216` (at `29b5073`) still exist and are no longer needed; remove them
-    when convenient (`git worktree remove`, `git branch -D`).
+  - The remote branch `design/email-claim-intake` was deleted on merge; the local branch and worktree are gone too.
   - The doc's status line still says "proposed, for review before implementation"; task 13 flips it to accepted/implemented.
 - **Scope (user decision):** short. Four sections (goal, workflow, claim states, agent architecture) and three
   diagrams (email workflow, claim states, agent organisation). No open questions, communication matrix,
@@ -467,11 +491,92 @@ Full evidence in [`spike-results-flow.md`](spike-results-flow.md). **14 spike te
   (3) `fork` OTel/MDC propagation if a parallel branch appears; (4) concurrency — every test ran one
   instance at a time, and Flow explicitly leaves singleton behaviour to the application; (5) re-check for
   1.2.0 final.
-- **Standing note, independent of the verdict and now demonstrated:** every current profile wipes durable
-  state on boot (`drop-and-create` in `%prod`/`%openshift`, Dev Services defaults elsewhere). B6 **only**
-  passes because the spike profile overrode schema management. Design doc step 8 does not hold today, for
-  the merged design's scope table or for Flow's three tables. **Raise on #216** — a real review gate needs
-  a persistent schema and a migration story (Flow recommends Flyway and ships PostgreSQL DDL).
+- **Durable state across restarts is not a requirement (user decision, 2026-10-07).** Every profile wipes
+  the schema on boot, and that's intended: a restart also reseeds the claims and empties GreenMail, so a
+  surviving review would point at data that no longer exists. No Flyway, no schema strategy, no separate
+  issue. `quarkus-flow-jpa` stays (it backs the `404`/`409` check). Design doc step 8 changes to "kept in
+  PostgreSQL while the app runs", and task 14's restart test is dropped.
+
+#### Follow-up spike: the whole intake as one workflow (option b1) — COMPLETE
+Full evidence in [`spike-results-flow.md`](spike-results-flow.md) → *Follow-up spike*. Three upstream bugs are filed
+(quarkus-flow #1056, #1057, #1058), each with a runnable reproducer in
+[edeandrea/quarkus-flow-reproducers](https://github.com/edeandrea/quarkus-flow-reproducers). Branch
+`spike/flow-workflow` (local, unpushed), commit `a7a2a62`. 18 tests pass under both Ollama profiles.
+
+- **User decision: option (b1).** The **whole intake** is one Flow workflow (match → supersede → agents →
+  route → persist → reply → file → wait for review → decision). The agentic root stays **one task** inside
+  it, so the agent topology in the design is unchanged. Rejected: (a) Flow only around the review, and
+  (b2) the agents redrawn as Flow tasks (which drops the agentic module's composition).
+- **F1 YES:** the design's sequence → conditional → parallel nesting runs as one Flow task. Each composite
+  becomes its own generated workflow; the parallel one is a real `fork`. Routing is right on both branches,
+  and there are zero LLM calls on resume.
+- **F5 — design change: no `@ParallelExecutor`.** Under Flow it fails **every** run with
+  `UnsupportedOperationException: Changing the default WorkflowApplication executor is not supported`.
+  Filed upstream as [quarkiverse/quarkus-flow#1057](https://github.com/quarkiverse/quarkus-flow/issues/1057).
+  Flow runs fork branches on its own executor.
+- **F2 YES:** a CDI `WorkflowExecutionListener` (`onWorkflowStatusChanged` → `WAITING`/`COMPLETED`/
+  `CANCELLED`/`FAULTED`) tells the one-at-a-time watcher when to move on. **F2b:** `WAITING` is set just
+  before the `listen` registers its consumer, so a decision published at that exact moment can be lost.
+  That's irrelevant for a human reviewer, but tests re-publish until the run leaves `WAITING`.
+- **F3 YES:** the reply's run cancels the waiting run from its first task
+  (`definition().activeInstance(id).map(WorkflowInstance::cancel)`), leaving no rows; the decision then
+  reaches only the live run. `activeInstance` is in-JVM only, which is fine given the restart decision.
+  A bug in `cancel()` drops the cancelled run's `workflow.execute` span (cosmetic; filed as [quarkiverse/quarkus-flow#1058](https://github.com/quarkiverse/quarkus-flow/issues/1058)). One first-run
+  "row still present" failure was not reproduced; task 08's test covers it.
+- **F4 — trace islands diagnosed.** Flow never makes its task span current while the task body runs
+  (cause a), **and** each generated agent subflow starts its own trace via `supplyAsync` (cause b).
+  Re-entering Flow's span (public accessors in `quarkus-flow-opentelemetry`) joins only the first agent
+  call. One claim run is 7 traces, or 6 re-entered. **Grouping by `gen_ai.conversation.id` (option 2) is
+  the only local fix that covers every island**; how to stamp it across Flow's thread hops is the main
+  open question for task 11. Option 5 (upstream) is filed as
+  [quarkiverse/quarkus-flow#1056](https://github.com/quarkiverse/quarkus-flow/issues/1056) (both causes, reproducer, suggested fixes).
+
+#### Follow-up spike 2: the conversation id on every span — COMPLETE
+Full evidence in [`spike-results-flow.md`](spike-results-flow.md) → *Follow-up spike 2*. Branch
+`spike/flow-conversation-id` (local, unpushed), commit `66db1e7`; 20 tests pass under both Ollama profiles.
+- **Feasible, with no baggage:** every span of a run (3 workflows, 7 tasks, 4 AI calls and their children) carries
+  the run's `gen_ai.conversation.id`, and 8 concurrent runs don't leak into each other.
+- **Baggage leaked across concurrent runs in the first version, but the cause isn't established.** Stale baggage
+  put other runs' ids on spans (and quarkus-langfuse stamps from baggage). That version's own `AgentListener` also
+  made baggage current per agent call, so the leak may be self-inflicted rather than Flow's. Context propagation
+  (capture on submit, restore and clear after) should make baggage correct; whether Flow's hops allow it is open.
+- **The mechanism (task 11):** the id travels as data: in the workflow input and as an argument of the agentic
+  root. A Flow listener maps instance id → conversation id (sub-workflows read it from the agentic scope), a CDI
+  `AgentListener` covers each agent call, the task-08 step helper covers our own steps, and a `SpanProcessor`
+  stamps from parent → instance map → agent call.
+- **Still open for task 11:** traces stay split (#1056), and Flow's ~58 persistence spans per run are separate
+  trace roots with no id (decide whether to suppress them). Also untested: the session mapping against a live
+  Langfuse, and the chat's baggage leaking onto Flow threads.
+
+#### Follow-up spike 3: why baggage leaked — COMPLETE
+Full evidence in [`spike-results-flow.md`](spike-results-flow.md) → *Follow-up spike 3*. Branch `spike/flow-baggage`
+(local, unpushed), commit `c28e09d`.
+- **The leak is a Quarkus bug, not Flow's or the spike's:** [quarkus#54354](https://github.com/quarkusio/quarkus/issues/54354).
+  In 3.40.1, the OTel context-propagation provider doesn't restore a pool thread's context after a task, so baggage
+  stays on the thread. Reproduced with the `ManagedExecutor` alone, no Flow.
+- **Fixed upstream** by [quarkus#56805](https://github.com/quarkusio/quarkus/pull/56805) (4.0.0.Beta1, labelled for a
+  3.40 backport, not in 3.40.1). With that one class shadowed: **0** leaked ids, against 81/118 without.
+- **Carrier decision input: baggage**, correct once the fix ships. What baggage alone misses is Flow's generated agent
+  sub-workflows (the `supplyAsync` hop, quarkus-flow#1056); a `CallableTaskProxyBuilder` covers our own steps with no
+  step code.
+- **Decided (user, 2026-10-07): baggage is the carrier; spike 2's data approach is dropped; work around quarkus#54354
+  until the fix ships**, in the generic core (see Key Decisions → Observability).
+
+#### Follow-up spike 4: the quarkus#54354 workaround — COMPLETE
+Evidence in [`spike-results-flow.md`](spike-results-flow.md) → *Follow-up spike 4*. Branch `spike/flow-baggage-guard`
+(local, unpushed).
+- **One class plus a `META-INF/services` entry:** a second `ThreadContextProvider` (its own context type, so it
+  doesn't clash with Quarkus's) resets the pool thread to `Context.root()` when a task ends and the propagated context
+  is still current. It works whichever order SmallRye ends the providers in, and leaves alone a thread that runs
+  the task inline and has its own context.
+- **Measured on 3.40.1, both Ollama profiles, no Quarkus class overridden:** pool tasks submitted with no baggage see
+  none (against earlier tasks' ids without it); a second batch of 8 runs carries **0** first-batch ids (against 118);
+  8 concurrent runs, 0 traces mixing ids. A thread's own span and baggage survive running a contextual task inline.
+- **Delete it when** quarkus#56805 ships (4.0, or the 3.40 backport). Spike 3's `managedExecutorPropagationIsClean`
+  is the regression test that shows it's no longer needed.
+- **The full suite is unchanged with the guard** (198 run, same 4 environment errors with or without it). But the 96
+  tests that need a real OpenAI key were skipped both times, so the chat's baggage paths haven't run with the guard
+  yet. The core task runs them with a real key.
 
 #### Rework required by the Flow verdict (task 01b = ADOPT)
 
@@ -488,17 +593,19 @@ conflict. That list was written against the merged `@HumanInTheLoop` + `Database
   round-trip self-test, no `ShutdownEvent` reset, no `allowDeserializationType` allowlist. Replace with the
   four Flow dependencies (`quarkus-flow`, `-langchain4j`, `-jpa`, `-opentelemetry`) plus
   `quarkus-langchain4j-agentic`. Add an explicit `quarkus.application.name` (it becomes Flow's
-  `application_id`, part of the PK of all three tables). Decide the schema strategy — see the standing note;
-  this is the item most likely to need a separate issue.
+  `application_id`; nice-to-have). **No schema strategy** (durable state isn't a requirement).
 - **task-07 (human review step): rewrite.** No static `@HumanInTheLoop` agent, no `SuspendedResponse`, no
   `DefaultAgenticScope`, no hand-rolled replay. It becomes a `Flow` bean whose `descriptor()` composes
   `function(intakeAgent::process, …)` → `emitJson` → `listen(toOne(consumed(REVIEW_DONE).dataAs(…)))` →
   `switchWhenOrElse`, with `.then(FlowDirectiveEnum.END)` on each terminal branch. **Both internal-API
   touch points disappear**, which was the main argument for this spike.
-- **task-08 (intake processor):** the "evict on every ending" rules go away — Flow deletes instance and
-  task rows on completion *and* on `cancel()` (E19, verified to 0 rows). Supersede-a-waiting-review becomes
-  `WorkflowInstance.cancel()` rather than the `toAny` two-event workaround. Policy-check ordering still
-  needs re-deriving against the new task order.
+- **task-08 (intake processor): rewrite as the intake workflow (b1).** `ClaimEmailProcessor`'s ordered
+  rules become the steps and branches of one `Flow` (sketch in the follow-up spike results). The
+  watcher starts a run and moves on at the handoff (F2). The "evict on every ending" rules go away (Flow
+  deletes the rows on completion *and* on `cancel()`). Supersede-a-waiting-review is a first-step
+  `cancel()` of the old run (F3). The policy check becomes a branch after the agents task, before any
+  persistence. Keep step data small: pass ids, not photo bytes or the raw email. **Task 07 is merged into
+  this rewrite (user decision, 2026-10-07):** the review is the last few steps of the same workflow.
 - **task-10 (review API and UI):** the `404`/`409` contract is preserved via `@Inject
   PersistenceInstanceReader` → `find(definition, instanceId).status() == WAITING`. **Do not implement the
   409 check as a raw `select status`** — that column is `NULL` for a waiting instance. The decision is
@@ -518,8 +625,9 @@ conflict. That list was written against the merged `@HumanInTheLoop` + `Database
   **cannot** do the joining — parent and trace id are immutable after span creation. Ranked options, a
   one-line diagnostic to pick between them, and the severity analysis are in
   [`spike-results-flow.md`](spike-results-flow.md) → *Open issue: the three trace islands*.
-- **Tasks 04, 05, 06, 09, 12, 13, 14:** unaffected in substance. Task 13's demo guide gains the Flow Dev UI
-  diagram, and task 12/14 should run under both Ollama profiles as the spike did.
+- **Tasks 04, 05, 06, 09, 12, 13, 14:** mostly unaffected. Task 05 drops `@ParallelExecutor` (F5). Task 09's
+  watcher starts a workflow run per email and waits only for the handoff (F2). Task 13's demo guide gains the
+  Flow Dev UI diagram. Task 14 drops the restart test. Tasks 12 and 14 run under both Ollama profiles.
 
 #### Changes required in later tasks
 **Applied to tasks 03–14 at the design gate.** Two items were adjusted when applied: the task-03 store
