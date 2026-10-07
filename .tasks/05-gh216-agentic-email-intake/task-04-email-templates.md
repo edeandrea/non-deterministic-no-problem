@@ -35,6 +35,10 @@ component and covered by rendering tests.
     classifier labels a follow-up that matches no claim. It gives **no details** (not whether the claim
     exists, its status or its owner) and asks the customer to write from the address they used for the
     claim, or to include their claim number.
+  - **Which claim?** (user decision, 2026-10-07): sent when an email matched no claim, the sender has pending
+    claims, and `ClaimResolver` (task 08) couldn't tell which one it's about. Lists the sender's **own** pending
+    claim numbers (sent only to the address already on those claims) and asks them to reply on that claim's
+    email or include its number. Nothing else about the claims.
   - **Skipped attachments:** a fragment included when attachments were ignored (non-image or too large).
 - Move the phone number and sign-off (now in `GenerateEmailService.EMAIL_ENDING`) into a shared
   constant/config that both the templates and `GenerateEmailService` use. Keep `EmailEndsAppropriatelyOutputGuardrail` working.
@@ -49,6 +53,7 @@ component and covered by rendering tests.
   - the processing-problem email leaks no details (no exception text, claim data or `Message-ID`)
   - the no-matching-claim email contains no claim number, status, name or address from any stored
     claim, and asks for the claim's address or the claim number
+  - the which-claim email lists exactly the given claim numbers and nothing else from those claims
   - sent replies carry the subject prefix and headers (read back from GreenMail)
 
 ## Files/Areas

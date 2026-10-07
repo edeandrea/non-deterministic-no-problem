@@ -7,34 +7,39 @@
 New mail in the claims INBOX is processed automatically, without polling. Mail that arrived while the
 app was down is processed on reconnect, and a GreenMail outage never stops startup.
 
+*Updated after the Flow verdict (task 01b, option b1) and the user's decision of 2026-10-07:* the watcher **doesn't
+wait for runs**. It hands each email to `ClaimIntakeStarter` (task 08), which starts a run (or queues the email behind
+the same sender's running run) and returns at once. There's no agentic scope store, so there's no startup-ordering rule.
+
 ## What to Do
 
 - Create `ClaimsInboxWatcher`. At startup it starts one dedicated thread, but only when `IntakeConfig.enabled()`.
-  - **Start it after the scope-store registrar** (task 03): from a `@Startup` bean or a default-priority
-    `StartupEvent` observer, never below the registrar's priority. A root first invoked before
-    `AgenticScopePersister.setStore` never persists, for the life of the JVM (spike Q12, Q18).
-  - **No agent calls in low-priority startup observers**, anywhere in the app. The watcher thread itself only
-    calls the processor once it's running.
+  Start it from a `@Startup` bean or a `StartupEvent` observer.
 
   The thread loops:
   1. Connect (retry with backoff on failure; log WARN, never throw to startup).
-  2. Process every message currently in the INBOX, one at a time, through `ClaimEmailProcessor` (catch-up).
-  3. Run IMAP `IDLE`, re-issuing it before the server timeout. On `MessageCountEvent`, process new messages one at a time.
+  2. For every message currently in the INBOX (catch-up): record its `Message-ID` (unique constraint; a duplicate is
+     filed without a reply), move it to the `processing` folder, and hand it to `ClaimIntakeStarter`.
+  3. Run IMAP `IDLE`, re-issuing it before the server timeout. On `MessageCountEvent`, do the same for new messages.
   4. On a disconnect, go back to step 1.
 - Stop cleanly on `ShutdownEvent`.
-- A run that pauses at the human review step (task 07) returns immediately (the processor catches the
-  suspension), so the watcher carries on with the next message. It never waits for a claims processor.
-- The email is filed when its run finishes, **including when it pauses for review**: the processor moves it
-  to the processed folder (or the failed folder on error) before the watcher picks the next message.
-- Confirm that the pinned GreenMail version supports IDLE (it's registered in GreenMail's command factory on main). If it doesn't, fall back to a short NOOP-based check and record it in `PLAN.md`.
-- **Tests (with a test profile that enables intake; mock `ClaimEmailProcessor`):**
+- **One watcher, no pool.** One IMAP IDLE connection notices new mail; several watchers on one INBOX would race for the
+  same message. The parallelism comes from Flow (`instance.start()` is asynchronous, on Quarkus's managed executor),
+  whose size caps how many runs go at once.
+- **Moving to `processing` is what stops a second pickup:** the email leaves the INBOX before its run starts. The run's
+  `file` step moves it to processed, or the failure listener to failed (task 08).
+- On startup, emails left in `processing` by a previous JVM belong to runs that no longer exist (a restart wipes the
+  database): move them back to the INBOX before the catch-up scan.
+- Confirm that the pinned GreenMail version supports IDLE (it's registered in GreenMail's command factory on main). If
+  it doesn't, fall back to a short NOOP-based check and record it in `PLAN.md`.
+- **Tests (with a test profile that enables intake; mock `ClaimIntakeStarter`):**
   - a message delivered while watching is processed
   - messages present before start are processed (catch-up)
-  - messages are processed one at a time
-  - two emails, where the first pauses at review: the second is still processed, and the first is no longer in the INBOX
+  - the watcher doesn't wait: several emails are handed over without waiting for runs
+  - a picked-up email is in `processing` before its run starts, and is never handed over twice
+  - emails left in `processing` at startup are moved back and processed
   - the watcher survives and reconnects after the IMAP connection drops
   - startup succeeds when GreenMail is unreachable
-  - the watcher starts after the store registrar (the store is set when the first message is processed)
 
 ## Files/Areas
 
@@ -45,12 +50,13 @@ app was down is processed on reconnect, and a GreenMail outage never stops start
 
 - Intake is disabled in `%test` by default, so only the watcher tests turn it on.
 - Use `io.quarkus.logging.Log`. Don't let the thread swallow `InterruptedException` without restoring the interrupt flag.
-- The per-email root span is opened by the processor (task 08); watcher metrics and IMAP spans are added in task 11.
-- One watcher thread, one replica: the agentic scope is cached in memory until eviction (task 03).
+- No observability code here: the starter enters the conversation id (task 08); IMAP spans and watcher metrics are
+  task 11's.
+- **Single replica.** Superseding a waiting review uses `activeInstance(id)`, which only finds runs in this JVM, and the
+  per-sender queue is in memory.
 
 ## Done When
 
-- [ ] The watcher starts after the scope-store registrar, and no low-priority startup observer calls an agent.
-- [ ] The watcher processes live and backlog mail one message at a time, and recovers from disconnects.
-- [ ] A paused run's email is filed and doesn't block the next message.
+- [ ] The watcher hands over live and backlog mail without waiting for runs, never twice, and recovers from disconnects.
+- [ ] Emails left in `processing` at startup are recovered.
 - [ ] All the watcher tests listed above pass under `-Pollama`.

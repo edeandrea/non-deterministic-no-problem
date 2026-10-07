@@ -16,21 +16,27 @@ The demo can be run from a written guide, and every project document describes t
   - a policy-number conflict
   - a not-a-claim email (newsletter)
 
-  For each, list what to show: Roundcube, the `claims@` folders, the claims list and review panel, Langfuse traces.
-  Include the step "open the intake trace in Grafana/Tempo and Langfuse". Cover both local dev mode and the cluster.
+  For each, list what to show: Roundcube, the `claims@` folders, the claims list and review panel, and Langfuse.
+  Include the steps "open the claim's **session** in Langfuse" (one session per claim, several traces; explain why:
+  quarkus-flow#1056) and "open the intake workflow in the Flow Dev UI" (the Workflows card draws the intake as a
+  typed, branching diagram; task 01b, E17). Cover both local dev mode and the cluster.
+  - **Live-demo caveat:** editing a `Flow` bean in dev mode can throw `IncompatibleClassChangeError`; restart dev mode.
 - Update the design doc `docs/design/email-claim-intake.md` (merged in PR #220): change its
   "Status: proposed, for review before implementation" line to say the design is accepted and implemented
   (linking #216), and fix anything the implementation changed (e.g. the incident time, if still extracted; see
   `PLAN.md` → Caveats). Re-render its diagrams if they change.
 - Update `CLAUDE.md`:
-  - **Architecture:** the `org.parasol.intake` package and the agent structure, including the human
-    review step (`@HumanInTheLoop` suspend/resume, `DatabaseAgenticScopeStore`, `ClaimReviewService`)
-  - **REST:** `POST /api/db/claims/{id}/review-decisions` (no authentication; it's a demo app; 404 missing scope, 409 lost lock)
+  - **Architecture:** the `org.parasol.intake` package; the intake as one quarkus-flow workflow (`ClaimIntakeFlow`)
+    with the agentic root as one step; the non-waiting watcher and starter (parallel runs, per-sender order, failure listener); `resolveClaim` and the which-claim reply; the review as the workflow's `listen` + `switch`
+    steps; and `ai.scoring.conversation` (core + chat/flow/agentic adapters, `ConversationEndedEvent`)
+  - **REST:** `POST /api/db/claims/{id}/review-decisions` (asynchronous, 202; no authentication, it's a demo app;
+    404 missing run, 409 not waiting / being decided / lost lock)
   - **Statuses:** intake uses `Pending Information`, `Pending Review` and `In Process`, never `New`
   - **Models table:** add `claim-intake`
   - **Configuration:** the `parasol.intake.*` keys and the profiles where intake is off
   - **Testing:** the intake test layers and the Roundcube E2E test; WireMock stubs match the last message only;
-    sub-agent `@InjectMock` tests use a dedicated profile; the restart test's shared database
+    sub-agent `@InjectMock` tests use a dedicated profile; decisions in tests re-publish until the run leaves
+    `WAITING` (F2b); tests assert no Flow rows remain
   - **Gotchas:**
     - no transactions across agent calls (including resume); `Message-ID` idempotency; tests must delete claims
     - **stateless agents:** every AI agent carries
@@ -38,25 +44,29 @@ The demo can be run from a written guide, and every project document describes t
       otherwise it silently gets the policy Easy RAG retriever and a chat memory shared across all runs; claim
       history is passed explicitly
     - every entry agent must be injected in `src/main`; each leaf agent belongs to exactly one root
-    - agent span names (from spike results 7 and 16)
-    - the HITL/persistence API is beta, with two internal touch points (`SuspendedResponse`, the `@Internal`
-      `DefaultAgenticScope` in the store SPI)
-    - **store lifecycle:** the JVM-global store is registered by a lowest-priority `StartupEvent` observer, reset on
-      `ShutdownEvent`, and checked by a startup round-trip self-test; no agent calls in startup observers below it
-    - scope values hold no `LocalDate`/`Optional` (ISO strings); types outside agent signatures are allowlisted
-    - scopes must be evicted manually on every ending (no rows may leak); the `@HumanInTheLoop` method must be
-      static and return `Object`; no `async = true`; resume re-invokes with the arguments read from the scope
-    - **single replica:** each scope is cached in memory until eviction, so a second replica could resume from a
-      stale copy; a reply during review and a decision are serialised by optimistic locking on the claim (`@Version`)
-  - **Observability** (task 11): the intake trace shape (root `claim-intake process` span, `invoke_agent` spans from
-    the root `@AgentListenerSupplier`, mail spans, the linked review-decision span); the `@ParallelExecutor`; the
-    `claim.intake.*` metrics; the `%test` Langfuse span export switch (`quarkus.langfuse.otel.enabled`, re-enabled
-    only in `LangfuseSessionScoringServiceTests`); `MonitoredAgent` is dev-only (the mechanism chosen in task 11),
-    with no monitor in prod
-- Update `README.md` ("What it demonstrates": agentic workflows and human-in-the-loop review; REST
-  endpoints, including `review-decisions`; prerequisites; the single-replica requirement; the intake trace,
-  `claim.intake.*` metrics and the dev-only agent monitor Dev UI pages) and `docs/application-flow.puml` (add the
-  intake flow, including the review step). Re-render with `./docs/render-diagrams.sh`.
+    - agent span names (`langchain4j.aiservices.<SimpleClassName>.<method>`; the dataset-name invariant, D11)
+    - **quarkus-flow:** `quarkus-flow-langchain4j` and `-opentelemetry` are Preview; **no `@ParallelExecutor`**
+      (quarkus-flow#1057); every terminal `switch` branch needs `.then(FlowDirectiveEnum.END)`; pass ids, not
+      payloads, in workflow data; the "is it waiting?" check uses `PersistenceInstanceReader`, never the raw status
+      column; `quarkus.application.name` is part of Flow's table keys; a cancelled run loses its `workflow.execute`
+      span (quarkus-flow#1058)
+    - agent outputs hold no `LocalDate`/`Optional` (ISO strings), unless task 05's round-trip test relaxed it
+    - **no durable state across restarts** (user decision): a restart wipes the database and GreenMail, so a waiting
+      review doesn't survive it
+    - **single replica:** superseding a waiting review uses `activeInstance(id)`, which only sees this JVM; a reply
+      during review and a decision are serialised by optimistic locking on the claim (`@Version`)
+    - **observability workarounds with exit conditions:** the quarkus#54354 `ThreadContextProvider` guard (delete when
+      quarkusio/quarkus#56805 ships) and the agentic adapter (delete when quarkus-flow#1056 is fixed)
+  - **Observability** (task 11): one claim = one Langfuse session via `gen_ai.conversation.id` (baggage, entered once
+    by the starter); the Flow task proxy; the trace shape and its known gaps (#1056); typed Flow spans; the
+    persistence-span decision; the `claim.intake.*` metrics; the `%test` Langfuse span export switch
+    (`quarkus.langfuse.otel.enabled`, re-enabled only in `LangfuseSessionScoringServiceTests`); both Dev UIs (agentic:
+    topology and per-run agent detail; Flow: the workflow and the review wait) and that `MonitoredAgent`
+    keeps finished sessions only in dev mode
+- Update `README.md` ("What it demonstrates": agentic workflows inside a quarkus-flow workflow, and human-in-the-loop
+  review; REST endpoints, including `review-decisions`; prerequisites; the single-replica requirement; the claim
+  session in Langfuse, `claim.intake.*` metrics and the Flow Dev UI) and `docs/application-flow.puml` (add the intake
+  flow, including the review step). Re-render with `./docs/render-diagrams.sh`.
 - Check `images/arch.png` and `langfuse-evaluation.md` for statements the feature makes stale. Report them rather than pixel-editing the raster.
 - Check the Kubernetes manifests (`dependencies.yml` / app deployment) keep the app at one replica, and document it.
 
@@ -73,6 +83,6 @@ The demo can be run from a written guide, and every project document describes t
 
 - [ ] The demo guide exists and covers all five scenarios, including the review step, for dev mode and the cluster.
 - [ ] The design doc's status line says accepted/implemented, and the doc matches the code.
-- [ ] `CLAUDE.md` and `README.md` describe the intake, the human review step, the `claim-intake` model,
-  the review endpoint, the configuration keys, the intake observability, the agent opt-outs, the single-replica
-  requirement and the store lifecycle, and the diagram (with the review step) is re-rendered.
+- [ ] `CLAUDE.md` and `README.md` describe the intake workflow, the human review step, the `claim-intake` model,
+  the review endpoint, the configuration keys, the conversation core and intake observability, the agent opt-outs,
+  the single-replica requirement and the quarkus-flow gotchas, and the diagram (with the review step) is re-rendered.

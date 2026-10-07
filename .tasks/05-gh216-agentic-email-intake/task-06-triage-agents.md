@@ -5,20 +5,31 @@
 ## Goal
 
 A `ClaimsMailboxAgent` root workflow classifies an inbound email and routes it, using the claim the
-processor already matched in code, to extraction, a status answer, or a not-a-claim / no-matching-claim
+intake starter already matched in code, to extraction, a status answer, or a not-a-claim / no-matching-claim
 outcome. It returns a sealed `IntakeOutcome` and has **no side effects**. **The matched claim wins.**
+
+*Updated after the Flow verdict (task 01b, option b1):* the root is invoked as **one step** of the intake workflow
+(task 08), not by a processor that catches a suspension. Flow translates each composite into its own generated
+sub-workflow, and the review pause lives in the outer workflow, so the agents never suspend and nothing here touches
+an agentic scope store.
 
 ## What to Do
 
 - **Claim resolution is code, not the LLM, and happens before the workflow** (design, Workflow steps 3–4).
-  The processor (task 08) resolves the claim:
+  The starter (task 08) resolves the claim:
   - first by regex on `[CLM…]` / `CLM\d+` in the subject and body
   - then by the `In-Reply-To` / `References` headers against stored `Message-ID`s
   - then checks the sender: only the claim's own email address may match it. A wrong sender gets the
-    "no matching claim" reply from the processor and the workflow isn't run.
+    "no matching claim" reply from the workflow's `replyNoMatchingClaim` step, and the agents aren't run.
 
   It passes the resolved claim, or none, into the root as a JSON-safe `MatchedClaim` record (claim number,
   status, plus the history the agents need), `null` when there's no match. No `Optional`, no `java.time`.
+- **`ClaimResolver`** (LLM, `@RegisterAiService` with both opt-outs and `@ModelName("claim-intake")`; **not** an
+  agent and not part of `ClaimsMailboxAgent`, so the proven topology is unchanged): given the email and the sender's
+  pending claims (claim number, short summary, requested items), returns `ClaimResolution` (`EXISTING` + claim number,
+  `NEW_INCIDENT`, or `UNSURE`). Called by task 08's `resolveClaim` step, which accepts `EXISTING` only for a number in
+  the list it passed (anything else → `UNSURE`). Unit tests with WireMock: picks the right claim of two; a new
+  incident; unsure; an invented claim number is rejected by the step.
 - **`EmailClassifierAgent`** (LLM): classifies into an `EmailType` enum (`NEW_CLAIM`, `CLAIM_FOLLOW_UP`, `NOT_A_CLAIM`).
 - **`EmailRouter`** (`@ConditionalAgent`) routes on the **matched claim first**, then on the type:
 
@@ -30,6 +41,8 @@ outcome. It returns a sealed `IntakeOutcome` and has **no side effects**. **The 
   | none | `NOT_A_CLAIM` | `UnmatchedEmailAgent` (non-LLM) | `NotAClaim` |
   | none | `CLAIM_FOLLOW_UP` | `UnmatchedEmailAgent` (non-LLM) | `NoMatchingClaim` |
 
+  - The three-way router, with a non-LLM branch and a tool-calling branch, is proven under Flow by follow-up spike 5
+    before this task starts.
   - Route with **typed** `@ActivationCondition` methods (e.g. `(MatchedClaim matchedClaim, EmailType emailType)`).
     **Every** condition is evaluated, not only the first match (spike Q3), so the conditions must be mutually
     exclusive and cheap: pure functions over their arguments, with no I/O and no LLM call.
@@ -43,20 +56,24 @@ outcome. It returns a sealed `IntakeOutcome` and has **no side effects**. **The 
 - **`UnmatchedEmailAgent`** (non-LLM agent, as in the design's "Not-a-claim / no-matching-claim agent"):
   maps an unmatched `NOT_A_CLAIM` to `NotAClaim` and an unmatched `CLAIM_FOLLOW_UP` to `NoMatchingClaim`.
 - **`ClaimsMailboxAgent`** (`@SequenceAgent`): the root and only entry point, returning a sealed `IntakeOutcome`
-  (`NewClaim`, `PendingClaimUpdate`, `StatusReply`, `NotAClaim`, `NoMatchingClaim`; task 07 adds the review outcomes).
-  - Method: `process(@MemoryId String messageId, …)`, memory id = the inbound `Message-ID`. The interface
-    extends `AgenticScopeAccess` (task 07/08 use `getAgenticScope` / `evictAgenticScope`).
+  (`NewClaim`, `PendingClaimUpdate`, `StatusReply`, `NotAClaim`, `NoMatchingClaim`).
+  - Method: `process(…)` with the inputs below. **No `@MemoryId` and no `AgenticScopeAccess`**: there's no
+    suspension or resume inside the agents any more, and the review is the outer workflow's job (task 08). If
+    the build requires a memory id for a `@SequenceAgent`, use the inbound `Message-ID`.
   - Keep the arguments few and JSON-safe (the correspondence, `MatchedClaim`, the fields extracted so far,
-    the requested items, the sent date as an ISO string): on resume they're read back from the scope with
-    `readState` and passed again (task 10).
-  - Inject it into `ClaimEmailProcessor` (task 08) in `src/main`; until then, inject it from a minimal
+    the requested items, the sent date as an ISO string). Flow checkpoints them with the agentic scope after
+    every sub-agent.
+  - Inject it into the intake workflow bean (task 08) in `src/main`; until then, inject it from a minimal
     package-private bean so build-time output-key validation passes (spike Q3).
+  - The review outcomes (`ReviewReady`, `ReviewNeedsInformation`) are **not** agent outcomes any more: the
+    reviewer's decision is routed by the outer workflow's `switch` (task 08).
 - **Opt-outs:** every AI agent interface here (`EmailClassifierAgent`, `ClaimFollowUpAgent`) carries
   `@RegisterAiService(retrievalAugmentor = NoRetrievalAugmentorSupplier.class, chatMemoryProviderSupplier = NoChatMemoryProviderSupplier.class)`
   and `@ModelName("claim-intake")`, as in task 05.
 - **Tests:**
   - **Unit:** each activation condition, including that exactly one is true for every
-    (matched claim status × email type) combination; the sealed-outcome mapping; `UnmatchedEmailAgent`.
+    (matched claim status × email type) combination; the sealed-outcome mapping; `UnmatchedEmailAgent`; every
+    `IntakeOutcome` variant round-trips through the Quarkus `ObjectMapper`.
   - **WireMock** (stubs match on the **last message only**):
     - each unmatched email type routes correctly
     - **matched claim wins:** a matched pending claim classified `NOT_A_CLAIM` or `NEW_CLAIM` still yields
@@ -78,9 +95,9 @@ outcome. It returns a sealed `IntakeOutcome` and has **no side effects**. **The 
 - **Each leaf agent belongs to exactly one root** (spike Q16c): leaf agents are CDI singletons, and a second
   root that lists them leaks its listeners into them and mangles their agent ids. `ClaimsMailboxAgent` is the
   only root in the app.
-- Allowlist every `IntakeOutcome` record that doesn't appear directly in an agent signature
-  (`AgenticScopeSerializer.allowDeserializationType`, task 03's startup list), and include them in the startup self-test.
-- Agents have no side effects. The processor sends every reply, including the no-matching-claim one.
+- Every `IntakeOutcome` variant must round-trip through the Quarkus `ObjectMapper` (Flow persists step data with
+  it): use a Jackson-polymorphic sealed interface (`@JsonTypeInfo`/`@JsonSubTypes`) and test the round trip.
+- Agents have no side effects. The intake workflow's steps send every reply, including the no-matching-claim one.
 
 ## Done When
 

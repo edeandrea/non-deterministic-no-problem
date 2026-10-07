@@ -30,7 +30,7 @@ the LLM mocked, and runs on every CI build.
   4. Reply in Roundcube with the category. Check the claim becomes `Pending Review`.
   5. Click **Ready for processing**. Check the claim becomes `In Process`.
 - Clean up the created claims and images, and purge GreenMail, after each scenario. Also assert that
-  no agentic scope rows remain.
+  no Flow workflow instance or task rows remain for the scenario's runs.
 
 ## Files/Areas
 
@@ -41,7 +41,9 @@ the LLM mocked, and runs on every CI build.
 
 - Use stable Roundcube selectors (form field names, ARIA roles), found by inspecting Roundcube 1.7.x. Record them in `PLAN.md`.
 - The WireMock stubs must return deterministic agent outputs for the classifier, extraction and summary calls,
-  including on resume after a review decision.
+  A review decision makes no LLM call (the waiting run's agents already ran), so there are no resume stubs.
+  - The review endpoint is asynchronous (202, task 10): after clicking a decision, wait for the status to change
+    rather than asserting it right away.
   - **Match each stub on the last message only** (e.g. a JSONPath on `$.messages[-1].content`), never on the
     whole request body. The agents are stateless (spike Q6, Q19), but matching on the last message keeps the stubs
     correct even if a prompt gains a system message or history, and avoids leftover content matching the wrong stub.
@@ -55,4 +57,4 @@ the LLM mocked, and runs on every CI build.
 - [ ] All three scenarios pass locally under `-Pollama`.
 - [ ] Every WireMock stub matches on the last message only.
 - [ ] The test runs as part of `./mvnw verify` (not excluded or tagged off).
-- [ ] The test leaves no claims, images, mail or agentic scope rows behind.
+- [ ] The test leaves no claims, images, mail or Flow rows behind.

@@ -772,6 +772,102 @@ today, did **not** run with the guard. Building the core task means running them
 
 ---
 
+## Follow-up spike 5: the remaining unknowns before implementation
+
+**STATUS: COMPLETE.** Branch `spike/flow-followup5` (local, unpushed): commit `ab86d12` (Dev UI screenshots and the
+dev-mode demo classes in `src/main/java/org/parasol/spike/devui/`), commit `0962dd4` (tests). 19 tests
+(`Spike5AgenticAdapterTests`, `Spike5RouterAndOrderTests`, plus `Spike4BaggageTests` and `Spike2IntakeFlowTests`
+as regression) pass under `-Pollama` and `-Pollama-openai`. `Spike5SubWorkflowListenerTests` runs on its own, because
+the option it measures leaks context into the JVM.
+
+### Q1: the agentic adapter carries the id into the generated sub-workflows' AI calls: **YES**
+
+`Spike5AgenticConversationAdapter` is task 11's adapter as specified:
+- **before:** if an id is current and the scope has none, write it under `ai.scoring.conversation.id`. If no id is
+  current, enter the scope's id as baggage.
+- **after/error:** close the scope from a per-thread stack.
+
+The run is 8 concurrent runs with an id, interleaved with 4 runs with **no** id, under the leak guard. Each run is 12
+AI-service calls in total, with spans counted per kind:
+
+| | AI-service spans stamped (of 48) | spans per id'd run | traces mixing ids | foreign ids |
+|---|---|---|---|---|
+| baseline (baggage only) | 16 (classify + direct only) | 9 | 0 | 0 |
+| adapter | **32** (all of the 8 id'd runs) | 15 | 0 | 0 |
+| adapter + task proxy | 32 | 15 | 0 | 0 |
+
+- **No-id runs stay clean.** All 4 no-id runs carry no id on any span, in all variants.
+- **No leaks across batches.** In a second batch of 8 no-id runs after an id'd batch, **0 of 432** spans are stamped.
+- **Balanced.** Every after matched a before (`unbalanced=0`). The adapter wrote to the scope 8 times (once per run,
+  at the classifier) and entered from the scope 16 times (the two parallel extraction leaves on their own threads).
+- **Still unstamped:** the generated sub-workflows' own Flow spans (`workflow.execute spike3-intake-agents`,
+  `spike3-extraction-workflow`, and their `task.execute` spans, 7 per run). Their AI calls and HTTP spans are stamped.
+  So Langfuse sessions get every LLM call; only Flow's bookkeeping spans inside the agent step are missing.
+
+**Task 11 option 2 (a Flow listener entering the scope's id for those spans): INVALIDATED.**
+- Flow runs each listener priority group as a separate future stage
+  (`LifecycleEventsUtils.publishEvent`, `thenCompose`).
+- So a priority-0 "enter" and a priority-2000 "exit" for the same instance ran on **different threads**, 42 of 42
+  times (e.g. `ForkJoinPool.commonPool-worker-15` → `executor-thread-17`).
+- The scope is never closed on the thread that opened it. 20–49 spans carried **another run's id**, and 16–139
+  stamped spans in a following no-id batch carried earlier ids.
+- Remaining choice: accept the gap until #1056 ships (option 1).
+
+### Q2: two emails from the same sender run in order: **YES**
+
+`Spike5IntakeStarter` is task 08's per-sender queue. It's a CDI `WorkflowExecutionListener` that releases the sender on
+`WAITING`/`COMPLETED`/`CANCELLED`/`FAULTED`, and the run is registered as working before `start()`. The first email
+holds its agent step for 3 s.
+
+```
+starter: submit:first, started:first, submit:second, queued:second, submit:other, started:other,
+         released:WAITING, released:WAITING, started:second, released:WAITING
+steps:   start:other, start:first, end:other, end:first, start:second, end:second
+```
+
+- **The second email waits.** It's queued (the address is matched case-insensitively, `JANE@` = `jane@`) and starts
+  only after the first run reaches the review wait.
+- **Other senders aren't held up.** A different sender ran alongside.
+- **A waiting run doesn't block its sender.** A third email from the same sender, while the first two wait for
+  review, started at once.
+- Supersede/cancel itself is F3.
+
+### Q3: `MonitoredAgent` under Flow, and the two Dev UIs: **keep both** (user decision, 2026-10-07)
+
+Screenshots and an index are in `spike5-screenshots/` on the spike branch. They were taken in `quarkus:dev` with
+`granite4:micro`: 7 emails, all three router branches, one tool call.
+
+| | Agentic Dev UI (`MonitoredAgent`) | Flow Dev UI (1.1.3) |
+|---|---|---|
+| Shape | Topology: sequence, router branches **labelled with their conditions**, parallel fork, state-key data flow | The business workflow: steps, switches, the review `listen`. The agent step's generated sub-workflows are opaque `CALL`s, and the 3-way router is drawn as a **straight chain** |
+| Per run | Executions: every agent, its input and output, tokens, a timeline, **tool calls with arguments and result** | **None.** `ManagementLifecycleRPCService` lists instances server-side, but no shipped Dev UI JS calls it |
+| Other | Testing page | Start a workflow from an input form |
+
+- **`MonitoredAgent` works on a Flow-translated root.** 4 successful executions, 0 ongoing.
+- **Memory: no leak in this design.** With 3 runs still waiting for review, `ongoingExecutions` was **0**. The agent
+  call finishes before the Flow run waits, so the leak that drove the old dev-only decision (suspended
+  `@HumanInTheLoop` runs) is gone.
+- **Prod:** neither UI exists outside dev mode. Langfuse is the prod view.
+
+### Q4: the three-way `EmailRouter` under Flow's translation: **YES**
+
+`Spike5EmailRouter` routes to:
+- the parallel extraction (2 LLM agents);
+- `Spike5FollowUpAgent`, with `@ToolBox(Spike5ClaimStatusTools)`;
+- `Spike5UnmatchedEmailAgent`, a plain Java `@Agent` with no LLM.
+
+| email | branch | run |
+|---|---|---|
+| new claim | parallel extraction (details 1, summary 1) | `WAITING` (review) |
+| status question on `CLM-1042` (In Process) | follow-up agent: tool request, `claimStatus`, then the answer (2 LLM calls, 1 tool call) | `COMPLETED` |
+| newsletter | Java agent | `COMPLETED` |
+| status question, no claim | Java agent (no matching claim) | `COMPLETED` |
+
+The tool ran with the run's conversation id current, and its `langchain4j.tools.claimStatus` span and the follow-up
+agent's span are stamped.
+
+---
+
 ## Durable state across restarts: not a requirement (user decision)
 
 `%prod` and `%openshift` set `schema-management.strategy: drop-and-create`, and dev/test take the Dev

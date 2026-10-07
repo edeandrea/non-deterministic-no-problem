@@ -13,35 +13,35 @@ code, tests and docs, and hand the real-key and live-demo checks to the user.
 - Run `OPENAI_API_KEY=change-me ./mvnw -B clean verify -Pollama`. Every intake test and the Roundcube E2E must pass.
   Report pre-existing secret-dependent failures separately.
 - Make sure these verification tests exist and pass (add any that earlier tasks didn't):
-  - **Restart test:** a run suspends under one `@TestProfile`, and a test under a **different** profile (a fresh
-    Quarkus app) resumes it through `POST …/review-decisions`, without calling the earlier agents again. The test
-    Postgres dev service is recreated when the profile changes, so use a database that survives the switch: a
-    shared container or a fixed JDBC URL for both profiles (preferred), or carry the scope row across as the spike
-    did (spike Q11b).
+  - **No restart test:** durable state across restarts isn't a requirement (user decision, 2026-10-07).
   - **Sub-agent mocks:** tests that `@InjectMock` a sub-agent run under their **own** test profile, because a
     sub-agent instance may be bound when the root is built (spike Q2).
-  - **No leaked scope rows:** a test (or a suite-level check after all intake tests) asserts the agentic scope
-    table is empty, apart from runs a test deliberately leaves waiting for review and then cleans up.
+  - **No leaked Flow rows:** a test (or a suite-level check after all intake tests) asserts Flow's instance and task
+    tables are empty, apart from runs a test deliberately leaves waiting for review and then cancels.
+  - **Full agent path on every build:** at least one test runs a real email through the starter, the workflow and the
+    agents (WireMock LLM), not a mocked root, under both Ollama profiles.
 - Have a **fresh** reviewer check:
   - each rule in task 08 has a test
   - no agent has side effects
   - every AI agent carries both opt-outs, every entry agent is injected in `src/main`, and every leaf belongs to one root
-  - no transaction is open across an agent call, including when a workflow resumes
+  - no transaction is open across an agent call
+  - no step contains observability code; the starter's `ConversationContext.callIn` is the intake's only one
+  - the conversation core depends on no adapter, and the adapters don't depend on each other (layering test)
   - every customer-submission case gets a reply (the "Every submission gets a reply" list in `PLAN.md`)
   - the matched claim wins; one "no matching claim" template; reviewer-ticked items gate completeness
-  - the policy check runs after the agents and evicts the run state on rejection
-  - the scope is evicted on every ending, and no agentic scope rows leak (in the app or in tests)
+  - the policy check runs after the agents and creates nothing on rejection
+  - a reply during review cancels the waiting run, and no Flow rows leak (in the app or in tests)
   - a reply during review and a decision are serialised by optimistic locking (race test)
-  - the outcome of the human-review decision gate (task 01/07) is recorded in `PLAN.md`
+  - the quarkus-flow decisions (task 01b and the follow-up spikes) are recorded in `PLAN.md`, with the upstream issue
+    status re-checked for the pinned Flow version (#1056, #1057, #1058) and Quarkus (quarkus#54354)
   - the policy-inconsistency and no-matching-claim emails leak nothing
   - auto-reply loop protection
-  - one connected trace per email, including across `@ParallelAgent`, with spans from the root `@AgentListenerSupplier`
-  - the review-decision span links to the original trace
-  - one claim = one `gen_ai.conversation.id` across its separate traces (each email and the review decision), and
-    the id is a UUID with no PII (no claim number, `Message-ID` or address)
+  - every intake span carries the claim's `gen_ai.conversation.id`, with no mixing under concurrency; the id is a UUID
+    with no PII (no claim number, `Message-ID` or address); any remaining gap is the one documented in task 11
   - no high-cardinality metric tags (claim numbers, `Message-ID`s, addresses)
   - Langfuse span export is off in tests, except in `LangfuseSessionScoringServiceTests`
-  - `MonitoredAgent` is dev-only: no agent monitor exists outside dev
+  - `MonitoredAgent` follows the decision recorded in task 11
+  - both workarounds (quarkus#54354 guard, agentic adapter) carry their delete conditions
   - docs match the code, and the design doc's status line is updated
 
   Re-review after fixes.
@@ -57,10 +57,15 @@ code, tests and docs, and hand the real-key and live-demo checks to the user.
 ## Key Points
 
 - Locally, skip `-Pollama-openai` (CI covers it). The E2E must still be CI-safe under both profiles.
+- Run the full suite on the profile CI uses (the default), not `-Pollama`: a plain `-Pollama` full run fails to boot
+  with an ambiguous `ChatModel` provider. With `NODE_ENV=production` in the shell, Jest is missing and Quinoa's test
+  step fails; use `NODE_ENV=development`.
+- The suites that need a real OpenAI key (the chat and `LangfuseSessionScoringServiceTests`) are the user's to run;
+  they're the only proof that task 10b changed nothing for the chat.
 
 ## Done When
 
 - [ ] Both `test-compile` runs succeed, and the `-Pollama` verify passes apart from documented secret-dependent failures.
-- [ ] The restart test (database surviving the profile switch), the dedicated sub-agent `@InjectMock` profile and the no-leaked-scope-rows test exist and pass.
+- [ ] The dedicated sub-agent `@InjectMock` profile, the no-leaked-Flow-rows test and the full-agent-path test exist and pass.
 - [ ] The fresh review has no unresolved BLOCKER or MAJOR findings.
 - [ ] `PLAN.md` lists the user's remaining manual checks.

@@ -2,12 +2,14 @@
 
 ## Your Mission
 
-A customer emails `claims@parasol.com` (from Roundcube). An IMAP IDLE watcher picks the email up, and
-a `quarkus-langchain4j-agentic` workflow triages it and extracts the claim details. The app then
-creates or updates the claim, stores photos, replies with Qute templates, and files the email. Before a
-claim moves to `In Process`, a claims processor does a final review: the workflow pauses at a
-`@HumanInTheLoop` step, suspended and persisted in PostgreSQL, and the processor's decision resumes it.
-A short design document (workflow, claim-state and agent-topology diagrams) was written and reviewed externally before implementation (PR #220, merged).
+A customer emails `claims@parasol.com` (from Roundcube). An IMAP IDLE watcher picks the email up and starts one
+**quarkus-flow** workflow run for it. Inside that run, a `quarkus-langchain4j-agentic` composition (one workflow step)
+triages the email and extracts the claim details. Then the workflow's own steps create or update the claim, store
+photos, reply with Qute templates, and file the email. Before a claim moves to `In Process`, a claims processor does a
+final review: the workflow waits (a `listen` step, persisted by Flow in PostgreSQL) for the processor's decision, and
+then applies it.
+A short design document (workflow, claim-state and agent-topology diagrams) was reviewed and merged in PR #220; the
+**revised (quarkus-flow, b1) design is back at the review gate** (see Task Plan).
 Last of five issues; see `.tasks/claim-intake-roadmap.md`. **Issues 1–4 must be complete before the
 implementation tasks (03 onwards).** The spike (task 01) and the design (task 02) ran ahead of them.
 
@@ -16,11 +18,12 @@ order: #212 via PR #219 (`2575c10`), #213 via #224, #214 via #225, #215 via #230
 quarkus-langchain4j **1.14.1** / Quarkus **3.40.1**, matching what the task 01 spike verified
 (langchain4j-agentic 1.20.2-beta30). **Nothing in the issue queue blocks task 03 any more.**
 
-**Task 01b is done and its verdict is ADOPT quarkus-flow.** The spike that gated tasks 03 and 07 has
-produced a verdict on evidence: Flow replaces the durable human-in-the-loop machinery, including both
-internal-API touch points. See **Flow Spike Results (task 01b)** under Shared Context and
-[`spike-results-flow.md`](spike-results-flow.md). **Tasks 03, 07, 08, 10 and 11 now need reworking, and
-the design document goes back through the review gate — see _Rework required by the Flow verdict_ below.**
+**Task 01b is done and its verdict is ADOPT quarkus-flow**, with option **b1** (the whole intake is one workflow) and
+four follow-up spikes. See **Flow Spike Results (task 01b)** under Shared Context and
+[`spike-results-flow.md`](spike-results-flow.md). **The task files are rewritten for it (2026-10-07):** tasks 03, 05,
+06, 08–11 and 12–14 changed, task 07 is merged into task 08, and the new task 10b builds the generic conversation core.
+**Next: update the design document and diagrams and put them back through the review gate (a PR ending
+`Part of #216`), then update the #216 issue body.** No implementation task starts before the gate passes.
 
 **Plan File:** `.tasks/05-gh216-agentic-email-intake/PLAN.md`
 **Tasks Directory:** `.tasks/05-gh216-agentic-email-intake/`
@@ -63,41 +66,55 @@ Edit or create task files and update `## Task Plan`.
 - [x] [task-01-agentic-spike.md](task-01-agentic-spike.md): Agentic module spike (runs first, throwaway)
 - [x] [task-02-design-and-review.md](task-02-design-and-review.md): Design document and review gate
 - [x] [task-01b-flow-spike.md](task-01b-flow-spike.md): quarkus-flow spike (throwaway; decided task 07) — **verdict: ADOPT**; follow-up (b1, whole intake as one workflow) **feasible**
-- [ ] [task-03-intake-config-and-mailbox.md](task-03-intake-config-and-mailbox.md): Intake configuration and claims mailbox
+- [ ] **Design gate re-run (blocking):** update `docs/design/email-claim-intake.md` and its diagrams for b1, open a PR
+  ending `Part of #216`, wait for the review; then update the #216 issue body to match
+- [x] **Follow-up spike 5 (blocking, user decisions 2026-10-07)**: **verdict: all four answered** (see
+  `spike-results-flow.md` → Follow-up spike 5; branch `spike/flow-followup5`):
+  1. the agentic adapter carries the baggage id onto every AI call inside the generated sub-workflows (8 concurrent
+     runs plus no-id runs: 0 mixing, 0 foreign, 0 stale). Their own Flow spans stay unstamped. Option 2 (a Flow
+     listener) is **invalidated**, because it leaks across threads, so the gap is accepted until #1056
+  2. per-sender order works with a CDI status listener driving the queue
+  3. `MonitoredAgent` works under Flow and holds nothing for waiting runs; **keep both Dev UIs** (user decision)
+  4. the three-way router (parallel LLM, tool-calling LLM, plain Java) works under Flow's translation
+- [ ] [task-03-intake-config-and-mailbox.md](task-03-intake-config-and-mailbox.md): Intake configuration, Flow dependencies and claims mailbox
 - [ ] [task-04-email-templates.md](task-04-email-templates.md): Qute reply templates and sender
 - [ ] [task-05-extraction-agents.md](task-05-extraction-agents.md): Claim extraction agents
 - [ ] [task-06-triage-agents.md](task-06-triage-agents.md): Triage agents
-- [ ] [task-07-human-review-step.md](task-07-human-review-step.md): Human review step (`@HumanInTheLoop` + database-backed scope store)
-- [ ] [task-08-intake-processor.md](task-08-intake-processor.md): Intake processor and business rules
+- ~~[task-07-human-review-step.md](task-07-human-review-step.md): Human review step~~ — **merged into task 08** (user decision, 2026-10-07)
+- [ ] [task-08-intake-processor.md](task-08-intake-processor.md): The intake workflow and business rules (includes the human review)
 - [ ] [task-09-imap-idle-watcher.md](task-09-imap-idle-watcher.md): IMAP IDLE watcher
 - [ ] [task-10-review-api-and-ui.md](task-10-review-api-and-ui.md): Review API and UI
-- [ ] [task-11-observability.md](task-11-observability.md): Observability for the intake workflow
+- [ ] [task-10b-conversation-core.md](task-10b-conversation-core.md): Generic conversation context core (`ai.scoring.conversation`; changes the chat's scoring trigger)
+- [ ] [task-11-observability.md](task-11-observability.md): Observability for the intake workflow (Flow and agentic adapters)
 - [ ] [task-12-roundcube-e2e.md](task-12-roundcube-e2e.md): Roundcube end-to-end test
 - [ ] [task-13-demo-and-docs.md](task-13-demo-and-docs.md): Demo guide and documentation
 - [ ] [task-14-verification.md](task-14-verification.md): Verification
 
-> **Ordering: task 01b is complete — verdict ADOPT quarkus-flow.** Tasks 03 and 07 are unblocked, but
-> **not as currently written**: they describe the `DatabaseAgenticScopeStore` / `@HumanInTheLoop` design
-> that the verdict replaces. Rework them (and 08, 10, 11) and re-run the design gate on
-> `docs/design/email-claim-intake.md` + `docs/design/claim-intake-agents.puml` before implementing. See
-> *Rework required by the Flow verdict*.
+> **Ordering:** the task files describe the b1 design (rewritten 2026-10-07). Implementation starts at task 03 once
+> the design gate re-run passes. Task 10b may run any time before task 11 (it only touches `ai.scoring` and the chat);
+> task 08 uses its `ConversationContext`, so if 08 runs first, give it a minimal `ConversationContext` stub and finish
+> it in 10b.
 
 ---
 
 ## Shared Context
 
 ### Overview
-Code in a new package `org.parasol.intake` (with `agent`, `mailbox`, `reply` and `review` sub-packages).
+Code in a new package `org.parasol.intake` (with `agent`, `mailbox`, `reply` and `review` sub-packages), plus the
+generic conversation core and its adapters in `ai.scoring.conversation` (task 10b, task 11).
 This follows the domain-first layout of the existing code (`org.parasol.claim`, `org.parasol.chat`, `org.parasol.notification`).
-The existing chat (`ClaimService`, chat scopes, `NotificationService`) stays unchanged.
+The existing chat (`ClaimService`, chat scopes, `NotificationService`) behaves as today; its conversation handling moves
+onto the generic conversation package `ai.scoring.conversation` (task 10b), with no behaviour change.
 
 ```
 Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, NotificationService)
                         ▲
-                        └──IMAP IDLE── ClaimsInboxWatcher → ClaimEmailProcessor → ClaimsMailboxAgent
-                                                                                    ⇣ suspends at ClaimReviewAgent
-                                                                                    ⇣ (scope saved in PostgreSQL)
-                         claims processor (UI) → ClaimReviewService → resume ⇢ ClaimEmailProcessor outcome
+                        └──IMAP IDLE── ClaimsInboxWatcher → ClaimIntakeStarter ─(handoff)─▶ next email
+                                                               │ starts one run
+                                                               ▼
+                         ClaimIntakeFlow: supersede → runAgents (ClaimsMailboxAgent) → policy → persist
+                                          → reply → file → [complete] waitReview (listen, kept in PostgreSQL)
+                         claims processor (UI) → POST review-decisions → publish REVIEW_DECIDED ⇢ apply decision
 ```
 
 ### Project Context
@@ -114,8 +131,10 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
 ### Key Decisions
 - **Triage flow:** code matches the claim and checks the sender first; then classify (`NEW_CLAIM` /
   `CLAIM_FOLLOW_UP` / `NOT_A_CLAIM`) and route, **matched claim first**, then the label (gap 1). Agents have
-  **no side effects**; `ClaimEmailProcessor` does all persistence, mail, folder moves and scope eviction.
+  **no side effects**; the intake workflow's steps (and the starter's skip and failure paths) do all persistence, mail
+  and folder moves.
   Unmatched not-a-claim and follow-up emails go to a non-LLM agent (design, Agent architecture).
+  *(Under b1, "the processor" is the intake workflow's steps plus the starter; task 08.)*
 - **Agent context (user decision):** every intake agent is **stateless**. Chat memory and Easy RAG are
   turned off on each agent interface (`chatMemoryProviderSupplier = NoChatMemoryProviderSupplier.class`,
   `retrievalAugmentor = NoRetrievalAugmentorSupplier.class`); by default agents share one `"default"`
@@ -126,8 +145,9 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
   - the items we asked the customer for
 
   Extraction re-runs over the whole thread each time: a reply on a pending claim goes through the same
-  `ClaimExtractionWorkflow` as a new claim (design, Workflow step 5). The root `@MemoryId` (= `Message-ID`) keys
-  only the workflow's `AgenticScope` (the review pause). Per-email or per-claim chat memory was rejected:
+  `ClaimExtractionWorkflow` as a new claim (design, Workflow step 5). *(Superseded: the root no longer has a
+  `@MemoryId` for a review pause; the review is the outer Flow workflow's, task 06/08.)* Per-email or per-claim chat
+  memory was rejected:
   - per-email memory has no history across replies
   - per-claim memory duplicates the claim record and needs its own persistence and cleanup
   - replaying old turns biases extraction and carries prompt injection forward
@@ -147,7 +167,12 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
   The spike (task 01) ran before the design, because its results shape it: it ran ahead of issue 1, on a
   throwaway local branch in a separate git worktree, with the latest stable versions, and its code is never
   merged or pushed.
-- **Human review** (task 07): a `ClaimReviewAgent` with a **static** `@HumanInTheLoop` method returns
+- **Human review — superseded by the Flow verdict (b1); kept as history.** Now: the review is the intake workflow's
+  last steps (`waitReview` `listen` → `routeDecision` `switch` → apply; task 08), and the review endpoint publishes a
+  `REVIEW_DECIDED` event after a `PersistenceInstanceReader` 404/409 check (task 10). A reply during review cancels
+  the waiting run (`activeInstance(id).cancel()`); optimistic locking on the claim (`@Version`) still serialises a reply
+  against a decision. No scope store, no eviction. The old text:
+  - A `ClaimReviewAgent` with a **static** `@HumanInTheLoop` method returns
   `Object` (`new SuspendedResponse<>("review:" + scope.memoryId())`, no `async`), so the workflow suspends
   instead of blocking; the root surfaces `AgenticSystemSuspendedException`, which the processor catches. A
   `DatabaseAgenticScopeStore` (task 03; key `agentId|memoryId`, registered JVM-globally through
@@ -168,12 +193,12 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
   - first email incomplete → missing information
   - reply that completes a pending claim → "received — final review"
   - reply still incomplete → still missing
-  - reply while `Pending Review` → the old suspended scope is evicted, the reply merged, and the
-    workflow re-run: still complete → stays `Pending Review` (new `reviewRunId`) with the "we've added
+  - reply while `Pending Review` → the reply's own run cancels the waiting run and merges the reply: still complete → stays `Pending Review` (new `reviewRunId`) with the "we've added
     your latest information; your claim is still in final review" variant; now incomplete →
     `Pending Information` + missing information
   - claim `In Process` or later (including seeded statuses) → status reply; the claim is never updated
   - not a claim / policy inconsistency / no matching claim → their templates
+  - no match, sender has pending claims, `ClaimResolver` unsure → "which claim?" (lists their pending claim numbers)
   - processing failure → message to the failed folder **and** a templated "processing problem" reply
     (best-effort, no details, call 1-800-CAR-SAFE)
   - reviewer decisions → thank-you (Ready) or missing information (Needs more information)
@@ -186,16 +211,28 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
   - name and email: the `From:` header
   - claim number: generated (issue 2)
   - inception date: random, before the incident date
+- **Supersede placement (design review, 2026-10-07):** the reply's run cancels the waiting run **after** the agents and
+  the policy check, just before the claim changes, so a failed or policy-rejected reply never leaves a `Pending Review`
+  claim with no waiting run. A decision that lands while the reply's agents run wins the lock (the reply then goes back
+  in line under the new status).
 - **Policy number** (checked in code by the processor **after the agents finish**, before any claim is
-  created or changed; gap 7):
+  created or changed; gap 7; the "different customer" rejection applies to **new** claims):
   - stated + same customer → reuse
-  - stated + a different customer → evict the run state (including a paused review) and reject with a
-    vague email (call 1-800-CAR-SAFE), creating nothing
+  - stated + a different customer → reject with a vague email (call 1-800-CAR-SAFE), creating nothing (the run ends
+    there; under b1 the check runs before any review wait, so there's nothing to evict)
   - stated + unknown → new claim on that number
   - absent → generate a unique one
 - **Follow-ups:**
   - Matched in code, before the workflow, by `[CLM…]` regex, then `In-Reply-To`/`References`. **The matched
     claim wins** over the classifier's label (gap 1).
+  - **No match, but the sender has pending claims (user decision, 2026-10-07: "try to route it, ask if we
+    can't"):** the run's `resolveClaim` step asks `ClaimResolver` (an LLM service outside the agent topology)
+    whether the email is about one of the sender's pending claims. One of them (validated in code against
+    that list) → handled as matched; a new incident → new claim; unsure → the "which claim?" reply listing the
+    sender's pending claim numbers, nothing changed. It closes the duplicate-claim gap for fresh emails without
+    a claim number, and leaks nothing: it only offers the sender their own claims.
+  - **Ordering is per sender address** (not per claim), because the claim isn't known until `resolveClaim`;
+    a claim only ever matches its own address, so this covers per-claim order.
   - Only from the claim's own email address. A wrong sender, or an unmatched email labelled a follow-up,
     gets the one "no matching claim" reply (no details; asks for the claim's address or the claim number; gap 9).
   - A `Pending Information` claim gets merged in, re-summarised, and moves to `Pending Review`
@@ -211,24 +248,25 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
   Non-image or oversized attachments are skipped and mentioned. New claims get no processed images.
 - **Idempotency:** a unique stored `Message-ID`. Replies carry `Auto-Submitted: auto-replied`, and
   inbound auto-replies and self-sent mail are skipped.
-- **Inbox handling:** HTML-only email is converted to text. Mail is processed one at a time. Processed
-  mail moves to a processed folder, failures to a failed folder.
-- **Observability** (task 11):
-  - One trace per email: the processor opens a root span `claim-intake process` (`setNoParent()`, `CONSUMER`,
-    `gen_ai.operation.name=invoke_agent`) and stores its trace context on the claim when the run pauses.
-  - A static `@AgentListenerSupplier` on the root, with `inheritedBySubagents()=true`, creates
-    `invoke_agent <name>` spans for every agent and ends open composite spans on suspension (gap 3; spike Q16c).
-    It is **not** a CDI `AgentListener`, which only reaches AI leaves. Leaf AI-service spans come from quarkus-langchain4j.
-  - Each `@ParallelAgent` declares a `@ParallelExecutor` returning
-    `Context.taskWrapping(Executors.newVirtualThreadPerTaskExecutor())`, so the parallel sub-agents stay in the root trace.
+- **Inbox handling:** HTML-only email is converted to text. **The watcher doesn't wait for runs (user decision,
+  2026-10-07):** it records the `Message-ID`, moves the email to a `processing` folder and starts its run. Runs for
+  different senders go in parallel; a sender's emails go in order (a per-sender queue: the next waits while that
+  sender's previous run is still working; a run waiting for review is cancelled instead). Only waiting runs are ever cancelled, never one
+  mid-step. One watcher, no pool: Flow's executor gives the parallelism and caps it. A failure listener handles every
+  failed run (failed folder + processing-problem reply). The run moves processed mail to the processed folder.
+- **Observability** (task 11), rewritten for b1:
+  - **Superseded:** the synthetic `claim-intake process` CONSUMER root span, the `@AgentListenerSupplier` span tree,
+    `@ParallelExecutor` (quarkus-flow#1057) and the linked review-decision span. Flow's own `workflow.execute` /
+    `task.execute` spans replace the root and agent spans (typed AGENT by a Flow-adapter `SpanProcessor`); the decision
+    steps run inside the claim's own run.
+  - **One run is still several traces** (quarkus-flow#1056); the claim is one **conversation**, not one trace.
   - Langfuse types observations from `gen_ai.operation.name` (`invoke_agent` → AGENT, `chat` → GENERATION, `execute_tool` → TOOL).
   - IMAP fetch/move and SMTP send get `CLIENT` spans.
-  - The review decision span is **linked** (span link) to the original trace context stored on the claim.
-  - **Conversation grouping (user decision):** each email and the review decision stay **separate traces**, grouped by
-    `gen_ai.conversation.id` (Langfuse maps it to the session id, langfuse/langfuse#7738), so a claim is one Langfuse session.
+  - **Conversation grouping (user decision):** every span of a claim's runs carries `gen_ai.conversation.id` (Langfuse
+    maps it to the session id, langfuse/langfuse#7738), so a claim is one Langfuse session.
     - The id is a per-claim UUID (not the claim number, which doesn't exist when the first spans start; no PII),
       minted for unmatched emails and stored on the claim (`intakeConversationId`) when a claim is created; follow-ups and
-      the review decision reuse it (tasks 07, 08, 10).
+      the review decision reuse it (task 08).
     - **Carrier: baggage** (as the chat's `ConversationalBaggageHandler` does; user decision, 2026-10-07). The
       carry-as-data approach from follow-up spike 2 is **dropped**. Follow-up spike 3 traced the leak to
       quarkus#54354 (fixed by quarkus#56805, not yet in 3.40.x).
@@ -239,11 +277,12 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
       `ExecutorServiceFactory`. (Flow also injects its executor factory by concrete class, so it can't be swapped
       cleanly.) **Proven (follow-up spike 4):** an extra MicroProfile `ThreadContextProvider` of its own context type,
       registered through `META-INF/services`, which resets a pool thread to `Context.root()` when a task ends with
-      the propagated context still current. No Quarkus class is overridden. Either way a project-owned `ConversationIdSpanProcessor` stamps the id onto every span, so it works
-      with the Langfuse processor off (`%test`) and for Tempo/LGTM (task 11).
-    - Tier-2 session scoring doesn't apply (it's triggered only by `ChatScopeEnded`); the tier-1 judge still scores
-      every intake LLM call. *(Revisit with the generic design below: once session scoring listens for
-      `ConversationEndedEvent`, the intake could fire it when a claim leaves the intake states.)*
+      the propagated context still current. No Quarkus class is overridden (task 10b). A project-owned
+      `ConversationIdSpanProcessor` stamps the id onto every span, so it works with the Langfuse processor off (`%test`)
+      and for Tempo/LGTM.
+    - Tier-2 session scoring doesn't run for intake conversations: nothing in the intake fires `ConversationEndedEvent`
+      (task 10b), and the session scorer reconstructs exchanges assuming the chat's shape. The tier-1 judge still scores
+      every intake LLM call. *(A later decision could fire it when a claim leaves the intake states.)*
   - **Generic conversation context (user decision, 2026-10-07).** The conversation concept is application-agnostic and
     will move to a separate library, so it's designed as one now, staged in `ai.scoring.conversation`:
     - **Core** (OTel API only): a `ConversationContext` API to start, read and run code within a conversation, a
@@ -258,29 +297,40 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
       `SessionScoringService` directly. Any number of places can fire the event; there's one listener.
     - **No mixing:** the intake workflow only says which conversation a run belongs to, with no span code in any step.
       The core never depends on an adapter, and adapters never depend on each other.
-    - **The Flow adapter's job:** carry the context across `FlowPlanner`'s `supplyAsync` (quarkus-flow#1056) and,
-      through a `CallableTaskProxyBuilder`, make each task's context current so steps need no helper.
+    - **The Flow adapter's job** (task 11): a `CallableTaskProxyBuilder` makes each task's context current, so steps
+      need no helper. The generated agent sub-workflows (`FlowPlanner`'s `supplyAsync`, quarkus-flow#1056) get no
+      context: an agentic `AgentListener` adapter covers their AI calls (to be proven in task 11), and the sub-workflows'
+      own Flow spans are a user decision in task 11.
+    - **Built in:** task 10b (core, chat adapter, scoring listener, leak guard) and task 11 (Flow and agentic adapters).
   - `IntakeMetrics` registers the `claim.intake.*` meters, with no high-cardinality tags (no claim numbers, `Message-ID`s or addresses).
   - Intake log lines carry the trace id.
   - Intake LLM calls **are** scored by the tier-1 Langfuse judge (user decision).
   - Langfuse span export is off in `%test` (`quarkus.langfuse.otel.enabled: false`), except in `LangfuseSessionScoringServiceTests`.
-  - `MonitoredAgent` is **dev-only** (user decision after spike Q18): prod has **no** monitor.
-    `setMaxRetainedSessions(0)` doesn't bound memory: suspended runs stay in `ongoingExecutions` until resumed,
-    and an abandoned review leaks forever, including the raw email, so the `@UnlessBuildProfile("dev")` cap is
-    dropped. **Open implementation point (task 11):** the mechanism. The interface hierarchy is fixed at compile
-    time, and a leaf agent must belong to exactly one root, so a second, dev-only root that shares the leaves
-    isn't allowed. The design doc deliberately doesn't cover it (short format).
+  - `MonitoredAgent`: **the root extends it, in every profile; both Dev UIs are kept** (user decision 2026-10-07, after
+    spike 5's screenshots). The agentic Dev UI shows the per-run agent detail (branch taken, tool calls, tokens), and
+    Flow's shows the business workflow and the review wait. The old dev-only decision was driven by suspended
+    `@HumanInTheLoop` runs leaking in `ongoingExecutions`. Under Flow the agent call ends before the run waits, and
+    spike 5 measured 0 ongoing with 3 runs waiting. **Finished sessions are kept only in dev mode** (user decision
+    2026-10-07): at startup, outside `LaunchMode.DEVELOPMENT`, `setMaxRetainedSessions(0)`. That's checked by launch
+    mode, not by profile, because dev runs activate `prod,ollama`, not `dev`. The monitor itself can't be made
+    dev-only: it isn't a CDI bean, and `extends MonitoredAgent` is fixed at compile time (details in task 11).
   - Grafana panels are a separate issue: #218 (Clean up the Grafana AI dashboard).
 - **Out of scope:** non-English email, multiple incidents per email, drift detection for the agents,
   the reviewer editing extracted fields.
 
 ### Caveats & Problems
-- Never hold a transaction open across an LLM call, including when a workflow resumes. Persist in `QuarkusTransaction.requiringNew()`.
+- Never hold a transaction open across an LLM call. Persist in `QuarkusTransaction.requiringNew()`.
+- **Two observability workarounds with exit conditions:** the quarkus#54354 `ThreadContextProvider` guard (task 10b;
+  delete when quarkusio/quarkus#56805 ships) and the agentic conversation adapter (task 11; delete when
+  quarkus-flow#1056 is fixed). Re-check both, and #1057/#1058, whenever Quarkus or Flow is upgraded.
 - Tests must delete the claims and images they create (`ClaimsListPageTests` expects 6) and must
   never assert absolute claim numbers.
 - Every `@QuarkusTest` stubs API keys through its profile, to avoid `SRCFG00011` under `-Pollama-openai`.
 - Agent builds don't have real API keys. Only compilation (and LLM-mocked tests) are trustworthy signals.
-- **Human review mechanics** (langchain4j-agentic beta; Quarkus adds no HITL or persistence support):
+- **Human review mechanics — superseded by the Flow verdict (b1); kept as history.** None of the scope-store,
+  allowlist, eviction or `@HumanInTheLoop` rules below apply any more; the quarkus-flow gotchas are in task 13's
+  Gotchas list and `spike-results-flow.md`. The old text:
+  (langchain4j-agentic beta; Quarkus adds no HITL or persistence support):
   - Beta module (`langchain4j-agentic` `-beta30`). Suspend/resume and persistence are documented upstream
     and mostly public; the only internal touch points are `SuspendedResponse` (`dev.langchain4j.agentic.internal`)
     and the `@Internal` `DefaultAgenticScope` exposed by the `AgenticScopeStore` SPI.
@@ -302,7 +352,8 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
   doc if the implementation keeps it.
 - **Open implementation points** (not in the design doc, by user decision; settle them in the named tasks).
   **Applied to the task files at the design gate** (after PR #220 merged):
-  - How to make `MonitoredAgent` dev-only (task 11): see Key Decisions → Observability. **Applied:** task 11 drops
+  - *(Superseded 2026-10-07 by spike 5: `MonitoredAgent` is kept in every profile, see Key Decisions → Observability.)*
+    How to make `MonitoredAgent` dev-only (task 11): see Key Decisions → Observability. **Applied:** task 11 drops
     the `@UnlessBuildProfile("dev")` cap, requires no monitor outside dev, and lists candidate mechanisms to
     investigate and present to the user (still a user decision at implementation time); task 13/14 updated.
   - A customer reply arriving while a reviewer is deciding (tasks 07/08/10). **Applied** to tasks 07
@@ -356,7 +407,9 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
      the claim number (task-04).
 
 ### Design
-- **Design doc:** `docs/design/email-claim-intake.md`, now on `main`.
+- **Design doc:** `docs/design/email-claim-intake.md`, on `main` (the #220 version). **A revised version for the
+  quarkus-flow b1 design is at the review gate again** (branch `design/email-claim-intake-flow`); the notes below
+  are about the #220 round.
   - **PR:** [#220](https://github.com/edeandrea/non-deterministic-no-problem/pull/220), **merged** at `ec1ca14`
     (2026-10-02) with no review feedback: the design was approved as-is, so the **gate is passed**.
   - The remote branch `design/email-claim-intake` was deleted on merge; the local branch and worktree are gone too.
@@ -408,7 +461,8 @@ Full evidence, the executive summary and the per-question answers (Q1–Q19) are
   - `@ParallelExecutor` returning `Context.taskWrapping(...)` on each `@ParallelAgent`
   - the review resume in a new trace with a span link
   - Langfuse types `invoke_agent` spans as AGENT, `chat` as GENERATION and `execute_tool` as TOOL
-- **Needs a user decision** (decided: `MonitoredAgent` dev-only, no monitor in prod; the mechanism is open in task 11):
+- **Needs a user decision** (decided: `MonitoredAgent` dev-only, no monitor in prod; the mechanism is open in task 11).
+  *Superseded 2026-10-07: under Flow nothing suspends, so the monitor is kept in every profile (Key Decisions → Observability):*
   - `MonitoredAgent` with `setMaxRetainedSessions(0)` still keeps every suspended run in `ongoingExecutions`, and
     an abandoned review leaks forever.
   - Leaf agents are CDI singletons shared across roots, so give each leaf exactly one root.
@@ -578,7 +632,11 @@ Evidence in [`spike-results-flow.md`](spike-results-flow.md) → *Follow-up spik
   tests that need a real OpenAI key were skipped both times, so the chat's baggage paths haven't run with the guard
   yet. The core task runs them with a real key.
 
-#### Rework required by the Flow verdict (task 01b = ADOPT)
+#### Rework required by the Flow verdict (task 01b = ADOPT) — APPLIED to the task files (2026-10-07)
+
+**Applied** to tasks 03, 05, 06, 08–11 and 12–14, with task 07 merged into 08 and the new task 10b. The task files
+are now the source of truth; where this list differs, the task file wins (it also absorbed the follow-up spikes 2–4,
+which this list predates). Still open from it: the **design gate re-run**. History below.
 
 The list below **supersedes** the "Changes required in later tasks" that follows it wherever the two
 conflict. That list was written against the merged `@HumanInTheLoop` + `DatabaseAgenticScopeStore` design.
@@ -630,7 +688,8 @@ conflict. That list was written against the merged `@HumanInTheLoop` + `Database
   Flow Dev UI diagram. Task 14 drops the restart test. Tasks 12 and 14 run under both Ollama profiles.
 
 #### Changes required in later tasks
-**Applied to tasks 03–14 at the design gate.** Two items were adjusted when applied: the task-03 store
+**History: superseded by the Flow rework above (the task files were rewritten on 2026-10-07).** Originally
+**applied to tasks 03–14 at the design gate.** Two items were adjusted when applied: the task-03 store
 items also absorbed task 07's store work, and the task-10 "handle NEEDS_INFO re-suspension" item was dropped
 (gap 2: Needs more information ends the run at `Pending Information`). Task 08 evicts on **every** ending,
 not only non-suspended ones (policy rejection and superseding evict a paused review too).

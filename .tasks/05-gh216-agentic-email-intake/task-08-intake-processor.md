@@ -1,176 +1,210 @@
-# Task 08: Intake Processor and Business Rules
+# Task 08: The Intake Workflow and Business Rules
 
 **Type:** Code Modification
 
 ## Goal
 
-`ClaimEmailProcessor` applies every business rule to an inbound email: it matches the claim, runs the
-root workflow, checks the policy number, persists claims and images, sends replies, files the message
-and evicts the run state. It also applies the claims processor's review decision. It is the **only**
-place with side effects. Every customer submission gets a reply, and every edge case is covered by an
-integration test.
+One quarkus-flow workflow, `ClaimIntakeFlow`, carries an inbound email from start to finish: it supersedes a waiting
+review, runs the agents, checks the policy number, persists the claim and photos, replies, files the email, and, for
+a complete claim, waits for the claims processor's decision and applies it. It's the **only** place with side
+effects. Every customer submission gets a reply, and every edge case has an integration test.
+
+*Rewritten after the Flow verdict (task 01b = ADOPT, option b1, user decision).* **Task 07 is merged in**: the human
+review is the workflow's last steps. The agentic root (task 06) stays **one step**, so the agent topology is
+unchanged. Evidence: `spike-results-flow.md` → *Follow-up spike* (F1–F5); sketch `Spike2IntakeFlow` on
+`spike/flow-workflow`.
+
+## The workflow
+
+```
+(starter: loop/duplicate checks, claim match, sender check, conversation id, per-sender order; doesn't wait)
+  → routeMatch ─ wrong sender ──────────→ replyNoMatchingClaim → file → END
+  → resolveClaim (no match + sender has pending claims) ─ unsure → replyWhichClaim → file → END
+  → runAgents (ClaimsMailboxAgent.process: one step; Flow generates the sub-workflows)
+  → policyCheck ─ different customer ───→ replyPolicyInconsistent → file → END
+  → supersede (claim waiting for review: lock + cancel the waiting run)
+  → applyOutcome (persist: claim, photos, correspondence)
+  → reply → file
+  → complete? ─ no ─────────────────────→ END
+       └ yes → waitReview (listen: REVIEW_DECIDED for this claim)
+               → routeDecision ─ READY ─→ markInProcess + thank-you → END
+                               └ NEEDS_INFORMATION → markPendingInformation + missing-information email → END
+```
+
+Every terminal `switch` branch needs `.then(FlowDirectiveEnum.END)` (task 01b, A1).
 
 ## What to Do
 
-Implement `ClaimEmailProcessor.process(InboundEmail)` with these rules, in order:
+- **Starter** (`ClaimIntakeStarter`, called by the watcher, task 09). Plain code before any run starts; it **doesn't
+  wait** for the run (user decision, 2026-10-07):
+  1. **Loop protection:** an auto-reply (`Auto-Submitted` other than `no`, or `Precedence: bulk|auto_reply|junk`) or
+     mail from the intake address → move to processed, no run, no reply.
+  2. **Duplicate:** a `Message-ID` already recorded (unique `Claim.sourceMessageId`, or a `ClaimCorrespondence` row:
+     claim, `Message-ID`, direction, sent date, stripped text) → move to processed, no run, no reply.
+  3. **Claim resolution (code, not the LLM):** subject/body regex (`[CLM…]` / `CLM\d+`), then
+     `In-Reply-To`/`References` against stored `Message-ID`s.
+  4. **Sender check:** a resolved claim only matches if its `emailAddress` equals the sender (case-insensitive).
+  5. **Conversation id:** a matched claim that passes the sender check reuses its `intakeConversationId`. Otherwise (no
+     match, wrong sender, or a seeded claim with none) → mint a UUID.
+  6. Start the run **inside `ConversationContext.callIn(conversationId, …)`** (task 10b), with a small input record
+     (`IntakeRun`: `Message-ID`, matched claim id or none, the sender-check result, the conversation id).
+     **That one call is the only observability-related code in the intake.**
+  7. **Per-sender order** (user decision, 2026-10-07): if the sender (case-insensitive address) already has a run
+     that's still working (not waiting, not ended), queue this email behind it instead of starting a run; start it
+     when that run waits or ends. Per sender, not per claim, because `resolveClaim` may only pick the claim inside the
+     run; a claim only matches its own address, so this covers per-claim order. A CDI `WorkflowExecutionListener`
+     (`onWorkflowStatusChanged` → `WAITING`, `COMPLETED`, `CANCELLED`, `FAULTED`; F2) drives the queue.
+     **Never cancel a run mid-step**; only a waiting run is cancelled (the `supersede` step).
+- **Pass ids, not payloads.** Flow persists step data after every step, so the workflow data never holds the raw email
+  or attachment bytes. Steps re-read the email with `ClaimsMailbox.find(messageId)` (task 03) before the `file` step
+  moves it. (The agentic scope Flow checkpoints *does* hold the correspondence text the agents receive. That's PII in
+  Flow's tables for as long as the run lives; Flow deletes the rows when the run ends or is cancelled.)
+- **Steps.** Each one is a `function`/`withFilter` calling a package-private bean. No step holds a transaction across
+  an LLM call, and every persistence step runs in `QuarkusTransaction.requiringNew()`.
+  - **`replyNoMatchingClaim`:** the one "no matching claim" template (task 04). Change nothing.
+  - **`supersede`** (after `policyCheck`, just before `applyOutcome`; design review 2026-10-07): if the matched claim is
+    `Pending Review`, clear `reviewRunId` in its own transaction under optimistic locking (`@Version` on `Claim`), then
+    cancel the waiting run with `definition().activeInstance(oldRunId).map(WorkflowInstance::cancel)` (F3; in-JVM only,
+    fine for a single replica). Placing it here means a faulted or policy-rejected reply never leaves a `Pending Review`
+    claim with no waiting run. If the lock is lost to a reviewer's decision (or the claim is being decided,
+    `decidingRunId` set), end this run without changes and put the email back in the claim's queue: it's handled again
+    under the new status (e.g. `In Process` → status reply).
+  - **`resolveClaim`** (user decision, 2026-10-07: "try to route it, ask if we can't"): only when no claim matched and
+    the sender has claims in `Pending Information` or `Pending Review`. Calls `ClaimResolver` (task 06) with the email
+    and those claims (number, short summary, requested items):
+    - `EXISTING` with a number **from that list** → continue exactly as a matched claim (supersede, history, etc.)
+    - `NEW_INCIDENT` → continue unmatched (the classifier then decides, as today)
+    - `UNSURE`, or a number not in the list → `replyWhichClaim` (task 04's template, the sender's pending claim
+      numbers), change nothing, END
+  - **`runAgents`:** `ClaimsMailboxAgent.process(…)` (task 06), with the claim history passed explicitly: the combined
+    correspondence, the matched claim (or none), the fields extracted so far, and the **requested items**, including
+    any reviewer-ticked items stored on the claim. Output: the `IntakeOutcome`.
+  - **`policyCheck`** (gap 7), in code, before any claim is created or changed:
+    - stated, and on another claim with the *same* customer (name + email): reuse it
+    - stated, with a *different* customer: send the policy-inconsistency template, create and change nothing, END
+    - stated but not found: use it for a new claim
+    - not stated: generate one (unique, `AC-` + digits; a sequence or a checked generator, following issue 2's pattern)
+  - **`applyOutcome`:**
+    - **`NewClaim`:**
+      - inception date random and strictly before the incident date (or before today if it's missing)
+      - name and email from `From:`; subject and full body
+      - the run's conversation id in the new `intakeConversationId` column (`intake_conversation_id`; nullable,
+        intake-only, never changed once set)
+      - the ISO `incidentDate`/`incidentTime` strings (task 05) converted to `LocalDate`/`LocalTime`
+      - image attachments as `ORIGINAL` (size/count limits), in the same transaction as the claim
+      - complete → `Pending Review`, with `reviewRunId` = this run's instance id; incomplete → `Pending Information`,
+        with the requested items stored
+    - **`PendingClaimUpdate`** (matched `Pending Information`, or `Pending Review` superseded above; **the matched claim
+      wins**, whatever the classifier said):
+      - append the stripped reply to `body` (separated, dated) and record the correspondence
+      - merge newly supplied fields (never overwrite with null); store new images
+      - **Completeness** (gap 8): complete only when no required detail is missing **and** every reviewer-ticked item
+        was answered (`missingInformation`, task 05). A blank reply answers nothing.
+      - complete → `Pending Review` (new `reviewRunId`), clear the requested items; incomplete →
+        `Pending Information`, store the still-requested items
+    - **`StatusReply`** (matched claim in any other status, including seeded `New`), **`NotAClaim`**,
+      **`NoMatchingClaim`:** change nothing.
+  - **`reply`:** the template for the outcome (the "Every submission gets a reply" list in `PLAN.md`):
+    - received — final review, or the "still in final review" variant if the claim was already `Pending Review`
+    - missing information, or still missing information
+    - the AI-written status answer
+    - not-a-claim; no matching claim
 
-0. **Root span.** Open a span `claim-intake process` (`setNoParent()`, kind `CONSUMER`,
-   `gen_ai.operation.name=invoke_agent`) and make it current for the whole run, so every agent, store and
-   mail span nests under it (spike Q16b). When the run pauses for review, store the span's trace context on
-   the claim (`intakeTraceparent`) in the same transaction as `reviewRunId`, for the review span link.
-   Task 11 adds the attributes, listener spans and tests.
-   - **Conversation id (task 11, Conversation grouping):** before the root span starts, resolve the claim
-     (rule 3) and check the sender (rule 4), read-only. A matched claim that passes the sender check → reuse its
-     `intakeConversationId`. Otherwise (no match, wrong sender, or a seeded claim with no `intakeConversationId`) → mint a
-     new UUID. Rules 3–4 then reuse this result instead of matching again.
-   - Make a `Context` carrying the baggage entry `gen_ai.conversation.id` current (try-with-resources, through
-     task 11's intake helper) around the root span, and close it when the run ends.
-   - A minted id is persisted only if the run creates a claim (rule 8, `NewClaim`); otherwise it just groups this
-     one trace. The `intakeConversationId` is never changed once set.
-   - `intakeConversationId` (new column `intake_conversation_id`, via the existing
-     `CamelCaseToUnderscoresNamingStrategy`) is **nullable** and intake-only, like `intakeTraceparent`: claims
-     not created by the intake (the seeded claims) have none, so a follow-up on one mints a fresh id as above.
-1. **Loop protection.** Skip (move to processed, no reply) when:
-   - the message is an auto-reply (`Auto-Submitted` other than `no`, or `Precedence: bulk|auto_reply|junk`)
-   - or it's from the intake address itself
-2. **Idempotency.**
-   - Add a unique `sourceMessageId` column to `Claim`.
-   - Store `Message-ID`s of follow-ups too (a `ClaimCorrespondence` table: claim, `Message-ID`, direction,
-     sent date, stripped text, and whether our reply was sent), so reprocessing a follow-up is a no-op.
-   - If the `Message-ID` is already recorded and its reply was sent: change nothing, resend nothing, just move the message.
-   - **Around the non-atomic scope saves** (spike Q12: checkpoints commit in their own transaction): a crash can
-     leave a scope row with no claim change, or a claim change with no reply sent. On reprocessing:
-     - a scope row for this `Message-ID` but no recorded claim change → evict it and run again
-     - a recorded claim change whose reply wasn't sent → send the reply, mark it sent, move the message
-   - Order every run as: agents → persist (`requiringNew`) → send the reply → mark it sent → move the message.
-3. **Claim resolution (code, not the LLM),** before the workflow: subject/body regex (`[CLM…]` / `CLM\d+`),
-   then `In-Reply-To`/`References` against stored `Message-ID`s.
-4. **Sender check.** A resolved claim only matches if its `emailAddress` equals the sender
-   (case-insensitive). Otherwise send the one **"no matching claim"** template (task 04), change nothing and
-   don't run the workflow.
-5. **Superseding a waiting review.** If the resolved claim is `Pending Review`, in a `requiringNew()`
-   transaction clear `reviewRunId` (optimistic lock, `@Version`; task 07), then evict the old suspended scope.
-   If the lock is lost to a reviewer's decision, re-read the claim and continue under its new status
-   (e.g. `In Process` → status reply). The reply is then merged and the workflow re-run like any pending-claim update.
-6. **Run `ClaimsMailboxAgent.process(@MemoryId messageId, …)`** (task 06, injected here; the root interface extends
-   `AgenticScopeAccess`), outside any transaction, with memory id = the inbound `Message-ID`. Pass the claim
-   history explicitly (the agents are stateless): the combined correspondence, the matched claim (or none),
-   the fields extracted so far, and the **requested items**, including the reviewer-ticked items stored on the claim.
-   - A complete claim's run throws **`AgenticSystemSuspendedException`** at `ClaimReviewAgent`: catch it as a
-     normal outcome, and read the extraction from the scope (`getAgenticScope(messageId).readState(…)`).
-7. **Policy check, after the agents finish** (gap 7), in code, before any claim is created or changed. For a
-   complete claim the run has already paused for review at this point.
-   - stated and exists on another claim with the *same* customer (name + email): reuse it
-   - stated and exists with a *different* customer: **evict the run state (including a paused review)**,
-     send the policy-inconsistency template, create and change nothing
-   - stated but not found: use it for a new claim
-   - not stated: generate one (unique, `AC-` + digits)
-8. **Apply the outcome:**
-   - **`NewClaim`** (unmatched `NEW_CLAIM`):
-     - **Inception date:** random, strictly before the incident date (or before today if the date is missing).
-     - Name and email from `From:`; subject and full body stored.
-     - Store the run's minted conversation id in the new `intakeConversationId` column (rule 0).
-     - Convert the ISO-string `incidentDate`/`incidentTime` (task 05) to `LocalDate`/`LocalTime` here.
-     - **Status:**
-       - suspended at review → `Pending Review`, with `reviewRunId` = the `Message-ID`, and the
-         "received — final review" template. **No** thank-you email.
-       - completed with missing items → `Pending Information`, store the requested items, and the
-         missing-information template.
-     - Persist the claim and its image attachments (`ORIGINAL`, size/count limits) in **one new
-       transaction** (`QuarkusTransaction.requiringNew()`).
-     - Add the photos note and the skipped-attachments fragment where relevant. A first email gets exactly one reply.
-   - **`PendingClaimUpdate`** (matched claim `Pending Information`, or `Pending Review` superseded by rule 5;
-     the matched claim wins, whatever the classifier said):
-     - Append the stripped reply to `body`, separated and dated, and record the correspondence.
-     - Merge the newly supplied fields (never overwrite with null). Summary and sentiment come from the
-       extraction workflow's re-run over the combined correspondence.
-     - Store new image attachments.
-     - **Completeness** (gap 8): the claim is complete only when no required detail is missing **and** every
-       reviewer-ticked item was answered (`missingInformation`, task 05). A blank reply answers nothing.
-       - complete (suspended at review) → `Pending Review` with the new `reviewRunId`, clear the requested
-         items, and the "received — final review" template. If the claim was already `Pending Review`, use
-         the "we've added your latest information; your claim is still in final review" variant.
-       - incomplete → `Pending Information`, store the still-requested items, and the still-missing template
-         (or the missing-information template if the claim was `Pending Review`).
-   - **`StatusReply`** (matched claim in any other status, including seeded `New`): send the AI-written answer. Change nothing.
-   - **`NotAClaim`:** send the not-a-claim template.
-   - **`NoMatchingClaim`** (unmatched follow-up): send the one "no matching claim" template. Change nothing.
-9. **Evict on every ending** (`evictAgenticScope(messageId)`): completed (any outcome), rejected by the policy
-   check, superseded (rule 5), skipped or duplicate after a run started, and failed. The **only** run that keeps a
-   scope row is one waiting for review whose claim is `Pending Review` with that `reviewRunId`.
-10. **Move the message** to the processed folder when its run finishes, **including when it pauses for review**.
-    On any exception:
-    - evict the run state, move the message to the failed folder, log at ERROR with the `Message-ID`, and never
-      rethrow to the watcher
-    - send the processing-problem template, best-effort (a failure to send is logged, not rethrown).
-      Never for auto-replies or self-sent mail.
+    Add the photos note and skipped-attachments fragment where relevant. A first email gets exactly one reply.
+    **No thank-you here.**
+  - **`file`:** move the email to the processed folder, **also when the run is about to wait for review**.
+  - **`waitReview`:** `listen(toOne(consumed(REVIEW_DECIDED).dataAs(ReviewDecision.class, (data, ctx) -> …)))`,
+    correlated on the claim id read from the run's input (C10). `ReviewDecision` is a record: a `ReviewOutcome` enum
+    (`READY` / `NEEDS_INFORMATION`) plus the `Set<MissingItem>` the reviewer ticked. Task 10 publishes it.
+  - **`routeDecision`** (a `switch`), then:
+    - **`markInProcess`:** `In Process`, clear `decidingRunId` (task 10 moved `reviewRunId` there when it claimed the
+      review), and the thank-you template. **This is the only place the
+      thank-you email is sent.**
+    - **`markPendingInformation`:** `Pending Information`, store the ticked items as the requested items, clear
+      `decidingRunId`, and the missing-information template listing exactly them. **The run ends** (no second wait);
+      the customer's next email starts a new run.
+- **Failures:** one **failure listener** (a CDI `WorkflowExecutionListener`, `onWorkflowFailed`) handles every faulted
+  run, before or after the review wait: move the email to the failed folder (if it's still in `processing`), log at
+  ERROR with the `Message-ID`, and send the processing-problem template best-effort (never for auto-replies or self-sent
+  mail). No partial claim is left: each persistence step commits only its own transaction.
+  - **A fault in the decision steps** (e.g. the thank-you can't be sent) also puts the claim back so the reviewer can
+    retry: `decidingRunId` → cleared and the claim stays `Pending Review`, or — if the status already changed — log it.
+    Flow 1.1.3 has `FlowDSL.tryCatch(...)` for doing this inside the run instead; pick whichever is simpler and test it.
+- **No crash-recovery rules.** Durable state across restarts isn't a requirement (user decision): a restart wipes the
+  database, the claims and GreenMail. So there's no "scope row but no claim" reprocessing, and no eviction anywhere.
+- **Status constants:** `Pending Information`, `Pending Review`, `In Process` (intake never sets `New`; seed statuses unchanged).
 
-Also implement **`applyReviewOutcome(claim, IntakeOutcome)`**, called by `ClaimReviewService` (task 07) after a resume
-with the resumed run's `ReviewReady` or `ReviewNeedsInformation` outcome:
-- **Ready** (`ReviewReady`) → `In Process`, and the thank-you template.
-- **Needs more information** (`ReviewNeedsInformation`) → `Pending Information`, store the ticked items as the requested items, and the
-  missing-information template listing exactly them. The run ends here (no re-suspension); the next reply starts a new run.
-- Clear `reviewRunId` in both cases. Persistence runs in its own `requiringNew()` transaction, never across an agent call.
-  `ClaimReviewService` evicts the scope afterwards.
+## Tests
 
-- **Integration tests** (Compose GreenMail, `@InjectMock` on the root or a WireMock LLM, cleanup of claims/images and scope rows after each). One test per rule:
-  - a complete new claim ends `Pending Review`, gets exactly one email (the received — final review), and leaves exactly one scope row
-  - each missing item, and several at once
-  - category `OTHER` is complete
-  - no photos → the note is included
-  - non-image and oversized attachments are skipped and mentioned
-  - each policy case: same customer, different customer (vague template, no claim, no details leaked,
-    **no scope row left, including when the run had paused for review**), unknown, absent
-  - inception date before incident date; ISO date/time strings persisted as `LocalDate`/`LocalTime`
-  - a pending claim completed by a reply moves to `Pending Review` and gets the received email
-  - a pending claim completed only after two replies
-  - a pending claim still incomplete after a reply
-  - **matched claim wins:** a reply on a pending claim that the classifier labels `NOT_A_CLAIM` is still merged
-  - an unmatched email classified as a follow-up gets the "no matching claim" reply, and nothing is created
-  - after Needs more information, an **empty reply** stays `Pending Information` with the still-missing email;
-    a reply answering the ticked items moves to `Pending Review`
-  - a reply during `Pending Review` supersedes the review: the old scope row is gone, a new one exists,
-    the claim stays `Pending Review` with the new `reviewRunId`, and the during-review variant is sent
-  - a reply during `Pending Review` that makes the claim incomplete moves it to `Pending Information`, with the missing-information email
-  - a reply that loses the optimistic lock to a decision is handled under the claim's new status
-  - `applyReviewOutcome`: Ready → `In Process` + exactly one thank-you email; Needs more information →
-    `Pending Information` + an email listing exactly the ticked items; `reviewRunId` cleared in both
-  - a follow-up on an `In Process` (or later, or seeded `New`) claim gets a status reply and the claim is unchanged
-  - a follow-up from a different address gets the "no matching claim" reply
-  - a follow-up matched by header vs by subject number
-  - a duplicate `Message-ID` is a no-op (no reply)
-  - reprocessing after a simulated crash (scope row but no claim; claim but no reply sent) sends exactly one reply
-  - an auto-reply and a self-sent message are skipped (no reply)
-  - an HTML-only email
-  - an agent exception moves the message to the failed folder, sends the processing-problem email, and creates no claim
-  - no scope rows remain for runs that didn't end waiting for review
-  - **conversation id:** a new claim persists a UUID `intakeConversationId`; a follow-up, a superseding reply and a status
-    reply reuse it, and it never changes; not-a-claim, no-matching-claim and policy-rejected emails persist none; a
-    wrong-sender email doesn't get the claim's id (span-level assertions are in task 11)
+Integration tests against Compose GreenMail, with a WireMock LLM (stubs match on the last message only). Each test
+deletes the claims and images it creates. Tests publish decisions with `publishUntilWoken` (re-publish until the run
+leaves `WAITING`; F2b). One test per rule:
+- a complete new claim ends `Pending Review`, gets exactly one email (received — final review), and its run is
+  `WAITING` (`PersistenceInstanceReader`)
+- each missing item, and several at once; category `OTHER` is complete
+- no photos → the note; non-image and oversized attachments are skipped and mentioned
+- each policy case: same customer, different customer (vague template, no claim, no details leaked), unknown, absent
+- inception date before incident date; ISO strings persisted as `LocalDate`/`LocalTime`
+- a pending claim completed by a reply → `Pending Review` + the received email; completed only after two replies;
+  still incomplete after a reply
+- **matched claim wins:** a reply on a pending claim labelled `NOT_A_CLAIM` is still merged
+- an unmatched email classified as a follow-up → "no matching claim", nothing created
+- after Needs more information, an **empty reply** stays `Pending Information` (still-missing email); a reply answering
+  the ticked items → `Pending Review`
+- **supersede:** a reply during `Pending Review` cancels the waiting run (0 Flow instance and task rows left for it).
+  The claim stays `Pending Review` with the new `reviewRunId`, the during-review variant is sent, and a later decision
+  reaches **only** the new run. A superseding reply that makes the claim incomplete → `Pending Information`.
+- **race:** a reply and a decision on the same `Pending Review` claim, run concurrently (latched): exactly one wins; a
+  losing decision gets the 409 and sends no email; a losing reply is handled under the new status
+- decision `READY` → `In Process` + exactly one thank-you; `NEEDS_INFORMATION` → `Pending Information` + an email listing
+  exactly the ticked items; `reviewRunId` and `decidingRunId` cleared in both; **zero LLM calls** after the decision (WireMock request
+  counts unchanged since the wait started)
+- a follow-up on an `In Process`/later/seeded `New` claim → status reply, claim unchanged
+- a follow-up from a different address → "no matching claim"; matched by header vs by subject number
+- a duplicate `Message-ID`, an auto-reply and a self-sent message: no run, no reply
+- an HTML-only email
+- an agent exception → failed folder, processing-problem email, no claim; a fault after `WAITING` is handled as decided
+- the starter doesn't wait: it returns before the run's first step finishes
+- **per-sender order:** two emails from the same sender, back to back: the second starts only after the first's run
+  waits or ends, and both are merged
+- **resolveClaim:** a fresh email (no number, no reply headers) from a sender with one pending claim, about it →
+  merged into that claim; with two pending claims → merged into the right one; about a new incident → a new claim;
+  unclear → the which-claim email listing exactly the sender's pending claims, nothing changed; an LLM answer naming a
+  claim not in the list → treated as unsure; a sender with no pending claims → no `ClaimResolver` call
+- **supersede after a failure:** a reply on a `Pending Review` claim whose agents fail (or whose policy check rejects
+  it) leaves the claim `Pending Review` with its original waiting run, which a decision still reaches
+- **no Flow rows remain** for completed and cancelled runs (E19; also catches the unreproduced F3 "row still present")
+- **conversation id:** a new claim persists a UUID `intakeConversationId`. A follow-up, a superseding reply and a status
+  reply reuse it, and it never changes. Not-a-claim, no-matching-claim and policy-rejected emails persist none. A
+  wrong-sender email doesn't get the claim's id. (Span-level assertions are task 11's.)
 
 ## Files/Areas
 
-- `src/main/java/org/parasol/intake/ClaimEmailProcessor.java` and supporting classes (new)
-- `src/main/java/org/parasol/claim/model/Claim.java` (`sourceMessageId`, requested items, `intakeConversationId`), a `ClaimCorrespondence` entity
-- `src/test/java/org/parasol/intake/` (new integration tests)
+- `src/main/java/org/parasol/intake/`: `ClaimIntakeFlow`, `ClaimIntakeStarter` (with the per-sender queue), the run-status and failure listeners, the step beans,
+  and `ReviewDecision`/`ReviewOutcome` (in `review/`)
+- `src/main/java/org/parasol/claim/model/Claim.java` (`sourceMessageId`, requested items, `reviewRunId`, `@Version`,
+  `decidingRunId`, `intakeConversationId`), a `ClaimCorrespondence` entity
+- `src/test/java/org/parasol/intake/` (integration tests)
 
 ## Key Points
 
-- **Side effects only here:** agents decide; the processor saves, mails, files and evicts.
-- Never hold a database transaction open during an agent call, including when a workflow resumes.
-- Policy-number generation must not collide with existing policies. Use a sequence or a checked generator, following issue 2's pattern.
-- Status string constants: `Pending Information`, `Pending Review`, `In Process` (intake never sets `New`; seed statuses unchanged).
-- The thank-you email is sent only from `applyReviewOutcome` (reviewer clicked Ready), never from `process`.
+- **Side effects only in workflow steps** (and the starter's failure path); agents only decide.
+- **No observability code in any step.** The conversation id is entered once, by the starter. Spans come from Flow and
+  the adapters (task 11).
+- Never hold a transaction open during an agent call.
 - Every customer submission gets a reply. The only exceptions are auto-replies, self-sent mail and duplicate `Message-ID`s.
-- Never assert absolute claim numbers. Delete created claims and images, because `ClaimsListPageTests` expects 6.
+- Never assert absolute claim numbers; `ClaimsListPageTests` expects 6 claims.
+- Don't assert on a cancelled run's `workflow.execute` span: quarkus-flow#1058 drops it.
+- Editing the `Flow` bean in dev mode can break hot reload (`IncompatibleClassChangeError`); restart dev mode instead.
 
 ## Done When
 
-- [ ] Every rule above is implemented, and each listed edge case has a passing integration test under `-Pollama`.
-- [ ] The policy check runs after the agents; a rejection evicts the run state (including a paused review) and creates no claim.
+- [ ] `ClaimIntakeFlow` implements the steps above, with the agentic root as one step and every terminal branch ending.
+- [ ] The starter does the checks, enters the conversation id once, keeps each sender's emails in order, and doesn't wait for runs.
+- [ ] `resolveClaim` routes fresh emails to the sender's pending claim, a new claim, or the which-claim reply, and never to a claim outside the sender's list.
+- [ ] The policy check runs after the agents; a rejection creates nothing.
 - [ ] Completeness accounts for reviewer-ticked items; the empty-reply test passes.
-- [ ] The scope is evicted on every ending; only a run waiting for review keeps a row.
-- [ ] Reprocessing after a partial failure is idempotent (exactly one reply, no duplicate claim).
-- [ ] Every run has a conversation id in baggage before its root span starts: minted for unmatched emails, persisted as `intakeConversationId` when a claim is created, and reused for matched claims; the conversation-id tests pass.
-- [ ] A forced failure leaves the message in the failed folder, sends the processing-problem reply, and leaves no partial claim and no scope row in the database.
-- [ ] Both `test-compile` runs succeed.
+- [ ] A reply during review cancels the waiting run; the race test passes; no Flow rows remain for ended runs.
+- [ ] The thank-you email is sent only from `markInProcess`; a decision makes no LLM call.
+- [ ] The failure listener handles faults before and after `WAITING`, with tests.
+- [ ] Every test listed above passes under `-Pollama`, and both `test-compile` runs succeed.
