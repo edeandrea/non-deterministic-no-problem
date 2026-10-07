@@ -16,11 +16,11 @@ order: #212 via PR #219 (`2575c10`), #213 via #224, #214 via #225, #215 via #230
 quarkus-langchain4j **1.14.1** / Quarkus **3.40.1**, matching what the task 01 spike verified
 (langchain4j-agentic 1.20.2-beta30). **Nothing in the issue queue blocks task 03 any more.**
 
-**But task 03 is gated on task 01b, not on the issue queue.** The quarkus-flow spike (task 01b) decides
-whether the durable human-in-the-loop machinery is built the way the merged design describes. It must
-produce a verdict *before* task 03 commits to a scope store and *before* task 07 is written. See
-**Flow Spike Results (task 01b)** under Shared Context, then
-[`spike-results-flow.md`](spike-results-flow.md) → *Resuming this spike*.
+**Task 01b is done and its verdict is ADOPT quarkus-flow.** The spike that gated tasks 03 and 07 has
+produced a verdict on evidence: Flow replaces the durable human-in-the-loop machinery, including both
+internal-API touch points. See **Flow Spike Results (task 01b)** under Shared Context and
+[`spike-results-flow.md`](spike-results-flow.md). **Tasks 03, 07, 08, 10 and 11 now need reworking, and
+the design document goes back through the review gate — see _Rework required by the Flow verdict_ below.**
 
 **Plan File:** `.tasks/05-gh216-agentic-email-intake/PLAN.md`
 **Tasks Directory:** `.tasks/05-gh216-agentic-email-intake/`
@@ -62,7 +62,7 @@ Edit or create task files and update `## Task Plan`.
 
 - [x] [task-01-agentic-spike.md](task-01-agentic-spike.md): Agentic module spike (runs first, throwaway)
 - [x] [task-02-design-and-review.md](task-02-design-and-review.md): Design document and review gate
-- [~] [task-01b-flow-spike.md](task-01b-flow-spike.md): quarkus-flow spike (throwaway; decides task 07) — **IN PROGRESS, suspended**
+- [x] [task-01b-flow-spike.md](task-01b-flow-spike.md): quarkus-flow spike (throwaway; decided task 07) — **verdict: ADOPT**
 - [ ] [task-03-intake-config-and-mailbox.md](task-03-intake-config-and-mailbox.md): Intake configuration and claims mailbox
 - [ ] [task-04-email-templates.md](task-04-email-templates.md): Qute reply templates and sender
 - [ ] [task-05-extraction-agents.md](task-05-extraction-agents.md): Claim extraction agents
@@ -76,10 +76,11 @@ Edit or create task files and update `## Task Plan`.
 - [ ] [task-13-demo-and-docs.md](task-13-demo-and-docs.md): Demo guide and documentation
 - [ ] [task-14-verification.md](task-14-verification.md): Verification
 
-> **Ordering: task 01b blocks tasks 03 and 07.** It is in progress and suspended. Do **not** start task 03
-> (it would commit to the `DatabaseAgenticScopeStore` design) or write task 07 until 01b has recorded a
-> verdict here. Everything else in the issue queue is already unblocked. Resume at
-> [`spike-results-flow.md`](spike-results-flow.md) → *Resuming this spike*.
+> **Ordering: task 01b is complete — verdict ADOPT quarkus-flow.** Tasks 03 and 07 are unblocked, but
+> **not as currently written**: they describe the `DatabaseAgenticScopeStore` / `@HumanInTheLoop` design
+> that the verdict replaces. Rework them (and 08, 10, 11) and re-run the design gate on
+> `docs/design/email-claim-intake.md` + `docs/design/claim-intake-agents.puml` before implementing. See
+> *Rework required by the Flow verdict*.
 
 ---
 
@@ -388,61 +389,137 @@ Full evidence, the executive summary and the per-question answers (Q1–Q19) are
     an abandoned review leaks forever.
   - Leaf agents are CDI singletons shared across roots, so give each leaf exactly one root.
 
-### Flow Spike Results (task 01b) — IN PROGRESS
-Full evidence in [`spike-results-flow.md`](spike-results-flow.md). **Suspended mid-spike; no verdict yet.**
+### Flow Spike Results (task 01b) — COMPLETE
+Full evidence in [`spike-results-flow.md`](spike-results-flow.md). **14 spike tests pass.**
 
-> **Picking this up?** Start at [`spike-results-flow.md`](spike-results-flow.md) → *Resuming this spike*.
-> The worktree `../non-deterministic-no-problem-spike-flow` and branch `spike/flow-hitl` **already exist
-> on this machine**, with the pom patch committed as `c3ab343` (local only, never pushed) — nothing needs
-> recreating. First action is step 1: finish the gate by adding one `@SequenceAgent` and booting a
-> `@QuarkusTest` (~15 min).
+> ## Verdict: **ADOPT quarkus-flow for the #216 review gate.**
+>
+> Every decision criterion is met **empirically**: the gate passes at Quarkus 3.40.1 /
+> quarkus-langchain4j 1.14.1 with **no downgrade**, A1–A3 and B6 all work, and C8 has a real answer
+> (`PersistenceInstanceReader` is CDI-injectable). The 12 CI-shaped tests pass under **both** Ollama
+> profiles.
 
-- **Why:** [quarkus-flow](https://docs.quarkiverse.io/quarkus-flow/dev/index.html) would replace exactly the
-  workaround half of the merged design — `DatabaseAgenticScopeStore` + entity, the
-  `AgenticScopePersister.setStore` registrar, the startup self-test, the `ShutdownEvent` reset, the
-  `allowDeserializationType` allowlist, the hand-rolled replay, **and both internal-API touch points**
-  (`SuspendedResponse`, `DefaultAgenticScope`) — plus the hand-rolled observability of spike items 12–18.
-- **Setup:** worktree `…-spike-flow`, branch `spike/flow-hitl` (local, unpushed) from `main` @ `8ed467d`.
-  Flow **1.1.3** (latest release; **no 1.2.0 final exists** — latest prerelease is 1.2.0.CR3).
-- **Gate: PASSED so far, at 3.40.1 / 1.14.1 with no downgrade.**
-  - `test-compile` and a full `package` (augmentation) both `BUILD SUCCESS`.
-  - Flow 1.1.3 + serverlessworkflow 7.32.1.Final coexist with quarkus-langchain4j **1.14.1** /
-    langchain4j-agentic **1.20.2-beta30**; the BOM import wins, so nothing is dragged back to 1.13.3.
-  - **The skew is low-risk:** `quarkus-flow-langchain4j-deployment` scans Jandex itself and couples to
-    exactly **one** build item, `DetectedAiAgentBuildItem`, which is **API-identical** between 1.13.3 and
-    1.14.1 (`javap` verified), plus one runtime class, `AgenticSystemTopology`.
-  - Its `quarkus-langchain4j-ollama-deployment` dependency is **test**-scoped, so it does not leak here.
-  - **Still open:** the augmentation ran with no `@SequenceAgent` present, so the agentic-translation path
-    did not execute. One `@SequenceAgent` + a booting `@QuarkusTest` finishes the gate.
-- **The review contract looks preservable** — the three questions flagged as possible blockers all have
-  API-level answers: `WorkflowStatus.WAITING` + `PersistenceInstanceReader.find(def, id)` +
-  `PersistenceWorkflowInfo.tasks()` for the "waiting at task Y" check (C8);
-  `WorkflowInstance.cancel()` for superseding, so the `toAny` workaround is a fallback not a requirement
-  (C9); and `dataAs(Class, predicate)` for business-key correlation, keeping `Claim.reviewRunId`
-  meaningful (C10). One check closes all three: whether `PersistenceInstanceReader` is CDI-injectable in
-  `quarkus-flow-jpa`.
-- **Unproven and load-bearing:** A1 (can `function(...)` be followed by `emitJson`/`listen`/
-  `switchWhenOrElse` in one task list), A3 (in-process `publish` wakes it **and** completed tasks are
-  skipped), A4 (**pivotal** — is a crash *inside* the agentic subflow resumable, or does the whole task
-  re-run all four LLM calls), B6 (survives a genuine restart).
-- **Two corrections to the pre-settled research:**
-  1. *"Never re-executes completed tasks"* is **not** in `persistence.html` — it only says execution
-     resumes "from its last recorded checkpoint". That makes A4 more load-bearing, not less.
-  2. Neither the persistence nor the correlation docs document any query/cancel API; the API inventory
-     found them anyway (above).
-- **Langfuse typing is not a cost to price.** The user owns the `quarkus-langfuse` extension and
-  `ai.scoring` is an explicit staging area for logic to be generalized upstream (Flow, langchain4j,
-  quarkus-langfuse), with `AiServiceDatasetSpanProcessor` as the in-repo precedent for stamping
-  attributes onto spans the app does not own. D12/D13 become "where does the fix live", not "is this a
-  blocker". D11 must still confirm the leaf `langchain4j.aiservices.<Agent>.<method>` naming empirically,
-  because the dataset-name invariant degrades **silently**.
-- **Decision criteria (unchanged):** adopt only if the gate passes with no downgrade, A1–A3 and B6 work,
-  and C8 has an answer or the `404`/`409` contract survives another way. Otherwise keep the merged design
-  and file an upstream ask for **Flow implementing `AgenticScopeStore` / `AgenticScopePersister`**, which
-  would replace only `DatabaseAgenticScopeStore` and leave the merged design's shape intact.
-- **Standing note, independent of the verdict:** every current profile wipes durable state on boot
-  (`drop-and-create` in `%prod`/`%openshift`, Dev Services defaults elsewhere), so the merged design's
-  own scope table does not survive a restart either. Design doc step 8 does not hold today. Raise on #216.
+- **Setup:** worktree `…-spike-flow`, branch `spike/flow-hitl` (local, unpushed) from `main` @ `8ed467d`;
+  commits `c3ab343`, `7306867`, `d953680`. Flow **1.1.3** (**no 1.2.0 final exists**; latest prerelease
+  `1.2.0.CR3`). Worktree removed; branch kept. `main` and `src/main` untouched.
+- **Gate: PASSED, complete.** A `@SequenceAgent` is now actually present, so
+  `FlowLangChain4jProcessor` really ran its agentic-translation path and generated
+  `GeneratedSpikeIntakeAgentFlow`. The skew is harmless: the BOM import wins, and the coupling is one
+  API-identical build item (`DetectedAiAgentBuildItem`) plus `AgenticSystemTopology`.
+- **Answers to the load-bearing questions:**
+  - **A1 YES** — `function(agent::method, …)` → `emitJson` → `listen(toOne(consumed(…).dataAs(…)))` →
+    `switchWhenOrElse` compose in one `.tasks(...)` list. Both switch branches need
+    `.then(FlowDirectiveEnum.END)` (the enum lives in `io.serverlessworkflow.api.types`).
+  - **A2 YES** — the default fallback broker serves `listen`; no messaging module needed.
+  - **A3 YES** — in-process `publish(...)` wakes it, and the completed intake task is **not** re-run
+    (invocation counter and WireMock request count both unchanged).
+  - **A4 — better than hoped.** The agentic subflow is **its own persisted workflow instance,
+    checkpointed per sub-agent** (`do/0/triage-0` on disk with `next_position=do/1/summarize-1` while the
+    second leaf is still in flight). Both halves of the contradictory docs are true. Measured by stalling
+    the second leaf agent, because sampling after the subflow completes proves nothing — Flow does not
+    retain completed instances.
+  - **B6 YES** — a review suspended in one JVM is auto-restored, woken and completed in a **separate
+    JVM**, with **zero** LLM calls in the new JVM.
+  - **C8/C9/C10 YES** — `@Inject PersistenceInstanceReader` (`JpaInstanceReader` is `@ApplicationScoped`)
+    → `find(def, id).status() == WAITING`; `WorkflowInstance.cancel()` works, so the `toAny` workaround is
+    unnecessary; `dataAs(Class, predicate)` correlates on the claim id, asserted negatively too.
+  - **E19 YES** — completed and cancelled instances leave **0** rows in all three tables.
+- **Three corrections recorded during the spike:**
+  1. **OTel is a separate extension**, `io.quarkiverse.flow:quarkus-flow-opentelemetry`. An initial
+     measurement without it wrongly concluded Flow emits no spans. `quarkus-flow`'s own `tracing.html` is
+     a *different*, log/MDC-based feature — easy to conflate.
+  2. *"Never re-executes completed tasks"* is still not in the docs, but is now **measured** (A3).
+  3. The docs document no query/cancel API, yet both exist and are CDI-reachable.
+- **Observability — good tree, two real gaps.** With `quarkus-flow-opentelemetry`, one trace holds
+  `workflow.execute spike-review` with every `task.execute <name>` parented under it, typed by
+  `flow.task.type` (`call_function`/`emit`/`listen`/`switch`). That replaces task 01's synthetic CONSUMER
+  span. **But** (a) the agentic subflow starts its own trace, and (b) the
+  `langchain4j.aiservices.*` spans remain orphan roots — three disconnected trace islands per run — and
+  (c) Flow spans carry `flow.*`, never `gen_ai.*`, so Langfuse renders them as untyped SPAN ancestors.
+  **D11 is safe**: the `langchain4j.aiservices.<SimpleClassName>.<method>` naming and the
+  `langfuse.dataset.name` stamping both survive (pinned by assertion, since this degrades silently).
+  **D15: the in-JVM resume is *not* a linked span** — same trace, zero links.
+  **The islands are an open issue to be addressed, with options on record** —
+  [`spike-results-flow.md`](spike-results-flow.md) → *Open issue: the three trace islands*. They are a
+  **legibility** problem, not a correctness one: tiers 1–3 and the dataset-name invariant are all
+  unaffected, so price it as demo polish rather than a blocker.
+- **D16 free metrics:** `quarkus.flow.workflow.started.total` / `.completed.total` / `.duration`, tagged
+  `workflow` + `workflowVersion`, for parent and subflow. No per-task meter and **no waiting gauge**, so
+  "how many reviews are waiting" still needs our own metric.
+- **E17 Dev UI is a genuine demo asset** (screenshots in the worktree's `spike-evidence/`): a Workflows
+  card that renders the HITL pipeline automatically as a typed, branching diagram —
+  `runIntake (CALL)` → `emitReviewRequired (EMIT)` → `waitHumanReview (LISTEN)` →
+  `routeDecision (SWITCH)` → `approveClaim` / `rejectClaim`. Caveat: editing a `Flow` bean in dev mode
+  throws `IncompatibleClassChangeError … _ClientProxy overrides final method Flow.definition()`; a clean
+  restart fixes it, but it is a sharp edge for live demos.
+- **Costs accepted:** Preview status on `quarkus-flow-langchain4j` and `quarkus-flow-opentelemetry`;
+  `gen_ai.*` stamping stays ours (an `ai.scoring` `SpanProcessor`, with `AiServiceDatasetSpanProcessor`
+  as precedent) and **the trace joining is a separate, undecided problem** — see
+  [`spike-results-flow.md`](spike-results-flow.md) → *Open issue: the three trace islands*; `application_id` is
+  `quarkus.application.name` and is part of the PK of all three tables, so it must be pinned explicitly or
+  a rename orphans every suspended instance.
+- **A gotcha for every future mocking profile:** an agent with no `@ModelName` uses the *unnamed default*
+  model, and under `-Pollama` that provider is ambiguous — augmentation fails with *"multiple available
+  providers … (ollama,openai)"*. Add `quarkus.langchain4j.chat-model.provider=openai`. This extends the
+  existing "a mocking profile must pin the provider" rule to the unnamed model.
+- **Open, not blocking:** (1) does auto-restore reattach a half-finished **subflow** to its parent's
+  pending task, or re-run it? (worst case = the merged design's behaviour); (2) is restore a linked span?;
+  (3) `fork` OTel/MDC propagation if a parallel branch appears; (4) concurrency — every test ran one
+  instance at a time, and Flow explicitly leaves singleton behaviour to the application; (5) re-check for
+  1.2.0 final.
+- **Standing note, independent of the verdict and now demonstrated:** every current profile wipes durable
+  state on boot (`drop-and-create` in `%prod`/`%openshift`, Dev Services defaults elsewhere). B6 **only**
+  passes because the spike profile overrode schema management. Design doc step 8 does not hold today, for
+  the merged design's scope table or for Flow's three tables. **Raise on #216** — a real review gate needs
+  a persistent schema and a migration story (Flow recommends Flyway and ships PostgreSQL DDL).
+
+#### Rework required by the Flow verdict (task 01b = ADOPT)
+
+The list below **supersedes** the "Changes required in later tasks" that follows it wherever the two
+conflict. That list was written against the merged `@HumanInTheLoop` + `DatabaseAgenticScopeStore` design.
+
+- **Design gate re-run (blocking).** `docs/design/email-claim-intake.md` and
+  `docs/design/claim-intake-agents.puml` describe the LangChain4j-native approach and are now wrong about
+  the review gate. Update both and put them **back through the review gate** before any implementation
+  task starts. The agent topology itself is unaffected — only the suspend/resume/persistence mechanism and
+  the observability section change.
+- **task-03 (config/mailbox):** **drop the scope-store deliverable entirely** — no
+  `DatabaseAgenticScopeStore`, no entity, no `AgenticScopePersister.setStore` registrar, no startup
+  round-trip self-test, no `ShutdownEvent` reset, no `allowDeserializationType` allowlist. Replace with the
+  four Flow dependencies (`quarkus-flow`, `-langchain4j`, `-jpa`, `-opentelemetry`) plus
+  `quarkus-langchain4j-agentic`. Add an explicit `quarkus.application.name` (it becomes Flow's
+  `application_id`, part of the PK of all three tables). Decide the schema strategy — see the standing note;
+  this is the item most likely to need a separate issue.
+- **task-07 (human review step): rewrite.** No static `@HumanInTheLoop` agent, no `SuspendedResponse`, no
+  `DefaultAgenticScope`, no hand-rolled replay. It becomes a `Flow` bean whose `descriptor()` composes
+  `function(intakeAgent::process, …)` → `emitJson` → `listen(toOne(consumed(REVIEW_DONE).dataAs(…)))` →
+  `switchWhenOrElse`, with `.then(FlowDirectiveEnum.END)` on each terminal branch. **Both internal-API
+  touch points disappear**, which was the main argument for this spike.
+- **task-08 (intake processor):** the "evict on every ending" rules go away — Flow deletes instance and
+  task rows on completion *and* on `cancel()` (E19, verified to 0 rows). Supersede-a-waiting-review becomes
+  `WorkflowInstance.cancel()` rather than the `toAny` two-event workaround. Policy-check ordering still
+  needs re-deriving against the new task order.
+- **task-10 (review API and UI):** the `404`/`409` contract is preserved via `@Inject
+  PersistenceInstanceReader` → `find(definition, instanceId).status() == WAITING`. **Do not implement the
+  409 check as a raw `select status`** — that column is `NULL` for a waiting instance. The decision is
+  delivered by publishing a CloudEvent, so the endpoint is now **asynchronous**: it returns once the event
+  is published, not once the workflow has finished. Correlate on the claim id (`Claim.reviewRunId` keeps
+  the Flow instance id for tracing).
+- **task-11 (observability):** much is now free — `workflow.execute` / `task.execute` spans typed by
+  `flow.task.type`, and `quarkus.flow.workflow.started.total` / `.completed.total` / `.duration`. Drop the
+  synthetic CONSUMER span and the `@AgentListenerSupplier` tree. **Three things remain ours:** (1) an
+  `ai.scoring` `SpanProcessor` stamping `gen_ai.operation.name=invoke_agent` onto `workflow.execute` /
+  `task.execute` so Langfuse types them AGENT rather than untyped SPAN; (2) a **waiting-reviews gauge**,
+  which Flow does not provide; (3) a regression test pinning the
+  `langchain4j.aiservices.<SimpleClassName>.<method>` naming, because the dataset-name invariant degrades
+  silently; (4) **a decision on the three trace islands** — one intake run emits three disconnected traces
+  (parent workflow / agentic subflow / each `langchain4j.aiservices.*` leaf). **This is legibility, not
+  correctness: no scoring tier and not the dataset-name invariant is affected.** Note a `SpanProcessor`
+  **cannot** do the joining — parent and trace id are immutable after span creation. Ranked options, a
+  one-line diagnostic to pick between them, and the severity analysis are in
+  [`spike-results-flow.md`](spike-results-flow.md) → *Open issue: the three trace islands*.
+- **Tasks 04, 05, 06, 09, 12, 13, 14:** unaffected in substance. Task 13's demo guide gains the Flow Dev UI
+  diagram, and task 12/14 should run under both Ollama profiles as the spike did.
 
 #### Changes required in later tasks
 **Applied to tasks 03–14 at the design gate.** Two items were adjusted when applied: the task-03 store

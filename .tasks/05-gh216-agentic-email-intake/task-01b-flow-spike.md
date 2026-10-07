@@ -33,13 +33,10 @@ completed instances not retained, linked resume spans, Preview status, version s
 
 ## What to Do
 
-> **Start here — this task is already in progress and suspended.** The spike worktree
-> `../non-deterministic-no-problem-spike-flow` and branch `spike/flow-hitl` **already exist on this
-> machine**, with the pom patch committed as `c3ab343` (local only, never pushed). Step 0 (the gate) has
-> **passed** everything tested so far; C8–C10 are provisionally answered on API evidence.
-> Go to [`spike-results-flow.md`](spike-results-flow.md) → *Resuming this spike* and begin at its step 1:
-> finish the gate by adding one `@SequenceAgent` and booting a `@QuarkusTest` (~15 min). Read the
-> *Environment preconditions* and *Do not* subsections there before running anything.
+> **DONE — verdict: ADOPT quarkus-flow.** All 19 questions are answered in
+> [`spike-results-flow.md`](spike-results-flow.md); `PLAN.md` carries the verdict and the rework list.
+> 14 spike tests pass, 12 of them under both Ollama profiles. The worktree has been removed; the branch
+> `spike/flow-hitl` is kept locally (commits `c3ab343`, `7306867`, `d953680`) and was never pushed.
 
 - **Where and when it runs:** now, before task 07, ideally before task 03.
   - Throwaway local branch in a **separate git worktree**, never merged, never pushed. `main` and the
@@ -148,11 +145,14 @@ shape, the static `@HumanInTheLoop`, the synchronous `409` and the ordered proce
 
 ## Done When
 
-- [ ] `spike-results-flow.md` answers every question with evidence, or records the gate failure.
-- [ ] `PLAN.md` carries a Flow verdict for task 07.
-- [ ] If the verdict is "adopt": a note of what changes in task 03 (drop the scope store), task 07
+- [x] `spike-results-flow.md` answers every question with evidence, or records the gate failure.
+- [x] `PLAN.md` carries a Flow verdict for task 07.
+- [x] If the verdict is "adopt": a note of what changes in task 03 (drop the scope store), task 07
       (rewrite), task 08 (policy-check ordering), task 10 (async decision) and task 11 (observability),
       plus the fact that `docs/design/email-claim-intake.md` and `docs/design/claim-intake-agents.puml`
       go back through the review gate.
-- [ ] The worktree is removed; the throwaway branch is kept locally and was never pushed.
-- [ ] `main` and the working tree are unchanged; no production file was modified.
+      — recorded in `PLAN.md` → *Rework required by the Flow verdict*.
+- [x] The worktree is removed; the throwaway branch is kept locally and was never pushed.
+- [x] `main` and the working tree are unchanged; no production file was modified.
+      — the only changes are these two planning docs. `git diff main -- src/main` on the spike branch is
+      empty. D14 and one A4 sub-question are left open and recorded, not silently dropped.
