@@ -1,4 +1,16 @@
+# The langfuse/valkey/seaweedfs pods each run under their own service account, so they do NOT
+# inherit the `dockerhub-auth` pull secret that is linked to the `default` service account.
+# Reference the secret explicitly everywhere, otherwise images are pulled anonymously and
+# hit the Docker Hub unauthenticated pull rate limit.
+# Consumed by the valkey (redis) and seaweedfs (s3) subcharts - list of secret names.
+global:
+  imagePullSecrets:
+    - dockerhub-auth
+
 langfuse:
+  image:
+    pullSecrets:
+      - name: dockerhub-auth
   encryptionKey:
     value: e098f1e3f571be035b2bcc5a94bdb77515ff8838819203601e14ec597a59579a
   salt:
@@ -27,6 +39,9 @@ langfuse:
       value: password1234$#@!
 
 postgresql:
+  # The postgres subchart expects `[{name: ...}]` rather than a list of names
+  imagePullSecrets:
+    - name: dockerhub-auth
   auth:
     username: langfuse
     password: langfuse

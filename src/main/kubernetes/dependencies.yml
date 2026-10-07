@@ -160,10 +160,18 @@ spec:
           volumeMounts:
             - mountPath: /data
               name: data
+            # Tempo 3.x writes its live-store shutdown marker to /var/tempo, which doesn't exist in
+            # the image and can't be created by the arbitrary UID OpenShift runs the container as.
+            # An emptyDir gets the pod's fsGroup applied, so it is writable. The contents are
+            # throw-away state; the real trace storage stays on the /data PVC.
+            - mountPath: /var/tempo
+              name: tempo-run
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: otel-lgtm-data-pvc
+        - name: tempo-run
+          emptyDir: {}
 ---
 apiVersion: route.openshift.io/v1
 kind: Route
@@ -187,7 +195,7 @@ kind: Deployment
 metadata:
   name: greenmail
   labels:
-    app.kubernetes.io/part-of: parasol-insurance
+    app.kubernetes.io/part-of: email
 spec:
   replicas: 1
   selector:
@@ -248,7 +256,7 @@ kind: Deployment
 metadata:
   name: roundcube
   labels:
-    app.kubernetes.io/part-of: parasol-insurance
+    app.kubernetes.io/part-of: email
   annotations:
     app.openshift.io/connects-to: greenmail
 spec:
