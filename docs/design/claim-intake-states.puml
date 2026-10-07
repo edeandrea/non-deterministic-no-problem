@@ -18,8 +18,8 @@ state "In Process" as IP
 PI --> PI : customer reply,\ndetails still missing
 PI --> PR : customer reply\ncompletes the details
 
-PR --> PR : customer reply, details still complete\n(waiting review superseded, new review)
-PR --> PI : customer reply leaves details missing\n(waiting review superseded)
+PR --> PR : customer reply, details still complete\n(waiting run cancelled, a new one waits)
+PR --> PI : customer reply leaves details missing\n(waiting run cancelled)
 PR --> PI : claims processor:\nNeeds more information
 PR --> IP : claims processor:\nReady
 

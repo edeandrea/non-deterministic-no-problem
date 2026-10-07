@@ -1,5 +1,5 @@
 @startuml
-' Agent topology of the email claim intake. Keep in sync with docs/design/email-claim-intake.md (Agent architecture).
+' Email claim intake: workflow and agents. Keep in sync with docs/design/email-claim-intake.md (Architecture).
 skinparam backgroundColor white
 skinparam componentStyle rectangle
 skinparam defaultTextAlignment center
@@ -11,72 +11,95 @@ skinparam component {
   BorderColor<<LLM>> #1565C0
   BackgroundColor<<no LLM>> #F1F8E9
   BorderColor<<no LLM>> #558B2F
+  BackgroundColor<<step>> #FFF8E1
+  BorderColor<<step>> #B28704
   BackgroundColor<<app>> #FFFFFF
 }
 
-title Email claim intake: agent topology
+title Email claim intake: workflow and agents
 
 actor Customer
 actor "Claims processor" as CP
 component "GreenMail\n(SMTP + IMAP)" as GM <<app>>
-database "PostgreSQL" as DB
+database "PostgreSQL\nclaims, photos;\nFlow: running and waiting runs" as DB
 
 package "Parasol app" {
-  component "ClaimsInboxWatcher\nIMAP IDLE, one email at a time" as W <<app>>
-  component "ClaimEmailProcessor\nmatches the email to a claim (code)\nand checks the sender first;\nchecks the policy number,\nsaves claims and photos,\nsends replies, files the email" as P <<app>>
+  component "ClaimsInboxWatcher\nIMAP IDLE; records the Message-ID,\nmoves the email to processing" as W <<app>>
+  component "ClaimIntakeStarter\nskips auto-replies, self-sent mail\nand duplicates; matches the claim\nand checks the sender (code);\nkeeps a sender's emails in order;\nstarts one run (doesn't wait)" as S <<app>>
+  component "Failure listener\nfailed run → failed folder,\nprocessing-problem reply" as FL <<app>>
+  component "Review REST API\nPOST /api/db/claims/{id}/review-decisions\nchecks the run is waiting;\npublishes REVIEW_DECIDED" as RR <<app>>
   component "IntakeReplySender\nQute templates" as RS <<app>>
-  component "Review REST API\nPOST /api/db/claims/{id}/review-decisions" as RR <<app>>
-  component "ClaimReviewService\nresumes the paused workflow" as RSV <<app>>
-  component "DatabaseAgenticScopeStore\npaused workflow state" as ST <<app>>
 
-  package "ClaimsMailboxAgent: root workflow (sequence)\nmemory id = inbound Message-ID; returns IntakeOutcome" as ROOT {
-    component "EmailClassifierAgent\nemail → email type" as C <<LLM>>
+  package "ClaimIntakeFlow: one quarkus-flow workflow per email (steps do the side effects)" as FLOW {
+    component "wrong sender?\n→ no-matching-claim reply" as F1 <<step>>
+    component "resolveClaim\nno match, sender has pending claims:\nwhich one? (or 'which claim?' reply)" as F1b <<step>>
+    component "ClaimResolver\npicks one of the sender's\npending claims, new, or unsure\n(checked in code)" as CR <<LLM>>
+    component "runAgents" as F2 <<step>>
+    component "policy check\n(code)" as F3 <<step>>
+    component "supersede: cancel the\nclaim's waiting run" as F3b <<step>>
+    component "save claim\nand photos" as F4 <<step>>
+    component "reply" as F5 <<step>>
+    component "file the email" as F6 <<step>>
+    component "wait for review\n(listen)" as F7 <<step>>
+    component "apply decision\n(switch): Ready /\nNeeds more information" as F8 <<step>>
 
-    package "EmailRouter (conditional)\nmatched claim first, then email type" as ROUTER {
-      package "ClaimExtractionWorkflow (parallel)\n→ claim extraction" as EX {
-        component "ClaimSummaryAgent\n→ summary" as SUM <<LLM>>
-        component "ClaimSentimentAgent\n→ sentiment" as SEN <<LLM>>
-        component "IncidentDetailsAgent\n→ description, date, location,\ncategory, policy number" as DET <<LLM>>
+    package "ClaimsMailboxAgent: agentic root (sequence), returns IntakeOutcome" as ROOT {
+      component "EmailClassifierAgent\nemail → email type" as C <<LLM>>
+
+      package "EmailRouter (conditional)\nmatched claim first, then email type" as ROUTER {
+        package "ClaimExtractionWorkflow (parallel)\n→ claim extraction" as EX {
+          component "ClaimSummaryAgent\n→ summary" as SUM <<LLM>>
+          component "ClaimSentimentAgent\n→ sentiment" as SEN <<LLM>>
+          component "IncidentDetailsAgent\n→ description, date, time,\nlocation, category, policy number" as DET <<LLM>>
+        }
+        component "ClaimFollowUpAgent\nstatus answer;\nread-only status tool" as FU <<LLM>>
+        component "UnmatchedEmailAgent\nnot a claim /\nno matching claim" as NAC <<no LLM>>
       }
-      component "ClaimFollowUpAgent\nstatus answer;\nread-only status tool" as FU <<LLM>>
-      component "Not-a-claim /\nno-matching-claim agent" as NAC <<no LLM>>
-    }
-
-    package "Review step (complete claims only)" as REVIEW {
-      component "ClaimReviewAgent\nhuman in the loop:\npauses the workflow\n→ review decision" as HR <<no LLM>>
-      component "Review decision router\nReady / Needs more information" as DR <<no LLM>>
     }
   }
 }
 
 Customer --> GM : email (Roundcube)
 GM --> W : new mail
-W --> P
-P --> ROOT : Message-ID, email,\nmatched claim (or none),\nclaim history
+W --> S
+S --> F1 : start a run (Message-ID,\nmatched claim, sender check,\nconversation id)
+F1 --> F1b
+F1b --> CR
+F1b --> F2
+F2 --> ROOT : email, matched claim (or none),\nclaim history
 C --> ROUTER : email type
 ROUTER --> EX : matched pending claim,\nor no match + new claim
 ROUTER --> FU : matched claim\nin any other status
 ROUTER --> NAC : no match +\nnot a claim or follow-up
-EX --> HR : all required\ndetails present
-HR --> DR : decision (on resume)
-ROOT --> P : IntakeOutcome,\nor paused for review
-ROOT ..> ST : saves state at the pause
-ST --> DB
-P --> DB : claims, photos
-P --> RS
+F2 --> F3 : IntakeOutcome
+F3 --> F3b
+F3b --> F4
+F4 --> F5
+F5 --> F6
+F6 --> F7 : complete claims only
+F7 --> F8
+F4 --> DB
+F5 --> RS
+F8 --> RS : thank-you /\nmissing information
+F8 --> DB : claim status
 RS --> GM : reply (SMTP)
+FLOW ..> DB : Flow persists each run
+FLOW ..> FL : run failed
+FL --> RS
 
 CP --> RR : Ready /\nNeeds more information
-RR --> RSV
-RSV --> ROOT : complete the pending review,\nre-run with the same Message-ID
-RSV --> P : apply the outcome
+RR ..> F7 : REVIEW_DECIDED\n(for this claim)
+RR --> DB : lock the claim;\nis the run waiting?
 
 legend right
   |= Colour |= Meaning |
-  |<#E3F2FD> | calls the LLM (claim-intake model) |
-  |<#F1F8E9> | no LLM call |
+  |<#FFF8E1> | workflow step (side effects allowed) |
+  |<#E3F2FD> | agent that calls the LLM (claim-intake model) |
+  |<#F1F8E9> | agent with no LLM call |
+  Agents have no side effects and never pause.
   Every LLM agent runs without chat memory or RAG.
-  Composite steps (sequence, conditional, parallel)
-  make no LLM call themselves.
+  Composite agents (sequence, conditional, parallel)
+  make no LLM call themselves; Flow runs each one
+  as its own sub-workflow.
 endlegend
 @enduml

@@ -16,17 +16,22 @@ start
 |Intake system|
 :Watcher receives the email (IMAP IDLE);
 if (Auto-reply, self-sent, or a\nMessage-ID already processed?) then (yes)
-  :No reply;
+  :No reply, no run;
 else (no)
+  :Record the Message-ID; move the email to processing;
   :Match the email to a claim (code, not the LLM):\nclaim number in subject or body, then reply headers;
+  :Start one workflow run for the email\n(the watcher doesn't wait; a sender's emails\nrun in order, different senders in parallel);
+  note right
+    Everything below, apart from the claims
+    processor's look-over, is that run's steps
+    (including the wait and the decision).
+  end note
   if (Claim matched, but the sender isn't\nthe claim's email address?) then (yes)
     :Reply: no matching claim\n(no details; write from the claim's\naddress or include the claim number);
-  else (no)
-    if (Matched claim is Pending Review?) then (yes)
-      :Supersede the waiting review;
-    else (no)
-    endif
-    :Classify: new claim / follow-up / not a claim;
+  elseif (No claim matched, and the sender\nhas pending claims: does the LLM say\nwhich one it's about?) then (can't tell)
+    :Reply: which claim?\n(lists the sender's pending claim\nnumbers; nothing created or changed);
+  else (one of them → handled as matched;\nnew incident or no pending claims → unmatched)
+    :Agents classify: new claim / follow-up / not a claim;
     note right
       The matched claim wins: an email matched to
       a claim is handled as a follow-up on it,
@@ -40,35 +45,37 @@ else (no)
     elseif (No claim matched,\nclassified follow-up?) then (yes)
       :Reply: no matching claim\n(no details; write from the claim's\naddress or include the claim number;\nnothing created or changed);
     else (claim matched and pending, or\nno claim matched, classified new claim)
-      :Extract the details\n(over the whole correspondence);
-      :Agents finish; a complete claim's run\nhas paused for review (state saved in PostgreSQL);
-      if (Processor, in code, before any claim is created or changed:\nnew claim whose policy number belongs to another customer?) then (yes)
-        :Discard the run state\n(including a paused review);
-        :Reply: policy inconsistency\n(no claim, no review);
-      elseif (Every required detail present\n(incl. items the reviewer asked for)?) then (no)
-        :Claim → Pending Information;
-        :Reply: the missing details;
-      else (yes)
-        :Claim → Pending Review;
-        :Reply: received, in final review;
-        :Paused run waits for the claims processor;
+      :Agents extract the details\n(over the whole correspondence);
+      if (In code, before any claim is created or changed:\nnew claim whose policy number belongs to another customer?) then (yes)
+        :Reply: policy inconsistency\n(no claim);
+      else (no)
+        :If the claim was waiting for review,\ncancel its waiting run;
+        if (Every required detail present\n(incl. items the reviewer asked for)?) then (no)
+          :Claim → Pending Information;
+          :Reply: the missing details;
+        else (yes)
+          :Claim → Pending Review;
+          :Reply: received, in final review;
+        endif
       endif
     endif
   endif
 endif
-:File the email; the watcher moves on;
+:File the email (processed folder);
 note right
-  The email is filed when its run finishes, even when the
-  workflow paused. On any processing failure it goes to the
-  failed folder and the customer gets a "processing problem" reply.
+  The email is filed before the run waits or ends.
+  If any step fails, before or after the wait, a failure
+  listener moves it to the failed folder and the customer
+  gets a "processing problem" reply.
 end note
-if (Workflow paused for review?) then (no)
+if (This run moved the claim\nto Pending Review?) then (no)
   stop
 else (yes)
+  :The run waits for the decision\n(no thread held; kept in PostgreSQL\nwhile the app runs);
   |Claims processor|
   :Later, separately: final completeness\nlook-over on the claim detail page\n(doesn't hold up the inbox);
   |Intake system|
-  :Workflow resumes with the decision;
+  :The waiting run wakes with the decision\n(no LLM call);
   if (Decision?) then (Ready)
     :Claim → In Process;
     :Reply: thank you, we're working on your claim;
