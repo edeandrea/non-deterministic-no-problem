@@ -105,6 +105,12 @@ entity, the `AgenticScopePersister.setStore` registrar, the `ShutdownEvent` rese
 - **Dependencies:** platform `quarkus-flow-bom` 3.40.1 → Flow **1.1.3** (the spikes' version; 1.2.0 final still not out).
   `dependency:tree`: quarkus-langchain4j 1.14.1, langchain4j-agentic 1.20.2-beta30, angus-mail 2.0.5 (compile),
   jsoup 1.23.2. No reproducer re-run needed (Flow version unchanged).
+  - **Angus Mail directly, not [quarkus-angus-mail](https://github.com/quarkiverse/quarkus-angus-mail)** (review,
+    2026-10-08). That extension only registers Angus Mail's and Jakarta Activation's `ServiceLoader` providers for a
+    native image (two `ServiceProviderBuildItem` build steps); in JVM mode `ServiceLoader` already finds them, and this
+    app only runs on the JVM (CI's `verify`, `%openshift`'s `base-jvm-image`). Its latest release, 0.0.5, is built on
+    Quarkus 3.17.6 (`main` targets 4.0.0.Beta1), isn't in the platform BOM, and ships the same Angus Mail 2.0.5.
+    Switch to it only if a native image becomes a goal, with a native CI job to prove it.
 - **`IntakeConfig`** (`parasol.intake.*`): `enabled` (false in `%test`), `address`, `imap.{host,port,user,password}`
   (host/port default to the mailer host and the Compose-mapped `parasol.mail.imap-port`, else 3143; user defaults to
   the address), `folders.{processing,processed,failed}` (`Processing`/`Processed`/`Failed`), and
