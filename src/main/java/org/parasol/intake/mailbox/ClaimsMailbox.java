@@ -1,6 +1,7 @@
 package org.parasol.intake.mailbox;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -30,8 +31,8 @@ import org.parasol.intake.IntakeConfig;
 @ApplicationScoped
 public class ClaimsMailbox {
 	private static final String INBOX = "INBOX";
-	private static final String TIMEOUT_MILLIS = "10000";
-	private static final String FETCH_SIZE_BYTES = String.valueOf(1024 * 1024);
+	private static final Duration IMAP_TIMEOUT = Duration.ofSeconds(10);
+	private static final int FETCH_SIZE_BYTES = 1024 * 1024;
 
 	private final IntakeConfig config;
 	private final Session session = Session.getInstance(sessionProperties());
@@ -180,10 +181,12 @@ public class ClaimsMailbox {
 	// because turning it off loads each attachment into memory whole, and the parser reads at most the size limit +
 	// 1 byte, so an oversized attachment costs only ~11 chunks
 	private static Properties sessionProperties() {
+		// Jakarta Mail session properties are strings, with timeouts in milliseconds
+		var timeoutMillis = String.valueOf(IMAP_TIMEOUT.toMillis());
 		var properties = new Properties();
-		properties.setProperty("mail.imap.connectiontimeout", TIMEOUT_MILLIS);
-		properties.setProperty("mail.imap.timeout", TIMEOUT_MILLIS);
-		properties.setProperty("mail.imap.fetchsize", FETCH_SIZE_BYTES);
+		properties.setProperty("mail.imap.connectiontimeout", timeoutMillis);
+		properties.setProperty("mail.imap.timeout", timeoutMillis);
+		properties.setProperty("mail.imap.fetchsize", String.valueOf(FETCH_SIZE_BYTES));
 
 		return properties;
 	}
