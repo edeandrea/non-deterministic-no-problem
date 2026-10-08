@@ -13,6 +13,9 @@ are stateless: everything they need is passed in.
 workflow (task 08), so `ClaimExtractionWorkflow` becomes a generated Flow sub-workflow whose two halves run as a
 real `fork`. **No `@ParallelExecutor`** (it breaks every run under Flow, quarkus-flow#1057).
 
+**Check first: quarkus-flow 1.2.0** (`PLAN.md` → Execution Steps → 2a; expected ~2026-10-09). If it's out, re-run the
+reproducers and re-adjust this task and the earlier ones before building. Here: #1057 is fixed on `main` (PR #1068), so `@ParallelExecutor` works again in 1.2.0. Whether this workflow wants one at all is a decision for the user (Flow already runs the fork on the `ManagedExecutor`).
+
 ## What to Do
 
 - Create the sub-agents (model `claim-intake`, `@ModelName("claim-intake")`). **Every agent interface** is
@@ -111,6 +114,9 @@ real `fork`. **No `@ParallelExecutor`** (it breaks every run under Flow, quarkus
   the root, `ClaimExtractionWorkflow` is an entry agent; if build validation fails on its inputs, inject it
   from a minimal package-private bean and remove that in task 06, so it doesn't become a second root.
 - The LLM is mocked in every test. CI only has a stub key.
+- **`MissingItem` already exists** (task 04): `org.parasol.intake.MissingItem`, with `label()` and `find` / `fromValue`
+  (a label or a constant name). `missingInformation` returns a `Set` of it; the reply templates list the items in the
+  set's iteration order.
 
 ## Done When
 

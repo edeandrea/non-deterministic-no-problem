@@ -19,8 +19,9 @@ exist. Traces go to LGTM and Langfuse; logs and metrics go to LGTM. Tests assert
 per generated agent sub-workflow, and one per AI-service call, plus one per Flow persistence statement. Joining the
 trace trees is upstream's fix. This task makes them **one conversation**, not one trace.
 
-**Check first: [quarkus-flow#1065](https://github.com/quarkiverse/quarkus-flow/pull/1065)** (the proposed #1056 fix,
-open on 2026-10-07, against 2.0.0-SNAPSHOT). It does upstream what this task's Flow task proxy and agentic adapter
+**Check first: quarkus-flow 1.2.0** (`PLAN.md` → Execution Steps → 2a), expected ~2026-10-09 with
+[quarkus-flow#1065](https://github.com/quarkiverse/quarkus-flow/pull/1065) in it (the maintainer's plan, 2026-10-08)
+(the proposed #1056 fix, open on 2026-10-07, against 2.0.0-SNAPSHOT, which 1.2.0 is cut from). It does upstream what this task's Flow task proxy and agentic adapter
 do, plus the sub-workflows' own spans. If a Flow release we can use contains it, drop both from this task, keep the
 `invoke_agent` span typing and the concurrent no-mixing test (it then asserts the sub-workflow spans carry the id
 too), and present that to the user before building.
@@ -169,6 +170,10 @@ too), and present that to the user before building.
 - Langfuse receives traces only. Logs and metrics go to LGTM over OTLP (`%openshift`: `http://lgtm:4318`).
 - Don't assert on a cancelled run's `workflow.execute` span: quarkus-flow#1058 drops it.
 - Grafana panels for these metrics are #218, not this task.
+- The reply templates are the `IntakeTemplates` methods (task 04: `receivedFinalReview`, `claimInProcess`,
+  `missingInformation`, `stillMissingInformation`, `processingProblem`, `policyInconsistency`, `notAClaim`,
+  `noMatchingClaim`, `whichClaim`), plus the AI-written status answer sent as text. Still open: the
+  `claim.intake.replies` `template` values, and where the counter lives given "no observability code in any step".
 - Each leaf agent belongs to one root, so the agentic listener only ever sees the intake's agents.
 
 ## Done When

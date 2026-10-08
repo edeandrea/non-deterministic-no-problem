@@ -16,6 +16,7 @@ import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.parasol.claim.model.Claim;
 import org.parasol.notification.ai.GenerateEmailService;
+import org.parasol.notification.guardrail.EmailEndsAppropriatelyOutputGuardrail;
 import org.parasol.testing.mail.GreenMailMailbox;
 import org.parasol.testing.mail.ReceivedEmail;
 
@@ -33,6 +34,9 @@ class NotificationServiceTests {
 	@Inject
 	NotificationService emailService;
 
+	@Inject
+	EmailEndsAppropriatelyOutputGuardrail endsAppropriately;
+
 	// Before rather than after each test, so mail left over by other test classes can't leak into the assertions
 	@BeforeEach
 	void purgeMail() {
@@ -44,7 +48,7 @@ class NotificationServiceTests {
 		named = "quarkus.test.profile",
 		matches = ".*ollama-openai.*",
 		disabledReason = """
-			Needs a model that reproduces GenerateEmailService.EMAIL_ENDING verbatim, or \
+			Needs a model that reproduces the rendered GenerateEmailService.EMAIL_ENDING verbatim, or \
 			EmailEndsAppropriatelyOutputGuardrail reprompts until max-retries. %ollama gives generate-email qwen3:4b \
 			with thinking off, which does reproduce it. %ollama-openai can't: it reaches Ollama through the \
 			OpenAI-compatible endpoint, where model-options.think isn't available, and qwen3:4b spends ~6k reasoning \
@@ -71,7 +75,7 @@ class NotificationServiceTests {
 				.returns(List.of(claim.emailAddress), ReceivedEmail::to)
 				.extracting(message -> message.body().strip().replace("\r\n", "\n"), STRING)
 				.startsWith(GenerateEmailService.EMAIL_STARTING.strip())
-				.endsWith(GenerateEmailService.EMAIL_ENDING.strip())
+				.endsWith(this.endsAppropriately.expectedEnding().strip())
 				.contains(claim.clientName)
 				.containsIgnoringCase(claim.claimNumber)
 				.containsIgnoringCase(status);

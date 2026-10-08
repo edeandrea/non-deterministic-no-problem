@@ -12,6 +12,9 @@ decision wakes the claim's waiting workflow run (task 08), which applies it.
 `readState` replay and no eviction. The endpoint checks that the run is waiting and **publishes a decision event**,
 so it's **asynchronous**: it returns once the event is published, not once the claim has changed.
 
+**Check first: quarkus-flow 1.2.0** (`PLAN.md` → Execution Steps → 2a; expected ~2026-10-09). If it's out, re-run the
+reproducers and re-adjust this task and the earlier ones before building. Nothing here depends on it directly.
+
 ## What to Do
 
 - **REST** (Jakarta REST annotations, plural kebab-case path):
@@ -87,6 +90,8 @@ so it's **asynchronous**: it returns once the event is published, not once the c
 
 - The API has no authentication (it's a demo app). Note this in the docs.
 - Keep the existing statuses (`New`, `In Process`, `Processed`, `Denied`) unchanged.
+- `MissingItem` and `IntakeClaimStatus` exist (`org.parasol.intake`, task 04). The checklist labels are
+  `MissingItem.label()`, which is also its JSON form (`@JsonValue` / `@JsonCreator`).
 - The review panel replaces the disabled Edit button only for `Pending Review` claims. Other claims render exactly as
   they do today.
 - Needs more information **ends** the run at `Pending Information`; the customer's next email starts a new run.

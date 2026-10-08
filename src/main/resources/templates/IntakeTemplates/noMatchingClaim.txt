@@ -1,0 +1,7 @@
+Dear {customerName.orElse('Customer')},
+
+We received your email, but could not match it to an existing claim for your email address. Please make sure you write from the email address registered on your claim, or include your claim number (it starts with CLM, followed by 8 digits) in the subject or body.
+
+Sincerely,
+{config:['parasol.claims-department.name']}
+Phone: {config:['parasol.claims-department.phone']}

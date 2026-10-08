@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<body>
+<p>Dear {customerName.orElse('Customer')},</p>
+
+<p>We received your email regarding claim <strong>{claimNumber}</strong> (Status: <strong>{IntakeClaimStatus:PENDING_INFORMATION.label}</strong>). To continue processing your claim, we need the following details:</p>
+
+<ul>
+{#for item in missingItems}
+  <li>{item.label}</li>
+{/for}
+</ul>
+
+<p>Please reply directly to this email with the requested information.</p>
+
+{#include IntakeTemplates/attachmentNotes.html /}
+
+<p>Sincerely,<br>
+{config:['parasol.claims-department.name']}<br>
+Phone: {config:['parasol.claims-department.phone']}</p>
+</body>
+</html>

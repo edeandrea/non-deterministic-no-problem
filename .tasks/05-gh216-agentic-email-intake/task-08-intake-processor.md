@@ -33,6 +33,9 @@ unchanged. Evidence: `spike-results-flow.md` → *Follow-up spike* (F1–F5); sk
 
 Every terminal `switch` branch needs `.then(FlowDirectiveEnum.END)` (task 01b, A1).
 
+**Check first: quarkus-flow 1.2.0** (`PLAN.md` → Execution Steps → 2a; expected ~2026-10-09). If it's out, re-run the
+reproducers and re-adjust this task and the earlier ones before building. Here: #1058 (PR #1059) would restore a cancelled run's `workflow.execute` span, so the "don't assert it" rule goes.
+
 ## What to Do
 
 - **Starter** (`ClaimIntakeStarter`, called by the watcher, task 09). Plain code before any run starts; it **doesn't
@@ -204,6 +207,18 @@ leaves `WAITING`; F2b). One test per rule:
 - Never hold a transaction open during an agent call.
 - Every customer submission gets a reply. The only exceptions are auto-replies, self-sent mail and duplicate `Message-ID`s.
 - Never assert absolute claim numbers; `ClaimsListPageTests` expects 6 claims.
+- **Sending replies** (task 04): every reply goes through `IntakeReplySender`, with the templates from
+  `IntakeTemplates` (the status answer through `sendTextReply`).
+  - Both send methods **block** until the mail server accepts the reply (up to `quarkus.mailer.timeout`), so `reply`
+    can run before `file` without waiting on a `Uni`.
+  - Pass the inbound `messageId` as `inReplyTo` and its `referencedMessageIds` as `references`. Don't set a
+    `Message-ID`: the mailer generates one.
+  - Pass the claim number only when the reply is about a claim the sender owns. **Never** for no-matching-claim.
+  - **Greeting** (user decision, 2026-10-08): `CustomerName.forReply(email, claim)`, with the resolved claim, or empty
+    when there isn't one or it mustn't be disclosed (no-matching-claim, which-claim).
+  - The photos note and skipped-attachments list are template parameters (`hasPhotos`, the email's
+    `skippedAttachments`), not text.
+  - Statuses: use `IntakeClaimStatus` labels for `Pending Information`, `Pending Review` and `In Process`.
 - Don't assert on a cancelled run's `workflow.execute` span: quarkus-flow#1058 drops it.
 - Editing the `Flow` bean in dev mode can break hot reload (`IncompatibleClassChangeError`); restart dev mode instead.
 

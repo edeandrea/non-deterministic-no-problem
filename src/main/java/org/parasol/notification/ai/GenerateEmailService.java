@@ -19,12 +19,12 @@ public interface GenerateEmailService {
 	String EMAIL_ENDING = """
 		
 		Sincerely,
-		Parasoft Insurance Claims Department
+		{config:['parasol.claims-department.name']}
 		
 		--------------------------------------------
 		Please note this is an unmonitored email box.
 		Should you choose to reply, nobody (not even an AI bot) will see your message.
-		Call a real human should you have any questions. 1-800-CAR-SAFE.""";
+		Call a real human should you have any questions. {config:['parasol.claims-department.phone']}.""";
 
 	String JSON_STRUCTURE = """
 		Please return a JSON response with the following structure:

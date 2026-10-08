@@ -13,6 +13,9 @@ outcome. It returns a sealed `IntakeOutcome` and has **no side effects**. **The 
 sub-workflow, and the review pause lives in the outer workflow, so the agents never suspend and nothing here touches
 an agentic scope store.
 
+**Check first: quarkus-flow 1.2.0** (`PLAN.md` → Execution Steps → 2a; expected ~2026-10-09). If it's out, re-run the
+reproducers and re-adjust this task and the earlier ones before building. Nothing here depends on it directly; the trace shape of the generated sub-workflows changes with #1065 (task 11).
+
 ## What to Do
 
 - **Claim resolution is code, not the LLM, and happens before the workflow** (design, Workflow steps 3–4).
@@ -98,6 +101,9 @@ an agentic scope store.
 - Every `IntakeOutcome` variant must round-trip through the Quarkus `ObjectMapper` (Flow persists step data with
   it): use a Jackson-polymorphic sealed interface (`@JsonTypeInfo`/`@JsonSubTypes`) and test the round trip.
 - Agents have no side effects. The intake workflow's steps send every reply, including the no-matching-claim one.
+- **The status answer is sent as plain text** with `IntakeReplySender.sendTextReply` (task 04). The sender adds the
+  subject prefix, threading headers and `Auto-Submitted`, but no greeting or sign-off: whatever the body holds is
+  what the customer gets.
 
 ## Done When
 

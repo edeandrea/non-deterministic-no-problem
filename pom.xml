@@ -134,6 +134,10 @@
 			<groupId>io.quarkus</groupId>
 			<artifactId>quarkus-mailer</artifactId>
 		</dependency>
+		<dependency>
+			<groupId>io.quarkus</groupId>
+			<artifactId>quarkus-qute</artifactId>
+		</dependency>
 		<!-- Jakarta Mail for reading the claims mailbox over IMAP (quarkus-mailer sends through Vert.x and doesn't bring it) -->
 		<dependency>
 			<groupId>org.eclipse.angus</groupId>

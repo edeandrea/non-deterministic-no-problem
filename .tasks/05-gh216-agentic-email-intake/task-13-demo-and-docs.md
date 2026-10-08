@@ -6,6 +6,9 @@
 
 The demo can be run from a written guide, and every project document describes the email intake accurately.
 
+**Check first: quarkus-flow 1.2.0** (`PLAN.md` → Execution Steps → 2a; expected ~2026-10-09). If it's out, re-run the
+reproducers and re-adjust this task and the earlier ones before building. Here: document what 1.2.0 fixed, not the workarounds it replaced.
+
 ## What to Do
 
 - Write a demo guide (e.g. `docs/email-claim-intake-demo.md`) with sample emails to paste into Roundcube:

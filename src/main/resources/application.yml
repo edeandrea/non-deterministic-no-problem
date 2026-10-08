@@ -277,8 +277,14 @@ quarkus:
   rest-client:
     follow-redirects: true
 
-# Email claim intake (IntakeConfig). The IMAP host and port default to the GreenMail the app sends through
 parasol:
+  # The sign-off on every customer email. No @ConfigMapping reads these: GenerateEmailService.EMAIL_ENDING, the
+  # intake's templates (templates/IntakeTemplates) and EmailEndsAppropriatelyOutputGuardrail read them through Qute's
+  # config: namespace, so there's no Java default and they must stay set here
+  claims-department:
+    name: Parasol Insurance Claims Department
+    phone: 1-800-CAR-SAFE
+  # Email claim intake (IntakeConfig). The IMAP host and port default to the GreenMail the app sends through
   intake:
     address: claims@parasol.com
 

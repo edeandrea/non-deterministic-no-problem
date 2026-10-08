@@ -11,6 +11,9 @@ app was down is processed on reconnect, and a GreenMail outage never stops start
 wait for runs**. It hands each email to `ClaimIntakeStarter` (task 08), which starts a run (or queues the email behind
 the same sender's running run) and returns at once. There's no agentic scope store, so there's no startup-ordering rule.
 
+**Check first: quarkus-flow 1.2.0** (`PLAN.md` → Execution Steps → 2a; expected ~2026-10-09). If it's out, re-run the
+reproducers and re-adjust this task and the earlier ones before building. Nothing here depends on it directly.
+
 ## What to Do
 
 - Create `ClaimsInboxWatcher`. At startup it starts one dedicated thread, but only when `IntakeConfig.enabled()`.

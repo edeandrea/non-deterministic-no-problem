@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<body>
+<p>Dear {customerName.orElse('Customer')},</p>
+
+{#if isReplyDuringReview}
+<p>Thank you for sending additional information. We've added your latest information to claim <strong>{claimNumber}</strong>, which is still in final review.</p>
+{#else}
+<p>Thank you for submitting your claim. We have received your information and created claim <strong>{claimNumber}</strong> (Status: <strong>{IntakeClaimStatus:PENDING_REVIEW.label}</strong>).</p>
+{/if}
+
+<p><strong>Recorded Summary:</strong><br>
+{summary}</p>
+
+<p>A claims processor will do a final check of your claim, and we'll be in touch.</p>
+
+{#include IntakeTemplates/attachmentNotes.html /}
+
+<p>Sincerely,<br>
+{config:['parasol.claims-department.name']}<br>
+Phone: {config:['parasol.claims-department.phone']}</p>
+</body>
+</html>

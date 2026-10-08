@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<body>
+<p>Dear {customerName.orElse('Customer')},</p>
+
+<p>Great news! Your claim <strong>{claimNumber}</strong> has been processed and is now <strong>{IntakeClaimStatus:IN_PROCESS.label}</strong>.</p>
+
+<p>Our claims team is actively working on your file. We will notify you of any further updates.</p>
+
+<p>Sincerely,<br>
+{config:['parasol.claims-department.name']}<br>
+Phone: {config:['parasol.claims-department.phone']}</p>
+</body>
+</html>

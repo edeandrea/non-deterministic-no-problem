@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+<body>
+<p>Dear {customerName.orElse('Customer')},</p>
+
+<p>Thank you for reaching out. This inbox is dedicated solely to handling insurance claims. If your inquiry is unrelated to an insurance claim, please contact customer support at {config:['parasol.claims-department.phone']}.</p>
+
+<p>Sincerely,<br>
+{config:['parasol.claims-department.name']}<br>
+Phone: {config:['parasol.claims-department.phone']}</p>
+</body>
+</html>
