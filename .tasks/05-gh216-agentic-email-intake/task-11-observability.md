@@ -169,6 +169,10 @@ too), and present that to the user before building.
 - Langfuse receives traces only. Logs and metrics go to LGTM over OTLP (`%openshift`: `http://lgtm:4318`).
 - Don't assert on a cancelled run's `workflow.execute` span: quarkus-flow#1058 drops it.
 - Grafana panels for these metrics are #218, not this task.
+- The reply templates are the `IntakeTemplates` methods (task 04: `receivedFinalReview`, `claimInProcess`,
+  `missingInformation`, `stillMissingInformation`, `processingProblem`, `policyInconsistency`, `notAClaim`,
+  `noMatchingClaim`, `whichClaim`), plus the AI-written status answer sent as text. Still open: the
+  `claim.intake.replies` `template` values, and where the counter lives given "no observability code in any step".
 - Each leaf agent belongs to one root, so the agentic listener only ever sees the intake's agents.
 
 ## Done When

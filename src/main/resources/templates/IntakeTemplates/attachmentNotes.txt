@@ -1,0 +1,13 @@
+{@java.lang.Boolean hasPhotos}
+{@java.util.List<org.parasol.intake.mailbox.SkippedAttachment> skippedAttachments}
+{#if !hasPhotos}
+
+We didn't receive any photos of the damage. If you have some, please reply to this email with them attached.
+{/if}
+{#if skippedAttachments}
+
+We couldn't use these attachments:
+{#for attachment in skippedAttachments}
+- {attachment.fileName}: {#include IntakeTemplates/skippedAttachmentReason.txt /}
+{/for}
+{/if}

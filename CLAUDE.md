@@ -30,8 +30,9 @@ The Java source is split into two top-level packages representing two distinct c
 | `org.parasol.notification.ai` | `GenerateEmailService` |
 | `org.parasol.notification.model` | `Email`, `ClaimInfo` |
 | `org.parasol.notification.guardrail` | The four email output guardrails, their `GenerateEmailOutputGuardrail` base, `PolitenessService`, `StringUtils` |
-| `org.parasol.intake` | The email claim intake ([#216](https://github.com/edeandrea/non-deterministic-no-problem/issues/216), being built): `IntakeConfig` (`parasol.intake.*`) |
+| `org.parasol.intake` | The email claim intake ([#216](https://github.com/edeandrea/non-deterministic-no-problem/issues/216), being built): `IntakeConfig` (`parasol.intake.*`), `MissingItem`, `IntakeClaimStatus` |
 | `org.parasol.intake.mailbox` | `ClaimsMailbox` (the `claims@parasol.com` IMAP mailbox: list, find by `Message-ID`, move between `MailFolder`s), `InboundEmail` and its attachment records, the package-private MIME parser, HTML-to-text and quoted-text helpers |
+| `org.parasol.intake.reply` | The intake's replies: `IntakeTemplates` (the fixed Qute mail templates, under `templates/IntakeTemplates/`), `IntakeReplySender` (blocking; subject prefix, threading and `Auto-Submitted` headers) and `CustomerName` (who a reply greets) |
 
 Dependencies point one way: `chat` → `notification` → `claim`, and `intake` → `claim`. New features get their own
 domain package with the same kind of layer sub-packages. Test packages mirror main, plus the test-only `org.parasol.ui` for Playwright
@@ -172,6 +173,9 @@ startup for every `@QuarkusTest` without a Dev-Service-free profile.
 `dev.langchain4j.guardrails.JsonExtractorOutputGuardrail<Email>`):
 `EmailContainsRequiredInformationOutputGuardrail`, `EmailStartsAppropriatelyOutputGuardrail`,
 `EmailEndsAppropriatelyOutputGuardrail`, `PolitenessOutputGuardrail`.
+`GenerateEmailService.EMAIL_ENDING` is a Qute template: the department name and phone come from
+`parasol.claims-department.*` through `{config:['…']}` (bracket form; the dotted form fails). The ending guardrail
+renders it once, at construction, with the same engine that renders the prompt, and checks against that.
 
 **None of them may report success by rewriting the output** — that was [#228](https://github.com/edeandrea/non-deterministic-no-problem/issues/228).
 `JsonExtractorOutputGuardrail.validate` returns `successWith(json, value)` unconditionally, which is a
@@ -571,7 +575,9 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   - **Reading is IMAP** (Angus Mail, version from the Quarkus BOM; compile scope since `ClaimsMailbox` uses it too):
     `messages(address)` reads one INBOX, `awaitMessage(address, atMost)` polls with Awaitility and returns the first message, and `allMessages()` reads
     every known user's INBOX. Messages come back as the `ReceivedEmail` record (`from`, `to`, `subject`, decoded
-    `body` with `\r\n` line endings). Plain-text mail only: anything else throws `MailboxAccessException`.
+    `body` with `\r\n` line endings, and `headers` keyed in lower case, read with `firstHeader(name)`). The body is
+    the message's `text/plain` content, or the first `text/plain` part of a multipart one that isn't an attachment (the
+    intake's templated replies are multipart/alternative). A message without one throws `MailboxAccessException`.
   - **Purging, listing and deleting users is the GreenMail REST API** (`POST /api/mail/purge`, `GET /api/user`,
     `DELETE /api/user/{address}`), because IMAP only sees one mailbox at a time. The API returns messages only as raw MIME, which is why reading doesn't use it.
   - **Auth is disabled,** so any password logs in and an unknown address is just an empty INBOX (no error). IMAP
@@ -589,6 +595,10 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   text, find by `Message-ID` and moving between folders. `QuotedTextTests` and `HtmlTextTests` are plain unit tests.
   `IntakeExtensionsTests` checks the app boots with the agentic and quarkus-flow extensions and Flow's three tables
   exist. They share `org.parasol.intake.IntakeTestProfile` (stub keys, Easy RAG ingestion off).
+- **Intake reply tests** (`org.parasol.intake.reply`): `IntakeTemplatesTests` renders both variants of every template
+  without sending (the HTML through jsoup's visible text, so both get the same assertions): greetings, missing items,
+  attachment notes, HTML escaping, and the no-leak checks against every seeded claim. `IntakeReplySenderTests` sends
+  through GreenMail and checks the subject and headers. `CustomerNameTests` is a plain unit test.
 - **Claim image tests:** `ClaimImageTests` (entity, `@TestTransaction`), `ClaimImageResourceTests` (REST and Problem
   Details), `ClaimImageContentTypeTests` (allow-list, no Quarkus), `ClaimImageSeederTests` and the Playwright
   `ClaimImagesPageTests`.

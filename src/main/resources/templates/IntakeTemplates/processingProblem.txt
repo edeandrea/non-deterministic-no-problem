@@ -1,0 +1,7 @@
+Dear {customerName.orElse('Customer')},
+
+We received your email, but encountered a problem processing it automatically. A member of our team will follow up, or you can call us at {config:['parasol.claims-department.phone']}.
+
+Sincerely,
+{config:['parasol.claims-department.name']}
+Phone: {config:['parasol.claims-department.phone']}

@@ -79,7 +79,7 @@ class EmailOutputGuardrailChainTests {
 	void aGuardrailAfterTheFirstCanStillReprompt() {
 		// Fails EmailEndsAppropriately only: correct greeting and claim details, but no closing block
 		var missingEnding = emailWith(BODY);
-		var corrected = emailWith(BODY + GenerateEmailService.EMAIL_ENDING);
+		var corrected = emailWith(BODY + this.endsAppropriately.expectedEnding());
 		var modelCalls = new AtomicInteger();
 		var chatExecutor = new FixedChatExecutor(corrected, modelCalls);
 
@@ -99,8 +99,8 @@ class EmailOutputGuardrailChainTests {
 	 */
 	@Test
 	void theLastGuardrailInTheChainCanStillReprompt() {
-		var impolite = emailWith(BODY + GenerateEmailService.EMAIL_ENDING);
-		var corrected = emailWith(BODY + GenerateEmailService.EMAIL_ENDING);
+		var impolite = emailWith(BODY + this.endsAppropriately.expectedEnding());
+		var corrected = emailWith(BODY + this.endsAppropriately.expectedEnding());
 		var modelCalls = new AtomicInteger();
 		var chatExecutor = new FixedChatExecutor(corrected, modelCalls);
 
@@ -125,7 +125,7 @@ class EmailOutputGuardrailChainTests {
 	 */
 	@Test
 	void noGuardrailRewritesTheOutput() {
-		var valid = emailWith(BODY + GenerateEmailService.EMAIL_ENDING);
+		var valid = emailWith(BODY + this.endsAppropriately.expectedEnding());
 		var request = requestFor(valid, new FixedChatExecutor(valid, new AtomicInteger()));
 
 		assertThat(List.of(this.containsRequiredInformation, this.startsAppropriately, this.endsAppropriately, this.politeness))

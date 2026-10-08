@@ -23,9 +23,10 @@ quarkus-langchain4j **1.14.1** / Quarkus **3.40.1**, matching what the task 01 s
 four follow-up spikes. See **Flow Spike Results (task 01b)** under Shared Context and
 [`spike-results-flow.md`](spike-results-flow.md). **The task files are rewritten for it (2026-10-07):** tasks 03, 05,
 06, 08–11 and 12–14 changed, task 07 is merged into task 08, and the new task 10b builds the generic conversation core.
-**The design gate re-run passed** (PR #231 merged; the #216 issue body is updated to match and links it). **Task 03 is
-done, in review as a PR into the `gh216-email-intake` feature branch (see Task Plan → Branches and pull requests).
-Next: task 04.**
+**The design gate re-run passed** (PR #231 merged; the #216 issue body is updated to match and links it). **Tasks 03 and
+04 are done** (task 03 squash-merged as [#233](https://github.com/edeandrea/non-deterministic-no-problem/pull/233);
+task 04 in review as a PR into the `gh216-email-intake` feature branch, see Task Plan → Branches and pull requests).
+**Next: task 05.**
 
 **Plan File:** `.tasks/05-gh216-agentic-email-intake/PLAN.md`
 **Tasks Directory:** `.tasks/05-gh216-agentic-email-intake/`
@@ -79,8 +80,8 @@ Edit or create task files and update `## Task Plan`.
   2. per-sender order works with a CDI status listener driving the queue
   3. `MonitoredAgent` works under Flow and holds nothing for waiting runs; **keep both Dev UIs** (user decision)
   4. the three-way router (parallel LLM, tool-calling LLM, plain Java) works under Flow's translation
-- [x] [task-03-intake-config-and-mailbox.md](task-03-intake-config-and-mailbox.md): Intake configuration, Flow dependencies and claims mailbox — **done 2026-10-08**, in review: [#233](https://github.com/edeandrea/non-deterministic-no-problem/pull/233) into `gh216-email-intake`
-- [ ] [task-04-email-templates.md](task-04-email-templates.md): Qute reply templates and sender
+- [x] [task-03-intake-config-and-mailbox.md](task-03-intake-config-and-mailbox.md): Intake configuration, Flow dependencies and claims mailbox — **done 2026-10-08**, squash-merged into `gh216-email-intake` as `fcfb8e8` ([#233](https://github.com/edeandrea/non-deterministic-no-problem/pull/233))
+- [x] [task-04-email-templates.md](task-04-email-templates.md): Qute reply templates and sender — **done 2026-10-08**, in review: PR_PLACEHOLDER into `gh216-email-intake`
 - [ ] [task-05-extraction-agents.md](task-05-extraction-agents.md): Claim extraction agents
 - [ ] [task-06-triage-agents.md](task-06-triage-agents.md): Triage agents
 - ~~[task-07-human-review-step.md](task-07-human-review-step.md): Human review step~~ — **merged into task 08** (user decision, 2026-10-07)
@@ -127,6 +128,16 @@ images on the allow-list, skipped attachments with reasons, and auto-reply detec
 against the Compose GreenMail. GreenMail 2.1.14 supports IDLE (task 09). An email can arrive with no `Message-ID`, so
 `messageId` is an `Optional`. **Decided (user, 2026-10-08):** an email without one takes the failure path (failed
 folder, processing-problem reply, no run; task 08 starter rule 2b), rather than getting a generated UUID.
+
+**Task 04 outcome (2026-10-08):** the nine fixed replies are Qute mail templates (`org.parasol.intake.reply.IntakeTemplates`,
+HTML and text), sent by `IntakeReplySender`, which **blocks** (no `Uni`) for up to `quarkus.mailer.timeout`. It sets the
+`[CLM…] Re:` subject prefix (`Re:` alone with no claim), `Auto-Submitted: auto-replied`, `In-Reply-To` and a `References`
+that carries the inbound email's own `References` plus its `Message-ID`. The sign-off is `parasol.claims-department.*`,
+read through Qute's `config:` namespace by the templates, `GenerateEmailService` and its ending guardrail alike.
+**Decided (user, 2026-10-08):** replies greet the claim's `clientName` when the email resolved to a claim from that claim's
+address, otherwise the `From` display name, otherwise "Customer" (`CustomerName.forReply`); "Which claim?" lists the
+sender's own pending claim numbers; `notification` doesn't use the intake sender. `MissingItem` and `IntakeClaimStatus`
+live in `org.parasol.intake`. Details in the task file's Outcome.
 
 Code in a new package `org.parasol.intake` (with `agent`, `mailbox`, `reply` and `review` sub-packages), plus the
 generic conversation core and its adapters in `ai.scoring.conversation` (task 10b, task 11).

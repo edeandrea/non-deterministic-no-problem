@@ -1,0 +1,17 @@
+Dear {customerName.orElse('Customer')},
+
+{#if isReplyDuringReview}
+Thank you for sending additional information. We've added your latest information to claim {claimNumber}, which is still in final review.
+{#else}
+Thank you for submitting your claim. We have received your information and created claim {claimNumber} (Status: {IntakeClaimStatus:PENDING_REVIEW.label}).
+{/if}
+
+Recorded Summary:
+{summary}
+
+A claims processor will do a final check of your claim, and we'll be in touch.
+{#include IntakeTemplates/attachmentNotes.txt /}
+
+Sincerely,
+{config:['parasol.claims-department.name']}
+Phone: {config:['parasol.claims-department.phone']}

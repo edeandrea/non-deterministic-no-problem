@@ -1,0 +1,9 @@
+Dear {customerName.orElse('Customer')},
+
+Great news! Your claim {claimNumber} has been processed and is now {IntakeClaimStatus:IN_PROCESS.label}.
+
+Our claims team is actively working on your file. We will notify you of any further updates.
+
+Sincerely,
+{config:['parasol.claims-department.name']}
+Phone: {config:['parasol.claims-department.phone']}

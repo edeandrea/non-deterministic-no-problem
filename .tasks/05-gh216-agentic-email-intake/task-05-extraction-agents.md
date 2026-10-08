@@ -111,6 +111,9 @@ real `fork`. **No `@ParallelExecutor`** (it breaks every run under Flow, quarkus
   the root, `ClaimExtractionWorkflow` is an entry agent; if build validation fails on its inputs, inject it
   from a minimal package-private bean and remove that in task 06, so it doesn't become a second root.
 - The LLM is mocked in every test. CI only has a stub key.
+- **`MissingItem` already exists** (task 04): `org.parasol.intake.MissingItem`, with `label()` and `find` / `fromValue`
+  (a label or a constant name). `missingInformation` returns a `Set` of it; the reply templates list the items in the
+  set's iteration order.
 
 ## Done When
 

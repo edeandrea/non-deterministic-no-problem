@@ -1,23 +1,32 @@
 package org.parasol.testing.mail;
 
 import static io.restassured.RestAssured.given;
+import static java.util.function.Predicate.not;
 import static org.awaitility.Awaitility.await;
 
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
-import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.mail.Address;
+import jakarta.mail.BodyPart;
 import jakarta.mail.Folder;
+import jakarta.mail.Header;
 import jakarta.mail.Message;
 import jakarta.mail.Message.RecipientType;
 import jakarta.mail.MessagingException;
+import jakarta.mail.Multipart;
+import jakarta.mail.Part;
 import jakarta.mail.Session;
 import jakarta.mail.internet.InternetAddress;
 
@@ -104,7 +113,7 @@ public class GreenMailMailbox {
 		return await()
 			.atMost(atMost)
 			.pollInterval(POLL_INTERVAL)
-			.until(() -> messages(address), Predicate.not(List::isEmpty))
+			.until(() -> messages(address), not(List::isEmpty))
 			.getFirst();
 	}
 
@@ -174,12 +183,24 @@ public class GreenMailMailbox {
 				.orElse("");
 
 			var to = addresses(message.getRecipients(RecipientType.TO)).toList();
+			var subject = Optional.ofNullable(message.getSubject())
+				.orElse("");
 
-			return new ReceivedEmail(from, to, message.getSubject(), textBody(message));
+			return new ReceivedEmail(from, to, subject, textBody(message), headers(message));
 		}
-		catch (MessagingException | IOException e) {
+		catch (MessagingException e) {
 			throw new MailboxAccessException("Couldn't read a message", e);
 		}
+	}
+
+	// Header names are case-insensitive, so they're keyed in lower case
+	private static Map<String, List<String>> headers(Message message) throws MessagingException {
+		return Collections.list(message.getAllHeaders())
+			.stream()
+			.collect(Collectors.groupingBy(
+				header -> header.getName().toLowerCase(Locale.ROOT),
+				Collectors.mapping(Header::getValue, Collectors.toUnmodifiableList())
+			));
 	}
 
 	private static Stream<String> addresses(Address[] addresses) {
@@ -189,14 +210,89 @@ public class GreenMailMailbox {
 			.map(address -> (address instanceof InternetAddress internetAddress) ? internetAddress.getAddress() : address.toString());
 	}
 
-	// The app sends plain text mail only (Mail.withText), so a multipart message is unexpected
-	private static String textBody(Message message) throws MessagingException, IOException {
-		return switch (message.getContent()) {
-			case null -> throw new MailboxAccessException("Message has no content (%s)".formatted(message.getContentType()));
-			case String text -> text;
-			case Object other -> throw new MailboxAccessException(
-				"Expected a text/plain message but got %s (%s)".formatted(message.getContentType(), other.getClass().getName())
-			);
-		};
+	// The text/plain body: the whole message (NotificationService's Mail.withText), or the first text/plain part of a
+	// multipart one (the intake's Qute templates send multipart/alternative). Attachments are never the body
+	private static String textBody(Message message) {
+		return plainText(message)
+			.orElseThrow(() -> new MailboxAccessException("Message has no text/plain body (%s)".formatted(contentType(message))));
+	}
+
+	private static Optional<String> plainText(Part part) {
+		return Optional.of(part)
+			.filter(not(GreenMailMailbox::isAttachment))
+			.flatMap(p -> isPlainText(p) ? Optional.of(text(p)) : firstPlainText(bodyParts(p)));
+	}
+
+	private static Optional<String> firstPlainText(Stream<BodyPart> parts) {
+		return parts.map(GreenMailMailbox::plainText)
+			.flatMap(Optional::stream)
+			.findFirst();
+	}
+
+	// Jakarta Mail's Part API throws checked exceptions, which streams can't, so these wrap them in MailboxAccessException
+
+	private static Stream<BodyPart> bodyParts(Part part) {
+		return (content(part) instanceof Multipart multipart) ?
+		       IntStream.range(0, partCount(multipart)).mapToObj(index -> bodyPart(multipart, index)) :
+		       Stream.empty();
+	}
+
+	private static boolean isAttachment(Part part) {
+		try {
+			return Part.ATTACHMENT.equalsIgnoreCase(part.getDisposition());
+		}
+		catch (MessagingException e) {
+			throw new MailboxAccessException("Couldn't read a part's disposition", e);
+		}
+	}
+
+	private static boolean isPlainText(Part part) {
+		try {
+			return part.isMimeType("text/plain");
+		}
+		catch (MessagingException e) {
+			throw new MailboxAccessException("Couldn't read a part's content type", e);
+		}
+	}
+
+	private static String contentType(Part part) {
+		try {
+			return part.getContentType();
+		}
+		catch (MessagingException e) {
+			throw new MailboxAccessException("Couldn't read a part's content type", e);
+		}
+	}
+
+	private static Object content(Part part) {
+		try {
+			return part.getContent();
+		}
+		catch (MessagingException | IOException e) {
+			throw new MailboxAccessException("Couldn't read a part's content", e);
+		}
+	}
+
+	// Jakarta Mail decodes a text/plain part's content to a String with the part's charset
+	private static String text(Part part) {
+		return (String) content(part);
+	}
+
+	private static int partCount(Multipart multipart) {
+		try {
+			return multipart.getCount();
+		}
+		catch (MessagingException e) {
+			throw new MailboxAccessException("Couldn't count a multipart's parts", e);
+		}
+	}
+
+	private static BodyPart bodyPart(Multipart multipart, int index) {
+		try {
+			return multipart.getBodyPart(index);
+		}
+		catch (MessagingException e) {
+			throw new MailboxAccessException("Couldn't read part %d of a multipart".formatted(index), e);
+		}
 	}
 }

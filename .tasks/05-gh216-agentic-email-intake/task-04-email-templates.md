@@ -39,11 +39,11 @@ component and covered by rendering tests.
     claims, and `ClaimResolver` (task 08) couldn't tell which one it's about. Lists the sender's **own** pending
     claim numbers (sent only to the address already on those claims) and asks them to reply on that claim's
     email or include its number. Nothing else about the claims.
-  - **Skipped attachments:** a fragment included when attachments were ignored (non-image or too large).
-- Move the phone number and sign-off (now in `GenerateEmailService.EMAIL_ENDING`) into a shared
-  constant/config that both the templates and `GenerateEmailService` use. Keep `EmailEndsAppropriatelyOutputGuardrail` working.
+  - **Skipped attachments:** a fragment included when attachments were ignored (not an image, too large, too many or
+    empty).
+- Move the phone number and sign-off into `parasol.claims-department.*` config that both the templates and `GenerateEmailService` use. Keep `EmailEndsAppropriatelyOutputGuardrail` working.
 - Create `IntakeReplySender`:
-  - Sends from `claims@parasol.com`, with the subject prefixed by `[<claim number>]` when a claim exists.
+  - Sends from `claims@parasol.com`, with the subject prefixed by `[<claim number>] Re: ` when a claim exists.
   - Sets `In-Reply-To` / `References` to the inbound `Message-ID`, and `Auto-Submitted: auto-replied`.
 - **Tests:**
   - render each template and assert the key content (claim number, each missing item, phone number)
@@ -65,13 +65,77 @@ component and covered by rendering tests.
 
 ## Key Points
 
-- Qute comes with `quarkus-mailer` (`quarkus-qute` is a dependency of quarkus-mailer). Confirm before adding anything to `pom.xml`.
+- Qute ships with `quarkus-mailer`, but the app declares `quarkus-qute` explicitly because it uses it directly (user
+  decision, 2026-10-08).
 - These templates are fixed on purpose. `GenerateEmailService` stays the AI-written example.
 - The no-matching-claim reply has no `[CLM…]` subject prefix: no claim is disclosed.
 
+## Outcome
+
+Done 2026-10-08, on branch `gh216/04-reply-templates`.
+
+- **Templates** (`org.parasol.intake.reply.IntakeTemplates`, `@CheckedTemplate(basePath = "IntakeTemplates")`): the
+  nine replies, each as `.html` and `.txt` under `src/main/resources/templates/IntakeTemplates/`.
+  - The photos note and skipped-attachments list are one shared fragment (`attachmentNotes`), so their wording isn't
+    passed in from Java. It takes `hasPhotos` and the `InboundEmail`'s `List<SkippedAttachment>`, and words all four
+    skip reasons (`NOT_AN_IMAGE`, `TOO_LARGE`, `TOO_MANY`, `EMPTY`; `skippedAttachmentReason.txt`).
+  - Status names come from `IntakeClaimStatus` (`@TemplateEnum`), so a reply names the status stored on the claim.
+  - The no-matching-claim reply describes the claim-number format instead of showing an example number: the earlier
+    example, `CLM01000000`, is the first seeded claim's real number.
+- **Greeting** (user decision, 2026-10-08): every template takes `Optional<String> customerName` and greets
+  `Dear <name>,`, or `Dear Customer,` without one. `CustomerName.forReply(email, claim)` picks it:
+  1. the claim's `clientName`, when the email resolved to a claim **and** came from that claim's address;
+  2. otherwise the `From` display name, unless it's blank or just an email address;
+  3. otherwise none.
+
+  A claim's name is never shown to another address. The no-matching-claim reply passes no claim, so it can only use
+  the sender's own `From` name.
+- **Which claim?** (user decision, 2026-10-08): it lists the sender's own pending claim numbers, and nothing else about
+  them. That isn't a leak: the reply goes to the address already on those claims, so a forged `From` never sees it.
+- **Sign-off:** `parasol.claims-department.name` / `.phone` in `application.yml` (user decision: app-level config).
+  The templates, `GenerateEmailService.EMAIL_ENDING` and `EmailEndsAppropriatelyOutputGuardrail` all read them through
+  Qute's `config:` namespace, in the bracket form `{config:['parasol.claims-department.name']}` (the dotted form fails
+  with `Property "parasol" not found`). There is no `@ConfigMapping`: no Java code reads the values.
+  - The guardrail renders `EMAIL_ENDING` once, at construction, with the same Qute engine that renders the AI
+    service's prompt, so the ending the model is told to write and the one it's checked against can't drift apart.
+  - "Parasoft" in the old ending is now "Parasol". `NotificationServiceTests.emailSendsWhenUserExists` still passes
+    with qwen3:4b under `%ollama`.
+- **`IntakeReplySender`:** sends from `parasol.intake.address`. The subject is `[<claim number>] Re: <subject>`, or
+  `Re: <subject>` with no claim, and a leading `Re:` isn't doubled. Every reply carries `Auto-Submitted: auto-replied`.
+  - `In-Reply-To` is the inbound `Message-ID`. `References` is the inbound email's own `References` plus that
+    `Message-ID`, without duplicates, so a customer's answer to our reply still references the original thread.
+    Without an inbound `Message-ID`, `In-Reply-To` is left off.
+  - The mailer generates our own `Message-ID` (Vert.x `MailEncoder`, read in the source, not tested), so the sender
+    doesn't set one.
+  - **It blocks**, rather than returning a `Uni`: the callers are Flow steps on worker threads that must know the reply
+    went out before they file the email. Text replies use the blocking `Mailer`. Templated replies can only send
+    through the `ReactiveMailer`, and `MailTemplateInstance.sendAndAwait()` waits forever, so the sender awaits
+    `send()` for `quarkus.mailer.timeout` (forever when 0, as the `Mailer` does).
+  - `sendTextReply` is for the AI-written status answer (tasks 06 and 08).
+- **Package boundaries** (review, 2026-10-08): `notification` doesn't use `IntakeReplySender`. `NotificationService`
+  still sends its status emails from `noreply@parasol.com` through its own `ReactiveMailer`.
+- **Enums in `org.parasol.intake`:** `MissingItem` (`label()` for the emails and the review checklist; `find` /
+  `fromValue` accept a label or a constant name) and `IntakeClaimStatus` (`Pending Information`, `Pending Review`,
+  `In Process`) for tasks 05, 08 and 10.
+- **Test support:** `GreenMailMailbox` reads the first `text/plain` part of multipart mail, and `ReceivedEmail` has
+  `headers` (keyed in lower case) and `firstHeader(name)`.
+- **Tests:**
+  - `IntakeTemplatesTests` renders both variants of every template without sending. The HTML is checked through its
+    visible text (jsoup), so both variants get the same assertions. It covers the greeting and its fallback, the
+    missing-item lists, the photos note, every skip reason, and HTML escaping of the customer's name and file names.
+    The no-leak tests check against every seeded claim's policy number, name, address and status, and against any
+    `CLM` number or `Message-ID`. The no-matching-claim test was checked to fail with the old example number put back.
+  - `IntakeReplySenderTests` reads the sent replies back from GreenMail: sender, subject prefix (with and without a
+    claim), `Auto-Submitted` and the threading headers.
+  - `CustomerNameTests` is a plain unit test of the name rules.
+- **Verified:** a full `./mvnw verify` against the real providers passed (user, 2026-10-08). Locally,
+  `./mvnw -B clean verify -P<profile> -Dquarkus.langchain4j.ollama.devservices.enabled=false` under `ollama` and
+  `ollama-openai` (219 tests each) passed apart from the 10 Playwright tests in `org.parasol.ui`, which fail the same way
+  in that local environment on the base commit `fcfb8e8`.
+
 ## Done When
 
-- [ ] All the listed templates exist in HTML and text form, and are sent through `IntakeReplySender`.
-- [ ] There is exactly one "no matching claim" template, used for both the wrong-sender and the unmatched-follow-up cases.
-- [ ] The rendering and header tests pass, including the "no leaked details" assertions (policy inconsistency, processing problem and no matching claim).
-- [ ] `GenerateEmailService` and the templates share one phone-number/sign-off source, and the existing email guardrail tests still pass.
+- [x] All the listed templates exist in HTML and text form, and are sent through `IntakeReplySender`.
+- [x] There is exactly one "no matching claim" template, used for both the wrong-sender and the unmatched-follow-up cases.
+- [x] The rendering and header tests pass, including the "no leaked details" assertions (policy inconsistency, processing problem and no matching claim).
+- [x] `GenerateEmailService` and the templates share one phone-number/sign-off source, and the existing email guardrail tests still pass.

@@ -98,6 +98,9 @@ an agentic scope store.
 - Every `IntakeOutcome` variant must round-trip through the Quarkus `ObjectMapper` (Flow persists step data with
   it): use a Jackson-polymorphic sealed interface (`@JsonTypeInfo`/`@JsonSubTypes`) and test the round trip.
 - Agents have no side effects. The intake workflow's steps send every reply, including the no-matching-claim one.
+- **The status answer is sent as plain text** with `IntakeReplySender.sendTextReply` (task 04). The sender adds the
+  subject prefix, threading headers and `Auto-Submitted`, but no greeting or sign-off: whatever the body holds is
+  what the customer gets.
 
 ## Done When
 

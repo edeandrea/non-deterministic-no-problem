@@ -87,6 +87,8 @@ so it's **asynchronous**: it returns once the event is published, not once the c
 
 - The API has no authentication (it's a demo app). Note this in the docs.
 - Keep the existing statuses (`New`, `In Process`, `Processed`, `Denied`) unchanged.
+- `MissingItem` and `IntakeClaimStatus` exist (`org.parasol.intake`, task 04). The checklist labels are
+  `MissingItem.label()`, which is also its JSON form (`@JsonValue` / `@JsonCreator`).
 - The review panel replaces the disabled Edit button only for `Pending Review` claims. Other claims render exactly as
   they do today.
 - Needs more information **ends** the run at `Pending Information`; the customer's next email starts a new run.

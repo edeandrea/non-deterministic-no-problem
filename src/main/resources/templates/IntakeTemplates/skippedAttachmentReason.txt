@@ -1,0 +1,1 @@
+{#when attachment.reason}{#is NOT_AN_IMAGE}it isn't a photo we can accept (we accept JPEG, PNG, GIF and WebP images).{#is TOO_LARGE}it's larger than we can accept.{#is TOO_MANY}it's over the number of photos we accept in one email.{#is EMPTY}it was empty.{/when}
