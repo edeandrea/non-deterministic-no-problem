@@ -113,10 +113,15 @@ entity, the `AgenticScopePersister.setStore` registrar, the `ShutdownEvent` rese
   `move(messageId, from, to)` (copy + delete + expunge, creating the target). The `processing` folder is in
   `MailFolder` already, for task 09. `find` takes the folder, because an email is in `processing` while its run reads
   it. IMAP `SEARCH HEADER` matches substrings, so `find`/`move` keep only the exact `Message-ID` (tested).
+  - **One `Session` for the bean's life, one `Store` (connection) per call** (review, 2026-10-08). The `Session` holds
+    only settings and is safe to share. A shared `Store` would need locking or a pool, because Flow runs steps for
+    different senders in parallel and Jakarta Mail folders aren't thread-safe. Revisit (one long-lived `Store` with
+    Angus Mail's pool) only if connects prove slow or GreenMail limits connections. The long-lived IDLE connection is
+    task 09's.
   - **Checked against GreenMail 2.1.14 before writing it:** its capabilities include `IDLE`, `MOVE` and `UIDPLUS` (task
     09's IDLE check is answered: supported); `SEARCH HEADER Message-ID` works; folders can be created; it adds no
-    `Message-ID` to mail that has none, so `InboundEmail.messageId` is an `Optional` (task 08 decides what to do with one
-    that has none).
+    `Message-ID` to mail that has none, so `InboundEmail.messageId` is an `Optional`. Task 08 sends such an email down
+    the failure path (user decision, 2026-10-08).
 - **`InboundEmail`**: `messageId`, `referencedMessageIds` (In-Reply-To then References, deduplicated), `fromAddress`,
   `fromName`, `subject`, `sentDate` (`Instant`; falls back to the received date), `body`, `strippedBody`, `images`
   (`ImageAttachment`: file name, `ClaimImageContentType`, bytes), `skippedAttachments` (`SkippedAttachment` with a reason:
@@ -127,6 +132,14 @@ entity, the `AgenticScopePersister.setStore` registrar, the `ShutdownEvent` rese
     double an email's image memory (up to 100 MB per copy at the limits, times the runs in parallel), to guard against
     changes no code makes. A real guarantee needs a clone in the constructor *and* in `data()`. The rule instead is
     "don't modify the array", stated in its Javadoc, with the reasoning in a code comment.
+  - **The `Optional` fields stay** (user decision, 2026-10-08): a record accessor must return its field's type, so
+    "nullable field, `Optional` accessor" would mean a second accessor next to a `null`-returning one, or a hand-written
+    class. The compact constructor rejects `null` `Optional`s. `InboundEmail` is never persisted (steps re-read the
+    email by `Message-ID`); if it ever has to go into workflow data or an agent input, map it to a plain-string record
+    there instead (the plan's no-`Optional`-in-persisted-values rule).
+  - **`sentDate` reads a `java.util.Date`** only because Jakarta Mail has no `java.time` API, and its own date parser
+    accepts valid forms `RFC_1123_DATE_TIME` rejects (a trailing `(EDT)` comment, two-digit years). It's converted to
+    `Instant` in the parser, so nothing downstream sees a `Date`.
 - **Quoted text:** `>` lines are dropped, and an "On … wrote:" attribution (one line or wrapped onto two) only when a
   quote follows it. HTML-only bodies go through jsoup, with `<blockquote>` turned into `>` lines so the same stripping
   applies. Non-breaking spaces become plain spaces.
@@ -135,6 +148,10 @@ entity, the `AgenticScopePersister.setStore` registrar, the `ShutdownEvent` rese
   Flow's three tables exist). `GreenMailMailbox` gained `deleteUser(address)` so each
   mailbox test starts with only an empty claims INBOX. No test pins `quarkus.application.name`: it would only restate
   the YAML, and the comment beside it already guards a rename.
+  - **`GreenMailMailbox` keeps its own `@ConfigProperty` values** (user decision, 2026-10-08), not `IntakeConfig`: it
+    reads any GreenMail mailbox (the claimants' too, in `NotificationServiceTests`), not just the intake's, and serves
+    every mail test. Both read the same `quarkus.mailer.host` / `parasol.mail.imap-port`, so they can't drift. Test
+    code injecting config properties directly is the documented convention (`CLAUDE.md`).
 
 ## Done When
 
