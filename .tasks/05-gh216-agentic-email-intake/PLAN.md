@@ -25,7 +25,7 @@ four follow-up spikes. See **Flow Spike Results (task 01b)** under Shared Contex
 06, 08–11 and 12–14 changed, task 07 is merged into task 08, and the new task 10b builds the generic conversation core.
 **The design gate re-run passed** (PR #231 merged; the #216 issue body is updated to match and links it). **Tasks 03 and
 04 are done** (task 03 squash-merged as [#233](https://github.com/edeandrea/non-deterministic-no-problem/pull/233);
-task 04 in review as a PR into the `gh216-email-intake` feature branch, see Task Plan → Branches and pull requests).
+task 04 in review as [#234](https://github.com/edeandrea/non-deterministic-no-problem/pull/234) into the `gh216-email-intake` feature branch, see Task Plan → Branches and pull requests).
 **Next: task 05.**
 
 **Plan File:** `.tasks/05-gh216-agentic-email-intake/PLAN.md`
@@ -81,7 +81,7 @@ Edit or create task files and update `## Task Plan`.
   3. `MonitoredAgent` works under Flow and holds nothing for waiting runs; **keep both Dev UIs** (user decision)
   4. the three-way router (parallel LLM, tool-calling LLM, plain Java) works under Flow's translation
 - [x] [task-03-intake-config-and-mailbox.md](task-03-intake-config-and-mailbox.md): Intake configuration, Flow dependencies and claims mailbox — **done 2026-10-08**, squash-merged into `gh216-email-intake` as `fcfb8e8` ([#233](https://github.com/edeandrea/non-deterministic-no-problem/pull/233))
-- [x] [task-04-email-templates.md](task-04-email-templates.md): Qute reply templates and sender — **done 2026-10-08**, in review: PR_PLACEHOLDER into `gh216-email-intake`
+- [x] [task-04-email-templates.md](task-04-email-templates.md): Qute reply templates and sender — **done 2026-10-08**, in review: [#234](https://github.com/edeandrea/non-deterministic-no-problem/pull/234) into `gh216-email-intake`
 - [ ] [task-05-extraction-agents.md](task-05-extraction-agents.md): Claim extraction agents
 - [ ] [task-06-triage-agents.md](task-06-triage-agents.md): Triage agents
 - ~~[task-07-human-review-step.md](task-07-human-review-step.md): Human review step~~ — **merged into task 08** (user decision, 2026-10-07)
