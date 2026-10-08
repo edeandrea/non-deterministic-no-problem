@@ -12,6 +12,8 @@ on:
   pull_request:
     branches:
       - main
+      # The #216 email intake: each task's PR targets this feature branch, which merges into main once complete
+      - gh216-email-intake
     paths-ignore:
       - '**/*.md'
       - '.github/dependabot.yml'

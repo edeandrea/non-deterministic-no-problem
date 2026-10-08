@@ -134,7 +134,9 @@ snapshot always shows an empty claims table; claim rendering is covered by the P
 
 `.github/workflows/simple-build-test.yml` runs `./mvnw -B clean verify` on Java 25 across the
 `ollama` and `ollama-openai` profiles. CI has no real OpenAI/Cohere/Gemini credentials, so **any new
-test must pass under the Ollama profiles**.
+test must pass under the Ollama profiles**. It runs on pushes to `main` and on pull requests into `main` or into
+`gh216-email-intake`, the feature branch the #216 task PRs merge into. Remove that branch from the trigger once it
+merges.
 
 **CI supplies Ollama as a GitHub service container,** `ollama/ollama` on `localhost:11434`, with
 `granite4:micro` and `snowflake-arctic-embed` pulled in a step before the build. Both profiles reach
