@@ -100,6 +100,8 @@ entity, the `AgenticScopePersister.setStore` registrar, the `ShutdownEvent` rese
 
 ## Outcome (2026-10-08)
 
+**PR:** [#233](https://github.com/edeandrea/non-deterministic-no-problem/pull/233) (into `gh216-email-intake`).
+
 - **Dependencies:** platform `quarkus-flow-bom` 3.40.1 → Flow **1.1.3** (the spikes' version; 1.2.0 final still not out).
   `dependency:tree`: quarkus-langchain4j 1.14.1, langchain4j-agentic 1.20.2-beta30, angus-mail 2.0.5 (compile),
   jsoup 1.23.2. No reproducer re-run needed (Flow version unchanged).

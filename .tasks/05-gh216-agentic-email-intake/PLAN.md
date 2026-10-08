@@ -79,7 +79,7 @@ Edit or create task files and update `## Task Plan`.
   2. per-sender order works with a CDI status listener driving the queue
   3. `MonitoredAgent` works under Flow and holds nothing for waiting runs; **keep both Dev UIs** (user decision)
   4. the three-way router (parallel LLM, tool-calling LLM, plain Java) works under Flow's translation
-- [x] [task-03-intake-config-and-mailbox.md](task-03-intake-config-and-mailbox.md): Intake configuration, Flow dependencies and claims mailbox — **done 2026-10-08** (in review: PR into `gh216-email-intake`)
+- [x] [task-03-intake-config-and-mailbox.md](task-03-intake-config-and-mailbox.md): Intake configuration, Flow dependencies and claims mailbox — **done 2026-10-08**, in review: [#233](https://github.com/edeandrea/non-deterministic-no-problem/pull/233) into `gh216-email-intake`
 - [ ] [task-04-email-templates.md](task-04-email-templates.md): Qute reply templates and sender
 - [ ] [task-05-extraction-agents.md](task-05-extraction-agents.md): Claim extraction agents
 - [ ] [task-06-triage-agents.md](task-06-triage-agents.md): Triage agents
@@ -103,6 +103,8 @@ Edit or create task files and update `## Task Plan`.
 >   `pull_request` trigger). Each task gets a branch off it (`gh216/<NN>-<topic>`, e.g. `gh216/03-mailbox`) and a PR
 >   **into the feature branch**, ending `Part of #216`. The user reviews it, then it's squash-merged. Tasks 05 and 06
 >   may share one PR (one agent topology).
+> - **Link task and PR both ways:** the PR body opens with "Implements task NN of #216" linking the task file (pinned to
+>   the PR's commit), and the task's line in the Task Plan plus the task file's Outcome name the PR.
 > - **Task 10b is the exception:** it's complete on its own (the generic conversation core, the chat moved onto it
 >   with no behaviour change, the quarkus#54354 guard), so its PR goes **straight to `main`**. Merge `main` into the
 >   feature branch afterwards, before task 11.
