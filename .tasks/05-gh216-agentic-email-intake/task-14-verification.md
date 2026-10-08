@@ -7,6 +7,9 @@
 Confirm the feature compiles and its test suites pass with stub keys, get an independent review across
 code, tests and docs, and hand the real-key and live-demo checks to the user.
 
+**Check first: quarkus-flow 1.2.0** (`PLAN.md` → Execution Steps → 2a; expected ~2026-10-09). If it's out, re-run the
+reproducers and re-adjust this task and the earlier ones before building. Here: re-check #1056, #1057 and #1058 against the Flow version the app then pins.
+
 ## What to Do
 
 - Run `./mvnw -B clean test-compile -Pollama` and `./mvnw -B clean test-compile`.

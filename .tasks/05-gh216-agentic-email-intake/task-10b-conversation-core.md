@@ -13,6 +13,9 @@ lifecycles feed the core through adapters, and reactions (session scoring) are C
 Runs **before task 11**, which adds the quarkus-flow and LangChain4j agentic adapters on top of this core.
 Evidence for every design choice here: `spike-results-flow.md` → *Follow-up spikes 2–4*.
 
+**Check first: quarkus-flow 1.2.0** (`PLAN.md` → Execution Steps → 2a; expected ~2026-10-09). If it's out, re-run the
+reproducers and re-adjust this task and the earlier ones before building. The core itself doesn't change, but if #1065 ships, task 11 drops its Flow and agentic adapters' context hops, so re-check which core hooks they still need.
+
 ## What to Do
 
 - **Core** (`ai.scoring.conversation`, depends on the OTel API, CDI and MicroProfile Context Propagation only;

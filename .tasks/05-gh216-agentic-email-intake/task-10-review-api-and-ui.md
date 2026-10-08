@@ -12,6 +12,9 @@ decision wakes the claim's waiting workflow run (task 08), which applies it.
 `readState` replay and no eviction. The endpoint checks that the run is waiting and **publishes a decision event**,
 so it's **asynchronous**: it returns once the event is published, not once the claim has changed.
 
+**Check first: quarkus-flow 1.2.0** (`PLAN.md` → Execution Steps → 2a; expected ~2026-10-09). If it's out, re-run the
+reproducers and re-adjust this task and the earlier ones before building. Nothing here depends on it directly.
+
 ## What to Do
 
 - **REST** (Jakarta REST annotations, plural kebab-case path):
