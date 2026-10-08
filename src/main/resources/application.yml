@@ -64,6 +64,8 @@ quarkus:
     default-transaction-timeout: 3m
 
   application:
+    # Also quarkus-flow's application_id, which is part of the primary key of all three Flow tables: renaming the
+    # application orphans every waiting intake run
     name: parasol-app
 
   langfuse:
@@ -119,6 +121,13 @@ quarkus:
           top-p: 1
         timeout: 600s
         api-key: "${quarkus.langchain4j.openai.api-key}"
+      claim-intake:
+        chat-model:
+          model-name: gpt-5-mini
+          temperature: 1
+          top-p: 1
+        timeout: 600s
+        api-key: "${quarkus.langchain4j.openai.api-key}"
       session-sentiment:
         chat-model:
           model-name: command-r7b-12-2024
@@ -160,6 +169,14 @@ quarkus:
         chat-model:
           model-id: granite4:micro
           temperature: 0.3
+      claim-intake:
+        timeout: 600s
+        chat-model:
+          # Same as generate-email
+          model-id: qwen3:4b
+          temperature: 0.3
+          model-options:
+            think: false
       session-sentiment:
         timeout: 600s
         chat-model:
@@ -260,6 +277,11 @@ quarkus:
   rest-client:
     follow-redirects: true
 
+# Email claim intake (IntakeConfig). The IMAP host and port default to the GreenMail the app sends through
+parasol:
+  intake:
+    address: claims@parasol.com
+
 # Ollama profile config
 '%ollama':
   quarkus:
@@ -285,6 +307,9 @@ quarkus:
       politeness:
         chat-model:
           provider: ollama
+      claim-intake:
+        chat-model:
+          provider: ollama
       embedding-model:
         provider: ollama
 
@@ -303,6 +328,10 @@ quarkus:
           chat-model:
             model-name: "${quarkus.langchain4j.ollama.parasol-chat.chat-model.model-id}"
         politeness:
+          base-url: "${%ollama-openai.quarkus.langchain4j.openai.base-url}"
+          chat-model:
+            model-name: "${quarkus.langchain4j.ollama.parasol-chat.chat-model.model-id}"
+        claim-intake:
           base-url: "${%ollama-openai.quarkus.langchain4j.openai.base-url}"
           chat-model:
             model-name: "${quarkus.langchain4j.ollama.parasol-chat.chat-model.model-id}"
@@ -365,6 +394,11 @@ quarkus:
       export:
         otlp:
           enabled: "${%test.quarkus.observability.enabled}"
+
+  # Only the watcher tests turn the intake on
+  parasol:
+    intake:
+      enabled: false
 
 # Prod mode config
 '%prod':

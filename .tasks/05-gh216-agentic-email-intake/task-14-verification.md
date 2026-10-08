@@ -45,6 +45,8 @@ code, tests and docs, and hand the real-key and live-demo checks to the user.
   - docs match the code, and the design doc's status line is updated
 
   Re-review after fixes.
+- Open the final PR, `gh216-email-intake` → `main` (see `PLAN.md` → Task Plan → Branches and pull requests): link every
+  task PR, and leave the merge to the user (a merge commit, which needs the `main` ruleset changed for that one PR).
 - Give the user:
   - `./mvnw -B clean verify` with real keys
   - the dev-mode demo walk-through from the demo guide

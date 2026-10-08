@@ -98,10 +98,46 @@ entity, the `AgenticScopePersister.setStore` registrar, the `ShutdownEvent` rese
 - Editing a `Flow` bean in dev mode can throw `IncompatibleClassChangeError … _ClientProxy overrides final method
   Flow.definition()`; restart dev mode instead (task 13 documents it).
 
+## Outcome (2026-10-08)
+
+- **Dependencies:** platform `quarkus-flow-bom` 3.40.1 → Flow **1.1.3** (the spikes' version; 1.2.0 final still not out).
+  `dependency:tree`: quarkus-langchain4j 1.14.1, langchain4j-agentic 1.20.2-beta30, angus-mail 2.0.5 (compile),
+  jsoup 1.23.2. No reproducer re-run needed (Flow version unchanged).
+- **`IntakeConfig`** (`parasol.intake.*`): `enabled` (false in `%test`), `address`, `imap.{host,port,user,password}`
+  (host/port default to the mailer host and the Compose-mapped `parasol.mail.imap-port`, else 3143; user defaults to
+  the address), `folders.{processing,processed,failed}` (`Processing`/`Processed`/`Failed`), and
+  `limits.{max-body-characters (20000), max-image-size (10M), max-images (10)}`. The body limit is for task 05.
+- **`ClaimsMailbox`** opens one IMAP connection per call: `unprocessed()`, `list(folder)`, `find(folder, messageId)`,
+  `move(messageId, from, to)` (copy + delete + expunge, creating the target). The `processing` folder is in
+  `MailFolder` already, for task 09. `find` takes the folder, because an email is in `processing` while its run reads
+  it. IMAP `SEARCH HEADER` matches substrings, so `find`/`move` keep only the exact `Message-ID` (tested).
+  - **Checked against GreenMail 2.1.14 before writing it:** its capabilities include `IDLE`, `MOVE` and `UIDPLUS` (task
+    09's IDLE check is answered: supported); `SEARCH HEADER Message-ID` works; folders can be created; it adds no
+    `Message-ID` to mail that has none, so `InboundEmail.messageId` is an `Optional` (task 08 decides what to do with one
+    that has none).
+- **`InboundEmail`**: `messageId`, `referencedMessageIds` (In-Reply-To then References, deduplicated), `fromAddress`,
+  `fromName`, `subject`, `sentDate` (`Instant`; falls back to the received date), `body`, `strippedBody`, `images`
+  (`ImageAttachment`: file name, `ClaimImageContentType`, bytes), `skippedAttachments` (`SkippedAttachment` with a reason:
+  `NOT_AN_IMAGE`, `TOO_LARGE`, `TOO_MANY`, `EMPTY`) and `isAutoReply` (`Auto-Submitted` other than `no`, or `Precedence`
+  `bulk`/`auto_reply`/`junk`). An attachment counts as an image by its declared media type only, through
+  `ClaimImageContentType.find`; oversized images are detected after reading at most max + 1 bytes.
+  - **`ImageAttachment` doesn't copy its `byte[]`** (user decision, 2026-10-08), to save memory. Copying would at least
+    double an email's image memory (up to 100 MB per copy at the limits, times the runs in parallel), to guard against
+    changes no code makes. A real guarantee needs a clone in the constructor *and* in `data()`. The rule instead is
+    "don't modify the array", stated in its Javadoc, with the reasoning in a code comment.
+- **Quoted text:** `>` lines are dropped, and an "On … wrote:" attribution (one line or wrapped onto two) only when a
+  quote follows it. HTML-only bodies go through jsoup, with `<blockquote>` turned into `>` lines so the same stripping
+  applies. Non-breaking spaces become plain spaces.
+- **Tests:** `ClaimsMailboxTests` (9, real SMTP → GreenMail → IMAP), `QuotedTextTests` (7), `HtmlTextTests` (4),
+  `IntakeExtensionsTests` (2: the app boots with agentic + the four Flow modules, `PersistenceInstanceReader` resolves,
+  Flow's three tables exist). `GreenMailMailbox` gained `deleteUser(address)` so each
+  mailbox test starts with only an empty claims INBOX. No test pins `quarkus.application.name`: it would only restate
+  the YAML, and the comment beside it already guards a rename.
+
 ## Done When
 
-- [ ] The platform `quarkus-flow-bom` is imported (a final Flow release), `quarkus-langchain4j-agentic`, the four Flow modules and jsoup are in `pom.xml` without versions, angus-mail is compile scope, `./mvnw dependency:tree` shows quarkus-langchain4j still on 1.14.x, and the build succeeds alongside `quarkus-langchain4j-chat-scopes-websocket`.
-- [ ] `quarkus.application.name` stays pinned, with a comment saying it's Flow's `application_id`; there is no agentic scope store, registrar, allowlist or self-test.
-- [ ] `IntakeConfig`, `ClaimsMailbox` (including find-by-`Message-ID`) and `InboundEmail` exist, and the `claim-intake` model is configured for every provider/profile, with explicit `temperature` and `top-p` on the OpenAI-client configs.
-- [ ] All the mailbox tests listed above pass against Compose GreenMail.
-- [ ] Both `test-compile` runs succeed.
+- [x] The platform `quarkus-flow-bom` is imported (a final Flow release), `quarkus-langchain4j-agentic`, the four Flow modules and jsoup are in `pom.xml` without versions, angus-mail is compile scope, `./mvnw dependency:tree` shows quarkus-langchain4j still on 1.14.x, and the build succeeds alongside `quarkus-langchain4j-chat-scopes-websocket`.
+- [x] `quarkus.application.name` stays pinned, with a comment saying it's Flow's `application_id`; there is no agentic scope store, registrar, allowlist or self-test.
+- [x] `IntakeConfig`, `ClaimsMailbox` (including find-by-`Message-ID`) and `InboundEmail` exist, and the `claim-intake` model is configured for every provider/profile, with explicit `temperature` and `top-p` on the OpenAI-client configs.
+- [x] All the mailbox tests listed above pass against Compose GreenMail.
+- [x] Both `test-compile` runs succeed.

@@ -30,10 +30,11 @@ The Java source is split into two top-level packages representing two distinct c
 | `org.parasol.notification.ai` | `GenerateEmailService` |
 | `org.parasol.notification.model` | `Email`, `ClaimInfo` |
 | `org.parasol.notification.guardrail` | The four email output guardrails, their `GenerateEmailOutputGuardrail` base, `PolitenessService`, `StringUtils` |
+| `org.parasol.intake` | The email claim intake ([#216](https://github.com/edeandrea/non-deterministic-no-problem/issues/216), being built): `IntakeConfig` (`parasol.intake.*`) |
+| `org.parasol.intake.mailbox` | `ClaimsMailbox` (the `claims@parasol.com` IMAP mailbox: list, find by `Message-ID`, move between `MailFolder`s), `InboundEmail` and its attachment records, the package-private MIME parser, HTML-to-text and quoted-text helpers |
 
-Dependencies point one way: `chat` → `notification` → `claim`. New features get their own domain
-package with the same kind of layer sub-packages (the planned email intake goes in
-`org.parasol.intake`). Test packages mirror main, plus the test-only `org.parasol.ui` for Playwright
+Dependencies point one way: `chat` → `notification` → `claim`, and `intake` → `claim`. New features get their own
+domain package with the same kind of layer sub-packages. Test packages mirror main, plus the test-only `org.parasol.ui` for Playwright
 and `org.parasol.testing.mail` for the GreenMail helper.
 
 Supporting docs:
@@ -380,6 +381,7 @@ Model names are configured in `src/main/resources/application.yml` and resolve p
 | `politeness` | `PolitenessService` | `gpt-5-mini` |
 | `session-sentiment` | `SessionSentimentService` | Cohere `command-r7b-12-2024` via its OpenAI-compatible endpoint |
 | `judge` | `EvaluatorAgent` (drift detection) | Cohere `command-r7b-12-2024` via its OpenAI-compatible endpoint |
+| `claim-intake` | The email intake agents (#216, being built; configured, no agent uses it yet) | `gpt-5-mini` |
 
 Note the Cohere models are reached through the **OpenAI** extension pointed at
 `https://api.cohere.ai/compatibility/v1` with `COHERE_API_KEY` — there is no Cohere-specific
@@ -405,12 +407,13 @@ Because `reuse-embeddings` is enabled, the ingested vectors are cached in `easy-
 switching between the default and the Ollama profiles.
 
 The two Ollama profiles are **not** equivalent:
-- `%ollama` switches `parasol-chat`, `generate-email`, `politeness` and the embedding model to
+- `%ollama` switches `parasol-chat`, `generate-email`, `politeness`, `claim-intake` and the embedding model to
   `provider: ollama` (`granite4:micro`, embeddings `snowflake-arctic-embed`) — **except
-  `generate-email`, which uses `qwen3:4b` with `model-options.think: false`**, because it is the
+  `generate-email` (and `claim-intake`, which matches it), which use `qwen3:4b` with `model-options.think: false`**,
+  because it is the
   only model measured to reproduce `EMAIL_ENDING` verbatim for
   `EmailEndsAppropriatelyOutputGuardrail`, and qwen3 reasons by default (~6k tokens per email
-  versus ~140 with thinking off). Note `%ollama-openai` does **not** inherit this: all three of its
+  versus ~140 with thinking off). Note `%ollama-openai` does **not** inherit this: all four of its chat
   `model-name`s interpolate from `quarkus.langchain4j.ollama.parasol-chat.chat-model.model-id`, not
   from their own, so changing `generate-email`'s id moves only the Ollama-native leg. That is
   deliberate — `model-options.think` has no equivalent on the OpenAI-compatible endpoint. It also
@@ -420,7 +423,7 @@ The two Ollama profiles are **not** equivalent:
   `session-sentiment` and `judge` keep `provider: openai` pointed at the Cohere-compatible
   endpoint — they are *not* moved to Ollama, they are just given a dummy key.
 - `%ollama-openai` only repoints the OpenAI client's `base-url` at `http://localhost:11434/v1` for
-  `parasol-chat`, `generate-email`, `politeness` and the embedding model. It stubs **no** API keys
+  `parasol-chat`, `generate-email`, `politeness`, `claim-intake` and the embedding model. It stubs **no** API keys
   and does **not** disable session scoring or startup initialization.
 
 ### Configuration profiles
@@ -461,7 +464,7 @@ deploys the app with `-Dquarkus.profile=openshift`. It ends by printing the Roun
 
 | Variable | When it is needed |
 |---|---|
-| `OPENAI_API_KEY` | Default profile — `parasol-chat`, `generate-email`, `politeness`, embeddings |
+| `OPENAI_API_KEY` | Default profile — `parasol-chat`, `generate-email`, `politeness`, `claim-intake`, embeddings |
 | `COHERE_API_KEY` | Default profile — `session-sentiment` and `judge` |
 | `GEMINI_API_KEY` | Only when `LangfuseEvaluationInitializer` runs (`initialize-on-startup`); it throws `IllegalStateException` if absent |
 
@@ -565,20 +568,27 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
 - AssertJ + Awaitility; Mockito is attached as a `-javaagent` in the surefire/failsafe config.
 - **Mail tests read the real GreenMail** from `compose-devservices.yml` (every test run starts it) through the
   injectable `org.parasol.testing.mail.GreenMailMailbox` bean. There is no mail mock.
-  - **Reading is IMAP** (Angus Mail, test scope, version from the Quarkus BOM): `messages(address)` reads one INBOX,
-    `awaitMessage(address, atMost)` polls with Awaitility and returns the first message, and `allMessages()` reads
+  - **Reading is IMAP** (Angus Mail, version from the Quarkus BOM; compile scope since `ClaimsMailbox` uses it too):
+    `messages(address)` reads one INBOX, `awaitMessage(address, atMost)` polls with Awaitility and returns the first message, and `allMessages()` reads
     every known user's INBOX. Messages come back as the `ReceivedEmail` record (`from`, `to`, `subject`, decoded
     `body` with `\r\n` line endings). Plain-text mail only: anything else throws `MailboxAccessException`.
-  - **Purging and listing users is the GreenMail REST API** (`POST /api/mail/purge`, `GET /api/user`), because IMAP
-    only sees one mailbox at a time. The API returns messages only as raw MIME, which is why reading doesn't use it.
+  - **Purging, listing and deleting users is the GreenMail REST API** (`POST /api/mail/purge`, `GET /api/user`,
+    `DELETE /api/user/{address}`), because IMAP only sees one mailbox at a time. The API returns messages only as raw MIME, which is why reading doesn't use it.
   - **Auth is disabled,** so any password logs in and an unknown address is just an empty INBOX (no error). IMAP
-    logins and deliveries create users; purging removes mail, not users.
+    logins and deliveries create users; purging removes mail, not users or folders. `deleteUser(address)` removes the
+    user with its folders too, which is how `ClaimsMailboxTests` starts every test with only an empty claims INBOX.
   - Host and ports are `@ConfigProperty` constructor parameters: `quarkus.mailer.host`, plus `parasol.mail.imap-port`
     and `parasol.mail.greenmail-api-port`, which the Compose labels map in. Test code injects config properties
     directly; the `@ConfigMapping` convention is for main code.
   - **Purge in `@BeforeEach`,** not `@AfterEach`, so mail from other test classes can't leak into "no email sent"
     assertions (`NotificationServiceTests.assertNoEmailSent` checks `allMessages()` is empty).
   - `GreenMailMailboxTests` covers the helper with the app's own `Mailer`, no LLM: mailbox isolation and purge.
+- **Claims mailbox tests** (`org.parasol.intake.mailbox`): `ClaimsMailboxTests` sends real MIME messages over SMTP with
+  Jakarta Mail (the app's `Mailer` can't build multipart/alternative or set arbitrary headers) and reads them back
+  through `ClaimsMailbox`: plain text, HTML-only, alternative, image and skipped attachments, auto-reply headers, quoted
+  text, find by `Message-ID` and moving between folders. `QuotedTextTests` and `HtmlTextTests` are plain unit tests.
+  `IntakeExtensionsTests` checks the app boots with the agentic and quarkus-flow extensions and Flow's three tables
+  exist. They share `org.parasol.intake.IntakeTestProfile` (stub keys, Easy RAG ingestion off).
 - **Claim image tests:** `ClaimImageTests` (entity, `@TestTransaction`), `ClaimImageResourceTests` (REST and Problem
   Details), `ClaimImageContentTypeTests` (allow-list, no Quarkus), `ClaimImageSeederTests` and the Playwright
   `ClaimImagesPageTests`.

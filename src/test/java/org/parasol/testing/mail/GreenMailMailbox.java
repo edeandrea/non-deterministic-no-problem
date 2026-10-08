@@ -121,6 +121,20 @@ public class GreenMailMailbox {
 		}
 	}
 
+	/**
+	 * Deletes a user with all its folders and mail. An unknown address is fine: there's nothing to delete.
+	 *
+	 * @param address The user's email address
+	 */
+	public void deleteUser(String address) {
+		var response = api().delete("/api/user/{address}", address);
+		var isUnknown = (response.statusCode() == 400) && response.asString().contains("not found");
+
+		if ((response.statusCode() != 200) && !isUnknown) {
+			throw new MailboxAccessException("Couldn't delete GreenMail user %s (HTTP %d): %s".formatted(address, response.statusCode(), response.asString()));
+		}
+	}
+
 	private List<String> users() {
 		var response = api().get("/api/user");
 
