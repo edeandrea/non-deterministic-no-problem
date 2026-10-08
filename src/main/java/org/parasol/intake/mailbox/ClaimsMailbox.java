@@ -31,6 +31,7 @@ import org.parasol.intake.IntakeConfig;
 public class ClaimsMailbox {
 	private static final String INBOX = "INBOX";
 	private static final String TIMEOUT_MILLIS = "10000";
+	private static final String FETCH_SIZE_BYTES = String.valueOf(1024 * 1024);
 
 	private final IntakeConfig config;
 	private final Session session = Session.getInstance(sessionProperties());
@@ -172,11 +173,17 @@ public class ClaimsMailbox {
 		};
 	}
 
-	// Jakarta Mail has no timeouts by default, so a stalled server would hang the caller forever
+	// Jakarta Mail has no timeouts by default, so a stalled server would hang the caller forever.
+	// It also fetches a part over IMAP in 16 KB chunks, one round trip each: a 10 MB photo (the default size limit) is
+	// ~640 round trips. ClaimsMailboxTests' oversized-image test took 4.6 s locally and timed out after 30 s on a CI
+	// runner; with 1 MB chunks it takes 0.5 s. Partial fetch stays on (mail.imap.partialfetch=false is a bit faster),
+	// because turning it off loads each attachment into memory whole, and the parser reads at most the size limit +
+	// 1 byte, so an oversized attachment costs only ~11 chunks
 	private static Properties sessionProperties() {
 		var properties = new Properties();
 		properties.setProperty("mail.imap.connectiontimeout", TIMEOUT_MILLIS);
 		properties.setProperty("mail.imap.timeout", TIMEOUT_MILLIS);
+		properties.setProperty("mail.imap.fetchsize", FETCH_SIZE_BYTES);
 
 		return properties;
 	}

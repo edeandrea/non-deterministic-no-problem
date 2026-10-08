@@ -118,6 +118,10 @@ entity, the `AgenticScopePersister.setStore` registrar, the `ShutdownEvent` rese
     different senders in parallel and Jakarta Mail folders aren't thread-safe. Revisit (one long-lived `Store` with
     Angus Mail's pool) only if connects prove slow or GreenMail limits connections. The long-lived IDLE connection is
     task 09's.
+  - **IMAP fetch size is 1 MB** (`mail.imap.fetchsize`, a constant; CI failure on #233, 2026-10-08). Jakarta Mail's
+    default 16 KB chunks made a 10 MB attachment ~640 round trips: `oversizedExtraAndEmptyImagesAreSkipped` took 4.6 s
+    locally and timed out (30 s) on the `-Pollama` CI runner. With 1 MB chunks it's 0.5 s. `partialfetch=false` is a bit
+    faster but loads every attachment whole, including oversized ones the parser stops reading at the limit + 1 byte.
   - **Checked against GreenMail 2.1.14 before writing it:** its capabilities include `IDLE`, `MOVE` and `UIDPLUS` (task
     09's IDLE check is answered: supported); `SEARCH HEADER Message-ID` works; folders can be created; it adds no
     `Message-ID` to mail that has none, so `InboundEmail.messageId` is an `Optional`. Task 08 sends such an email down
