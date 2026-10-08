@@ -21,10 +21,13 @@ The demo can be run from a written guide, and every project document describes t
   quarkus-flow#1056) and "open the intake workflow in the Flow Dev UI" (the Workflows card draws the intake as a
   typed, branching diagram; task 01b, E17). Cover both local dev mode and the cluster.
   - **Live-demo caveat:** editing a `Flow` bean in dev mode can throw `IncompatibleClassChangeError`; restart dev mode.
-- Update the design doc `docs/design/email-claim-intake.md` (merged in PR #220): change its
+- Update the design doc `docs/design/email-claim-intake.md` (merged in PR #220, revised for quarkus-flow in PR #231): change its
   "Status: proposed, for review before implementation" line to say the design is accepted and implemented
   (linking #216), and fix anything the implementation changed (e.g. the incident time, if still extracted; see
   `PLAN.md` → Caveats). Re-render its diagrams if they change.
+  - Its Observability section says the agentic adapter is
+    "proven before implementation starts": follow-up spike 5 proved it, so reword it (and the same line in the #216
+    issue body) to match what task 11 built, including whether quarkus-flow#1065 replaced the adapter.
 - Update `CLAUDE.md`:
   - **Architecture:** the `org.parasol.intake` package; the intake as one quarkus-flow workflow (`ClaimIntakeFlow`)
     with the agentic root as one step; the non-waiting watcher and starter (parallel runs, per-sender order, failure listener); `resolveClaim` and the which-claim reply; the review as the workflow's `listen` + `switch`

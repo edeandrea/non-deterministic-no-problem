@@ -17,22 +17,33 @@ entity, the `AgenticScopePersister.setStore` registrar, the `ShutdownEvent` rese
 
 - **Dependencies** (`pom.xml`):
   - `io.quarkiverse.langchain4j:quarkus-langchain4j-agentic` (managed by the quarkus-langchain4j BOM).
-  - **Import `io.quarkiverse.flow:quarkus-flow-bom`** (`type pom`, `scope import`) in `<dependencyManagement>`, after
-    the Quarkus platform and quarkus-langchain4j BOMs, with its version in a `quarkus.flow.version` property. Then
-    add `quarkus-flow`, `quarkus-flow-langchain4j`, `quarkus-flow-jpa` and `quarkus-flow-opentelemetry` **without
-    versions**. (The spike versioned each dependency separately instead; the BOM is cleaner.) The 1.1.3 BOM manages
-    only `io.quarkiverse.flow` artifacts, so it can't override the Quarkus or quarkus-langchain4j versions. Check
-    that this still holds for the version you pick.
-  - Use the latest **final** release: re-check Maven Central for 1.2.0 final first (1.1.3 is what the spikes
-    verified; 1.2.0.CR3 was the latest prerelease on 2026-10-07). If you move off 1.1.3, re-run the three
-    reproducers in [edeandrea/quarkus-flow-reproducers](https://github.com/edeandrea/quarkus-flow-reproducers) with
-    `-Dquarkus.flow.version=<new>` and update the issue status in `PLAN.md` (#1056, #1057, #1058).
-  - `org.eclipse.angus:angus-mail` (managed by the Quarkus BOM) and `org.jsoup:jsoup` (latest stable).
+  - **Import the platform's `${quarkus.platform.group-id}:quarkus-flow-bom:${quarkus.platform.version}`** (`type pom`,
+    `scope import`) in `<dependencyManagement>`, after the Quarkus platform and quarkus-langchain4j BOMs. No new
+    version property. Then add `quarkus-flow`, `quarkus-flow-langchain4j`, `quarkus-flow-jpa` and
+    `quarkus-flow-opentelemetry` **without versions**. (The spike versioned each dependency separately instead.)
+    - **Why the platform BOM, not `io.quarkiverse.flow:quarkus-flow-bom`** (checked 2026-10-08 by diffing effective
+      POMs against today's `pom.xml`): platform 3.40.1's `quarkus-flow-bom` ships Flow **1.1.3**, the version the
+      spikes verified. It adds 74 managed entries (Flow, serverless-workflow, cloudevents, jackson-jq) and changes
+      none. The Quarkiverse 1.1.3 BOM's parent imports the **Quarkus 3.39.0** BOM and the serverless-workflow BOM,
+      so it adds 119 entries, including 32 `io.vertx`, `io.fabric8`, wiremock and assertj. Our 3.40.1 platform BOM
+      comes first, so none of today's versions change, but 3.39-era entries for anything the platform doesn't manage
+      would come in. The platform BOM also keeps Flow aligned with Quarkus on every platform upgrade.
+    - **Flow version:** whatever the platform ships. Re-check Maven Central for 1.2.0 final first (1.2.0.CR3 was the
+      latest prerelease on 2026-10-08). A Flow version the platform doesn't ship yet means overriding the platform
+      BOM; present that to the user before doing it. Whenever the Flow version changes, re-run the three reproducers
+      in [edeandrea/quarkus-flow-reproducers](https://github.com/edeandrea/quarkus-flow-reproducers) with
+      `-Dquarkus.flow.version=<new>` (that's the reproducers' own property) and update the issue status in `PLAN.md`
+      (#1056, #1057, #1058).
+  - **`org.eclipse.angus:angus-mail` is already in `pom.xml` at `test` scope** (for the GreenMail helper). `ClaimsMailbox`
+    is main code, so move it to compile scope; don't add a second entry. `quarkus-mailer` doesn't bring Jakarta Mail.
+  - **`org.jsoup:jsoup`** without a version: the Quarkus BOM manages it (1.23.2, the latest release on 2026-10-08).
+    It's already on the classpath through Easy RAG's Tika parsers; declare it directly because the mailbox uses it.
   - Confirm with `./mvnw dependency:tree` that quarkus-langchain4j stays on the project's version (Flow 1.1.3 was
     built against 1.13.3), and that the build still succeeds alongside `quarkus-langchain4j-chat-scopes-websocket`.
-- **Flow config** (`application.yml`): set `quarkus.application.name` explicitly. It becomes Flow's
-  `application_id`, part of the primary key of all three Flow tables. **No schema strategy**: durable state across
-  restarts isn't a requirement (user decision), and every profile already recreates the schema on boot.
+- **Flow config** (`application.yml`): `quarkus.application.name: parasol-app` is **already set** explicitly. Keep it,
+  and add a comment saying it's Flow's `application_id`, part of the primary key of all three Flow tables, so a rename
+  orphans every waiting run. **No schema strategy**: durable state across restarts isn't a requirement (user
+  decision), and every profile already recreates the schema on boot.
 - **Model:** add the `claim-intake` model for openai (default), ollama, `%ollama` and `%ollama-openai`, matching
   `generate-email` in each.
   - **Project rule:** every new OpenAI-client chat model (the default openai config and `%ollama-openai`) sets
@@ -72,7 +83,7 @@ entity, the `AgenticScopePersister.setStore` registrar, the `ShutdownEvent` rese
 
 ## Files/Areas
 
-- `pom.xml` (the `quarkus-flow-bom` import, agentic, the four Flow modules, angus-mail, jsoup)
+- `pom.xml` (the platform `quarkus-flow-bom` import, agentic, the four Flow modules, angus-mail to compile scope, jsoup)
 - `src/main/resources/application.yml`
 - `src/main/java/org/parasol/intake/IntakeConfig.java`, `src/main/java/org/parasol/intake/mailbox/` (new)
 - `src/test/java/org/parasol/intake/mailbox/` (new)
@@ -89,8 +100,8 @@ entity, the `AgenticScopePersister.setStore` registrar, the `ShutdownEvent` rese
 
 ## Done When
 
-- [ ] `quarkus-flow-bom` is imported (a final release), `quarkus-langchain4j-agentic` and the four Flow modules are in `pom.xml` without versions, quarkus-langchain4j stays on 1.14.x, and the build succeeds alongside `quarkus-langchain4j-chat-scopes-websocket`.
-- [ ] `quarkus.application.name` is set; there is no agentic scope store, registrar, allowlist or self-test.
+- [ ] The platform `quarkus-flow-bom` is imported (a final Flow release), `quarkus-langchain4j-agentic`, the four Flow modules and jsoup are in `pom.xml` without versions, angus-mail is compile scope, `./mvnw dependency:tree` shows quarkus-langchain4j still on 1.14.x, and the build succeeds alongside `quarkus-langchain4j-chat-scopes-websocket`.
+- [ ] `quarkus.application.name` stays pinned, with a comment saying it's Flow's `application_id`; there is no agentic scope store, registrar, allowlist or self-test.
 - [ ] `IntakeConfig`, `ClaimsMailbox` (including find-by-`Message-ID`) and `InboundEmail` exist, and the `claim-intake` model is configured for every provider/profile, with explicit `temperature` and `top-p` on the OpenAI-client configs.
 - [ ] All the mailbox tests listed above pass against Compose GreenMail.
 - [ ] Both `test-compile` runs succeed.

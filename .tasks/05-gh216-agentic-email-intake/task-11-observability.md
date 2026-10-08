@@ -19,6 +19,12 @@ exist. Traces go to LGTM and Langfuse; logs and metrics go to LGTM. Tests assert
 per generated agent sub-workflow, and one per AI-service call, plus one per Flow persistence statement. Joining the
 trace trees is upstream's fix. This task makes them **one conversation**, not one trace.
 
+**Check first: [quarkus-flow#1065](https://github.com/quarkiverse/quarkus-flow/pull/1065)** (the proposed #1056 fix,
+open on 2026-10-07, against 2.0.0-SNAPSHOT). It does upstream what this task's Flow task proxy and agentic adapter
+do, plus the sub-workflows' own spans. If a Flow release we can use contains it, drop both from this task, keep the
+`invoke_agent` span typing and the concurrent no-mixing test (it then asserts the sub-workflow spans carry the id
+too), and present that to the user before building.
+
 ## The conversation id
 
 *Unchanged from the merged design.*

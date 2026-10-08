@@ -9,7 +9,8 @@ photos, reply with Qute templates, and file the email. Before a claim moves to `
 final review: the workflow waits (a `listen` step, persisted by Flow in PostgreSQL) for the processor's decision, and
 then applies it.
 A short design document (workflow, claim-state and agent-topology diagrams) was reviewed and merged in PR #220; the
-**revised (quarkus-flow, b1) design is back at the review gate** (see Task Plan).
+**revised (quarkus-flow, b1) design passed the review gate again in PR #231** (merged 2026-10-07 as `26d8b83`, no
+review feedback).
 Last of five issues; see `.tasks/claim-intake-roadmap.md`. **Issues 1–4 must be complete before the
 implementation tasks (03 onwards).** The spike (task 01) and the design (task 02) ran ahead of them.
 
@@ -22,8 +23,8 @@ quarkus-langchain4j **1.14.1** / Quarkus **3.40.1**, matching what the task 01 s
 four follow-up spikes. See **Flow Spike Results (task 01b)** under Shared Context and
 [`spike-results-flow.md`](spike-results-flow.md). **The task files are rewritten for it (2026-10-07):** tasks 03, 05,
 06, 08–11 and 12–14 changed, task 07 is merged into task 08, and the new task 10b builds the generic conversation core.
-**Next: update the design document and diagrams and put them back through the review gate (a PR ending
-`Part of #216`), then update the #216 issue body.** No implementation task starts before the gate passes.
+**The design gate re-run passed** (PR #231 merged; the #216 issue body is updated to match and links it). **Next:
+task 03.**
 
 **Plan File:** `.tasks/05-gh216-agentic-email-intake/PLAN.md`
 **Tasks Directory:** `.tasks/05-gh216-agentic-email-intake/`
@@ -66,8 +67,9 @@ Edit or create task files and update `## Task Plan`.
 - [x] [task-01-agentic-spike.md](task-01-agentic-spike.md): Agentic module spike (runs first, throwaway)
 - [x] [task-02-design-and-review.md](task-02-design-and-review.md): Design document and review gate
 - [x] [task-01b-flow-spike.md](task-01b-flow-spike.md): quarkus-flow spike (throwaway; decided task 07) — **verdict: ADOPT**; follow-up (b1, whole intake as one workflow) **feasible**
-- [ ] **Design gate re-run (blocking):** update `docs/design/email-claim-intake.md` and its diagrams for b1, open a PR
-  ending `Part of #216`, wait for the review; then update the #216 issue body to match
+- [x] **Design gate re-run (blocking):** update `docs/design/email-claim-intake.md` and its diagrams for b1, open a PR
+  ending `Part of #216`, wait for the review; then update the #216 issue body to match — **passed:** PR #231 merged
+  (`26d8b83`, no review feedback); the issue body matches it
 - [x] **Follow-up spike 5 (blocking, user decisions 2026-10-07)**: **verdict: all four answered** (see
   `spike-results-flow.md` → Follow-up spike 5; branch `spike/flow-followup5`):
   1. the agentic adapter carries the baggage id onto every AI call inside the generated sub-workflows (8 concurrent
@@ -90,8 +92,8 @@ Edit or create task files and update `## Task Plan`.
 - [ ] [task-13-demo-and-docs.md](task-13-demo-and-docs.md): Demo guide and documentation
 - [ ] [task-14-verification.md](task-14-verification.md): Verification
 
-> **Ordering:** the task files describe the b1 design (rewritten 2026-10-07). Implementation starts at task 03 once
-> the design gate re-run passes. Task 10b may run any time before task 11 (it only touches `ai.scoring` and the chat);
+> **Ordering:** the task files describe the b1 design (rewritten 2026-10-07). The design gate re-run has passed
+> (PR #231), so implementation starts at task 03. Task 10b may run any time before task 11 (it only touches `ai.scoring` and the chat);
 > task 08 uses its `ConversationContext`, so if 08 runs first, give it a minimal `ConversationContext` stub and finish
 > it in 10b.
 
@@ -323,6 +325,20 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
 - **Two observability workarounds with exit conditions:** the quarkus#54354 `ThreadContextProvider` guard (task 10b;
   delete when quarkusio/quarkus#56805 ships) and the agentic conversation adapter (task 11; delete when
   quarkus-flow#1056 is fixed). Re-check both, and #1057/#1058, whenever Quarkus or Flow is upgraded.
+  - **#1056 has a proposed fix (2026-10-07):** [quarkus-flow#1065](https://github.com/quarkiverse/quarkus-flow/pull/1065)
+    (open, against `main` = 2.0.0-SNAPSHOT; not in any release, no 1.1.x backport yet). It makes the task span current
+    in every task body (`OTelTaskSpanProxy`, on by default, `quarkus.flow.otel.task-span-current`), carries the
+    caller's context into the generated agent workflows (`FlowPlanner.firstAction`), and activates the requesting
+    task's context on the agent's thread (`FlowAgentContextListener`). It propagates the whole OTel `Context`, so
+    baggage rides along. If it ships in a version we can use, it replaces **both** our Flow task proxy and the agentic
+    adapter (task 11), and the sub-workflows' own spans get the id too. Its only failing check on 2026-10-07 is the
+    website build's generated-docs validation, on `quarkus-flow-persistence*.adoc`, which the PR doesn't touch.
+  - **Re-checked 2026-10-08:** #1065 is still open with no reviews; #1056, #1057 and #1058 are open; Flow 1.2.0 final
+    isn't out (1.2.0.CR3), and 1.1.3 is the latest 1.1.x release. quarkus#56805 is merged for 4.0.0.Beta1 and labelled
+    `triage/backport-3.40`, but 3.40.1 is still the latest 3.40 release. Both workarounds stay.
+- **Flow comes in through the platform BOM** (`io.quarkus.platform:quarkus-flow-bom`, task 03), not the Quarkiverse
+  `io.quarkiverse.flow:quarkus-flow-bom`. The Quarkiverse BOM's parent imports an older Quarkus BOM (3.39.0 for Flow
+  1.1.3), so it brings stale entries. Platform 3.40.1 ships Flow 1.1.3, the version the spikes verified.
 - Tests must delete the claims and images they create (`ClaimsListPageTests` expects 6) and must
   never assert absolute claim numbers.
 - Every `@QuarkusTest` stubs API keys through its profile, to avoid `SRCFG00011` under `-Pollama-openai`.
@@ -407,9 +423,12 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
      the claim number (task-04).
 
 ### Design
-- **Design doc:** `docs/design/email-claim-intake.md`, on `main` (the #220 version). **A revised version for the
-  quarkus-flow b1 design is at the review gate again** (branch `design/email-claim-intake-flow`); the notes below
-  are about the #220 round.
+- **Design doc:** `docs/design/email-claim-intake.md`, on `main`, is the **quarkus-flow b1 version merged in
+  [#231](https://github.com/edeandrea/non-deterministic-no-problem/pull/231)** (`26d8b83`, 2026-10-07, no review
+  feedback: **gate re-run passed**). Its worktree is removed; the local branch `design/email-claim-intake-flow` is
+  kept (remote deleted on merge). The notes below are about the #220 round.
+  - Observability's last bullet still says the agentic adapter is "proven before implementation starts"; spike 5 has
+    since proven it. Fix that wording (doc and issue body) in task 13, with the status line.
   - **PR:** [#220](https://github.com/edeandrea/non-deterministic-no-problem/pull/220), **merged** at `ec1ca14`
     (2026-10-02) with no review feedback: the design was approved as-is, so the **gate is passed**.
   - The remote branch `design/email-claim-intake` was deleted on merge; the local branch and worktree are gone too.
