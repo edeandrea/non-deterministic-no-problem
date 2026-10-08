@@ -16,7 +16,8 @@ the same sender's running run) and returns at once. There's no agentic scope sto
 - Create `ClaimsInboxWatcher`. At startup it starts one dedicated thread, but only when `IntakeConfig.enabled()`.
   Start it from a `@Startup` bean or a `StartupEvent` observer.
 
-  The thread loops:
+  The thread loops (`ClaimsMailbox` from task 03 has `unprocessed()`, `list(folder)`, `find(folder, messageId)` and
+  `move(messageId, from, to)`; `MailFolder.PROCESSING` exists; the IDLE connection itself is this task's):
   1. Connect (retry with backoff on failure; log WARN, never throw to startup).
   2. For every message currently in the INBOX (catch-up): record its `Message-ID` (unique constraint; a duplicate is
      filed without a reply), move it to the `processing` folder, and hand it to `ClaimIntakeStarter`.
@@ -31,7 +32,8 @@ the same sender's running run) and returns at once. There's no agentic scope sto
 - On startup, emails left in `processing` by a previous JVM belong to runs that no longer exist (a restart wipes the
   database): move them back to the INBOX before the catch-up scan.
 - Confirm that the pinned GreenMail version supports IDLE (it's registered in GreenMail's command factory on main). If
-  it doesn't, fall back to a short NOOP-based check and record it in `PLAN.md`.
+  it doesn't, fall back to a short NOOP-based check and record it in `PLAN.md`. **Answered in task 03:** GreenMail
+  2.1.14 advertises `IDLE` (and `MOVE`, `UIDPLUS`) in its capabilities.
 - **Tests (with a test profile that enables intake; mock `ClaimIntakeStarter`):**
   - a message delivered while watching is processed
   - messages present before start are processed (catch-up)

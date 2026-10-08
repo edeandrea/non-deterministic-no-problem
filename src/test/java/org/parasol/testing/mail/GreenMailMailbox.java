@@ -39,7 +39,7 @@ public class GreenMailMailbox {
 	private static final String ANY_PASSWORD = "any-password";
 	private static final Duration POLL_INTERVAL = Duration.ofMillis(500);
 	private static final String PURGED = "Purged mails";
-	private static final String IMAP_TIMEOUT_MILLIS = "5000";
+	private static final Duration IMAP_TIMEOUT = Duration.ofSeconds(5);
 
 	private final String host;
 	private final int imapPort;
@@ -121,6 +121,20 @@ public class GreenMailMailbox {
 		}
 	}
 
+	/**
+	 * Deletes a user with all its folders and mail. An unknown address is fine: there's nothing to delete.
+	 *
+	 * @param address The user's email address
+	 */
+	public void deleteUser(String address) {
+		var response = api().delete("/api/user/{address}", address);
+		var isUnknown = (response.statusCode() == 400) && response.asString().contains("not found");
+
+		if ((response.statusCode() != 200) && !isUnknown) {
+			throw new MailboxAccessException("Couldn't delete GreenMail user %s (HTTP %d): %s".formatted(address, response.statusCode(), response.asString()));
+		}
+	}
+
 	private List<String> users() {
 		var response = api().get("/api/user");
 
@@ -145,8 +159,10 @@ public class GreenMailMailbox {
 	// Fail fast instead of hanging an Awaitility poll if GreenMail stops answering (Jakarta Mail defaults to no timeout)
 	private static Properties imapProperties() {
 		var properties = new Properties();
-		properties.setProperty("mail.imap.connectiontimeout", IMAP_TIMEOUT_MILLIS);
-		properties.setProperty("mail.imap.timeout", IMAP_TIMEOUT_MILLIS);
+		// Jakarta Mail session properties are strings, with timeouts in milliseconds
+		var timeoutMillis = String.valueOf(IMAP_TIMEOUT.toMillis());
+		properties.setProperty("mail.imap.connectiontimeout", timeoutMillis);
+		properties.setProperty("mail.imap.timeout", timeoutMillis);
 
 		return properties;
 	}

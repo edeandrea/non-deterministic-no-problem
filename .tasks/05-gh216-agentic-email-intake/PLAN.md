@@ -23,8 +23,9 @@ quarkus-langchain4j **1.14.1** / Quarkus **3.40.1**, matching what the task 01 s
 four follow-up spikes. See **Flow Spike Results (task 01b)** under Shared Context and
 [`spike-results-flow.md`](spike-results-flow.md). **The task files are rewritten for it (2026-10-07):** tasks 03, 05,
 06, 08–11 and 12–14 changed, task 07 is merged into task 08, and the new task 10b builds the generic conversation core.
-**The design gate re-run passed** (PR #231 merged; the #216 issue body is updated to match and links it). **Next:
-task 03.**
+**The design gate re-run passed** (PR #231 merged; the #216 issue body is updated to match and links it). **Task 03 is
+done, in review as a PR into the `gh216-email-intake` feature branch (see Task Plan → Branches and pull requests).
+Next: task 04.**
 
 **Plan File:** `.tasks/05-gh216-agentic-email-intake/PLAN.md`
 **Tasks Directory:** `.tasks/05-gh216-agentic-email-intake/`
@@ -78,7 +79,7 @@ Edit or create task files and update `## Task Plan`.
   2. per-sender order works with a CDI status listener driving the queue
   3. `MonitoredAgent` works under Flow and holds nothing for waiting runs; **keep both Dev UIs** (user decision)
   4. the three-way router (parallel LLM, tool-calling LLM, plain Java) works under Flow's translation
-- [ ] [task-03-intake-config-and-mailbox.md](task-03-intake-config-and-mailbox.md): Intake configuration, Flow dependencies and claims mailbox
+- [x] [task-03-intake-config-and-mailbox.md](task-03-intake-config-and-mailbox.md): Intake configuration, Flow dependencies and claims mailbox — **done 2026-10-08**, in review: [#233](https://github.com/edeandrea/non-deterministic-no-problem/pull/233) into `gh216-email-intake`
 - [ ] [task-04-email-templates.md](task-04-email-templates.md): Qute reply templates and sender
 - [ ] [task-05-extraction-agents.md](task-05-extraction-agents.md): Claim extraction agents
 - [ ] [task-06-triage-agents.md](task-06-triage-agents.md): Triage agents
@@ -97,11 +98,36 @@ Edit or create task files and update `## Task Plan`.
 > task 08 uses its `ConversationContext`, so if 08 runs first, give it a minimal `ConversationContext` stub and finish
 > it in 10b.
 
+> **Branches and pull requests (user decision, 2026-10-08).** `main` only ever gets the finished intake:
+> - **Feature branch `gh216-email-intake`** (from `main` @ `00d95cf`; first commit `b1a450f` adds it to CI's
+>   `pull_request` trigger). Each task gets a branch off it (`gh216/<NN>-<topic>`, e.g. `gh216/03-mailbox`) and a PR
+>   **into the feature branch**, ending `Part of #216`. The user reviews it, then it's squash-merged. Tasks 05 and 06
+>   may share one PR (one agent topology).
+> - **Link task and PR both ways:** the PR body opens with "Implements task NN of #216" linking the task file (pinned to
+>   the PR's commit), and the task's line in the Task Plan plus the task file's Outcome name the PR.
+> - **Task 10b is the exception:** it's complete on its own (the generic conversation core, the chat moved onto it
+>   with no behaviour change, the quarkus#54354 guard), so its PR goes **straight to `main`**. Merge `main` into the
+>   feature branch afterwards, before task 11.
+> - **Keeping up with `main`:** merge `main` into the feature branch locally and push (no PR needed: the `main`
+>   ruleset doesn't cover it). Its required checks are strict, so the final PR must be up to date anyway.
+> - **Final PR** after task 14: `gh216-email-intake` → `main`, linking every task PR, merged with a **merge commit**
+>   (user decision) so each reviewed task stays its own commit on `main`. The `main` ruleset allows only squash, so
+>   allow merge commits on the ruleset (and in the repo settings) for that one PR, then switch back. Then remove the
+>   branch from the CI trigger and delete it.
+
 ---
 
 ## Shared Context
 
 ### Overview
+**Task 03 outcome (2026-10-08):** Flow 1.1.3 comes in through the platform `quarkus-flow-bom`, alongside the agentic
+extension, with quarkus-langchain4j still on 1.14.1. `IntakeConfig` (`parasol.intake.*`) and `ClaimsMailbox` (list, find
+by `Message-ID` in a given folder, move between `MailFolder`s) parse mail into `InboundEmail`, with the stripped body,
+images on the allow-list, skipped attachments with reasons, and auto-reply detection. They're tested over real SMTP/IMAP
+against the Compose GreenMail. GreenMail 2.1.14 supports IDLE (task 09). An email can arrive with no `Message-ID`, so
+`messageId` is an `Optional`. **Decided (user, 2026-10-08):** an email without one takes the failure path (failed
+folder, processing-problem reply, no run; task 08 starter rule 2b), rather than getting a generated UUID.
+
 Code in a new package `org.parasol.intake` (with `agent`, `mailbox`, `reply` and `review` sub-packages), plus the
 generic conversation core and its adapters in `ai.scoring.conversation` (task 10b, task 11).
 This follows the domain-first layout of the existing code (`org.parasol.claim`, `org.parasol.chat`, `org.parasol.notification`).

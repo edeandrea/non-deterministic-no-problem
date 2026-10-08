@@ -41,6 +41,12 @@ Every terminal `switch` branch needs `.then(FlowDirectiveEnum.END)` (task 01b, A
      mail from the intake address → move to processed, no run, no reply.
   2. **Duplicate:** a `Message-ID` already recorded (unique `Claim.sourceMessageId`, or a `ClaimCorrespondence` row:
      claim, `Message-ID`, direction, sent date, stripped text) → move to processed, no run, no reply.
+  2b. **No `Message-ID`** (user decision, 2026-10-08; `InboundEmail.messageId` is empty, task 03): the failure path, with
+     no run: move it to the failed folder, log at WARN, and send the processing-problem template to the `From:` address
+     (best-effort, no threading headers). Real mail clients always set one; only hand-written scripts sending raw SMTP
+     produce this, and GreenMail stores them as-is. Generating a UUID instead was rejected: steps re-read the email by
+     its `Message-ID`, so it would have to be rewritten into the stored message (copy, append, delete). Rule 1 still
+     runs first, so this can't start a mail loop.
   3. **Claim resolution (code, not the LLM):** subject/body regex (`[CLM…]` / `CLM\d+`), then
      `In-Reply-To`/`References` against stored `Message-ID`s.
   4. **Sender check:** a resolved claim only matches if its `emailAddress` equals the sender (case-insensitive).
@@ -56,7 +62,7 @@ Every terminal `switch` branch needs `.then(FlowDirectiveEnum.END)` (task 01b, A
      (`onWorkflowStatusChanged` → `WAITING`, `COMPLETED`, `CANCELLED`, `FAULTED`; F2) drives the queue.
      **Never cancel a run mid-step**; only a waiting run is cancelled (the `supersede` step).
 - **Pass ids, not payloads.** Flow persists step data after every step, so the workflow data never holds the raw email
-  or attachment bytes. Steps re-read the email with `ClaimsMailbox.find(messageId)` (task 03) before the `file` step
+  or attachment bytes. Steps re-read the email with `ClaimsMailbox.find(MailFolder.PROCESSING, messageId)` (task 03) before the `file` step
   moves it. (The agentic scope Flow checkpoints *does* hold the correspondence text the agents receive. That's PII in
   Flow's tables for as long as the run lives; Flow deletes the rows when the run ends or is cancelled.)
 - **Steps.** Each one is a `function`/`withFilter` calling a package-private bean. No step holds a transaction across
@@ -91,7 +97,9 @@ Every terminal `switch` branch needs `.then(FlowDirectiveEnum.END)` (task 01b, A
       - the run's conversation id in the new `intakeConversationId` column (`intake_conversation_id`; nullable,
         intake-only, never changed once set)
       - the ISO `incidentDate`/`incidentTime` strings (task 05) converted to `LocalDate`/`LocalTime`
-      - image attachments as `ORIGINAL` (size/count limits), in the same transaction as the claim
+      - image attachments as `ORIGINAL` (size/count limits), in the same transaction as the claim. Pass
+        `ImageAttachment.data()` straight to `ClaimImage.store` without changing it: the record doesn't copy its array,
+        to save memory (task 03)
       - complete → `Pending Review`, with `reviewRunId` = this run's instance id; incomplete → `Pending Information`,
         with the requested items stored
     - **`PendingClaimUpdate`** (matched `Pending Information`, or `Pending Review` superseded above; **the matched claim
@@ -162,6 +170,8 @@ leaves `WAITING`; F2b). One test per rule:
 - a follow-up on an `In Process`/later/seeded `New` claim → status reply, claim unchanged
 - a follow-up from a different address → "no matching claim"; matched by header vs by subject number
 - a duplicate `Message-ID`, an auto-reply and a self-sent message: no run, no reply
+- an email with no `Message-ID` (sent as raw SMTP, since Jakarta Mail adds one): failed folder, processing-problem
+  email without threading headers, no run, no claim
 - an HTML-only email
 - an agent exception → failed folder, processing-problem email, no claim; a fault after `WAITING` is handled as decided
 - the starter doesn't wait: it returns before the run's first step finishes

@@ -39,6 +39,14 @@
 				<type>pom</type>
 				<scope>import</scope>
 			</dependency>
+			<!-- The platform's Flow BOM, not io.quarkiverse.flow:quarkus-flow-bom: that one's parent imports an older Quarkus BOM -->
+			<dependency>
+				<groupId>${quarkus.platform.group-id}</groupId>
+				<artifactId>quarkus-flow-bom</artifactId>
+				<version>${quarkus.platform.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
 		</dependencies>
 	</dependencyManagement>
 	<dependencies>
@@ -57,6 +65,26 @@
 		<dependency>
 			<groupId>io.quarkiverse.langchain4j</groupId>
 			<artifactId>quarkus-langchain4j-chat-scopes-websocket</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.quarkiverse.langchain4j</groupId>
+			<artifactId>quarkus-langchain4j-agentic</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.quarkiverse.flow</groupId>
+			<artifactId>quarkus-flow</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.quarkiverse.flow</groupId>
+			<artifactId>quarkus-flow-langchain4j</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.quarkiverse.flow</groupId>
+			<artifactId>quarkus-flow-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.quarkiverse.flow</groupId>
+			<artifactId>quarkus-flow-opentelemetry</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>io.quarkiverse.langfuse</groupId>
@@ -105,6 +133,16 @@
 		<dependency>
 			<groupId>io.quarkus</groupId>
 			<artifactId>quarkus-mailer</artifactId>
+		</dependency>
+		<!-- Jakarta Mail for reading the claims mailbox over IMAP (quarkus-mailer sends through Vert.x and doesn't bring it) -->
+		<dependency>
+			<groupId>org.eclipse.angus</groupId>
+			<artifactId>angus-mail</artifactId>
+		</dependency>
+		<!-- HTML-only email bodies to text -->
+		<dependency>
+			<groupId>org.jsoup</groupId>
+			<artifactId>jsoup</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>io.quarkus</groupId>
@@ -198,11 +236,6 @@
 		<dependency>
 			<groupId>org.awaitility</groupId>
 			<artifactId>awaitility</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.eclipse.angus</groupId>
-			<artifactId>angus-mail</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<dependency>

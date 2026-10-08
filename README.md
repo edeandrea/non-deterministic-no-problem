@@ -84,7 +84,7 @@ The full rationale, including which Langfuse platform gaps drove each tier, is i
 
 | Variable | Needed for |
 |---|---|
-| `OPENAI_API_KEY` | The `parasol-chat`, `generate-email` and `politeness` models, plus the Easy RAG embedding model |
+| `OPENAI_API_KEY` | The `parasol-chat`, `generate-email`, `politeness` and `claim-intake` models, plus the Easy RAG embedding model |
 | `COHERE_API_KEY` | The `session-sentiment` and `judge` models, reached through Cohere's OpenAI-compatible endpoint at `https://api.cohere.ai/compatibility/v1` |
 | `GEMINI_API_KEY` | Only when `LangfuseEvaluationInitializer` runs. A *missing* key raises an `IllegalStateException` that is deliberately rethrown and aborts boot; other failures reaching Langfuse (`LangfuseApiException` or anything else) are caught and logged as warnings so startup continues |
 
@@ -226,8 +226,8 @@ To run the app outside dev mode, build it as described above, then run:
 java -Dquarkus.profile=ollama-openai,prod -jar target/quarkus-app/quarkus-run.jar
 ```
 
-Both Ollama profiles redirect only the three business chat models — `parasol-chat`,
-`generate-email`, `politeness` — plus the embedding model to a local Ollama (`granite4:micro` and
+Both Ollama profiles redirect only the business chat models — `parasol-chat`,
+`generate-email`, `politeness` and `claim-intake` (the email intake's model) — plus the embedding model to a local Ollama (`granite4:micro` and
 `snowflake-arctic-embed` respectively). The two Cohere-backed models, `session-sentiment` and
 `judge`, are **not** redirected: they keep the OpenAI provider pointed at
 `https://api.cohere.ai/compatibility/v1`.
