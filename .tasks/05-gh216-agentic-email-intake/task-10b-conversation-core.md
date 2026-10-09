@@ -13,8 +13,9 @@ lifecycles feed the core through adapters, and reactions (session scoring) are C
 Runs **before task 11**, which adds the quarkus-flow and LangChain4j agentic adapters on top of this core.
 Evidence for every design choice here: `spike-results-flow.md` → *Follow-up spikes 2–4*.
 
-**Check first: quarkus-flow 1.2.0** (`PLAN.md` → Execution Steps → 2a; expected ~2026-10-09). If it's out, re-run the
-reproducers and re-adjust this task and the earlier ones before building. The core itself doesn't change, but if #1065 ships, task 11 drops its Flow and agentic adapters' context hops, so re-check which core hooks they still need.
+**quarkus-flow 1.2.0 (2026-10-09):** adopted in task 06b. The core doesn't change. #1065 is in it, so task 11 expects
+to drop its Flow task proxy and agentic adapter: once task 11 has proven that, check which core hooks it still needs
+(`ConversationContext.callIn` from the starter, at least). Check `PLAN.md` → Execution Steps → 2a first.
 
 ## What to Do
 

@@ -170,3 +170,9 @@ entity, the `AgenticScopePersister.setStore` registrar, the `ShutdownEvent` rese
 - [x] `IntakeConfig`, `ClaimsMailbox` (including find-by-`Message-ID`) and `InboundEmail` exist, and the `claim-intake` model is configured for every provider/profile, with explicit `temperature` and `top-p` on the OpenAI-client configs.
 - [x] All the mailbox tests listed above pass against Compose GreenMail.
 - [x] Both `test-compile` runs succeed.
+
+**2026-10-09 note (task 06b):** Flow is now 1.2.0, ahead of the platform. `pom.xml` imports
+`io.quarkiverse.flow:quarkus-flow-bom:${quarkus.flow.version}` before the platform's Flow BOM, which stays for when a
+platform pins Flow ≥ 1.2.0 (user decision; see task 06b). The "platform BOM, not the Quarkiverse one" reasoning above
+still holds for that day. The `-Dquarkus.flow.version=<new>` reproducer instruction above is wrong: Quarkus's test
+bootstrap ignores it, so set the version in the reproducers' `pom.xml` (`PLAN.md` → 2a).

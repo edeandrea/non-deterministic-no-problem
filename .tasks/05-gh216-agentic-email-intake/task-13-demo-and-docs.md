@@ -6,8 +6,9 @@
 
 The demo can be run from a written guide, and every project document describes the email intake accurately.
 
-**Check first: quarkus-flow 1.2.0** (`PLAN.md` → Execution Steps → 2a; expected ~2026-10-09). If it's out, re-run the
-reproducers and re-adjust this task and the earlier ones before building. Here: document what 1.2.0 fixed, not the workarounds it replaced.
+**quarkus-flow 1.2.0 (2026-10-09):** adopted in task 06b, ahead of the platform. Document what 1.2.0 fixed, not the
+workarounds it replaced, and the override in `pom.xml` with its removal condition. Check `PLAN.md` → Execution Steps →
+2a first.
 
 ## What to Do
 
@@ -30,7 +31,8 @@ reproducers and re-adjust this task and the earlier ones before building. Here: 
   `PLAN.md` → Caveats). Re-render its diagrams if they change.
   - Its Observability section says the agentic adapter is
     "proven before implementation starts": follow-up spike 5 proved it, so reword it (and the same line in the #216
-    issue body) to match what task 11 built, including whether quarkus-flow#1065 replaced the adapter.
+    issue body) to match what task 11 built, including whether quarkus-flow#1065 replaced the adapter. Its closing
+    line "quarkus-flow is 1.1.3" (and the issue body's) becomes 1.2.0, pinned ahead of the platform (task 06b).
 - Update `CLAUDE.md`:
   - **Architecture:** the `org.parasol.intake` package; the intake as one quarkus-flow workflow (`ClaimIntakeFlow`)
     with the agentic root as one step; the non-waiting watcher and starter (parallel runs, per-sender order, failure listener); `resolveClaim` and the which-claim reply; the review as the workflow's `listen` + `switch`
@@ -51,18 +53,20 @@ reproducers and re-adjust this task and the earlier ones before building. Here: 
       history is passed explicitly
     - every entry agent must be injected in `src/main`; each leaf agent belongs to exactly one root
     - agent span names (`langchain4j.aiservices.<SimpleClassName>.<method>`; the dataset-name invariant, D11)
-    - **quarkus-flow:** `quarkus-flow-langchain4j` and `-opentelemetry` are Preview; **no `@ParallelExecutor`**
-      (quarkus-flow#1057); every terminal `switch` branch needs `.then(FlowDirectiveEnum.END)`; pass ids, not
+    - **quarkus-flow:** `quarkus-flow-langchain4j` and `-opentelemetry` are Preview; no `@ParallelExecutor` (Flow
+      forks on the `ManagedExecutor` and, since 1.2.0, carries the OTel context; before 1.2.0 one broke every run,
+      quarkus-flow#1057); Flow 1.2.0 is pinned ahead of the platform by a BOM override in `pom.xml` (task 06b), removed
+      once a platform pins it; every terminal `switch` branch needs `.then(FlowDirectiveEnum.END)`; pass ids, not
       payloads, in workflow data; the "is it waiting?" check uses `PersistenceInstanceReader`, never the raw status
-      column; `quarkus.application.name` is part of Flow's table keys; a cancelled run loses its `workflow.execute`
-      span (quarkus-flow#1058)
+      column; `quarkus.application.name` is part of Flow's table keys
     - agent outputs hold no `LocalDate`/`Optional` (ISO strings), unless task 05's round-trip test relaxed it
     - **no durable state across restarts** (user decision): a restart wipes the database and GreenMail, so a waiting
       review doesn't survive it
     - **single replica:** superseding a waiting review uses `activeInstance(id)`, which only sees this JVM; a reply
       during review and a decision are serialised by optimistic locking on the claim (`@Version`)
     - **observability workarounds with exit conditions:** the quarkus#54354 `ThreadContextProvider` guard (delete when
-      quarkusio/quarkus#56805 ships) and the agentic adapter (delete when quarkus-flow#1056 is fixed)
+      quarkusio/quarkus#56805 ships), and whatever task 11 kept of its Flow and agentic adapters (Flow 1.2.0 fixes
+      quarkus-flow#1056, so task 11 expects to need neither)
   - **Observability** (task 11): one claim = one Langfuse session via `gen_ai.conversation.id` (baggage, entered once
     by the starter); the Flow task proxy; the trace shape and its known gaps (#1056); typed Flow spans; the
     persistence-span decision; the `claim.intake.*` metrics; the `%test` Langfuse span export switch

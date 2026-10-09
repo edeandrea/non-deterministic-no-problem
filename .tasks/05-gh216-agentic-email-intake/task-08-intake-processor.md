@@ -33,8 +33,9 @@ unchanged. Evidence: `spike-results-flow.md` → *Follow-up spike* (F1–F5); sk
 
 Every terminal `switch` branch needs `.then(FlowDirectiveEnum.END)` (task 01b, A1).
 
-**Check first: quarkus-flow 1.2.0** (`PLAN.md` → Execution Steps → 2a; expected ~2026-10-09). If it's out, re-run the
-reproducers and re-adjust this task and the earlier ones before building. Here: #1058 (PR #1059) would restore a cancelled run's `workflow.execute` span, so the "don't assert it" rule goes.
+**quarkus-flow 1.2.0 (2026-10-09):** adopted in task 06b before this task. #1058 is fixed there, so a canceled run
+now exports its `workflow.execute` span: the old "don't assert it" rule is gone (Key Points). Check `PLAN.md` →
+Execution Steps → 2a first (a platform that pins Flow ≥ 1.2.0).
 
 ## What to Do
 
@@ -164,7 +165,7 @@ reproducers and re-adjust this task and the earlier ones before building. Here: 
   mail). No partial claim is left: each persistence step commits only its own transaction.
   - **A fault in the decision steps** (e.g. the thank-you can't be sent) also puts the claim back so the reviewer can
     retry: `decidingRunId` → cleared and the claim stays `Pending Review`, or — if the status already changed — log it.
-    Flow 1.1.3 has `FlowDSL.tryCatch(...)` for doing this inside the run instead; pick whichever is simpler and test it.
+    Flow 1.2.0 has `FlowDSL.tryCatch(...)` for doing this inside the run instead; pick whichever is simpler and test it.
 - **No crash-recovery rules.** Durable state across restarts isn't a requirement (user decision): a restart wipes the
   database, the claims and GreenMail. So there's no "scope row but no claim" reprocessing, and no eviction anywhere.
 - **Status constants:** `Pending Information`, `Pending Review`, `In Process` (intake never sets `New`; seed statuses unchanged).
@@ -189,8 +190,11 @@ leaves `WAITING`; F2b). One test per rule:
 - **supersede:** a reply during `Pending Review` cancels the waiting run (0 Flow instance and task rows left for it).
   The claim stays `Pending Review` with the new `reviewRunId`, the during-review variant is sent, and a later decision
   reaches **only** the new run. A superseding reply that makes the claim incomplete → `Pending Information`.
-- **race:** a reply and a decision on the same `Pending Review` claim, run concurrently (latched): exactly one wins; a
-  losing decision gets the 409 and sends no email; a losing reply is handled under the new status
+- **race (the reply's side; user decision 2026-10-09):** a reply whose `supersede` step finds the `Pending Review` claim
+  already being decided (`decidingRunId` set, or the `@Version` lock lost) ends without changes and goes back in the
+  queue, and is handled again under the claim's new status (e.g. `In Process` → status reply). The test sets up the
+  "being decided" state directly, since the review endpoint is task 10's. **The decision's side, and the two run
+  concurrently (latched), are task 10's race test**: a losing decision needs the endpoint to return its 409.
 - decision `READY` → `In Process` + exactly one thank-you; `NEEDS_INFORMATION` → `Pending Information` + an email listing
   exactly the ticked items; `reviewRunId` and `decidingRunId` cleared in both; **zero LLM calls** after the decision (WireMock request
   counts unchanged since the wait started)
@@ -243,7 +247,8 @@ leaves `WAITING`; F2b). One test per rule:
   - The photos note and skipped-attachments list are template parameters (`hasPhotos`, the email's
     `skippedAttachments`), not text.
   - Statuses: use `IntakeClaimStatus` labels for `Pending Information`, `Pending Review` and `In Process`.
-- Don't assert on a cancelled run's `workflow.execute` span: quarkus-flow#1058 drops it.
+- A canceled run's `workflow.execute` span is exported since Flow 1.2.0 (quarkus-flow#1058, fixed by #1059): assert it
+  where a test cancels a run, rather than working around its absence.
 - Editing the `Flow` bean in dev mode can break hot reload (`IncompatibleClassChangeError`); restart dev mode instead.
 
 ## Done When
@@ -253,7 +258,7 @@ leaves `WAITING`; F2b). One test per rule:
 - [ ] `resolveClaim` routes fresh emails to the sender's pending claim, a new claim, or the which-claim reply, and never to a claim outside the sender's list.
 - [ ] The policy check runs after the agents; a rejection creates nothing.
 - [ ] Completeness accounts for reviewer-ticked items; the empty-reply test passes.
-- [ ] A reply during review cancels the waiting run; the race test passes; no Flow rows remain for ended runs.
+- [ ] A reply during review cancels the waiting run; a reply that finds the claim being decided goes back in the queue (the reply's side of the race; the decision's side is task 10's); no Flow rows remain for ended runs.
 - [ ] The thank-you email is sent only from `markInProcess`; a decision makes no LLM call.
 - [ ] The failure listener handles faults before and after `WAITING`, with tests.
 - [ ] Every test listed above passes under `-Pollama`, and both `test-compile` runs succeed.

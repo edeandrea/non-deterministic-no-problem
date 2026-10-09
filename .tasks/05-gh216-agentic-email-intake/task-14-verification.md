@@ -7,8 +7,9 @@
 Confirm the feature compiles and its test suites pass with stub keys, get an independent review across
 code, tests and docs, and hand the real-key and live-demo checks to the user.
 
-**Check first: quarkus-flow 1.2.0** (`PLAN.md` → Execution Steps → 2a; expected ~2026-10-09). If it's out, re-run the
-reproducers and re-adjust this task and the earlier ones before building. Here: re-check #1056, #1057 and #1058 against the Flow version the app then pins.
+**quarkus-flow 1.2.0 (2026-10-09):** adopted in task 06b, ahead of the platform. Here: re-check #1056, #1057 and #1058
+against the Flow version the app then pins (the reproducers, with the version set in their `pom.xml`), and whether a
+platform now pins Flow ≥ 1.2.0 so the override can go (`PLAN.md` → Execution Steps → 2a).
 
 ## What to Do
 

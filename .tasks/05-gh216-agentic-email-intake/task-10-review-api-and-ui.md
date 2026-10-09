@@ -12,8 +12,8 @@ decision wakes the claim's waiting workflow run (task 08), which applies it.
 `readState` replay and no eviction. The endpoint checks that the run is waiting and **publishes a decision event**,
 so it's **asynchronous**: it returns once the event is published, not once the claim has changed.
 
-**Check first: quarkus-flow 1.2.0** (`PLAN.md` → Execution Steps → 2a; expected ~2026-10-09). If it's out, re-run the
-reproducers and re-adjust this task and the earlier ones before building. Nothing here depends on it directly.
+**quarkus-flow 1.2.0 (2026-10-09):** adopted in task 06b. Nothing here depends on it directly. Check `PLAN.md` →
+Execution Steps → 2a first.
 
 ## What to Do
 
@@ -70,6 +70,9 @@ reproducers and re-adjust this task and the earlier ones before building. Nothin
     - 409 for a claim not in review, a second decision while the first is being applied, a stale `version`, and a
       decision after a superseding reply
     - a failed step-2 check leaves the claim's `reviewRunId` as it was
+    - **race (moved here from task 08, user decision 2026-10-09):** a customer reply and a decision on the same
+      `Pending Review` claim, run concurrently (latched): exactly one wins. A losing decision gets the 409 and sends no
+      email; a losing reply is handled under the claim's new status. (Task 08 covers the reply's side on its own.)
     - 400 for each invalid body
     - decisions published right as the run reaches `WAITING` aren't lost: the test re-publishes until the run leaves
       `WAITING` (F2b: `WAITING` is set just before the `listen` registers its consumer)
@@ -102,6 +105,6 @@ reproducers and re-adjust this task and the earlier ones before building. Nothin
 
 - [ ] The review endpoint exists, is validated, returns 202 on success and Problem Details for every error case (404 missing run, 409 not waiting / being decided / lost lock). `/q/openapi` lists it.
 - [ ] A decision claims the review under the lock, checks the run through `PersistenceInstanceReader`, and publishes the decision event; the run applies it.
-- [ ] A reply and a decision are serialised; the losing reply is handled under the claim's new status.
+- [ ] A reply and a decision are serialized; the losing reply is handled under the claim's new status, and the concurrent race test passes.
 - [ ] Both new statuses have labels and filters, and the review panel drives both decisions.
 - [ ] All the REST and Playwright tests listed above pass, and the frontend builds.

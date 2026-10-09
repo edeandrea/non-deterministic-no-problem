@@ -27,11 +27,13 @@ four follow-up spikes. See **Flow Spike Results (task 01b)** under Shared Contex
 04 are done** (task 03 squash-merged as [#233](https://github.com/edeandrea/non-deterministic-no-problem/pull/233);
 task 04 squash-merged as [#234](https://github.com/edeandrea/non-deterministic-no-problem/pull/234) (`9c719cb`), both into
 the `gh216-email-intake` feature branch, see Task Plan → Branches and pull requests).
-**Tasks 05 and 06 are built, reviewed and in PR** (branch `gh216/05-extraction-agents`,
-[#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235), one commit each, user decision 2026-10-09).
-The PR gets squash-merged as one commit. **Next: #235's review and merge**, then review the task list before task 07.
-**Expected: quarkus-flow 1.2.0 with the user's upstream fixes, ~2026-10-09** (see Execution Steps →
-2a and Caveats → *quarkus-flow 1.2.0*). Every task checks for it first.
+**Tasks 05 and 06 are done**, squash-merged into the feature branch as one commit,
+[#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235) (`1b232cc`, 2026-10-09).
+**quarkus-flow 1.2.0 was released on 2026-10-09** with all three of the user's fixes, and the user decided to adopt it
+ahead of the platform (2026-10-09): **task 06b** overrides Flow to 1.2.0, in its own PR into the feature branch
+([#236](https://github.com/edeandrea/non-deterministic-no-problem/pull/236), in review). **Next: task 08, once #236
+merges** (user decision, 2026-10-09: the upgrade comes first, so task 08's diff holds only task 08). See Caveats →
+*quarkus-flow 1.2.0*.
 
 **Plan File:** `.tasks/05-gh216-agentic-email-intake/PLAN.md`
 **Tasks Directory:** `.tasks/05-gh216-agentic-email-intake/`
@@ -44,32 +46,25 @@ Find the next incomplete task, and read the key decisions, spike results and not
 ### 2. Understand Your Task
 Read your task file in `.tasks/05-gh216-agentic-email-intake/task-XX-*.md`: Goal, Key Points, Done When.
 
-### 2a. Check for quarkus-flow 1.2.0 (MANDATORY, every task, until it's adopted)
-The maintainer plans to release **quarkus-flow 1.2.0 by EOD 2026-10-09**, with every issue and PR the user raised merged
-([quarkus-flow#1065 comment](https://github.com/quarkiverse/quarkus-flow/pull/1065), 2026-10-08). Before starting any
-task:
-1. Check whether 1.2.0 final exists:
-   `curl -s https://repo1.maven.org/maven2/io/quarkiverse/flow/quarkus-flow/maven-metadata.xml | grep '<version>' | tail -3`.
-   Check which Flow version the Quarkus platform's `quarkus-flow-bom` pins too (we import that one, task 03):
+### 2a. Check for a platform that pins quarkus-flow 1.2.0 or later (every task, while the override stays)
+*History: until 2026-10-09 this step waited for quarkus-flow 1.2.0 itself. It was released that day, the reproducers
+passed against it, and task 06b overrides the platform's Flow 1.1.3 with it (user decision; see Caveats →
+quarkus-flow 1.2.0).*
+
+Before starting any task:
+1. Check which Flow version the newest Quarkus platform's `quarkus-flow-bom` pins:
    `curl -s https://repo1.maven.org/maven2/io/quarkus/platform/quarkus-flow-bom/maven-metadata.xml | grep -E '<latest>|<release>'`,
-   then grep the newest `quarkus-flow-bom-<v>.pom` for `<artifactId>quarkus-flow</artifactId>`. A 1.2.0 the platform
-   doesn't pin yet means overriding the version, and that override is a decision for the user.
-2. Re-check Flow's [1.2.0 milestone](https://github.com/quarkiverse/quarkus-flow/milestone/12) and each upstream item in Caveats → *quarkus-flow 1.2.0*:
-   `gh api 'repos/quarkiverse/quarkus-flow/issues?milestone=12&state=all' -q '.[] | "\(.number) \(.state) \(.title)"'`,
-   then `gh pr view` on each fixing PR. Closed in the milestone? In the release notes? An item that moved out of the
-   milestone, or a new one that touches tracing, agents or `cancel()`, is a finding too.
-3. **If 1.2.0 is out**, before writing the task's code:
-   - **Re-run the reproducers** in [edeandrea/quarkus-flow-reproducers](https://github.com/edeandrea/quarkus-flow-reproducers)
-     against 1.2.0, and the spike tests that showed each gap. A gap counts as closed only when its reproducer passes.
-   - Check what 1.2.0 needs: its Quarkus and quarkus-langchain4j versions (1.2.0.CR3's parent is on Quarkus 3.39.0 and
-     quarkus-langchain4j 1.13.3; we're on 3.40.1 / 1.14.1).
-   - **Go back over every task, done or not, and re-adjust the plan to what 1.2.0 really fixes.** For done tasks, list
-     what's now obsolete (a workaround, a `Don't` rule, a test that asserts a gap) as follow-up work, in the current
-     task or a new one; never edit a merged task's Outcome history, add a dated note under it. For tasks not yet done,
-     rewrite their steps. The *What 1.2.0 would change* table in Caveats is the starting list.
-   - Present the findings and the proposed plan changes to the user and wait, as in steps 6–7. Upgrading Flow is a
-     decision for the user, not part of a task's build.
-4. **If it isn't out**, say so in one line in the findings and carry on with today's workarounds.
+   then grep that version's `quarkus-flow-bom-<v>.pom` for `<artifactId>quarkus-flow</artifactId>`. The platform side is
+   tracked in quarkusio/quarkus-platform (`gh search prs --repo quarkusio/quarkus-platform "Quarkus Flow"`).
+2. **If a platform we can move to pins Flow 1.2.0 or later**, say so in the findings: dropping the override (the
+   `io.quarkiverse.flow:quarkus-flow-bom` import and `quarkus.flow.version` in `pom.xml`) is a decision for the user,
+   usually taken together with that platform upgrade.
+3. Otherwise say so in one line in the findings and carry on.
+4. **Whenever the Flow version changes**, re-run the reproducers in
+   [edeandrea/quarkus-flow-reproducers](https://github.com/edeandrea/quarkus-flow-reproducers) by **editing
+   `quarkus.flow.version` in its `pom.xml`**. A `-Dquarkus.flow.version=` on the command line doesn't reach Quarkus's
+   test bootstrap, which then runs the old Flow (found on 2026-10-09). Check what ran with
+   `strings -n 8 target/quarkus/bootstrap/test-app-model.dat | grep -oE 'io.quarkiverse.flow:quarkus-flow[a-z-]*::jar:[0-9.A-Z]+' | sort | uniq -c`.
 
 ### 3. Execute the Task
 - Follow the global rules in `AGENTS.md` (coding style, AssertJ, records, `Optional`, constructor injection, commit rules, documentation policy).
@@ -114,8 +109,9 @@ Edit or create task files and update `## Task Plan`.
   4. the three-way router (parallel LLM, tool-calling LLM, plain Java) works under Flow's translation
 - [x] [task-03-intake-config-and-mailbox.md](task-03-intake-config-and-mailbox.md): Intake configuration, Flow dependencies and claims mailbox — **done 2026-10-08**, squash-merged into `gh216-email-intake` as `fcfb8e8` ([#233](https://github.com/edeandrea/non-deterministic-no-problem/pull/233))
 - [x] [task-04-email-templates.md](task-04-email-templates.md): Qute reply templates and sender — **done 2026-10-08**, squash-merged into `gh216-email-intake` as `9c719cb` ([#234](https://github.com/edeandrea/non-deterministic-no-problem/pull/234))
-- [ ] [task-05-extraction-agents.md](task-05-extraction-agents.md): Claim extraction agents — **built 2026-10-08, in PR** (branch `gh216/05-extraction-agents`; [#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235), shared with task 06)
-- [ ] [task-06-triage-agents.md](task-06-triage-agents.md): Triage agents — **built 2026-10-09, in PR**; second commit on task 05's branch and [#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235)
+- [x] [task-05-extraction-agents.md](task-05-extraction-agents.md): Claim extraction agents — **done 2026-10-09**, squash-merged into `gh216-email-intake` with task 06 as `1b232cc` ([#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235))
+- [x] [task-06-triage-agents.md](task-06-triage-agents.md): Triage agents — **done 2026-10-09**, in the same squash commit `1b232cc` ([#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235))
+- [ ] [task-06b-flow-1-2-0.md](task-06b-flow-1-2-0.md): Adopt quarkus-flow 1.2.0 ahead of the platform (user decision, 2026-10-09) — **built, in PR** (branch `gh216/flow-1.2.0`, [#236](https://github.com/edeandrea/non-deterministic-no-problem/pull/236))
 - ~~[task-07-human-review-step.md](task-07-human-review-step.md): Human review step~~ — **merged into task 08** (user decision, 2026-10-07)
 - [ ] [task-08-intake-processor.md](task-08-intake-processor.md): The intake workflow and business rules (includes the human review)
 - [ ] [task-09-imap-idle-watcher.md](task-09-imap-idle-watcher.md): IMAP IDLE watcher
@@ -173,7 +169,7 @@ address, otherwise the `From` display name, otherwise "Customer" (`CustomerName.
 sender's own pending claim numbers; `notification` doesn't use the intake sender. `MissingItem` and `IntakeClaimStatus`
 live in `org.parasol.intake`. Details in the task file's Outcome.
 
-**Task 05 outcome (2026-10-08, in PR #235):** `ClaimExtractionWorkflow` is a declarative `@ParallelAgent` over the
+**Task 05 outcome (2026-10-08, merged in #235):** `ClaimExtractionWorkflow` is a declarative `@ParallelAgent` over the
 summary, sentiment and incident-details agents (`extractClaim(correspondence, extractedSoFar, requestedItems,
 sentDate)`), with guardrails for JSON, length and dates. A date or time the model never corrects is treated as
 missing, through the workflow's `@ErrorHandler`; malformed JSON still fails the run. `findMissingItems` is a pure
@@ -183,7 +179,7 @@ the `@Agent` method (and `@RegisterAiService(modelName)` is needed too, or `-Pol
 agent's own parameters only validate when it's injected in `src/main` (`ClaimExtractionWorkflowEntryPoint`,
 `@Unremovable`; task 06 deletes it). Details in the task file's Outcome.
 
-**Task 06 outcome (2026-10-09, in PR #235):** `ClaimsMailboxAgent` (classifier → `EmailRouter`, a three-way
+**Task 06 outcome (2026-10-09, merged in #235):** `ClaimsMailboxAgent` (classifier → `EmailRouter`, a three-way
 `@ConditionalAgent` deciding on the matched claim first) returns the sealed `IntakeOutcome`; `ClaimResolver` is a plain
 AI service whose answer task 08 limits to the offered claims. "No match" is `MatchedClaim.none()` (a `null` input counts
 as missing), the extraction's date recovery moved to the root's `@ErrorHandler` (a nested workflow's own handler doesn't
@@ -414,6 +410,9 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
 - **Two observability workarounds with exit conditions:** the quarkus#54354 `ThreadContextProvider` guard (task 10b;
   delete when quarkusio/quarkus#56805 ships) and the agentic conversation adapter (task 11; delete when
   quarkus-flow#1056 is fixed). Re-check both, and #1057/#1058, whenever Quarkus or Flow is upgraded.
+  - **2026-10-09: #1056 is fixed in Flow 1.2.0, which task 06b adopts.** Task 11 now expects to drop both its Flow task
+    proxy and the agentic adapter, after a concurrent test proves the baggage id reaches every span (see task 11's
+    "Check first"). The quarkus#54354 guard stays: #56805 is in no 3.40 release yet (3.40.1 is the latest).
   - **#1056 has a proposed fix (2026-10-07):** [quarkus-flow#1065](https://github.com/quarkiverse/quarkus-flow/pull/1065)
     (open, against `main` = 2.0.0-SNAPSHOT; not in any release, no 1.1.x backport yet). It makes the task span current
     in every task body (`OTelTaskSpanProxy`, on by default, `quarkus.flow.otel.task-span-current`), carries the
@@ -425,6 +424,27 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
   - **Re-checked 2026-10-08:** #1065 is still open with no reviews; #1056, #1057 and #1058 are open; Flow 1.2.0 final
     isn't out (1.2.0.CR3), and 1.1.3 is the latest 1.1.x release. quarkus#56805 is merged for 4.0.0.Beta1 and labelled
     `triage/backport-3.40`, but 3.40.1 is still the latest 3.40 release. Both workarounds stay.
+- **quarkus-flow 1.2.0: released 2026-10-09 and adopted ahead of the platform (task 06b, user decision 2026-10-09).**
+  - **State on 2026-10-09** (checked with `gh` and Maven Central): 1.2.0 was released at 19:21Z. Its release notes include
+    #1065 (#1056), #1068 (#1057), #1059 (#1058) and #1066 (#1040); the milestone's #1013 (log/trace correlation, PR #939)
+    is still open and not in it. quarkus-platform 3.40.1 (the latest) still pins Flow 1.1.3, and no platform PR for 1.2.0
+    exists yet. 1.2.0's parent is on Quarkus 3.39.0 and quarkus-langchain4j 1.14.1.
+  - **Reproducers** ([edeandrea/quarkus-flow-reproducers](https://github.com/edeandrea/quarkus-flow-reproducers), version
+    set in its `pom.xml`, the loaded jars checked in Quarkus's bootstrap model): all five tests fail on 1.1.3 and pass on
+    1.2.0. On 1.2.0 the task span is current inside the task body, one `TracingFlow` run is 24 spans in **1 trace** (6
+    on 1.1.3), a `@ParallelExecutor` runs, and 10 canceled waiting runs each export their `workflow.execute` span.
+  - **Our intake suite on 1.2.0**: 146 tests (all 22 intake classes), 0 failures under default, `-Pollama` and
+    `-Pollama-openai`, in task 06b's full `clean verify`. The rest of the suite is unchanged from the base commit (10
+    Playwright failures locally, the same names on `1b232cc`, green in CI).
+  - **What the override costs:** an `io.quarkiverse.flow:quarkus-flow-bom:${quarkus.flow.version}` import *after*
+    quarkus-bom (its Quarkus 3.39.0 parent then changes no `io.quarkus` version). It moves serverlessworkflow 7.32.1 →
+    7.35.3, cloudevents 3.0.0 → 5.0.0, h2-mvstore and classgraph (patch), and brings `quarkus-scheduler` +
+    `cron-utils` in through `quarkus-flow-persistence-common`, for 1.2.0's periodic re-scan of persisted runs (#1064).
+    The re-scan is off unless `quarkus.flow.persistence.scan-interval` is set (it's `Optional`, no default), and it skips
+    instances already active in this JVM.
+  - **Dropping the override** (Execution Steps → 2a): once a platform we move to pins Flow ≥ 1.2.0.
+
+  *History (2026-10-08): the maintainer's plan and the state before the release, kept as written.*
 - **quarkus-flow 1.2.0 (expected EOD 2026-10-09; recorded 2026-10-08).** The maintainer, on
   [#1065](https://github.com/quarkiverse/quarkus-flow/pull/1065): *"my goal is to have all the telemetry PRs merged by
   tomorrow and release 1.2.0 my EOD. I'll set a milestone for it."* Every task re-checks it first (Execution Steps → 2a).
