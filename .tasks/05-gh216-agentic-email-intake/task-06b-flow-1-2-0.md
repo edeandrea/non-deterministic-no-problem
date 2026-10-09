@@ -58,7 +58,8 @@ The app runs on quarkus-flow **1.2.0**, which fixes all three upstream bugs the 
 
 ## Outcome
 
-Built 2026-10-09 on branch `gh216/flow-1.2.0`.
+Built 2026-10-09 on branch `gh216/flow-1.2.0`; in review as
+[#236](https://github.com/edeandrea/non-deterministic-no-problem/pull/236) into `gh216-email-intake`.
 
 - **The override** (`pom.xml`): the Quarkiverse Flow BOM is imported third, after `quarkus-bom` and the
   quarkus-langchain4j BOM, and before the platform's `quarkus-flow-bom`. Effective-POM diff, before → after
