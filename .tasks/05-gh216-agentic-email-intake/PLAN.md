@@ -27,10 +27,10 @@ four follow-up spikes. See **Flow Spike Results (task 01b)** under Shared Contex
 04 are done** (task 03 squash-merged as [#233](https://github.com/edeandrea/non-deterministic-no-problem/pull/233);
 task 04 squash-merged as [#234](https://github.com/edeandrea/non-deterministic-no-problem/pull/234) (`9c719cb`), both into
 the `gh216-email-intake` feature branch, see Task Plan → Branches and pull requests).
-**Task 05 is built and in review** (branch `gh216/05-extraction-agents`, not yet committed). **Tasks 05 and 06 share one
+**Task 05 is built and in review** (branch `gh216/05-extraction-agents`, draft
+[#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235)). **Tasks 05 and 06 share one
 draft PR** (user decision, 2026-10-09): task 05 is its first commit, task 06 a second commit on the same branch, and
-the PR is marked ready once 06 lands, then squash-merged as one commit. **Next: task 06**, on that branch, once the
-draft PR is open. **Expected: quarkus-flow 1.2.0 with the user's upstream fixes, ~2026-10-09** (see Execution Steps →
+the PR is marked ready once 06 lands, then squash-merged as one commit. **Next: task 06**, on that branch. **Expected: quarkus-flow 1.2.0 with the user's upstream fixes, ~2026-10-09** (see Execution Steps →
 2a and Caveats → *quarkus-flow 1.2.0*). Every task checks for it first.
 
 **Plan File:** `.tasks/05-gh216-agentic-email-intake/PLAN.md`
@@ -114,8 +114,8 @@ Edit or create task files and update `## Task Plan`.
   4. the three-way router (parallel LLM, tool-calling LLM, plain Java) works under Flow's translation
 - [x] [task-03-intake-config-and-mailbox.md](task-03-intake-config-and-mailbox.md): Intake configuration, Flow dependencies and claims mailbox — **done 2026-10-08**, squash-merged into `gh216-email-intake` as `fcfb8e8` ([#233](https://github.com/edeandrea/non-deterministic-no-problem/pull/233))
 - [x] [task-04-email-templates.md](task-04-email-templates.md): Qute reply templates and sender — **done 2026-10-08**, squash-merged into `gh216-email-intake` as `9c719cb` ([#234](https://github.com/edeandrea/non-deterministic-no-problem/pull/234))
-- [ ] [task-05-extraction-agents.md](task-05-extraction-agents.md): Claim extraction agents — **built 2026-10-08, in review** (branch `gh216/05-extraction-agents`; draft PR shared with task 06)
-- [ ] [task-06-triage-agents.md](task-06-triage-agents.md): Triage agents — second commit on task 05's branch and draft PR
+- [ ] [task-05-extraction-agents.md](task-05-extraction-agents.md): Claim extraction agents — **built 2026-10-08, in review** (branch `gh216/05-extraction-agents`; draft [#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235), shared with task 06)
+- [ ] [task-06-triage-agents.md](task-06-triage-agents.md): Triage agents — second commit on task 05's branch and draft [#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235)
 - ~~[task-07-human-review-step.md](task-07-human-review-step.md): Human review step~~ — **merged into task 08** (user decision, 2026-10-07)
 - [ ] [task-08-intake-processor.md](task-08-intake-processor.md): The intake workflow and business rules (includes the human review)
 - [ ] [task-09-imap-idle-watcher.md](task-09-imap-idle-watcher.md): IMAP IDLE watcher

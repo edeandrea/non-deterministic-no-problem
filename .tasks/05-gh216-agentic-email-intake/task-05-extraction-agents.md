@@ -149,8 +149,10 @@ reproducers and re-adjust this task and the earlier ones before building. Here: 
 
 ## Outcome
 
-Built 2026-10-08 on branch `gh216/05-extraction-agents`. Not yet committed. Opens a **draft PR shared with task 06**
-(user decision, 2026-10-09): task 06 is a second commit on this branch, and the PR is squash-merged once 06 lands.
+Built 2026-10-08 on branch `gh216/05-extraction-agents`, committed as `454711f`; in review as draft
+[#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235) into `gh216-email-intake`, **shared with
+task 06** (user decision, 2026-10-09): task 06 is a second commit on this branch, and the PR is squash-merged once 06
+lands.
 
 - **Packages** (user decision, 2026-10-09: split by agent group, not by layer, so the intake doesn't end up with one
   package of 20+ classes after task 06):

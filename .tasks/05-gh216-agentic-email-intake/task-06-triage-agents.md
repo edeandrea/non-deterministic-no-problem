@@ -3,8 +3,8 @@
 **Type:** Code Modification
 
 > **Branch and PR (user decision, 2026-10-09):** no branch of its own. Build this as a **second commit on
-> `gh216/05-extraction-agents`**, in task 05's draft PR. Mark the PR ready once this commit lands; it's squash-merged
-> as one commit for both tasks.
+> `gh216/05-extraction-agents`**, in task 05's draft [#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235).
+> Mark the PR ready once this commit lands; it's squash-merged as one commit for both tasks.
 
 ## Goal
 
