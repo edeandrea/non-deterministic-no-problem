@@ -85,9 +85,33 @@ reproducers and re-adjust this task and the earlier ones before building. Here: 
     - `NEW_INCIDENT` → continue unmatched (the classifier then decides, as today)
     - `UNSURE`, or a number not in the list → `replyWhichClaim` (task 04's template, the sender's pending claim
       numbers), change nothing, END
+    - *From task 06:* `ClaimResolver.resolveClaim(email, List<PendingClaim>)` returns a `ClaimResolution`
+      (`org.parasol.intake.model`). Always pass it through `limitToOfferedClaims(offeredNumbers)`, which turns an
+      `EXISTING` answer for a claim that wasn't offered into `UNSURE` (unit-tested there; the step's own test still
+      covers the routing).
   - **`runAgents`:** `ClaimsMailboxAgent.process(…)` (task 06), with the claim history passed explicitly: the combined
     correspondence, the matched claim (or none), the fields extracted so far, and the **requested items**, including
     any reviewer-ticked items stored on the claim. Output: the `IntakeOutcome`.
+    - *From task 06:* the signature is `process(correspondence, matchedClaim, extractedSoFar, requestedItems, sentDate,
+      invocationParameters)`. Pass `MatchedClaim.none()` (never `null`) when nothing matched, and always
+      `ClaimStatusTools.scopedTo(matchedClaim)` as the last argument: it scopes the status tool to that claim (see the
+      task 06 Outcome for why the root takes it). `MatchedClaim.of(claimNumber, status)` takes the claim's stored
+      status string.
+    - *From task 06:* inject `ClaimsMailboxAgent` into the workflow bean and **delete `ClaimsMailboxAgentEntryPoint`**
+      in the same change.
+    - *From task 05:* build the combined correspondence in a package-private helper here, and cap it there at
+      `intakeConfig.limits().maxBodyCharacters()` (the stored body isn't truncated). The cap was first built in task 05
+      and moved here in its review; keep its rules and tests:
+      - keep the **newest** text: replies are appended at the end, and older facts reach the agents through the fields
+        extracted so far
+      - cut forward to the next line break so no line is sent half cut; one very long line is cut mid-line rather than
+        dropped
+      - put an `[Earlier correspondence omitted]` line in front of what's kept; the marker and its line break count
+        toward the limit
+      - tests: text that fits is sent unchanged; long text keeps the newest whole lines within the limit; one very long
+        line is cut mid-line; a limit with no room beyond the marker is rejected
+    - Pass the fields so far as an `IncidentDetails` (all `null` for a new claim, never `null` itself) and the
+      requested items as any `Collection<MissingItem>`.
   - **`policyCheck`** (gap 7), in code, before any claim is created or changed:
     - stated, and on another claim with the *same* customer (name + email): reuse it
     - stated, with a *different* customer: send the policy-inconsistency template, create and change nothing, END
@@ -110,7 +134,7 @@ reproducers and re-adjust this task and the earlier ones before building. Here: 
       - append the stripped reply to `body` (separated, dated) and record the correspondence
       - merge newly supplied fields (never overwrite with null); store new images
       - **Completeness** (gap 8): complete only when no required detail is missing **and** every reviewer-ticked item
-        was answered (`missingInformation`, task 05). A blank reply answers nothing.
+        was answered (`missingInformation`, task 05; built as `ClaimExtractionRules.findMissingItems`). A blank reply answers nothing.
       - complete → `Pending Review` (new `reviewRunId`), clear the requested items; incomplete →
         `Pending Information`, store the still-requested items
     - **`StatusReply`** (matched claim in any other status, including seeded `New`), **`NotAClaim`**,

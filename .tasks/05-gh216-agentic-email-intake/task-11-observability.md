@@ -107,6 +107,8 @@ too), and present that to the user before building.
 - **`MonitoredAgent`: keep it, alongside Flow's Dev UI** (user decision 2026-10-07, after spike 5's screenshots).
   - The root (`ClaimsMailboxAgent`) extends `MonitoredAgent`. The agentic Dev UI shows what Flow's can't: the branch
     taken, inputs and outputs, tokens, and tool calls with their arguments and results.
+    - *From task 06:* it doesn't extend it yet; adding `extends MonitoredAgent` and the retention observer is this
+      task's.
   - The old dev-only decision was driven by suspended `@HumanInTheLoop` runs staying in `ongoingExecutions`. Under
     Flow the agent call ends inside `runAgents`, before the run waits. Spike 5 measured 0 ongoing with 3 runs waiting
     for review.

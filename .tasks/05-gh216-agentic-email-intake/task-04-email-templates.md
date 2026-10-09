@@ -72,7 +72,7 @@ component and covered by rendering tests.
 
 ## Outcome
 
-Done 2026-10-08, on branch `gh216/04-reply-templates`; in review as [#234](https://github.com/edeandrea/non-deterministic-no-problem/pull/234) into `gh216-email-intake`.
+Done 2026-10-08, on branch `gh216/04-reply-templates`; squash-merged into `gh216-email-intake` as `9c719cb` ([#234](https://github.com/edeandrea/non-deterministic-no-problem/pull/234)).
 
 - **Templates** (`org.parasol.intake.reply.IntakeTemplates`, `@CheckedTemplate(basePath = "IntakeTemplates")`): the
   nine replies, each as `.html` and `.txt` under `src/main/resources/templates/IntakeTemplates/`.
