@@ -21,8 +21,9 @@ import dev.langchain4j.guardrail.OutputGuardrailResult;
  * Parallel claim extraction workflow that fans out to the summary, sentiment and incident-details agents.
  * <p>
  * The parameters are the workflow's own inputs; the sub-agents read them from the agentic scope by name. There's no
- * {@code @ParallelExecutor}: under Flow it fails every run (quarkiverse/quarkus-flow#1057), and Flow already runs the
- * fork on Quarkus's {@code ManagedExecutor}.
+ * {@code @ParallelExecutor}: Flow already runs the fork on Quarkus's {@code ManagedExecutor}, and since quarkus-flow
+ * 1.2.0 (quarkiverse/quarkus-flow#1065) it carries the caller's OpenTelemetry context onto the agent threads, which is
+ * what a custom executor would have been for. (Before 1.2.0 one also failed every run, quarkiverse/quarkus-flow#1057.)
  */
 public interface ClaimExtractionWorkflow {
 	/**

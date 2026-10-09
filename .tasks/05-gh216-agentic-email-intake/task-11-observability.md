@@ -12,19 +12,28 @@ exist. Traces go to LGTM and Langfuse; logs and metrics go to LGTM. Tests assert
 **quarkus-flow** and **LangChain4j agentic** adapters on task 10b's generic conversation core. Gone:
 - the synthetic `CONSUMER` root span (Flow's `workflow.execute` / `task.execute` spans replace it)
 - the `@AgentListenerSupplier` span tree
-- `@ParallelExecutor` (quarkus-flow#1057)
+- `@ParallelExecutor` (quarkus-flow#1057, fixed in 1.2.0; still not wanted: Flow carries the context itself since #1065)
 - the separate review-decision trace and its span link: the decision steps run inside the claim's own run (D15)
 
-**What one run looks like today** (quarkus-flow#1056, F4): several traces, not one. These are the main workflow, one
-per generated agent sub-workflow, and one per AI-service call, plus one per Flow persistence statement. Joining the
-trace trees is upstream's fix. This task makes them **one conversation**, not one trace.
+**What one run looked like on Flow 1.1.3** (quarkus-flow#1056, F4): several traces, not one. These are the main
+workflow, one per generated agent sub-workflow, and one per AI-service call, plus one per Flow persistence statement.
 
-**Check first: quarkus-flow 1.2.0** (`PLAN.md` → Execution Steps → 2a), expected ~2026-10-09 with
-[quarkus-flow#1065](https://github.com/quarkiverse/quarkus-flow/pull/1065) in it (the maintainer's plan, 2026-10-08)
-(the proposed #1056 fix, open on 2026-10-07, against 2.0.0-SNAPSHOT, which 1.2.0 is cut from). It does upstream what this task's Flow task proxy and agentic adapter
-do, plus the sub-workflows' own spans. If a Flow release we can use contains it, drop both from this task, keep the
-`invoke_agent` span typing and the concurrent no-mixing test (it then asserts the sub-workflow spans carry the id
-too), and present that to the user before building.
+**Check first (2026-10-09): quarkus-flow 1.2.0 is adopted (task 06b), and it contains
+[#1065](https://github.com/quarkiverse/quarkus-flow/pull/1065), the #1056 fix.** It makes the task span current in
+every task body (`OTelTaskSpanProxy`, on by default, `quarkus.flow.otel.task-span-current`), carries the caller's
+context into the generated agent sub-workflows (`FlowPlanner.firstAction`), and activates the requesting task's
+context on the agent's thread (`FlowAgentContextListener`). It propagates the whole OTel `Context`, so baggage should
+ride along. The #1056 reproducer passes on 1.2.0 (one run: 24 spans in 1 trace, against 6 traces on 1.1.3).
+- **Expected:** drop the Flow task proxy and the agentic adapter below, and the "sub-workflow spans carry no id" gap
+  with them. Keep the `invoke_agent` span typing, the concurrent no-mixing test (it then also asserts the
+  sub-workflows' own spans carry the id), the metrics, logs, `MonitoredAgent` and Langfuse items.
+- **Not yet proven:** that the **baggage** id (not just the trace) reaches every span of a run, including the AI calls
+  under the sub-workflows, with 8 concurrent runs and the task 10b leak guard in place. The reproducer checks trace
+  joining only. Prove that first (a short probe, or this task's concurrent test written before any adapter), then
+  present the result to the user before dropping or building either adapter.
+- The log trace id step is unaffected: #1013 (Flow lifecycle logs with the trace) is still open and not in 1.2.0.
+
+The sections below were written for 1.1.3 and still describe both adapters; they stay until the proof above decides.
 
 ## The conversation id
 
@@ -170,7 +179,8 @@ too), and present that to the user before building.
   never import each other or the intake. Task 10b's layering test covers them.
 - `%drift` disables the OTel SDK entirely, so there are no spans there. That's expected; don't "fix" it.
 - Langfuse receives traces only. Logs and metrics go to LGTM over OTLP (`%openshift`: `http://lgtm:4318`).
-- Don't assert on a cancelled run's `workflow.execute` span: quarkus-flow#1058 drops it.
+- A canceled run's `workflow.execute` span is exported since Flow 1.2.0 (quarkus-flow#1058): assert it, and that it
+  carries the run's conversation id.
 - Grafana panels for these metrics are #218, not this task.
 - The reply templates are the `IntakeTemplates` methods (task 04: `receivedFinalReview`, `claimInProcess`,
   `missingInformation`, `stillMissingInformation`, `processingProblem`, `policyInconsistency`, `notAClaim`,

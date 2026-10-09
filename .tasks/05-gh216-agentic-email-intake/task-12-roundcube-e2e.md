@@ -7,8 +7,8 @@
 A Playwright test drives the full demo through the real Roundcube UI and the Parasol review panel, with
 the LLM mocked, and runs on every CI build.
 
-**Check first: quarkus-flow 1.2.0** (`PLAN.md` → Execution Steps → 2a; expected ~2026-10-09). If it's out, re-run the
-reproducers and re-adjust this task and the earlier ones before building. Nothing here depends on it directly.
+**quarkus-flow 1.2.0 (2026-10-09):** adopted in task 06b. Nothing here depends on it directly. Check `PLAN.md` → Execution Steps →
+2a first.
 
 ## What to Do
 

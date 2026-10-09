@@ -13,6 +13,7 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
+		<quarkus.flow.version>1.2.0</quarkus.flow.version>
 		<quarkus.langchain4j.version>1.14.1</quarkus.langchain4j.version>
 		<quarkus.playwright.version>2.3.10</quarkus.playwright.version>
 		<quarkus.quinoa.version>2.9.2</quarkus.quinoa.version>
@@ -36,6 +37,21 @@
 				<groupId>io.quarkiverse.langchain4j</groupId>
 				<artifactId>quarkus-langchain4j-bom</artifactId>
 				<version>${quarkus.langchain4j.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+			<!--
+				quarkus-flow ahead of the platform: 1.2.0 fixes quarkiverse/quarkus-flow#1056, #1057 and #1058, and platform
+				3.40.1 still pins 1.1.3. Its parent imports the Quarkus 3.39.0 BOM, but it comes after quarkus-bom, so that
+				import changes no io.quarkus version (it adds two platform-descriptor entries). It moves serverlessworkflow
+				7.32.1 -> 7.35.3 and cloudevents 3.0.0 -> 5.0.0 (plus h2-mvstore and classgraph patch bumps), and pulls in
+				quarkus-scheduler for Flow's persistence re-scan. Remove it and quarkus.flow.version once a platform release
+				pins Flow 1.2.0 or later: the platform's Flow BOM below then applies again
+			-->
+			<dependency>
+				<groupId>io.quarkiverse.flow</groupId>
+				<artifactId>quarkus-flow-bom</artifactId>
+				<version>${quarkus.flow.version}</version>
 				<type>pom</type>
 				<scope>import</scope>
 			</dependency>

@@ -15,6 +15,8 @@ real `fork`. **No `@ParallelExecutor`** (it breaks every run under Flow, quarkus
 
 **Check first: quarkus-flow 1.2.0** (`PLAN.md` → Execution Steps → 2a; expected ~2026-10-09). If it's out, re-run the
 reproducers and re-adjust this task and the earlier ones before building. Here: #1057 is fixed on `main` (PR #1068), so `@ParallelExecutor` works again in 1.2.0. Whether this workflow wants one at all is a decision for the user (Flow already runs the fork on the `ManagedExecutor`).
+*2026-10-09 note (task 06b): 1.2.0 was released and adopted. #1057 is fixed, but `ClaimExtractionWorkflow` still has
+no `@ParallelExecutor` (Flow forks on the `ManagedExecutor` and #1065 carries the OTel context); its Javadoc now says so.*
 
 **Pre-flight findings (2026-10-08):**
 - **Guardrail reprompts keep the full prompt under Quarkus; nothing special is needed.** Plain LangChain4j 1.20.2–1.22.0

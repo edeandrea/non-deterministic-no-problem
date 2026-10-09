@@ -19,6 +19,7 @@ an agentic scope store.
 
 **Check first: quarkus-flow 1.2.0** (`PLAN.md` → Execution Steps → 2a; expected ~2026-10-09). If it's out, re-run the
 reproducers and re-adjust this task and the earlier ones before building. Nothing here depends on it directly; the trace shape of the generated sub-workflows changes with #1065 (task 11).
+*2026-10-09 note (task 06b): 1.2.0 was released and adopted; nothing in this task changes for it.*
 
 ## What to Do
 
