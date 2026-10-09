@@ -33,6 +33,8 @@ The Java source is split into two top-level packages representing two distinct c
 | `org.parasol.intake` | The email claim intake ([#216](https://github.com/edeandrea/non-deterministic-no-problem/issues/216), being built): `IntakeConfig` (`parasol.intake.*`), `MissingItem`, `IntakeClaimStatus` |
 | `org.parasol.intake.mailbox` | `ClaimsMailbox` (the `claims@parasol.com` IMAP mailbox: list, find by `Message-ID`, move between `MailFolder`s), `InboundEmail` and its attachment records, the package-private MIME parser, HTML-to-text and quoted-text helpers |
 | `org.parasol.intake.reply` | The intake's replies: `IntakeTemplates` (the fixed Qute mail templates, under `templates/IntakeTemplates/`), `IntakeReplySender` (blocking; subject prefix, threading and `Auto-Submitted` headers) and `CustomerName` (who a reply greets) |
+| `org.parasol.intake.model` | The intake's records that Flow persists and later steps read: `IncidentDetails`, `ClaimExtraction` (JSON-safe: ISO date/time strings, no `Optional`) |
+| `org.parasol.intake.agent.extraction` | Everything behind `ClaimExtractionWorkflow` (`@ParallelAgent` over `ClaimSummaryAgent`, `ClaimSentimentAgent` and `IncidentDetailsAgent`): its package-private output guardrails and `IsoValues`, plus `ClaimExtractionRules.findMissingItems`. `org.parasol.intake.agent` itself is for the root agent and router (task 06), with triage agents in `.triage` |
 
 Dependencies point one way: `chat` → `notification` → `claim`, and `intake` → `claim`. New features get their own
 domain package with the same kind of layer sub-packages. Test packages mirror main, plus the test-only `org.parasol.ui` for Playwright
@@ -385,7 +387,7 @@ Model names are configured in `src/main/resources/application.yml` and resolve p
 | `politeness` | `PolitenessService` | `gpt-5-mini` |
 | `session-sentiment` | `SessionSentimentService` | Cohere `command-r7b-12-2024` via its OpenAI-compatible endpoint |
 | `judge` | `EvaluatorAgent` (drift detection) | Cohere `command-r7b-12-2024` via its OpenAI-compatible endpoint |
-| `claim-intake` | The email intake agents (#216, being built; configured, no agent uses it yet) | `gpt-5-mini` |
+| `claim-intake` | The email intake agents (#216, being built): `ClaimSummaryAgent`, `ClaimSentimentAgent`, `IncidentDetailsAgent` | `gpt-5-mini` |
 
 Note the Cohere models are reached through the **OpenAI** extension pointed at
 `https://api.cohere.ai/compatibility/v1` with `COHERE_API_KEY` — there is no Cohere-specific
@@ -599,6 +601,27 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   without sending (the HTML through jsoup's visible text, so both get the same assertions): greetings, missing items,
   attachment notes, HTML escaping, and the no-leak checks against every seeded claim. `IntakeReplySenderTests` sends
   through GreenMail and checks the subject and headers. `CustomerNameTests` is a plain unit test.
+- **Intake agent tests** (`org.parasol.intake.agent.extraction`): plain unit tests for `findMissingItems`, the two
+  guardrails and the `@Output` method; `ClaimExtractionValueRoundTripTests` (`org.parasol.intake.model`) round-trips the records through
+  the Quarkus `ObjectMapper` (what Flow persists with). `ClaimExtractionWorkflowTests` runs the real workflow against
+  WireMock:
+  - stubs match on the **last** message (`matchingJsonPath("$.messages[-1:].content", ...)`), so a reprompt gets its own
+    stub;
+  - its profile pins `claim-intake`'s provider to `openai` and its `model-name` to `claim-intake-model`, so the WireMock
+    stubs are hit under every CI profile, and an agent on the wrong model shows up;
+  - parallelism is checked from WireMock's own timings (every request arrives before the first is answered), not from
+    wall-clock time.
+  - the incident-details prompt's category list comes from `ClaimCategory` through `ExtractionPromptExtensions`
+    (`{extraction:claimCategories}`), a test checks the rendered list. Domain enums carry no Qute annotation; bind them
+    in the template's own package with a `@TemplateExtension(namespace = …)`.
+- **Agentic gotchas (quarkus-langchain4j 1.14.1):**
+  - `@ModelName` must sit on the `@Agent` **method**; on the interface it's silently ignored and the agent uses the
+    default model. Also set `@RegisterAiService(modelName = ...)` to the same name: the core extension reads only that
+    attribute when it registers the AI service, so without it the build asks for the default chat model, which is
+    ambiguous (and fails) under `-Pollama`, where both `ollama` and `openai` are on the classpath.
+  - A workflow's own parameters only pass the build's "No agent provides an output key" check if the workflow interface
+    is `@Inject`-ed somewhere **in `src/main`**. `ClaimExtractionWorkflowEntryPoint` does that until task 06 nests the
+    workflow under the root; it's `@Unremovable`, or ArC drops it with its injection point.
 - **Claim image tests:** `ClaimImageTests` (entity, `@TestTransaction`), `ClaimImageResourceTests` (REST and Problem
   Details), `ClaimImageContentTypeTests` (allow-list, no Quarkus), `ClaimImageSeederTests` and the Playwright
   `ClaimImagesPageTests`.

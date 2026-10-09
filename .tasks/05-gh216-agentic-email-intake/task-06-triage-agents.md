@@ -2,6 +2,10 @@
 
 **Type:** Code Modification
 
+> **Branch and PR (user decision, 2026-10-09):** no branch of its own. Build this as a **second commit on
+> `gh216/05-extraction-agents`**, in task 05's draft PR. Mark the PR ready once this commit lands; it's squash-merged
+> as one commit for both tasks.
+
 ## Goal
 
 A `ClaimsMailboxAgent` root workflow classifies an inbound email and routes it, using the claim the
@@ -68,11 +72,24 @@ reproducers and re-adjust this task and the earlier ones before building. Nothin
     every sub-agent.
   - Inject it into the intake workflow bean (task 08) in `src/main`; until then, inject it from a minimal
     package-private bean so build-time output-key validation passes (spike Q3).
+    - *From task 05 (2026-10-08):* that bean must be **`@Unremovable`**, or ArC drops it as unused and the validation
+      fails again (see `ClaimExtractionWorkflowEntryPoint`). **Delete `ClaimExtractionWorkflowEntryPoint` in this
+      task**, once `ClaimExtractionWorkflow` is a sub-agent of `ClaimsMailboxAgent`, so it doesn't stay a second root.
+  - *From task 05:* `ClaimExtractionWorkflow.extractClaim(correspondence, extractedSoFar, requestedItems, sentDate)`
+    reads those four from the scope, so the root needs parameters with **exactly those names** (`IncidentDetails
+    extractedSoFar`, never `null`: a new claim passes an all-`null` one; `Collection<MissingItem> requestedItems`, the
+    same type, since the scope passes a value through only when it's an instance of the declared type). Its
+    `@ErrorHandler` treats a never-corrected date as missing; a root `@ErrorHandler` would replace it for the agents
+    under the root, so check that nesting keeps it (or move the same recovery to the root).
   - The review outcomes (`ReviewReady`, `ReviewNeedsInformation`) are **not** agent outcomes any more: the
     reviewer's decision is routed by the outer workflow's `switch` (task 08).
 - **Opt-outs:** every AI agent interface here (`EmailClassifierAgent`, `ClaimFollowUpAgent`) carries
   `@RegisterAiService(retrievalAugmentor = NoRetrievalAugmentorSupplier.class, chatMemoryProviderSupplier = NoChatMemoryProviderSupplier.class)`
-  and `@ModelName("claim-intake")`, as in task 05.
+  and `@ModelName("claim-intake")`, as in task 05. *(Task 05: put `@ModelName` on the `@Agent` method, since on the
+  interface it's silently ignored, and also set `@RegisterAiService(modelName = "claim-intake")`, or `-Pollama` fails
+  the build asking for an ambiguous default chat model. Import the nested `NoRetrievalAugmentorSupplier` /
+  `NoChatMemoryProviderSupplier` rather than qualifying them. Name agent methods verb-first, e.g.
+  `classifyEmail`: the method name ends up in span and Langfuse dataset names.)*
 - **Tests:**
   - **Unit:** each activation condition, including that exactly one is true for every
     (matched claim status × email type) combination; the sealed-outcome mapping; `UnmatchedEmailAgent`; every
@@ -88,8 +105,13 @@ reproducers and re-adjust this task and the earlier ones before building. Nothin
 
 ## Files/Areas
 
-- `src/main/java/org/parasol/intake/agent/` (classifier, router, follow-up, unmatched-email agent, entry point, outcome types, `MatchedClaim`)
-- `src/test/java/org/parasol/intake/agent/`
+- `src/main/java/org/parasol/intake/agent/`: the root `ClaimsMailboxAgent` and `EmailRouter`
+- `src/main/java/org/parasol/intake/agent/triage/`: the classifier, follow-up agent and its status tool,
+  unmatched-email agent and `ClaimResolver`
+- `src/main/java/org/parasol/intake/model/`: `IntakeOutcome` and its variants, `MatchedClaim`, `EmailType` (next to
+  task 05's `IncidentDetails` / `ClaimExtraction`)
+- the matching test packages
+- *(Package layout decided in task 05, 2026-10-09: one package per agent group, records in `intake.model`.)*
 
 ## Key Points
 
