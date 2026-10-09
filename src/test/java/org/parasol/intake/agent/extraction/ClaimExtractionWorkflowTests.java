@@ -9,7 +9,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -22,7 +21,7 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.parasol.claim.model.ClaimCategory;
-import org.parasol.intake.IntakeTestProfile;
+import org.parasol.intake.IntakeAgentsTestProfile;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.model.ClaimExtraction;
 import org.parasol.intake.model.IncidentDetails;
@@ -41,7 +40,7 @@ import io.quarkiverse.wiremock.devservice.ConnectWireMock;
  * reprompt, which arrives as a new last message, gets its own stub.
  */
 @QuarkusTest
-@TestProfile(ClaimExtractionWorkflowTests.ClaimExtractionTestProfile.class)
+@TestProfile(IntakeAgentsTestProfile.class)
 @ConnectWireMock
 class ClaimExtractionWorkflowTests {
 	private static final String SENT_DATE = "2026-10-08";
@@ -317,22 +316,6 @@ class ClaimExtractionWorkflowTests {
 		}
 		catch (Exception e) {
 			throw new AssertionError("Couldn't build the stub response", e);
-		}
-	}
-
-	public static class ClaimExtractionTestProfile extends IntakeTestProfile {
-		private static final String WIREMOCK_URL = "http://localhost:${quarkus.wiremock.devservices.port}/v1";
-
-		@Override
-		public Map<String, String> getConfigOverrides() {
-			var overrides = new HashMap<>(super.getConfigOverrides());
-			// Pin the provider: %ollama switches claim-intake to ollama, which would bypass the WireMock stubs
-			overrides.put("quarkus.langchain4j.claim-intake.chat-model.provider", "openai");
-			overrides.put("quarkus.langchain4j.openai.claim-intake.api-key", "changeme");
-			overrides.put("quarkus.langchain4j.openai.claim-intake.base-url", WIREMOCK_URL);
-			// %ollama-openai renames the model; keep the request body the same under every profile
-			overrides.put("quarkus.langchain4j.openai.claim-intake.chat-model.model-name", "claim-intake-model");
-			return Map.copyOf(overrides);
 		}
 	}
 }

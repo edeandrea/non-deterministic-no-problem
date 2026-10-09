@@ -85,9 +85,20 @@ reproducers and re-adjust this task and the earlier ones before building. Here: 
     - `NEW_INCIDENT` → continue unmatched (the classifier then decides, as today)
     - `UNSURE`, or a number not in the list → `replyWhichClaim` (task 04's template, the sender's pending claim
       numbers), change nothing, END
+    - *From task 06:* `ClaimResolver.resolveClaim(email, List<PendingClaim>)` returns a `ClaimResolution`
+      (`org.parasol.intake.model`). Always pass it through `limitToOfferedClaims(offeredNumbers)`, which turns an
+      `EXISTING` answer for a claim that wasn't offered into `UNSURE` (unit-tested there; the step's own test still
+      covers the routing).
   - **`runAgents`:** `ClaimsMailboxAgent.process(…)` (task 06), with the claim history passed explicitly: the combined
     correspondence, the matched claim (or none), the fields extracted so far, and the **requested items**, including
     any reviewer-ticked items stored on the claim. Output: the `IntakeOutcome`.
+    - *From task 06:* the signature is `process(correspondence, matchedClaim, extractedSoFar, requestedItems, sentDate,
+      invocationParameters)`. Pass `MatchedClaim.none()` (never `null`) when nothing matched, and always
+      `ClaimStatusTools.scopedTo(matchedClaim)` as the last argument: it scopes the status tool to that claim (see the
+      task 06 Outcome for why the root takes it). `MatchedClaim.of(claimNumber, status)` takes the claim's stored
+      status string.
+    - *From task 06:* inject `ClaimsMailboxAgent` into the workflow bean and **delete `ClaimsMailboxAgentEntryPoint`**
+      in the same change.
     - *From task 05:* build the combined correspondence in a package-private helper here, and cap it there at
       `intakeConfig.limits().maxBodyCharacters()` (the stored body isn't truncated). The cap was first built in task 05
       and moved here in its review; keep its rules and tests:

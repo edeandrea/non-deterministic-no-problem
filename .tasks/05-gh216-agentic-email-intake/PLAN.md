@@ -27,10 +27,10 @@ four follow-up spikes. See **Flow Spike Results (task 01b)** under Shared Contex
 04 are done** (task 03 squash-merged as [#233](https://github.com/edeandrea/non-deterministic-no-problem/pull/233);
 task 04 squash-merged as [#234](https://github.com/edeandrea/non-deterministic-no-problem/pull/234) (`9c719cb`), both into
 the `gh216-email-intake` feature branch, see Task Plan → Branches and pull requests).
-**Task 05 is built and in review** (branch `gh216/05-extraction-agents`, draft
-[#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235)). **Tasks 05 and 06 share one
-draft PR** (user decision, 2026-10-09): task 05 is its first commit, task 06 a second commit on the same branch, and
-the PR is marked ready once 06 lands, then squash-merged as one commit. **Next: task 06**, on that branch. **Expected: quarkus-flow 1.2.0 with the user's upstream fixes, ~2026-10-09** (see Execution Steps →
+**Tasks 05 and 06 are built, reviewed and in PR** (branch `gh216/05-extraction-agents`,
+[#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235), one commit each, user decision 2026-10-09).
+The PR gets squash-merged as one commit. **Next: #235's review and merge**, then review the task list before task 07.
+**Expected: quarkus-flow 1.2.0 with the user's upstream fixes, ~2026-10-09** (see Execution Steps →
 2a and Caveats → *quarkus-flow 1.2.0*). Every task checks for it first.
 
 **Plan File:** `.tasks/05-gh216-agentic-email-intake/PLAN.md`
@@ -114,8 +114,8 @@ Edit or create task files and update `## Task Plan`.
   4. the three-way router (parallel LLM, tool-calling LLM, plain Java) works under Flow's translation
 - [x] [task-03-intake-config-and-mailbox.md](task-03-intake-config-and-mailbox.md): Intake configuration, Flow dependencies and claims mailbox — **done 2026-10-08**, squash-merged into `gh216-email-intake` as `fcfb8e8` ([#233](https://github.com/edeandrea/non-deterministic-no-problem/pull/233))
 - [x] [task-04-email-templates.md](task-04-email-templates.md): Qute reply templates and sender — **done 2026-10-08**, squash-merged into `gh216-email-intake` as `9c719cb` ([#234](https://github.com/edeandrea/non-deterministic-no-problem/pull/234))
-- [ ] [task-05-extraction-agents.md](task-05-extraction-agents.md): Claim extraction agents — **built 2026-10-08, in review** (branch `gh216/05-extraction-agents`; draft [#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235), shared with task 06)
-- [ ] [task-06-triage-agents.md](task-06-triage-agents.md): Triage agents — second commit on task 05's branch and draft [#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235)
+- [ ] [task-05-extraction-agents.md](task-05-extraction-agents.md): Claim extraction agents — **built 2026-10-08, in PR** (branch `gh216/05-extraction-agents`; [#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235), shared with task 06)
+- [ ] [task-06-triage-agents.md](task-06-triage-agents.md): Triage agents — **built 2026-10-09, in PR**; second commit on task 05's branch and [#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235)
 - ~~[task-07-human-review-step.md](task-07-human-review-step.md): Human review step~~ — **merged into task 08** (user decision, 2026-10-07)
 - [ ] [task-08-intake-processor.md](task-08-intake-processor.md): The intake workflow and business rules (includes the human review)
 - [ ] [task-09-imap-idle-watcher.md](task-09-imap-idle-watcher.md): IMAP IDLE watcher
@@ -173,7 +173,7 @@ address, otherwise the `From` display name, otherwise "Customer" (`CustomerName.
 sender's own pending claim numbers; `notification` doesn't use the intake sender. `MissingItem` and `IntakeClaimStatus`
 live in `org.parasol.intake`. Details in the task file's Outcome.
 
-**Task 05 outcome (2026-10-08, in review):** `ClaimExtractionWorkflow` is a declarative `@ParallelAgent` over the
+**Task 05 outcome (2026-10-08, in PR #235):** `ClaimExtractionWorkflow` is a declarative `@ParallelAgent` over the
 summary, sentiment and incident-details agents (`extractClaim(correspondence, extractedSoFar, requestedItems,
 sentDate)`), with guardrails for JSON, length and dates. A date or time the model never corrects is treated as
 missing, through the workflow's `@ErrorHandler`; malformed JSON still fails the run. `findMissingItems` is a pure
@@ -182,6 +182,14 @@ helper for task 08; the correspondence cap moved to task 08. Packages: `intake.m
 the `@Agent` method (and `@RegisterAiService(modelName)` is needed too, or `-Pollama` fails the build), and an entry
 agent's own parameters only validate when it's injected in `src/main` (`ClaimExtractionWorkflowEntryPoint`,
 `@Unremovable`; task 06 deletes it). Details in the task file's Outcome.
+
+**Task 06 outcome (2026-10-09, in PR #235):** `ClaimsMailboxAgent` (classifier → `EmailRouter`, a three-way
+`@ConditionalAgent` deciding on the matched claim first) returns the sealed `IntakeOutcome`; `ClaimResolver` is a plain
+AI service whose answer task 08 limits to the offered claims. "No match" is `MatchedClaim.none()` (a `null` input counts
+as missing), the extraction's date recovery moved to the root's `@ErrorHandler` (a nested workflow's own handler doesn't
+apply under a root), and the status tool is scoped to the matched claim through `InvocationParameters`, which
+quarkus-langchain4j 1.14.1's build check forces onto the root's signature too (filed as quarkiverse/quarkus-langchain4j#2950,
+fix in #2951). Details in the task file's Outcome.
 
 Code in a new package `org.parasol.intake` (with `agent`, `mailbox`, `reply` and `review` sub-packages), plus the
 generic conversation core and its adapters in `ai.scoring.conversation` (task 10b, task 11).

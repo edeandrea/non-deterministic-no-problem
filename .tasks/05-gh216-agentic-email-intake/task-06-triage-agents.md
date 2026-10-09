@@ -129,8 +129,87 @@ reproducers and re-adjust this task and the earlier ones before building. Nothin
 
 ## Done When
 
-- [ ] `ClaimsMailboxAgent` returns every `IntakeOutcome` variant for the matching input, and the matched claim always wins over the label.
-- [ ] Routing uses typed, mutually exclusive, side-effect-free `@ActivationCondition`s; the unmatched not-a-claim / follow-up outcomes come from a non-LLM agent.
-- [ ] Every AI agent carries both opt-outs, and every leaf belongs to `ClaimsMailboxAgent` only.
-- [ ] No agent or tool writes to the database or sends mail.
-- [ ] All the unit and WireMock tests listed above pass under `-Pollama`.
+- [x] `ClaimsMailboxAgent` returns every `IntakeOutcome` variant for the matching input, and the matched claim always wins over the label.
+  *(`ClaimsMailboxAgentTests`: all five variants; `aMatchedPendingClaimIsUpdatedWhateverTheClassifierSays`,
+  `aMatchedInProcessClaimClassifiedAsANewClaimGetsAStatusReply`.)*
+- [x] Routing uses typed, mutually exclusive, side-effect-free `@ActivationCondition`s; the unmatched not-a-claim / follow-up outcomes come from a non-LLM agent.
+  *(`EmailRouterTests`, 25 cases; `UnmatchedEmailAgentTests`; the unmatched WireMock tests make one model call each.)*
+- [x] Every AI agent carries both opt-outs, and every leaf belongs to `ClaimsMailboxAgent` only.
+  *(`ClaimExtractionWorkflowEntryPoint` is deleted; `ClaimsMailboxAgentEntryPoint` injects the only root.)*
+- [x] No agent or tool writes to the database or sends mail.
+  *(The status tool reads only its `InvocationParameters`; no agent injects a repository, mailer or entity.)*
+- [x] All the unit and WireMock tests listed above pass under `-Pollama`.
+  *(2026-10-09: the 96 intake agent and model tests pass under default, `-Pollama` and `-Pollama-openai`.)*
+
+## Outcome
+
+Built 2026-10-09 as the second commit on `gh216/05-extraction-agents`, in
+[#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235) with task 05 (user decision, 2026-10-09).
+quarkus-flow 1.2.0 isn't out (latest 1.2.0.CR3). Of its issues, #1040 closed 2026-10-08, and #1056 and #1058 closed
+2026-10-09 (fixed for the 1.2.0 milestone, via #1065 and #1059); #1013 is still open. Nothing in this task changes
+for it: none of those touch the triage agents, and the workarounds stay until a release is usable.
+
+- **Packages:** `intake.agent` holds the root `ClaimsMailboxAgent`, `EmailRouter` and the package-private `EmailRoute`;
+  `intake.agent.triage` holds the classifier, follow-up agent, `ClaimStatusTools`, `UnmatchedEmailAgent` and
+  `ClaimResolver`; `intake.model` gains `IntakeOutcome`, `MatchedClaim`, `EmailType`, `PendingClaim` and
+  `ClaimResolution`.
+- **`ClaimsMailboxAgent.process(correspondence, matchedClaim, extractedSoFar, requestedItems, sentDate,
+  invocationParameters)`**, a `@SequenceAgent` (classifier → router). No `@MemoryId`, no `MonitoredAgent` yet (task 11
+  adds it, with the dev-only retention setting). The names match `ClaimExtractionWorkflow`'s, so the nested workflow
+  reads them from the scope.
+- **No matched claim is `MatchedClaim.none()`, not `null`** (deviation from "`null` when there's no match"): the
+  agentic scope throws `MissingArgumentException` for a `null` input, as task 05 found for `extractedSoFar`. Its
+  `isMatched()`/`isPending()` are `@JsonIgnore`d, so a checkpoint holds only the two strings (round-trip tested).
+- **One routing rule, three conditions.** `EmailRoute.route(matchedClaim, emailType)` decides; each
+  `@ActivationCondition` is `route(...) == X`, so exactly one is true for any input by construction (every condition is
+  evaluated, spike Q3). `EmailRouterTests` covers every matched status (both pending ones, the seeded `New`, `In Process`,
+  `Processed`, `Denied`, and case) × every `EmailType`.
+- **The router's `@Output` reads the agentic scope** rather than one parameter per branch output: only one branch runs,
+  and the others' keys would throw `MissingArgumentException`. It turns the extraction into `PendingClaimUpdate` for a
+  matched claim and `NewClaim` otherwise.
+- **The extraction's "uncorrected date → missing" recovery moved to the root too.** A nested workflow runs in the root's
+  agentic scope, and the scope's error handler is the root's (`PlannerBasedInvocationHandler.currentAgenticScope`), so
+  `ClaimExtractionWorkflow`'s own `@ErrorHandler` doesn't apply under the root. `ClaimsMailboxAgent`'s `@ErrorHandler`
+  delegates to it; `aDateTheModelNeverCorrectsIsStillTreatedAsMissingUnderTheRoot` covers it.
+- **The status tool takes no argument from the model** (deviation: the task said "scoped to the matched claim" without
+  a mechanism). `ClaimStatusTools.findClaimStatus(InvocationParameters)` reads the matched claim from the invocation
+  parameters, which the agentic scope passes to `ClaimFollowUpAgent` from its execution context, never as a prompt
+  variable. Its tool schema has no properties (`theStatusToolTakesNoArgumentFromTheModel`), and an email asking for
+  another claim still gets the matched one (`aFollowUpOnAClaimPastTheIntakeIsAnsweredFromTheMatchedClaimOnly`). It reads
+  the status the claim was matched with, not the database: the intake already loaded the claim, and this way the tool
+  can't touch anything.
+  - **quarkus-langchain4j 1.14.1 gap:** its build check (`AgenticProcessor#validateAgenticParameterTypes`) skips
+    `AgenticScope` and `@MemoryId` parameters but not `InvocationParameters`, so the follow-up agent's parameter failed
+    the build ("No agent provides an output key named 'invocationParameters'"). The root therefore takes an
+    `InvocationParameters` argument too, always `ClaimStatusTools.scopedTo(matchedClaim)` (comment in the code). Filed
+    as [quarkiverse/quarkus-langchain4j#2950](https://github.com/quarkiverse/quarkus-langchain4j/issues/2950), with a
+    reproducer in [edeandrea/quarkus-langchain4j-reproducers](https://github.com/edeandrea/quarkus-langchain4j-reproducers)
+    and the fix in [#2951](https://github.com/quarkiverse/quarkus-langchain4j/pull/2951). Built locally, the fix lets a
+    root fill the parameters itself in a `@BeforeCall` (`agenticScope.writeExecutionContext(...)`) and the sub-agent's
+    tool receives them, so once it's released the root can drop the argument.
+- **`ClaimFollowUpAgent` writes the whole reply body**, greeting and sign-off included, because `sendTextReply` adds
+  neither. The sign-off reads `parasol.claims-department.*` through Qute's `config:` namespace, like the other emails.
+- **The enum meanings come from the enums, not the prompts** (review decision, 2026-10-09). Quarkus already appends
+  LangChain4j's format instructions to the user message, built from the return type, so the prompts list no values:
+  - `EmailType`'s constants carry LangChain4j's `@Description`; `EnumOutputParser` sends them as
+    `NEW_CLAIM - the email reports …` (`theClassifierRequestListsEveryEmailTypeWithItsDescriptionFromTheEnum`). The
+    "no Qute binding on a domain enum" rule from task 05 doesn't apply: `EmailType` exists only as the classifier's
+    answer, and the description is LangChain4j's, not a template binding.
+  - `ClaimResolution.Kind`'s meanings sit in a `@Description` on the record's `kind` field: `PojoOutputParser` prints
+    field descriptions and the constant names, but no per-constant descriptions
+    (`theRequestCarriesEveryKindWithWhatItMeansFromTheRecord`). `theKindDescriptionSaysWhenToUseEveryKind` fails if a new
+    `Kind` isn't explained there. `@Description` targets `FIELD`/`TYPE`, so on a record component it lands on the field,
+    which is what the parser reads.
+- **`ClaimResolver`** is a plain `@RegisterAiService` (no `@Agent`, so `modelName` on the annotation is all it needs).
+  It takes `PendingClaim`s (number, summary, requested items) and returns a `ClaimResolution`.
+  `ClaimResolution.limitToOfferedClaims` turns an `EXISTING` answer for a claim that wasn't offered into `UNSURE`; task
+  08's `resolveClaim` step must call it (`anInventedClaimNumberIsRejected`).
+- **`ClaimsMailboxAgentEntryPoint`** (package-private, `@Unremovable`) replaces `ClaimExtractionWorkflowEntryPoint`, for
+  the same build-validation reason; task 08 deletes it once the intake workflow injects the root.
+- **Tests:** the WireMock profile moved out of `ClaimExtractionWorkflowTests` into `IntakeAgentsTestProfile`, so the
+  three WireMock classes share one app boot, plus a small `ChatStubs` helper (stubs on the last message, tool-call
+  stubs). Every WireMock request is checked to be system + one user message, on the pinned model name.
+- **`IntakeOutcome` has no `permits` clause** (review decision): its variants are nested in the same file, so Java infers
+  it, and a third copy of the five names would add nothing. The list that can drift is `@JsonSubTypes` (a variant
+  missing from it compiles, then fails when Flow reads a checkpoint back), so `IntakeOutcomeTests` checks it against
+  `getPermittedSubclasses()`. Seen failing once with `NoMatchingClaim` removed from `@JsonSubTypes`.
