@@ -15,7 +15,10 @@ the LLM mocked, and runs on every CI build.
 - Create a Playwright test class (extending the existing `PlaywrightTests` base) with intake enabled,
   the Compose Roundcube running (using the issue 4 spike's mechanism), and the LLM stubbed with WireMock.
 - **Scenario 1, complete claim:**
-  1. Log in to Roundcube as `marty.mcfly@email.com` (any password).
+  1. Log in to Roundcube as `marty.mcfly@email.com` (any password). Since #237 the seeded claimants' identities carry their
+     names, so the email `claims@parasol.com` receives is `From: Marty McFly <marty.mcfly@email.com>`: assert it, and that a
+     reply that resolves no claim greets "Marty McFly" rather than "Customer" (`CustomerName.forReply` falls back to the
+     `From` display name).
   2. Compose an email to `claims@parasol.com` with an incident description and a photo attachment, and send it.
   3. Wait until a new claim appears in the Parasol claims list. Open it, and check it shows `Pending Review`, plus the summary, sentiment and the attached photo.
   4. Back in Roundcube, check the "received — final review" email arrived in Marty's inbox with `[CLM…]` in the subject.

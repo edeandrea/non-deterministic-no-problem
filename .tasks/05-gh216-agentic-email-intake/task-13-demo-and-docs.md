@@ -12,7 +12,10 @@ workarounds it replaced, and the override in `pom.xml` with its removal conditio
 
 ## What to Do
 
-- Write a demo guide (e.g. `docs/email-claim-intake-demo.md`) with sample emails to paste into Roundcube:
+- Write a demo guide (e.g. `docs/email-claim-intake-demo.md`) with sample emails to paste into Roundcube. Say to log in as a
+  seeded claimant (`marty.mcfly@email.com`, …), not an arbitrary address: those identities carry the claimant's name (#237), so
+  the email goes out as `Marty McFly <marty.mcfly@email.com>` and the replies greet "Marty McFly". Any other address sends as
+  a bare address and is greeted "Customer":
   - a complete new claim (`Pending Review`, then the claims processor clicks **Ready for processing** →
     `In Process`; also show **Request more information** → `Pending Information` → reply → `Pending Review`)
   - a claim missing its location (reply → `Pending Review` → Ready → `In Process`)

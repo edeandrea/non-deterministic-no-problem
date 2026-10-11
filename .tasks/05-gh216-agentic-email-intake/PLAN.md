@@ -31,9 +31,13 @@ the `gh216-email-intake` feature branch, see Task Plan → Branches and pull req
 [#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235) (`1b232cc`, 2026-10-09).
 **quarkus-flow 1.2.0 was released on 2026-10-09** with all three of the user's fixes, and the user decided to adopt it
 ahead of the platform (2026-10-09): **task 06b** overrides Flow to 1.2.0, in its own PR into the feature branch
-([#236](https://github.com/edeandrea/non-deterministic-no-problem/pull/236), in review). **Next: task 08, once #236
-merges** (user decision, 2026-10-09: the upgrade comes first, so task 08's diff holds only task 08). See Caveats →
-*quarkus-flow 1.2.0*.
+([#236](https://github.com/edeandrea/non-deterministic-no-problem/pull/236), squash-merged as `9c2d0b7`, 2026-10-11).
+See Caveats → *quarkus-flow 1.2.0*.
+**Issue #237 (step 4a, a #215 follow-up) landed on `main` first** (user request, 2026-10-11; PR
+[#238](https://github.com/edeandrea/non-deterministic-no-problem/pull/238), squash-merged as `9939213`, then `main` was
+merged into this branch): the six seeded claimants' Roundcube identities carry their names, so mail they send from
+Roundcube is `From: Marty McFly <marty.mcfly@email.com>`. Plan: `.tasks/04a-gh237-roundcube-identities/PLAN.md`; it
+changes tasks 12 and 13 (below). **Next: task 08.**
 
 **Plan File:** `.tasks/05-gh216-agentic-email-intake/PLAN.md`
 **Tasks Directory:** `.tasks/05-gh216-agentic-email-intake/`
@@ -111,7 +115,7 @@ Edit or create task files and update `## Task Plan`.
 - [x] [task-04-email-templates.md](task-04-email-templates.md): Qute reply templates and sender — **done 2026-10-08**, squash-merged into `gh216-email-intake` as `9c719cb` ([#234](https://github.com/edeandrea/non-deterministic-no-problem/pull/234))
 - [x] [task-05-extraction-agents.md](task-05-extraction-agents.md): Claim extraction agents — **done 2026-10-09**, squash-merged into `gh216-email-intake` with task 06 as `1b232cc` ([#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235))
 - [x] [task-06-triage-agents.md](task-06-triage-agents.md): Triage agents — **done 2026-10-09**, in the same squash commit `1b232cc` ([#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235))
-- [ ] [task-06b-flow-1-2-0.md](task-06b-flow-1-2-0.md): Adopt quarkus-flow 1.2.0 ahead of the platform (user decision, 2026-10-09) — **built, in PR** (branch `gh216/flow-1.2.0`, [#236](https://github.com/edeandrea/non-deterministic-no-problem/pull/236))
+- [x] [task-06b-flow-1-2-0.md](task-06b-flow-1-2-0.md): Adopt quarkus-flow 1.2.0 ahead of the platform (user decision, 2026-10-09) — **done**, squash-merged into `gh216-email-intake` as `9c2d0b7` ([#236](https://github.com/edeandrea/non-deterministic-no-problem/pull/236))
 - ~~[task-07-human-review-step.md](task-07-human-review-step.md): Human review step~~ — **merged into task 08** (user decision, 2026-10-07)
 - [ ] [task-08-intake-processor.md](task-08-intake-processor.md): The intake workflow and business rules (includes the human review)
 - [ ] [task-09-imap-idle-watcher.md](task-09-imap-idle-watcher.md): IMAP IDLE watcher

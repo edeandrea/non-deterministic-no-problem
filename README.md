@@ -146,6 +146,10 @@ For example, log in as `marty.mcfly@email.com`, then ask the chat bot to update 
   or use a private window to keep a second mailbox open alongside.
 - **Mail you send from Roundcube also stays inside GreenMail.** It never leaves your machine, so you can
   write to any address, including another seeded claimant.
+- **Seeded claimants have their names on their identity.** Logging in as one of the six addresses above sends mail
+  as `Marty McFly <marty.mcfly@email.com>`; any other address sends as a bare address. A name you clear in Settings →
+  Identities comes back at the next login, and one you change is kept. The names come from
+  `src/main/docker/roundcube/config/parasol-identities.php`, which has to follow the claimants in `import.sql`.
 - **Mail lives in memory only,** so restarting dev mode empties every mailbox.
 
 The claims REST API provides `GET /api/db/claims` and `GET /api/db/claims/{id}`. Claim images are stored in
