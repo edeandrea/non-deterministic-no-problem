@@ -448,6 +448,17 @@ deploys the app with `-Dquarkus.profile=openshift`. It ends by printing the Roun
   - **GreenMail** is internal only (ClusterIP Service for SMTP 3025, IMAP 3143 and the API on 8080; no Route). It keeps
     mail in memory, so a pod restart loses every mailbox. That's deliberate: GreenMail has no persistent store
     (`greenmail.preload.dir` only loads `.eml` files at startup), and claim data lives in PostgreSQL anyway.
+  - **Roundcube's `parasol_identities` plugin** (`src/main/docker/roundcube/`) gives the six seeded claimants' identities
+    their names, so mail they send from Roundcube goes out as `Marty McFly <marty.mcfly@email.com>`. `user_create` names a
+    new user, and `login_after` fills the name of any mapped identity whose name is empty at every login (a name set in
+    Settings → Identities is never overwritten). The address → name map, `config/parasol-identities.php`, must follow the
+    claimants in `import.sql`. Compose mounts the three files read-only; on OpenShift `deploy-to-openshift.sh` creates the
+    `roundcube-identities` ConfigMap from the same files, so there is one copy. **The plugin can't be mounted into
+    `/var/www/html/plugins`:** the runtime would create that directory root-owned and the image's entrypoint (as
+    `www-data`) couldn't copy Roundcube's own plugins into it. It is mounted under `/usr/local/share/parasol/plugins`, and
+    `entrypoint-tasks/post-setup/10-parasol-identities-plugin.sh` (run by the image's entrypoint) symlinks it in. The
+    one `Failed to load plugin file … parasol_identities.php` line in the startup log comes from the entrypoint's DB
+    initialisation, which runs before that link exists; it is harmless.
   - **Roundcube** is exposed through an edge-TLS Route; log in as any address with any password. It runs under the
     restricted SCC (arbitrary UID) only because `ROUNDCUBEMAIL_DB_DIR=/tmp/roundcube-db` moves its SQLite DB off the
     `www-data`-owned `/var/roundcube`. There is no volume, so sessions and settings are lost on restart.

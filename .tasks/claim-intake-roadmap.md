@@ -13,7 +13,8 @@ Filed on GitHub as **#212–#216** (bodies in `github-issues/`, numbers in `gith
 | 2 | Rework the claim data model: sequence-generated claim numbers and typed fields | [`02-gh213-claim-data-model/PLAN.md`](02-gh213-claim-data-model/PLAN.md) | 1 |
 | 3 | Serve claim images from the backend instead of bundled frontend assets | [`03-gh214-claim-images/PLAN.md`](03-gh214-claim-images/PLAN.md) | 2 (both edit `ClaimDetail.tsx` and the seed data) |
 | 4 | Replace Mailpit with GreenMail and Roundcube webmail | [`04-gh215-greenmail-roundcube/PLAN.md`](04-gh215-greenmail-roundcube/PLAN.md) | 1 |
-| 5 | Agentic email claim intake and triage | [`05-gh216-agentic-email-intake/PLAN.md`](05-gh216-agentic-email-intake/PLAN.md) | 1, 2, 3, 4 |
+| 4a | Give the seeded claimants' Roundcube identities their names (#237, added 2026-10-11) | [`04a-gh237-roundcube-identities/PLAN.md`](04a-gh237-roundcube-identities/PLAN.md) | 4 |
+| 5 | Agentic email claim intake and triage | [`05-gh216-agentic-email-intake/PLAN.md`](05-gh216-agentic-email-intake/PLAN.md) | 1, 2, 3, 4, 4a (before task 08) |
 
 **Related, not part of the five-step order:** #218 Clean up the Grafana AI dashboard
 (body in `github-issues/issue-06-grafana-dashboard.md`; independent of steps 2–5, blocked by step 1

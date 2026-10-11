@@ -75,6 +75,12 @@ oc create secret generic parasol-app-creds \
   --from-literal=GEMINI_API_KEY="${GEMINI_API_KEY}"
 oc delete deployment parasol-app --ignore-not-found
 
+# Roundcube's parasol_identities plugin (the seeded claimants' display names): the same files compose-devservices.yml mounts
+oc create configmap roundcube-identities \
+  --from-file=parasol_identities.php=src/main/docker/roundcube/plugins/parasol_identities/parasol_identities.php \
+  --from-file=parasol-identities.php=src/main/docker/roundcube/config/parasol-identities.php \
+  --from-file=10-parasol-identities-plugin.sh=src/main/docker/roundcube/entrypoint-tasks/post-setup/10-parasol-identities-plugin.sh \
+  --dry-run=client -o yaml | oc apply -f -
 oc apply -f src/main/kubernetes/dependencies.yml
 ./mvnw clean package -DskipTests \
   -Dquarkus.kubernetes.deploy=true \

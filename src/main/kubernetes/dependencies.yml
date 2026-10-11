@@ -251,6 +251,9 @@ spec:
 # Roundcube webmail: log in as any address with any password. Sends and reads mail through greenmail only.
 # Runs under OpenShift's restricted SCC (arbitrary UID) because ROUNDCUBEMAIL_DB_DIR points its SQLite DB at a
 # writable path; /var/roundcube is owned by www-data. Sessions and settings are lost on a pod restart.
+# The parasol_identities plugin gives the seeded claimants' identities their names. Its three files come from the
+# roundcube-identities ConfigMap, which deploy-to-openshift.sh creates from src/main/docker/roundcube/ (the same files
+# compose-devservices.yml mounts), so apply this file only after that ConfigMap exists.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -286,6 +289,20 @@ spec:
               value: "3025"
             - name: ROUNDCUBEMAIL_DB_DIR
               value: /tmp/roundcube-db
+            - name: ROUNDCUBEMAIL_PLUGINS
+              value: archive,zipdownload,parasol_identities
+          volumeMounts:
+            - name: identities
+              mountPath: /usr/local/share/parasol/plugins/parasol_identities/parasol_identities.php
+              subPath: parasol_identities.php
+              readOnly: true
+            - name: identities
+              mountPath: /var/roundcube/config/parasol-identities.php
+              subPath: parasol-identities.php
+              readOnly: true
+            - name: identities-post-setup
+              mountPath: /entrypoint-tasks/post-setup
+              readOnly: true
           readinessProbe:
             httpGet:
               path: /
@@ -295,6 +312,18 @@ spec:
               memory: 256Mi
             requests:
               memory: 64Mi
+      volumes:
+        - name: identities
+          configMap:
+            name: roundcube-identities
+        # The post-setup script has to be executable, which the plugin and config files don't
+        - name: identities-post-setup
+          configMap:
+            name: roundcube-identities
+            items:
+              - key: 10-parasol-identities-plugin.sh
+                path: 10-parasol-identities-plugin.sh
+                mode: 0755
 ---
 apiVersion: v1
 kind: Service
