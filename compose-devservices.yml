@@ -5,6 +5,8 @@
 #   root level in application.yml so it applies under every AI profile). Never in tests: surefire/failsafe set
 #   quarkus.compose.devservices.profiles=none whatever the config profile, and %test blanks it for IDE/continuous-testing
 #   runs. Sends and reads mail through greenmail only. Host port 8000 is fixed, so it must be free when dev mode starts.
+#   The parasol_identities plugin (src/main/docker/roundcube/) gives the seeded claimants' identities their names; the
+#   address -> name map in config/parasol-identities.php must follow the claimants in import.sql.
 services:
   greenmail:
     image: docker.io/greenmail/standalone:2.1.14
@@ -33,3 +35,9 @@ services:
       ROUNDCUBEMAIL_SMTP_PORT: "3025"
       # Keep the SQLite DB somewhere writable when running under an arbitrary UID (OpenShift restricted SCC)
       ROUNDCUBEMAIL_DB_DIR: /tmp/roundcube-db
+      # The image's default (archive,zipdownload) plus the plugin that names the seeded claimants' identities
+      ROUNDCUBEMAIL_PLUGINS: archive,zipdownload,parasol_identities
+    volumes:
+      - ./src/main/docker/roundcube/plugins/parasol_identities:/usr/local/share/parasol/plugins/parasol_identities:ro
+      - ./src/main/docker/roundcube/entrypoint-tasks/post-setup:/entrypoint-tasks/post-setup:ro
+      - ./src/main/docker/roundcube/config/parasol-identities.php:/var/roundcube/config/parasol-identities.php:ro

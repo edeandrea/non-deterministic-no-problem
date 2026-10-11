@@ -46,8 +46,8 @@ Edit or create task files and update `## Task Plan`.
 
 ## Task Plan
 
-- [ ] [task-01-plugin-and-compose.md](task-01-plugin-and-compose.md): The `parasol_identities` plugin and the Compose mount (spike + build)
-- [ ] [task-02-kubernetes-manifests.md](task-02-kubernetes-manifests.md): OpenShift ConfigMap and Roundcube Deployment
+- [x] [task-01-plugin-and-compose.md](task-01-plugin-and-compose.md): The `parasol_identities` plugin and the Compose mount (spike + build)
+- [x] [task-02-kubernetes-manifests.md](task-02-kubernetes-manifests.md): OpenShift ConfigMap and Roundcube Deployment
 - [ ] [task-03-docs-and-verification.md](task-03-docs-and-verification.md): Documentation, verification, PR, and the merge into the #216 feature branch
 
 > **Branch and PR (user decision, 2026-10-11):** all three tasks on one branch, `gh237/roundcube-identities`, off
@@ -73,8 +73,35 @@ anyone can log in as any address; that's unchanged. This only gives the seeded c
   `include`s every `/var/roundcube/config/*.php` into its generated config, and merges `ROUNDCUBEMAIL_PLUGINS`
   (default `archive,zipdownload`) into `$config['plugins']`. Plugins live in `/var/www/html/plugins/<name>/<name>.php`.
 
+### Spike Answers (task 01, 2026-10-11)
+1. **Relative bind mounts:** work with `podman compose` (paths resolve against the compose file). Not tested through Quarkus's
+   own Compose Dev Services launch: dev mode itself wasn't started; the stack was run with `podman compose -p idtest -f
+   compose-devservices.yml --profile webmail up -d`, which is what Quarkus runs.
+2. **The plugin can't be mounted at `/var/www/html/plugins/parasol_identities`.** The runtime creates `plugins/` root-owned,
+   so the entrypoint (as `www-data`) can't copy Roundcube's own plugins into it, and every plugin fails to load (HTTP 500
+   after login). The image has `/entrypoint-tasks/post-setup/` (every executable in it runs at the end of the entrypoint),
+   so the plugin is mounted at `/usr/local/share/parasol/plugins/parasol_identities` and a post-setup script symlinks it in.
+   This adds a third file (`entrypoint-tasks/post-setup/10-parasol-identities-plugin.sh`) to the plan.
+3. **Harmless startup noise:** one `Failed to load plugin file … parasol_identities.php` line, from the entrypoint's DB
+   init, which runs before the post-setup link. The built-in plugins load fine and login works.
+4. **Verified in a real Roundcube 1.7.4 container (scripted login, SQLite and GreenMail):** Marty, `JAnderson@mail.com`
+   (identity stored lower-case, name `John T. Anderson`) and Jane get their names; an unmapped address gets none and logs in
+   without error; a cleared name is refilled at the next login; a changed name (`Martin S. McFly`) is kept; and a mail
+   sent as Marty arrived in `claims@parasol.com` as `From: Marty McFly <marty.mcfly@email.com>`.
+5. **Podman note for agents:** `podman compose` needs the user's normal `TMPDIR` (it finds the machine's API socket there);
+   the session's long `TMPDIR` makes it fail with "unix socket path is too long".
+
+### Task 02 decisions (2026-10-11)
+- **ConfigMap is generated, not inline (user decision):** `deploy-to-openshift.sh` creates `roundcube-identities` from the
+  three files in `src/main/docker/roundcube/` before applying `dependencies.yml`, so there's one copy. `dependencies.yml`
+  therefore isn't complete on its own (its comment says so). The script gets mode `0755` through a second volume with `items`.
+- **Validated:** kubeconform `-strict` 16/16, and the image run as UID `1000680000:0` with the same mounts links the plugin
+  and serves HTTP 200.
+
 ### Task Outcomes
-*(none yet)*
+- **Task 01:** the `parasol_identities` plugin, its name map and the post-setup link script are in `src/main/docker/roundcube/`, mounted by `compose-devservices.yml`. Checked in a real Roundcube 1.7.4 container and through Quarkus dev mode (`-Pollama`): named identities for mapped addresses (mixed case included), none for an unmapped one, a cleared name refilled at the next login, a changed name kept, and `From: Marty McFly <marty.mcfly@email.com>` on a mail sent from Roundcube.
+- **Task 02:** `dependencies.yml` mounts the `roundcube-identities` ConfigMap (script with mode `0755`) and sets `ROUNDCUBEMAIL_PLUGINS`; `deploy-to-openshift.sh` creates the ConfigMap from the same files. kubeconform `-strict` 16/16; arbitrary-UID run OK. The live cluster check is the user's (see Manual Checks).
+- **Task 03 (in progress):** README, CLAUDE.md and comments updated. `./mvnw -B clean verify -Pollama` with CI's flags: 169 tests, 0 failures, 1 skipped (the drift test). A fresh `code-review` found no issues. The default-profile dev-mode run wasn't repeated (the mail stack is profile-independent); the PR and the merge into `gh216-email-intake` follow.
 
 ### Key Decisions
 - **Both hooks, fill only empty names** (user decision, 2026-10-11): `user_create` names new users; `login_after`
@@ -100,3 +127,7 @@ on the feature branch, in the merge (keep the feature branch's version of any co
   `From: Marty McFly <marty.mcfly@email.com>`; where a reply resolves no claim, it greets "Marty McFly", not "Customer"
   (`CustomerName.forReply` falls back to the `From` display name).
 - **Task 13:** the demo guide says to log in as a seeded claimant (not an arbitrary address) to get a named sender.
+
+### Manual Checks (for the user)
+- **Cluster:** run `deploy-to-openshift.sh`, open the Roundcube URL it prints, log in as `marty.mcfly@email.com`, check
+  Settings → Identities shows "Marty McFly", and send a mail to any address: the `From` carries the name.

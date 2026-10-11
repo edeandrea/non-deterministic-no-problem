@@ -28,7 +28,8 @@ out as `From: Marty McFly <marty.mcfly@email.com>`.
     `domt@email.com` → Dominic Toretto, `bettercallsaul@email.com` → Saul Goodman, `tylannister@email.com` → Tyrion
     Lannister). Say it must follow `import.sql`, and add the reverse note at the top of `import.sql`.
 - **`compose-devservices.yml`:** on `roundcube`, mount the plugin directory read-only to
-  `/var/www/html/plugins/parasol_identities` and the config file to `/var/roundcube/config/parasol-identities.php`, and
+  `/usr/local/share/parasol/plugins/parasol_identities` (**not** under `/var/www/html/plugins`, which breaks the image's
+  plugin copy; a post-setup script `entrypoint-tasks/post-setup/10-parasol-identities-plugin.sh` symlinks it in) and the config file to `/var/roundcube/config/parasol-identities.php`, and
   set `ROUNDCUBEMAIL_PLUGINS: archive,zipdownload,parasol_identities`. Update the header comment.
 
 ## Key Points
