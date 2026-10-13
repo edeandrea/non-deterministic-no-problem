@@ -79,11 +79,16 @@ public class LangfuseEvaluationInitializer {
 					() -> Log.warn("Session scoring config setup failed")
 				);
 
-			getOrRegisterCohereModelDefinition()
-				.ifPresentOrElse(
-					model -> Log.info("Cohere model definition set up"),
-					() -> Log.warn("Cohere model definition setup failed")
-				);
+			// Langfuse only computes cost for models it has a price for. Prices are USD per token.
+			getOrRegisterModelDefinition("command-r7b", "(?i)^(command-r7b)(-.+)?$",
+				Map.of("input", 0.00000004, "output", 0.00000015));
+
+			getOrRegisterModelDefinition("gpt-5-mini", "(?i)^(openai/)?(gpt-5-mini)(-\\d{4}-\\d{2}-\\d{2})?$",
+				Map.of("input", 0.00000025, "input_cached_tokens", 0.000000025, "output", 0.000002));
+
+			// The LLM-as-a-judge model; text/image/video paid-tier rates.
+			getOrRegisterModelDefinition("gemini-2.5-flash", "(?i)^(google/)?(gemini-2.5-flash)$",
+				Map.of("input", 0.0000003, "input_cached_tokens", 0.00000003, "output", 0.0000025));
 
 			getOrCreateGeminiLlmConnection()
 				.flatMap(this::handleEvaluator)
@@ -418,12 +423,16 @@ public class LangfuseEvaluationInitializer {
 		}
 	}
 
-	private Optional<Model> getOrRegisterCohereModelDefinition() {
-		Log.info("Ensuring Cohere model pricing definition exists");
+	/**
+	 * Idempotent: {@code createIfAbsent} looks the model up by name first and only creates it when missing, so an
+	 * existing definition (including one edited by hand in the Langfuse UI) is left untouched.
+	 */
+	private Optional<Model> getOrRegisterModelDefinition(String modelName, String matchPattern, Map<String, Double> prices) {
+		Log.infof("Ensuring %s model pricing definition exists", modelName);
 
 		var request = CreateModelRequest.builder()
-		                                .modelName("command-r7b")
-		                                .matchPattern("(?i)^(command-r7b)(-.+)?$")
+		                                .modelName(modelName)
+		                                .matchPattern(matchPattern)
 		                                .unit(ModelUsageUnit.TOKENS)
 		                                .pricingTiers(
 			                                List.of(
@@ -431,19 +440,14 @@ public class LangfuseEvaluationInitializer {
 				                                                .isDefault(true)
 				                                                .priority(0)
 				                                                .name("standard")
-				                                                .prices(
-					                                                Map.of(
-						                                                "input", 0.00000004,
-						                                                "output", 0.00000015
-					                                                )
-				                                                )
+				                                                .prices(prices)
 				                                                .build()
 			                                ))
 		                                .build();
 
 		try {
 			var model = this.langfuse.models().createIfAbsent(request);
-			Log.infof("Cohere model pricing definition ready in Langfuse (id=%s)", model.getId());
+			Log.infof("%s model pricing definition ready in Langfuse (id=%s)", modelName, model.getId());
 			return Optional.of(model);
 		}
 		catch (LangfuseApiException e) {
