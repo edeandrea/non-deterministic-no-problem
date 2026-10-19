@@ -55,18 +55,25 @@ workarounds it replaced, and the override in `pom.xml` with its removal conditio
       otherwise it silently gets the policy Easy RAG retriever and a chat memory shared across all runs; claim
       history is passed explicitly
     - every entry agent must be injected in `src/main`; each leaf agent belongs to exactly one root
+    - **task 08 findings** (the full list is in `CLAUDE.md` → Gotchas → *The email intake workflow*): Flow's `tryCatch`
+      only catches a `WorkflowException`; block on the mailer only off the caller's thread (`IntakeReplySender`); Panache
+      statics don't work through method references; the per-sender lock also covers a woken review run; the intake's
+      bookkeeping lives in `ClaimIntakeState`, never on `Claim`
     - agent span names (`langchain4j.aiservices.<SimpleClassName>.<method>`; the dataset-name invariant, D11)
     - **quarkus-flow:** `quarkus-flow-langchain4j` and `-opentelemetry` are Preview; no `@ParallelExecutor` (Flow
       forks on the `ManagedExecutor` and, since 1.2.0, carries the OTel context; before 1.2.0 one broke every run,
       quarkus-flow#1057); Flow 1.2.0 is pinned ahead of the platform by a BOM override in `pom.xml` (task 06b), removed
       once a platform pins it; every terminal `switch` branch needs `.then(FlowDirectiveEnum.END)`; pass ids, not
       payloads, in workflow data; the "is it waiting?" check uses `PersistenceInstanceReader`, never the raw status
-      column; `quarkus.application.name` is part of Flow's table keys
+      column; `quarkus.application.name` is part of Flow's table keys; **an agent that throws leaves its generated agentic
+      run unended in 1.2.0** (worker thread blocked, Flow rows kept): the deprecated `AgenticWorkflowRuns` /
+      `FailedAgenticSystemListener` workaround (task 08) fails those runs by reflection until a release includes
+      quarkus-flow#1095; document whether it's still needed
     - agent outputs hold no `LocalDate`/`Optional` (ISO strings), unless task 05's round-trip test relaxed it
     - **no durable state across restarts** (user decision): a restart wipes the database and GreenMail, so a waiting
       review doesn't survive it
     - **single replica:** superseding a waiting review uses `activeInstance(id)`, which only sees this JVM; a reply
-      during review and a decision are serialised by optimistic locking on the claim (`@Version`)
+      during review and a decision are serialized by optimistic locking on the claim (`@Version`)
     - **observability workarounds with exit conditions:** the quarkus#54354 `ThreadContextProvider` guard (delete when
       quarkusio/quarkus#56805 ships), and whatever task 11 kept of its Flow and agentic adapters (Flow 1.2.0 fixes
       quarkus-flow#1056, so task 11 expects to need neither)

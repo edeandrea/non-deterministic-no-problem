@@ -12,7 +12,7 @@ extracts the details, asks the **customer** for anything missing and updates the
 arrive. A **claims processor** then does one last completeness look-over (not an approval).
 The existing chat (`ClaimService`), `NotificationService` and `GenerateEmailService` behave as today.
 They share the email sign-off with the new templates, and the chat's conversation handling moves onto the
-new conversation package described under Observability, with no behaviour change. Out of scope: non-English email, several
+new conversation package described under Observability, with no behavior change. Out of scope: non-English email, several
 incidents in one email, the reviewer editing extracted fields, and drift detection for the new agents.
 
 The prerequisites are [#212](https://github.com/edeandrea/non-deterministic-no-problem/issues/212) (dependency upgrades), [#213](https://github.com/edeandrea/non-deterministic-no-problem/issues/213) (claim data model), [#214](https://github.com/edeandrea/non-deterministic-no-problem/issues/214) (claim images) and [#215](https://github.com/edeandrea/non-deterministic-no-problem/issues/215)
@@ -25,8 +25,8 @@ The prerequisites are [#212](https://github.com/edeandrea/non-deterministic-no-p
 A claim is **pending** while it is `Pending Information` or `Pending Review`. Each email gets **one
 workflow run**, and the steps below are that run's steps.
 
-1. A watcher (IMAP IDLE) receives the email, records its `Message-ID`, moves it to a `processing` folder
-   and starts its run **without waiting for it**. Runs for different customers go in parallel. One
+1. A watcher (IMAP IDLE) receives the email, moves it to a `processing` folder and hands it to the starter, which
+   records its `Message-ID` and starts its run **without waiting for it**. Runs for different customers go in parallel. One
    customer's emails go in order: while their previous run is still working, the next email waits behind
    it.
 2. Auto-replies, self-sent mail and duplicates (same `Message-ID`) are filed without a reply, and no run
@@ -48,7 +48,7 @@ workflow run**, and the steps below are that run's steps.
 6. When the agents finish, the workflow applies the policy-number rule in code, before any claim is
    created or changed. If a new claim states a number that belongs to another customer, it sends a vague
    "policy inconsistency" reply and ends; no claim is created. Otherwise, if the claim was waiting for
-   review, its waiting run is cancelled now, just before the claim changes.
+   review, its waiting run is canceled now, just before the claim changes.
 7. If anything is missing, the claim is `Pending Information` and the customer is asked for exactly
    those items. Each reply starts again at step 1.
 8. When nothing is missing, the claim is `Pending Review`, the customer is told it's received and in
@@ -64,8 +64,8 @@ workflow run**, and the steps below are that run's steps.
     decision makes no LLM call.
 
 Every submission gets a reply (fixed templates, except the AI-written status answer), apart from
-auto-replies, self-sent mail and duplicates. A reply and a decision arriving together are serialised by
-optimistic locking on the claim: whichever commits first wins. A losing decision gets a 409; a losing
+auto-replies, self-sent mail and duplicates. A reply and a decision arriving together are serialized by
+optimistic locking on the claim's intake state (not on the claim itself): whichever commits first wins. A losing decision gets a 409; a losing
 reply's email goes back in line behind the claim's run and is handled again under the claim's new status.
 
 ## Claim states
@@ -78,8 +78,8 @@ reply's email goes back in line behind the claim's run and is handled again unde
 | (new) | New claim email with every detail present | `Pending Review` |
 | `Pending Information` | Customer reply, details still missing | `Pending Information` |
 | `Pending Information` | Customer reply completes the details | `Pending Review` |
-| `Pending Review` | Customer reply, details still complete: the waiting run is cancelled and a new one waits | `Pending Review` |
-| `Pending Review` | Customer reply leaves details missing: the waiting run is cancelled | `Pending Information` |
+| `Pending Review` | Customer reply, details still complete: the waiting run is canceled and a new one waits | `Pending Review` |
+| `Pending Review` | Customer reply leaves details missing: the waiting run is canceled | `Pending Information` |
 | `Pending Review` | Claims processor: Needs more information | `Pending Information` |
 | `Pending Review` | Claims processor: Ready | `In Process` |
 
@@ -97,7 +97,7 @@ waits for a `REVIEW_DECIDED` event for that claim, and a `switch` applies the de
 draws the workflow as a diagram. `ClaimIntakeStarter` does the checks before a run (loop and duplicate checks,
 claim match, sender check), keeps each sender's emails in order, and starts the run; nothing waits for
 it. Ordering by sender covers ordering by claim, because a claim only ever matches its own address.
-The app runs as a **single replica**: cancelling a run and delivering the decision event both happen
+The app runs as a **single replica**: canceling a run and delivering the decision event both happen
 in-process.
 
 **Resolving the claim.** Before the agents, a `resolveClaim` step handles an email that code couldn't

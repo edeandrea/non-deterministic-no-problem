@@ -22,8 +22,10 @@ Execution Steps → 2a first.
   The thread loops (`ClaimsMailbox` from task 03 has `unprocessed()`, `list(folder)`, `find(folder, messageId)` and
   `move(messageId, from, to)`; `MailFolder.PROCESSING` exists; the IDLE connection itself is this task's):
   1. Connect (retry with backoff on failure; log WARN, never throw to startup).
-  2. For every message currently in the INBOX (catch-up): record its `Message-ID` (unique constraint; a duplicate is
-     filed without a reply), move it to the `processing` folder, and hand it to `ClaimIntakeStarter`.
+  2. For every message currently in the INBOX (catch-up): move it to the `processing` folder and call
+     `ClaimIntakeStarter.submit(email)` (task 08). **The starter records the `Message-ID`** (task 08, D4) and skips
+     duplicates; the watcher doesn't. The starter also handles auto-replies, mail from the claims address and mail with no
+     `Message-ID` (failed folder, problem reply), so the watcher passes every email on without looking at it.
   3. Run IMAP `IDLE`, re-issuing it before the server timeout. On `MessageCountEvent`, do the same for new messages.
   4. On a disconnect, go back to step 1.
 - Stop cleanly on `ShutdownEvent`.

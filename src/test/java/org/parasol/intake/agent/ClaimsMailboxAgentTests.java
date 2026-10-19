@@ -13,7 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.parasol.claim.model.ClaimCategory;
 import org.parasol.intake.ChatStubs;
-import org.parasol.intake.IntakeAgentsTestProfile;
+import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.agent.triage.ClaimStatusTools;
 import org.parasol.intake.model.EmailType;
@@ -32,7 +32,7 @@ import io.quarkiverse.wiremock.devservice.ConnectWireMock;
  * The root agent end to end against a stubbed model: classify, route, and each branch's outcome.
  */
 @QuarkusTest
-@TestProfile(IntakeAgentsTestProfile.class)
+@TestProfile(IntakeTestProfile.class)
 @ConnectWireMock
 class ClaimsMailboxAgentTests {
 	private static final String SENT_DATE = "2026-10-08";
@@ -87,7 +87,7 @@ class ClaimsMailboxAgentTests {
 			.allSatisfy(request -> assertThat(this.stubs.roles(request))
 				.as("a system prompt and one user message: no chat history, no RAG content")
 				.containsExactly("system", "user"))
-			.allSatisfy(request -> assertThat(this.stubs.body(request).path("model").asText()).isEqualTo(IntakeAgentsTestProfile.MODEL_NAME));
+			.allSatisfy(request -> assertThat(this.stubs.body(request).path("model").asText()).isEqualTo(IntakeTestProfile.MODEL_NAME));
 		assertThat(this.stubs.countRequestsFor(FOLLOW_UP)).isZero();
 	}
 

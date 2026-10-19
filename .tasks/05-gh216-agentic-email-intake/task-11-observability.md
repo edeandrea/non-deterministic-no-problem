@@ -42,8 +42,8 @@ The sections below were written for 1.1.3 and still describe both adapters; they
   (generated on insert, #213), and the attribute is copied onto spans **at span start**. A UUID also keeps PII out of
   the attribute, and matches the chat's chat-scope UUIDs.
 - The starter mints it for any email with no matched claim (also a wrong sender, or a seeded claim with none) and
-  enters it with `ConversationContext.callIn` (task 08). A run that creates a claim persists it as
-  `intakeConversationId`, and follow-ups and the decision reuse it. Emails that never create a claim keep their fresh
+  enters it with `ConversationContext.runIn` (task 08). A run that creates a claim persists it as
+  `ClaimIntakeState.intakeConversationId` (not on `Claim`), and follow-ups and the decision reuse it. Emails that never create a claim keep their fresh
   id, which groups just their own spans.
 - Langfuse maps `gen_ai.conversation.id` to the session id (langfuse/langfuse#7738). `langfuse.session.id` and
   `session.id` would take precedence, so don't set them.
@@ -86,9 +86,13 @@ The sections below were written for 1.1.3 and still describe both adapters; they
     threads (42 of 42), and other runs' ids leaked onto spans.
   - **Delete the agentic adapter** once #1056's fix makes baggage reach the sub-workflows. The concurrent test shows it.
 - **No intake code in either adapter.** The intake's only observability-related line is the starter's
-  `ConversationContext.callIn(...)` (task 08).
+  `ConversationContext.runIn(...)` (task 08).
 - **Mail spans:** wrap IMAP fetch/move and SMTP send in `CLIENT` spans with `messaging`/`server.address` attributes, in
   `ClaimsMailbox` and the reply sender. Never put addresses or email bodies on spans.
+  - **`IntakeReplySender` runs every send on `ForkJoinPool.commonPool()`** (task 08: the reactive mailer stalls when it's
+    blocked on a thread with a captured Vert.x context). That thread has no OTel context, so a send span started on the
+    caller's thread wouldn't parent the SMTP work and the baggage id wouldn't reach it. Carry the context across
+    explicitly (`Context.current().wrap(runnable)`) and check it still avoids the stall.
 - **Flow persistence spans:** about 58 separate root traces per run (`INSERT/UPDATE/DELETE/SELECT` on Flow's tables),
   noise in Tempo and Langfuse. Find the cheapest way to drop them: e.g. a sampler or exporter filter on those statement
   names, or a JDBC-telemetry switch for Flow's datasource if one exists. Present it to the user.
@@ -187,6 +191,10 @@ The sections below were written for 1.1.3 and still describe both adapters; they
   `noMatchingClaim`, `whichClaim`), plus the AI-written status answer sent as text. Still open: the
   `claim.intake.replies` `template` values, and where the counter lives given "no observability code in any step".
 - Each leaf agent belongs to one root, so the agentic listener only ever sees the intake's agents.
+- When an agent throws, task 08's deprecated workaround (`AgenticWorkflowRuns`, until quarkus-flow#1095 is released) makes
+  every generated agentic run of that invocation **fault**: each level should then export a faulted `workflow.execute` span
+  (not verified yet), and `FlowPlanner` logs one "Workflow failed" ERROR for each, besides the intake run's own failure. Without it those runs never end
+  (no span at all). The upstream fix logs them at DEBUG.
 
 ## Done When
 

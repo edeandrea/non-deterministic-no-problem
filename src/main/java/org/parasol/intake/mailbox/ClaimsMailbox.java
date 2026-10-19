@@ -88,6 +88,37 @@ public class ClaimsMailbox {
 			.orElse(false);
 	}
 
+	/**
+	 * Moves every email without a {@code Message-ID} from one folder to another. Such an email can't be found by id, so this
+	 * is how the intake files it. Real mail clients always set one; only hand-written SMTP scripts don't.
+	 *
+	 * @param from The folder the emails are in
+	 * @param to The folder to move them to
+	 * @return {@code true} if any email was moved
+	 */
+	public boolean moveWithoutMessageId(MailFolder from, MailFolder to) {
+		return withFolder(from, Folder.READ_WRITE, source -> moveMessages(source, withoutMessageId(source), to))
+			.orElse(false);
+	}
+
+	private static Message[] withoutMessageId(Folder folder) throws MessagingException {
+		return Arrays.stream(folder.getMessages())
+			.filter(message -> !hasAnyMessageId(message))
+			.toArray(Message[]::new);
+	}
+
+	private static boolean hasAnyMessageId(Message message) {
+		try {
+			return Optional.ofNullable(message.getHeader("Message-ID"))
+				.stream()
+				.flatMap(Arrays::stream)
+				.anyMatch(header -> !header.isBlank());
+		}
+		catch (MessagingException e) {
+			throw new MailboxException("Couldn't read the Message-ID of a message", e);
+		}
+	}
+
 	private boolean moveMessages(Folder source, Message[] messages, MailFolder to) throws MessagingException {
 		var hasMessages = (messages.length > 0);
 
