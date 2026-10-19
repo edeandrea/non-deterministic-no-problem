@@ -31,4 +31,8 @@ public record IncidentDetails(
 	public IncidentDetails {
 		answeredItems = (answeredItems == null) ? Set.of() : Set.copyOf(answeredItems);
 	}
+
+	public static IncidentDetails empty() {
+		return new IncidentDetails(null, null, null, null, null, null, Set.of());
+	}
 }

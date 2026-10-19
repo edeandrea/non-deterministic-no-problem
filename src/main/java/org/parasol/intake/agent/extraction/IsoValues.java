@@ -11,15 +11,15 @@ import java.util.function.Function;
  * {@link org.parasol.intake.model.IncidentDetails} so the agentic scope stays JSON-safe (spike Q13); these helpers are
  * where they become {@code java.time} values.
  */
-final class IsoValues {
+public final class IsoValues {
 	private IsoValues() {
 	}
 
-	static Optional<LocalDate> parseDate(String value) {
+	public static Optional<LocalDate> parseDate(String value) {
 		return parse(value, LocalDate::parse);
 	}
 
-	static Optional<LocalTime> parseTime(String value) {
+	public static Optional<LocalTime> parseTime(String value) {
 		return parse(value, LocalTime::parse);
 	}
 

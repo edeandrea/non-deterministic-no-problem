@@ -2,6 +2,8 @@ package org.parasol.claim.model;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 import jakarta.persistence.Column;
@@ -61,6 +63,17 @@ public class Claim extends PanacheEntity {
 
 	public String emailAddress;
 	public String status;
+
+	/**
+	 * Lists the claims an address has in one of the given statuses, case-insensitively by address.
+	 *
+	 * @param address the claimant's email address
+	 * @param statuses the status labels to match
+	 * @return the matching claims, oldest first
+	 */
+	public static List<Claim> findByEmailAddressAndStatus(String address, Collection<String> statuses) {
+		return list("lower(emailAddress) = lower(?1) and status in ?2 order by id", address, statuses);
+	}
 
 	public static Optional<Claim> findByClaimNumber(String claimNumber) {
 		return Optional.ofNullable(claimNumber)
