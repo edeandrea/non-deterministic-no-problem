@@ -50,9 +50,8 @@ class IntakeReplySenderTests {
 				List.of()),
 			recipient,
 			"Need more information",
-			Optional.of("CLM01000000"),
-			Optional.of(inReplyTo),
-			references);
+			"CLM01000000",
+			new ThreadingHeaders(Optional.of(inReplyTo), references));
 
 		assertThat(this.mailbox.awaitMessage(recipient, WAIT_DURATION))
 			.returns("claims@parasol.com", ReceivedEmail::from)
@@ -72,9 +71,7 @@ class IntakeReplySenderTests {
 			IntakeTemplates.noMatchingClaim(Optional.empty()),
 			recipient,
 			"RE: My claim",
-			Optional.empty(),
-			Optional.of("<follow-up@example.com>"),
-			List.of());
+			ThreadingHeaders.replyingTo("<follow-up@example.com>"));
 
 		assertThat(this.mailbox.awaitMessage(recipient, WAIT_DURATION))
 			.returns("Re: My claim", ReceivedEmail::subject)
@@ -89,9 +86,8 @@ class IntakeReplySenderTests {
 			recipient,
 			"Status update",
 			"Body text",
-			Optional.of("CLM01000000"),
-			Optional.empty(),
-			List.of());
+			"CLM01000000",
+			ThreadingHeaders.none());
 
 		assertThat(this.mailbox.awaitMessage(recipient, WAIT_DURATION))
 			.returns("[CLM01000000] Re: Status update", ReceivedEmail::subject)
