@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.StreamSupport;
 
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.client.WireMock;
@@ -45,6 +46,37 @@ public final class ChatStubs {
 		this.wiremock.register(post(urlPathEqualTo(CHAT_PATH))
 			.withRequestBody(matchingJsonPath("$.messages[-1:].content", containing(lastMessageContains)))
 			.willReturn(okJson(completion(Map.of("role", "assistant", "content", answer), "stop")).withFixedDelay(delayMs)));
+	}
+
+	/**
+	 * Answers requests whose last message contains <b>all</b> the given texts: a prompt phrase to pick the agent, and a
+	 * marker from the email to pick the test.
+	 */
+	public void answerWhenAll(List<String> lastMessageContains, String answer) {
+		answerWhenAll(lastMessageContains, answer, 0);
+	}
+
+	public void answerWhenAll(List<String> lastMessageContains, String answer, int delayMs) {
+		var mapping = post(urlPathEqualTo(CHAT_PATH));
+
+		for (var text : lastMessageContains) {
+			mapping = mapping.withRequestBody(matchingJsonPath("$.messages[-1:].content", containing(text)));
+		}
+
+		this.wiremock.register(mapping.willReturn(okJson(completion(Map.of("role", "assistant", "content", answer), "stop")).withFixedDelay(delayMs)));
+	}
+
+	/**
+	 * Fails requests whose last message contains <b>all</b> the given texts, as a provider outage would.
+	 */
+	public void failWhenAll(List<String> lastMessageContains) {
+		var mapping = post(urlPathEqualTo(CHAT_PATH));
+
+		for (var text : lastMessageContains) {
+			mapping = mapping.withRequestBody(matchingJsonPath("$.messages[-1:].content", containing(text)));
+		}
+
+		this.wiremock.register(mapping.willReturn(com.github.tomakehurst.wiremock.client.WireMock.serverError()));
 	}
 
 	public void callTool(String lastMessageContains, String toolName, String argumentsJson) {
@@ -116,7 +148,7 @@ public final class ChatStubs {
 				"id", "chatcmpl-test",
 				"object", "chat.completion",
 				"created", 1234567890,
-				"model", IntakeAgentsTestProfile.MODEL_NAME,
+				"model", IntakeTestProfile.MODEL_NAME,
 				"choices", List.of(Map.of(
 					"index", 0,
 					"message", message,

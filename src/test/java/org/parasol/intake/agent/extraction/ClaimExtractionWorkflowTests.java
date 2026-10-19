@@ -21,7 +21,7 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.parasol.claim.model.ClaimCategory;
-import org.parasol.intake.IntakeAgentsTestProfile;
+import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.model.ClaimExtraction;
 import org.parasol.intake.model.IncidentDetails;
@@ -40,7 +40,7 @@ import io.quarkiverse.wiremock.devservice.ConnectWireMock;
  * reprompt, which arrives as a new last message, gets its own stub.
  */
 @QuarkusTest
-@TestProfile(IntakeAgentsTestProfile.class)
+@TestProfile(IntakeTestProfile.class)
 @ConnectWireMock
 class ClaimExtractionWorkflowTests {
 	private static final String SENT_DATE = "2026-10-08";
