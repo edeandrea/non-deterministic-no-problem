@@ -6,7 +6,7 @@
 
 The "conversation" concept (which interaction belongs to which conversation, and what happens when one ends)
 is application-agnostic, so it's built as our own framework-neutral package, `ai.scoring.conversation`, ready to be
-extracted later (user decision, 2026-10-07). The chat moves onto it with no behaviour change, and the intake
+extracted later (user decision, 2026-10-07). The chat moves onto it with no behavior change, and the intake
 (tasks 08, 11) uses the same core. Observability never mixes with business or workflow logic: framework
 lifecycles feed the core through adapters, and reactions (session scoring) are CDI event observers.
 
@@ -16,6 +16,11 @@ Evidence for every design choice here: `spike-results-flow.md` → *Follow-up sp
 **quarkus-flow 1.2.0 (2026-10-09):** adopted in task 06b. The core doesn't change. #1065 is in it, so task 11 expects
 to drop its Flow task proxy and agentic adapter: once task 11 has proven that, check which core hooks it still needs
 (`ConversationContext.callIn` from the starter, at least). Check `PLAN.md` → Execution Steps → 2a first.
+
+**Task 08 adds a minimal `ConversationContext`** (user decision, 2026-10-11, D1): baggage only (`currentId`, `enter`,
+`callIn`, `runIn`; `@ApplicationScoped`, with a public `CONVERSATION_ID_KEY`), with no span processor, leak guard, events
+or chat move. The starter uses `runIn`. This task completes it and keeps that API, and makes `ConversationalBaggageHandler`
+use `CONVERSATION_ID_KEY` instead of its own private constant.
 
 ## What to Do
 
@@ -49,7 +54,7 @@ to drop its Flow task proxy and agentic adapter: once task 11 has proven that, c
     This is the **one** core class that touches a Quarkus type (`QuarkusContextStorage`). Keep it in its own
     sub-package (e.g. `ai.scoring.conversation.quarkus`) so it's obvious it stays behind if the core is extracted.
 - **Chat adapter** (`ai.scoring.conversation.chat`): move `ConversationalBaggageHandler` here, onto the core:
-  - activate/deactivate through `ConversationContext` (same baggage key, same behaviour)
+  - activate/deactivate through `ConversationContext` (same baggage key, same behavior)
   - on `ChatScopeEnded`, fire `ConversationEndedEvent`; it **no longer depends on `SessionScoringService`**
 - **Session scoring reacts to the event:** one `@ObservesAsync ConversationEndedEvent` observer (e.g.
   `SessionScoringListener`, next to `SessionScoringService` in `ai.scoring.evaluation`) calls
@@ -90,7 +95,7 @@ to drop its Flow task proxy and agentic adapter: once task 11 has proven that, c
 
 ## Key Points
 
-- **No behaviour change for the chat**: same baggage key, same scoring trigger, same `score-session` gating.
+- **No behavior change for the chat**: same baggage key, same scoring trigger, same `score-session` gating.
 - Langfuse span export stays off in `%test`; the project's span processor is what makes the id assertable.
 - The core is generic: no intake, claim or Flow vocabulary in it.
 - The leak guard is a stopgap with an exit condition, not part of the library's design.

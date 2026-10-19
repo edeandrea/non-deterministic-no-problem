@@ -37,7 +37,11 @@ See Caveats → *quarkus-flow 1.2.0*.
 [#238](https://github.com/edeandrea/non-deterministic-no-problem/pull/238), squash-merged as `9939213`, then `main` was
 merged into this branch): the six seeded claimants' Roundcube identities carry their names, so mail they send from
 Roundcube is `From: Marty McFly <marty.mcfly@email.com>`. Plan: `.tasks/04a-gh237-roundcube-identities/PLAN.md`; it
-changes tasks 12 and 13 (below). **Next: task 08.**
+changes tasks 12 and 13 (below).
+**Task 08 is built** (2026-10-11, branch `gh216/08-intake-workflow`, uncommitted): **resume from the task file's *Resume here* section**. It was planned
+with the user the same day (six decisions, D1–D6) and then changed twice with the user while building it: the intake's
+bookkeeping lives in its own `ClaimIntakeState` entity, never on `Claim` (so claim retrieval neither returns nor loads
+it), and `IntakeReplySender` takes no `Optional` parameters. **Next: task 09.**
 
 **Plan File:** `.tasks/05-gh216-agentic-email-intake/PLAN.md`
 **Tasks Directory:** `.tasks/05-gh216-agentic-email-intake/`
@@ -117,7 +121,7 @@ Edit or create task files and update `## Task Plan`.
 - [x] [task-06-triage-agents.md](task-06-triage-agents.md): Triage agents — **done 2026-10-09**, in the same squash commit `1b232cc` ([#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235))
 - [x] [task-06b-flow-1-2-0.md](task-06b-flow-1-2-0.md): Adopt quarkus-flow 1.2.0 ahead of the platform (user decision, 2026-10-09) — **done**, squash-merged into `gh216-email-intake` as `9c2d0b7` ([#236](https://github.com/edeandrea/non-deterministic-no-problem/pull/236))
 - ~~[task-07-human-review-step.md](task-07-human-review-step.md): Human review step~~ — **merged into task 08** (user decision, 2026-10-07)
-- [ ] [task-08-intake-processor.md](task-08-intake-processor.md): The intake workflow and business rules (includes the human review)
+- [ ] [task-08-intake-processor.md](task-08-intake-processor.md): The intake workflow and business rules (includes the human review) — **built 2026-10-11 on `gh216/08-intake-workflow`, awaiting review (not committed)**; 2026-10-19: found a quarkus-flow 1.2.0 leak when an agent throws (workaround in `org.parasol.intake.agent`, upstream issue quarkiverse/quarkus-flow#1096, PR #1095)
 - [ ] [task-09-imap-idle-watcher.md](task-09-imap-idle-watcher.md): IMAP IDLE watcher
 - [ ] [task-10-review-api-and-ui.md](task-10-review-api-and-ui.md): Review API and UI
 - [ ] [task-10b-conversation-core.md](task-10b-conversation-core.md): Generic conversation context core (`ai.scoring.conversation`; changes the chat's scoring trigger)
@@ -141,7 +145,7 @@ Edit or create task files and update `## Task Plan`.
 > - **Link task and PR both ways:** the PR body opens with "Implements task NN of #216" linking the task file (pinned to
 >   the PR's commit), and the task's line in the Task Plan plus the task file's Outcome name the PR.
 > - **Task 10b is the exception:** it's complete on its own (the generic conversation core, the chat moved onto it
->   with no behaviour change, the quarkus#54354 guard), so its PR goes **straight to `main`**. Merge `main` into the
+>   with no behavior change, the quarkus#54354 guard), so its PR goes **straight to `main`**. Merge `main` into the
 >   feature branch afterwards, before task 11.
 > - **Keeping up with `main`:** merge `main` into the feature branch locally and push (no PR needed: the `main`
 >   ruleset doesn't cover it). Its required checks are strict, so the final PR must be up to date anyway.
@@ -195,7 +199,7 @@ Code in a new package `org.parasol.intake` (with `agent`, `mailbox`, `reply` and
 generic conversation core and its adapters in `ai.scoring.conversation` (task 10b, task 11).
 This follows the domain-first layout of the existing code (`org.parasol.claim`, `org.parasol.chat`, `org.parasol.notification`).
 The existing chat (`ClaimService`, chat scopes, `NotificationService`) behaves as today; its conversation handling moves
-onto the generic conversation package `ai.scoring.conversation` (task 10b), with no behaviour change.
+onto the generic conversation package `ai.scoring.conversation` (task 10b), with no behavior change.
 
 ```
 Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, NotificationService)
@@ -220,6 +224,31 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
   templates on purpose, to show both patterns.
 
 ### Key Decisions
+- **Task 08 planning decisions (user, 2026-10-11)**, detailed in task 08's *Implementation Handoff*:
+  - D1: task 08 adds a minimal `ConversationContext`; 10b completes it.
+  - D2: a `tryCatch` around the decision steps restores the review and loops back to `waitReview`.
+  - D3: a reply that finds its claim being decided goes back to the front of the sender's queue; the per-sender lock
+    also covers a woken review run, with a short backoff for the gap.
+  - D4: one `ClaimCorrespondence` table records every inbound `Message-ID` (no `Claim.sourceMessageId`).
+  - D5: a reply replaces only a generated policy number (`policyNumberGenerated`), through the same rule.
+  - D6: `ReviewDecided(claimId, runId, decision)`; the review wait matches both ids.
+  - Same customer: the address matches, and the name is compared only when both are present.
+- **Task 08 decisions made while building (user, 2026-10-11):**
+  - **The intake's bookkeeping is not on `Claim`.** `ClaimIntakeState` (`org.parasol.intake.model`, 1:1 `@MapsId`, lazy, no reference
+    from `Claim`) holds `reviewRunId`, `decidingRunId`, `intakeConversationId`, `policyNumberGenerated`, requested items and
+    the `@Version`. The lock the reply/decision race needs is on that row; `Claim` has no `version` column. Claim retrieval
+    neither returns nor loads any of it (`ClaimRetrievalHasNoIntakeBookkeepingTests`). Tasks 09, 10, 10b and 11 are updated.
+  - **`IntakeReplySender` takes no `Optional` parameters:** a `ThreadingHeaders` record, and overloads with and without a claim number.
+  - The per-sender queue is an immutable `SenderState` changed only through `ConcurrentHashMap.compute` (no `synchronized`),
+    with a Mutiny delay for the requeue backoff.
+- **Task 08 review, round 1 (user, 2026-10-11):**
+  - **`@Transactional`, not `QuarkusTransaction`,** as much as possible: a transaction that mustn't span an LLM or mail call
+    is its own non-private `@Transactional(REQUIRES_NEW)` method (Quarkus intercepts self-invocation). Applies to later
+    tasks too (task 10's claim-the-review step).
+  - **JPA entities live in a `model` sub-package** (`ClaimIntakeState` → `intake.model`).
+  - **Sub-packages by concern:** `intake` keeps only what every sub-package shares; `intake.dispatch` (the starter side),
+    `intake.failure`, and `intake.workflow` with `policy`, `outcome`, `review` and `mail` sub-packages. Tests sit in the
+    package of what they test.
 - **Triage flow:** code matches the claim and checks the sender first; then classify (`NEW_CLAIM` /
   `CLAIM_FOLLOW_UP` / `NOT_A_CLAIM`) and route, **matched claim first**, then the label (gap 1). Agents have
   **no side effects**; the intake workflow's steps (and the starter's skip and failure paths) do all persistence, mail
@@ -261,7 +290,7 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
 - **Human review — superseded by the Flow verdict (b1); kept as history.** Now: the review is the intake workflow's
   last steps (`waitReview` `listen` → `routeDecision` `switch` → apply; task 08), and the review endpoint publishes a
   `REVIEW_DECIDED` event after a `PersistenceInstanceReader` 404/409 check (task 10). A reply during review cancels
-  the waiting run (`activeInstance(id).cancel()`); optimistic locking on the claim (`@Version`) still serialises a reply
+  the waiting run (`activeInstance(id).cancel()`); optimistic locking on the claim (`@Version`) still serializes a reply
   against a decision. No scope store, no eviction. The old text:
   - A `ClaimReviewAgent` with a **static** `@HumanInTheLoop` method returns
   `Object` (`new SuspendedResponse<>("review:" + scope.memoryId())`, no `async`), so the workflow suspends
@@ -324,11 +353,11 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
     a claim number, and leaks nothing: it only offers the sender their own claims.
   - **Ordering is per sender address** (not per claim), because the claim isn't known until `resolveClaim`;
     a claim only ever matches its own address, so this covers per-claim order.
-  - Only from the claim's own email address. A wrong sender, or an unmatched email labelled a follow-up,
+  - Only from the claim's own email address. A wrong sender, or an unmatched email labeled a follow-up,
     gets the one "no matching claim" reply (no details; asks for the claim's address or the claim number; gap 9).
-  - A `Pending Information` claim gets merged in, re-summarised, and moves to `Pending Review`
+  - A `Pending Information` claim gets merged in, re-summarized, and moves to `Pending Review`
     ("received — final review" email) when complete.
-  - A reply during `Pending Review` supersedes the waiting review (see above). It is serialised against
+  - A reply during `Pending Review` supersedes the waiting review (see above). It is serialized against
     the reviewer's decision by optimistic locking on the claim (`@Version`): a losing decision gets a 409,
     a losing reply re-reads the claim (user decision).
   - A claim `In Process` or later gets an AI-written status answer only, and is **never** updated.
@@ -342,7 +371,7 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
 - **Inbox handling:** HTML-only email is converted to text. **The watcher doesn't wait for runs (user decision,
   2026-10-07):** it records the `Message-ID`, moves the email to a `processing` folder and starts its run. Runs for
   different senders go in parallel; a sender's emails go in order (a per-sender queue: the next waits while that
-  sender's previous run is still working; a run waiting for review is cancelled instead). Only waiting runs are ever cancelled, never one
+  sender's previous run is still working; a run waiting for review is canceled instead). Only waiting runs are ever canceled, never one
   mid-step. One watcher, no pool: Flow's executor gives the parallelism and caps it. A failure listener handles every
   failed run (failed folder + processing-problem reply). The run moves processed mail to the processed folder.
 - **Observability** (task 11), rewritten for b1:
@@ -410,7 +439,7 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
   the reviewer editing extracted fields.
 
 ### Caveats & Problems
-- Never hold a transaction open across an LLM call. Persist in `QuarkusTransaction.requiringNew()`.
+- Never hold a transaction open across an LLM call. Persist in a `@Transactional(REQUIRES_NEW)` method of its own (task 08 review: prefer `@Transactional` to `QuarkusTransaction`).
 - **Two observability workarounds with exit conditions:** the quarkus#54354 `ThreadContextProvider` guard (task 10b;
   delete when quarkusio/quarkus#56805 ships) and the agentic conversation adapter (task 11; delete when
   quarkus-flow#1056 is fixed). Re-check both, and #1057/#1058, whenever Quarkus or Flow is upgraded.
@@ -426,7 +455,7 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
     adapter (task 11), and the sub-workflows' own spans get the id too. Its only failing check on 2026-10-07 is the
     website build's generated-docs validation, on `quarkus-flow-persistence*.adoc`, which the PR doesn't touch.
   - **Re-checked 2026-10-08:** #1065 is still open with no reviews; #1056, #1057 and #1058 are open; Flow 1.2.0 final
-    isn't out (1.2.0.CR3), and 1.1.3 is the latest 1.1.x release. quarkus#56805 is merged for 4.0.0.Beta1 and labelled
+    isn't out (1.2.0.CR3), and 1.1.3 is the latest 1.1.x release. quarkus#56805 is merged for 4.0.0.Beta1 and labeled
     `triage/backport-3.40`, but 3.40.1 is still the latest 3.40 release. Both workarounds stay.
 - **quarkus-flow 1.2.0: released 2026-10-09 and adopted ahead of the platform (task 06b, user decision 2026-10-09).**
   - **State on 2026-10-09** (checked with `gh` and Maven Central): 1.2.0 was released at 19:21Z. Its release notes include
@@ -473,7 +502,7 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
     |---|---|---|
     | 03 (done) | Flow 1.1.3 from platform 3.40.1's `quarkus-flow-bom` | Override to 1.2.0 until a platform pins it (user decision); re-run `IntakeExtensionsTests` |
     | 05 | No `@ParallelExecutor` (#1057) | It works again; decide whether `ClaimExtractionWorkflow` wants one at all (Flow already forks on the `ManagedExecutor`) |
-    | 08 | Don't assert a cancelled run's `workflow.execute` span (#1058) | Drop the rule, assert the span |
+    | 08 | Don't assert a canceled run's `workflow.execute` span (#1058) | Drop the rule, assert the span |
     | 11 | Our Flow task proxy plus the agentic conversation adapter; several traces per run (#1056) | #1065 replaces both (it propagates the whole OTel `Context`, so the baggage id rides along); one trace per run; the sub-workflows' own spans get the id. Keep the `invoke_agent` typing and the concurrent no-mixing test. Recheck the log trace-id step against #1013 |
     | 13 | Documents the workarounds and their exit conditions | Document what 1.2.0 fixed instead |
     | 14 | Re-check #1056/#1057/#1058 for the pinned Flow version | Same, against 1.2.0 |
@@ -517,7 +546,7 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
     (`@Version`, `decide(claimId, expectedVersion, …)`, race test), 08 (rule 5 lock and lost-lock test) and 10
     (`version` in the body, 409 on a lost lock). **Decided (user confirmed):**
     the reply supersedes the review and evicts its scope, while the decision tries to resume the same
-    scope. Serialise the two with optimistic locking on the claim (`@Version`): whichever loses gets a
+    scope. Serialize the two with optimistic locking on the claim (`@Version`): whichever loses gets a
     409 (decision) or re-reads the claim (reply). Cover it with a test. Fold this into tasks 07, 08 and
     10 together with the spike-driven changes after the design review.
 - **Gaps found while writing the design doc** (found at design commit `876fe9d`; merged unchanged at `29b5073` in
@@ -575,7 +604,7 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
   - The remote branch `design/email-claim-intake` was deleted on merge; the local branch and worktree are gone too.
   - The doc's status line still says "proposed, for review before implementation"; task 13 flips it to accepted/implemented.
 - **Scope (user decision):** short. Four sections (goal, workflow, claim states, agent architecture) and three
-  diagrams (email workflow, claim states, agent organisation). No open questions, communication matrix,
+  diagrams (email workflow, claim states, agent organization). No open questions, communication matrix,
   alternatives or review-sequence diagram.
   - This supersedes the task-02 bullet under "Changes required in later tasks" below, which asked for a review
     sequence diagram, span details and the `MonitoredAgent` decision.
@@ -661,7 +690,7 @@ Full evidence in [`spike-results-flow.md`](spike-results-flow.md). **14 spike te
   - **C8/C9/C10 YES** — `@Inject PersistenceInstanceReader` (`JpaInstanceReader` is `@ApplicationScoped`)
     → `find(def, id).status() == WAITING`; `WorkflowInstance.cancel()` works, so the `toAny` workaround is
     unnecessary; `dataAs(Class, predicate)` correlates on the claim id, asserted negatively too.
-  - **E19 YES** — completed and cancelled instances leave **0** rows in all three tables.
+  - **E19 YES** — completed and canceled instances leave **0** rows in all three tables.
 - **Three corrections recorded during the spike:**
   1. **OTel is a separate extension**, `io.quarkiverse.flow:quarkus-flow-opentelemetry`. An initial
      measurement without it wrongly concluded Flow emits no spans. `quarkus-flow`'s own `tracing.html` is
@@ -701,9 +730,9 @@ Full evidence in [`spike-results-flow.md`](spike-results-flow.md). **14 spike te
   providers … (ollama,openai)"*. Add `quarkus.langchain4j.chat-model.provider=openai`. This extends the
   existing "a mocking profile must pin the provider" rule to the unnamed model.
 - **Open, not blocking:** (1) does auto-restore reattach a half-finished **subflow** to its parent's
-  pending task, or re-run it? (worst case = the merged design's behaviour); (2) is restore a linked span?;
+  pending task, or re-run it? (worst case = the merged design's behavior); (2) is restore a linked span?;
   (3) `fork` OTel/MDC propagation if a parallel branch appears; (4) concurrency — every test ran one
-  instance at a time, and Flow explicitly leaves singleton behaviour to the application; (5) re-check for
+  instance at a time, and Flow explicitly leaves singleton behavior to the application; (5) re-check for
   1.2.0 final.
 - **Durable state across restarts is not a requirement (user decision, 2026-10-07).** Every profile wipes
   the schema on boot, and that's intended: a restart also reseeds the claims and empties GreenMail, so a
@@ -735,7 +764,7 @@ Full evidence in [`spike-results-flow.md`](spike-results-flow.md) → *Follow-up
 - **F3 YES:** the reply's run cancels the waiting run from its first task
   (`definition().activeInstance(id).map(WorkflowInstance::cancel)`), leaving no rows; the decision then
   reaches only the live run. `activeInstance` is in-JVM only, which is fine given the restart decision.
-  A bug in `cancel()` drops the cancelled run's `workflow.execute` span (cosmetic; filed as [quarkiverse/quarkus-flow#1058](https://github.com/quarkiverse/quarkus-flow/issues/1058)). One first-run
+  A bug in `cancel()` drops the canceled run's `workflow.execute` span (cosmetic; filed as [quarkiverse/quarkus-flow#1058](https://github.com/quarkiverse/quarkus-flow/issues/1058)). One first-run
   "row still present" failure was not reproduced; task 08's test covers it.
 - **F4 — trace islands diagnosed.** Flow never makes its task span current while the task body runs
   (cause a), **and** each generated agent subflow starts its own trace via `supplyAsync` (cause b).
@@ -768,7 +797,7 @@ Full evidence in [`spike-results-flow.md`](spike-results-flow.md) → *Follow-up
 - **The leak is a Quarkus bug, not Flow's or the spike's:** [quarkus#54354](https://github.com/quarkusio/quarkus/issues/54354).
   In 3.40.1, the OTel context-propagation provider doesn't restore a pool thread's context after a task, so baggage
   stays on the thread. Reproduced with the `ManagedExecutor` alone, no Flow.
-- **Fixed upstream** by [quarkus#56805](https://github.com/quarkusio/quarkus/pull/56805) (4.0.0.Beta1, labelled for a
+- **Fixed upstream** by [quarkus#56805](https://github.com/quarkusio/quarkus/pull/56805) (4.0.0.Beta1, labeled for a
   3.40 backport, not in 3.40.1). With that one class shadowed: **0** leaked ids, against 81/118 without.
 - **Carrier decision input: baggage**, correct once the fix ships. What baggage alone misses is Flow's generated agent
   sub-workflows (the `supplyAsync` hop, quarkus-flow#1056); a `CallableTaskProxyBuilder` covers our own steps with no

@@ -19,20 +19,25 @@ Execution Steps → 2a first.
 
 - **REST** (Jakarta REST annotations, plural kebab-case path):
   - `POST /api/db/claims/{id}/review-decisions`, with body
-    `{ "outcome": "READY" | "NEEDS_INFORMATION", "missingItems": [ ... ], "version": <claim version> }`.
-    The `version` is the claim version the reviewer saw (optimistic locking, `@Version` on `Claim`).
+    `{ "outcome": "READY" | "NEEDS_INFORMATION", "missingItems": [ ... ], "version": <review version> }`.
+    The `version` is the version the reviewer saw (optimistic locking). **Task 08 moved it off `Claim`:** it's the `@Version`
+    of the claim's `ClaimIntakeState` row (user decision, 2026-10-11: no intake bookkeeping on `Claim`, and none in claim
+    retrieval: `ClaimRetrievalHasNoIntakeBookkeepingTests`). So `ClaimDetails` doesn't carry it. **Decide here, with the
+    user:** the review UI needs the version (and the claim's requested items) from somewhere, so give the review resource
+    its own read, e.g. `GET /api/db/claims/{id}/review` returning a `ClaimReviewState` record, rather than widening the claim DTO.
   - Validate the body with Bean Validation: `NEEDS_INFORMATION` needs at least one item, and `READY` must have none (a
     class-level constraint).
   - A `ClaimReviewService.submit(claimId, expectedVersion, ReviewDecision)` does, in order:
-    1. **Claim the review**, in a `requiringNew()` transaction under the optimistic lock: the claim must be
-       `Pending Review`, have a `reviewRunId`, and still be at the reviewer's version. Move `reviewRunId` to
-       `decidingRunId` and commit (bumping the version). This is what serialises a decision against a customer reply
+    1. **Claim the review**, in its own transaction (`@Transactional(REQUIRES_NEW)` on a method of its own: task 08's review decision prefers `@Transactional` to `QuarkusTransaction`) under the optimistic lock: the claim must be
+       `Pending Review`, its `ClaimIntakeState` must have a `reviewRunId`, and still be at the reviewer's version. Move
+       `reviewRunId` to `decidingRunId` (both on `ClaimIntakeState`) and commit (bumping the version). This is what serializes a decision against a customer reply
        that supersedes the review (task 08): whichever commits first wins.
     2. **Check the run is waiting:** `@Inject PersistenceInstanceReader` →
        `find(intakeFlow.definition(), runId)` (C8). Missing → 404. Present but not `WAITING` → 409. **Don't use a raw
        `select status`**: that column is `NULL` for a waiting instance.
-    3. **Publish** the `REVIEW_DECIDED` CloudEvent, with the claim id and the `ReviewDecision` as its data. Task 08's
-       `listen` correlates on the claim id.
+    3. **Publish** the `REVIEW_DECIDED` CloudEvent through task 08's `ReviewDecisionPublisher`, with
+       `ReviewDecided(claimId, runId, decision)` as its data, where `runId` is the id just moved into `decidingRunId`.
+       Task 08's `listen` matches **both** the run id and the claim id (D6).
     4. Return **202 Accepted** with the claim (still `Pending Review`, now being decided).
   - If step 2 fails, put `reviewRunId` back in a compensating transaction, so the claim isn't left stuck in
     "being decided".
@@ -53,7 +58,7 @@ Execution Steps → 2a first.
   conversation id (task 11). No separate decision trace and no span link: the run's decision steps are already in its
   spans.
 - **UI:**
-  - `ClaimsList.tsx` and `ClaimDetail.tsx`: add label colours, and status-filter options, for `Pending Information` and
+  - `ClaimsList.tsx` and `ClaimDetail.tsx`: add label colors, and status-filter options, for `Pending Information` and
     `Pending Review`.
   - `ClaimDetail.tsx`: when the status is `Pending Review`, show a review panel in place of the disabled Edit button, with:
     - **Ready for processing**
@@ -85,7 +90,7 @@ Execution Steps → 2a first.
 ## Files/Areas
 
 - `src/main/java/org/parasol/intake/review/`: `ClaimReviewService`, `rest/ClaimReviewResource.java` (new), request/response records
-- `src/main/java/org/parasol/claim/model/Claim.java` (`decidingRunId`), `org.parasol.claim.rest.ClaimDetails` (`version`)
+- Task 08 already adds `ClaimIntakeState` (`org.parasol.intake.model`: `reviewRunId`, `decidingRunId`, `@Version`, requested items), the `org.parasol.intake.review` event types and `ReviewDecisionPublisher`. `ClaimDetails` stays untouched
 - `src/main/webui/src/app/components/ClaimsList/ClaimsList.tsx`, `src/main/webui/src/app/components/ClaimDetail/ClaimDetail.tsx`
 - `src/test/java/org/parasol/intake/review/rest/`, `src/test/java/org/parasol/ui/`
 
