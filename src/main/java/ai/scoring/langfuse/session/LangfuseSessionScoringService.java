@@ -309,8 +309,8 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 		try {
 			// Deliberately the synchronous operations tree: this runs on a background worker thread and the score
 			// must be posted before the enclosing ComputeSessionScore span is ended by scoreSession().
-			var response = this.langfuse.scores().create(request);
-			Log.infof("Posted session-sentiment score for session %s (scoreId=%s)", conversationId, response.getId());
+			this.langfuse.scores().create(request);
+			Log.infof("Posted session-sentiment score for session %s", conversationId);
 		}
 		catch (LangfuseApiException e) {
 			// getMessage() carries the whole raw response body; getServerMessage() is the server's own sentence.
