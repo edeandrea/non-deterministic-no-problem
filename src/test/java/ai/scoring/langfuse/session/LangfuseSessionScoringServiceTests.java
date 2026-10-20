@@ -35,7 +35,7 @@ import com.langfuse.api.datasetItems.DatasetItemsApi.APIDatasetItemsListRequest;
 import com.langfuse.api.model.Dataset;
 import com.langfuse.api.model.ScoreSubjectSessionV31;
 import com.langfuse.api.observations.ObservationsApi.APIObservationsGetManyRequest;
-import com.langfuse.api.scoresV3.ScoresV3Api.APIScoresV3GetManyV3Request;
+import com.langfuse.api.scores.ScoresApi.APIScoresGetManyRequest;
 import io.quarkiverse.langchain4j.chatscopes.ChatScopeEnded;
 import io.quarkiverse.langchain4j.chatscopes.LocalChatRoutes;
 import io.quarkiverse.langfuse.api.LangfuseOperations;
@@ -216,8 +216,8 @@ class LangfuseSessionScoringServiceTests {
 		       .pollInterval(Duration.ofSeconds(2))
 		       .pollDelay(sessionConfig.otelFlushWaitTime())
 		       .untilAsserted(() -> {
-			       var scores = this.langfuse.api().scoresV3()
-				       .scoresV3GetManyV3(APIScoresV3GetManyV3Request.newBuilder()
+			       var scores = this.langfuse.api().scores()
+				       .scoresGetMany(APIScoresGetManyRequest.newBuilder()
 				                                                     .name(SessionSentiment.SCORE_NAME)
 				                                                     .sessionId(sessionId)
 				                                                     .fields("details,subject")

@@ -14,14 +14,14 @@
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
 		<quarkus.flow.version>1.2.0</quarkus.flow.version>
-		<quarkus.langchain4j.version>1.14.1</quarkus.langchain4j.version>
+		<quarkus.langchain4j.version>1.14.2</quarkus.langchain4j.version>
 		<quarkus.playwright.version>2.3.10</quarkus.playwright.version>
-		<quarkus.quinoa.version>2.9.2</quarkus.quinoa.version>
+		<quarkus.quinoa.version>2.9.3</quarkus.quinoa.version>
 		<quarkus.wiremock.version>1.8.1</quarkus.wiremock.version>
 		<quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
 		<quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
 		<quarkus.platform.version>3.40.1</quarkus.platform.version>
-		<quarkus.langfuse.version>0.7.2</quarkus.langfuse.version>
+		<quarkus.langfuse.version>0.8.0</quarkus.langfuse.version>
 		<surefire-plugin.version>3.6.0</surefire-plugin.version>
 	</properties>
 	<dependencyManagement>
