@@ -2,7 +2,7 @@ package org.parasol.intake.mailbox;
 
 /**
  * The folders of the claims mailbox an email moves through. The names are configured in
- * {@link org.parasol.intake.IntakeConfig.Folders}, except the INBOX's.
+ * {@link org.parasol.intake.config.IntakeConfig.Folders}, except the INBOX's.
  */
 public enum MailFolder {
 	/**

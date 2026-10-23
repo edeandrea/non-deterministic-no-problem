@@ -30,9 +30,10 @@ The Java source is split into two top-level packages representing two distinct c
 | `org.parasol.notification.ai` | `GenerateEmailService` |
 | `org.parasol.notification.model` | `Email`, `ClaimInfo` |
 | `org.parasol.notification.guardrail` | The four email output guardrails, their `GenerateEmailOutputGuardrail` base, `PolitenessService`, `StringUtils` |
-| `org.parasol.intake` | The email claim intake ([#216](https://github.com/edeandrea/non-deterministic-no-problem/issues/216), being built). Only what every sub-package shares: `IntakeConfig` (`parasol.intake.*`), `MissingItem`, `IntakeClaimStatus` |
-| `org.parasol.intake.mailbox` | `ClaimsMailbox` (the `claims@parasol.com` IMAP mailbox: list, find by `Message-ID`, move between `MailFolder`s), `InboundEmail` and its attachment records, `MailLoopGuard` (auto-replies and mail from the claims address), the package-private MIME parser, HTML-to-text and quoted-text helpers |
-| `org.parasol.intake.dispatch` | What happens to an inbound email before its run: `ClaimIntakeStarter` (`submit(email)`: loop/duplicate/`Message-ID` checks, then a per-sender queue of immutable `SenderState`s; also the Flow status listener that drives the queue), `ClaimMatcher`, `CorrespondenceRecorder` and the package-private `ClaimReference` |
+| `org.parasol.intake` | The email claim intake ([#216](https://github.com/edeandrea/non-deterministic-no-problem/issues/216), being built). Only what every sub-package shares: `MissingItem`, `IntakeClaimStatus` |
+| `org.parasol.intake.config` | `IntakeConfig` (`parasol.intake.*`) |
+| `org.parasol.intake.mailbox` | `ClaimsMailbox` (the `claims@parasol.com` IMAP mailbox: list, find by `Message-ID`, move between `MailFolder`s, `moveOldest`), `ClaimsInboxWatcher` (the IMAP IDLE watcher, a Mutiny pipeline on a virtual thread (`@VirtualThreads` executor): scans the INBOX, moves each email to `processing`, fires `EmailReceived`; `ClaimIntakeDispatcher` observes it), `InboxIdle` (its own IMAP session for IDLE), `InboundEmail` and its attachment records, `MailLoopGuard` (auto-replies and mail from the claims address), the package-private MIME parser, HTML-to-text and quoted-text helpers |
+| `org.parasol.intake.dispatch` | What happens to an inbound email before its run: `ClaimIntakeDispatcher` (`submit(email)`: loop/duplicate/`Message-ID` checks, then a per-sender queue of immutable `SenderState`s; also the Flow status listener that drives the queue), `ClaimMatcher`, `CorrespondenceRecorder` and the package-private `ClaimReference` |
 | `org.parasol.intake.failure` | The failure path: `IntakeFailureHandler`, the `IntakeFailureListener` (`onWorkflowFailed`) and `ProcessingProblemReplySender` |
 | `org.parasol.intake.reply` | The intake's replies: `IntakeTemplates` (the fixed Qute mail templates, under `templates/IntakeTemplates/`), `IntakeReplySender` (blocking; subject prefix, `ThreadingHeaders` headers and `Auto-Submitted`; overloads with and without a claim number, no `Optional` parameters) and `CustomerName` (who a reply greets) |
 | `org.parasol.intake.model` | The intake's records that Flow persists and later steps read: `IncidentDetails`, `ClaimExtraction` (JSON-safe: ISO date/time strings, no `Optional`), the sealed `IntakeOutcome`, `MatchedClaim` (`none()` rather than `null`), `EmailType`, `ClaimResolver`'s `PendingClaim` / `ClaimResolution`, and the `ClaimIntakeState` entity (the intake's bookkeeping about a claim, kept off `Claim`) |
@@ -642,12 +643,13 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   text, find by `Message-ID` and moving between folders. `QuotedTextTests` and `HtmlTextTests` are plain unit tests.
   `IntakeExtensionsTests` checks the app boots with the agentic and quarkus-flow extensions and Flow's three tables
   exist. They share `org.parasol.intake.IntakeTestProfile` (stub keys, Easy RAG ingestion off).
+- **Inbox watcher tests** (`ClaimsInboxWatcherTests`, `org.parasol.intake.mailbox`): each test builds its own `ClaimsInboxWatcher` with short timings and a mocked `Event<EmailReceived>`. It can't be `@InjectMock ClaimIntakeDispatcher`: `@InjectMock` disables the observers declared on the mocked bean (quarkusio/quarkus#11122; `@InjectSpy` keeps them, since #51790), so the mock would never be notified. Network faults (connection dropped, silent, unreachable) come from a **Toxiproxy** Testcontainers container, because WireMock only speaks HTTP: `ToxiproxyTestResource` (a `QuarkusTestResourceLifecycleManager`, registered by `IntakeTestProfile.testResources()`, so no extra boot) starts it, and `org.parasol.testing.mail.Toxiproxy` drives it. Its upstream is GreenMail's mapped IMAP port through `host.testcontainers.internal`, since GreenMail is a Compose container. Only the watcher's IDLE session goes through the proxy. Track [quarkus-network-faults#14](https://github.com/quarkiverse/quarkus-network-faults/issues/14) (IMAP support): it may replace this.
 - **Intake workflow tests** (`ClaimIntake*Tests` in `org.parasol.intake.workflow` and its sub-packages, `dispatch` and `failure`; tests sit in the package of what they test) run the real `ClaimIntakeFlow`
   against the Compose GreenMail and a WireMock model, one test per rule: new claims, pending claims and replies, the
   review (supersede, the decision race, both decisions, a fault in a decision step), the policy rules, `resolveClaim`, and the
   starter (it doesn't wait; per-sender order). They share `IntakeTestProfile` (one boot; it also pins `claim-intake` to WireMock and turns Hibernate statistics on, so every test of what the intake stores or loads uses it too, and **a new intake test uses it rather than adding a profile**: each profile is another full application boot) and:
   - `IntakeScenario` (`org.parasol.intake`, an `@ApplicationScoped` test helper) sends a real MIME message to the claims address, moves it to
-    the processing folder and calls `ClaimIntakeStarter.submit`, as the watcher will; it also reads replies, finds a
+    the processing folder and calls `ClaimIntakeDispatcher.submit`, as the watcher will; it also reads replies, finds a
     claim's waiting run, claims the review (as task 10 will), publishes decisions with `publishUntilWoken` (a decision
     published the moment a run says `WAITING` can be lost, so it republishes until the run leaves `WAITING`), and cleans
     up (every Flow run canceled, claims beyond the six seeded ones, recorded emails and intake state). It also owns the
@@ -886,7 +888,7 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
     `ForkJoinPool.commonPool()` for that reason, as `NotificationService` does.
   - **Panache statics through a method reference throw** ("did you forget to annotate your entity"): use a lambda
     (`id -> Claim.<Claim>findById(id)`), never `Claim::<Claim>findById`.
-  - **The per-sender lock covers a woken review run.** `ClaimIntakeStarter` (also Flow's status listener) holds the sender
+  - **The per-sender lock covers a woken review run.** `ClaimIntakeDispatcher` (also Flow's status listener) holds the sender
     while a run works. A waiting review run that wakes for its decision holds it again until it ends, so an email that a
     run handed back (`EmailRequeued`: its claim was being decided) waits for the decision steps. The wake-up is seen as a
     `WAITING → RUNNING` status change, with the `routeDecision` task start as a backstop; a requeued email that still finds

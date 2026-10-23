@@ -4,7 +4,7 @@ import java.util.Optional;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
-import org.parasol.intake.IntakeConfig;
+import org.parasol.intake.config.IntakeConfig;
 import org.parasol.intake.mailbox.InboundEmail;
 import org.parasol.intake.mailbox.MailLoopGuard;
 import org.parasol.intake.reply.CustomerName;

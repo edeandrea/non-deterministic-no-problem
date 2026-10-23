@@ -152,6 +152,14 @@
 		</dependency>
 		<dependency>
 			<groupId>io.quarkus</groupId>
+			<artifactId>quarkus-virtual-threads</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.quarkus</groupId>
+			<artifactId>quarkus-scheduler</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.quarkus</groupId>
 			<artifactId>quarkus-qute</artifactId>
 		</dependency>
 		<!-- Jakarta Mail for reading the claims mailbox over IMAP (quarkus-mailer sends through Vert.x and doesn't bring it) -->
@@ -223,6 +231,16 @@
 		<dependency>
 			<groupId>io.quarkus</groupId>
 			<artifactId>quarkus-junit-mockito</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.quarkus.junit</groupId>
+			<artifactId>junit-virtual-threads</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers-toxiproxy</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
