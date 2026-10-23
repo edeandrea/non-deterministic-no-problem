@@ -10,7 +10,7 @@ import jakarta.transaction.Transactional.TxType;
 
 import org.parasol.claim.model.Claim;
 import org.parasol.intake.IntakeClaimStatus;
-import org.parasol.intake.IntakeConfig;
+import org.parasol.intake.config.IntakeConfig;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.agent.triage.ClaimResolver;
 import org.parasol.intake.model.ClaimIntakeState;

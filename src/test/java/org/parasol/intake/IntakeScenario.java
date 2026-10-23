@@ -28,12 +28,13 @@ import jakarta.transaction.Transactional;
 import jakarta.transaction.Transactional.TxType;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.parasol.intake.config.IntakeConfig;
 import org.parasol.claim.model.Claim;
 import org.parasol.claim.model.ClaimCategory;
 import org.parasol.claim.model.ClaimCorrespondence;
 import org.parasol.claim.model.ClaimImage;
 import org.parasol.claim.model.CorrespondenceDirection;
-import org.parasol.intake.dispatch.ClaimIntakeStarter;
+import org.parasol.intake.dispatch.ClaimIntakeDispatcher;
 import org.parasol.intake.mailbox.ClaimsMailbox;
 import org.parasol.intake.mailbox.InboundEmail;
 import org.parasol.intake.mailbox.MailFolder;
@@ -61,7 +62,7 @@ public class IntakeScenario {
 
 	private final ClaimsMailbox mailbox;
 	private final GreenMailMailbox greenMail;
-	private final ClaimIntakeStarter starter;
+	private final ClaimIntakeDispatcher starter;
 	private final ClaimIntakeFlow flow;
 	private final ReviewDecisionPublisher publisher;
 	private final IntakeConfig config;
@@ -72,7 +73,7 @@ public class IntakeScenario {
 	IntakeScenario(
 		ClaimsMailbox mailbox,
 		GreenMailMailbox greenMail,
-		ClaimIntakeStarter starter,
+		ClaimIntakeDispatcher starter,
 		ClaimIntakeFlow flow,
 		ReviewDecisionPublisher publisher,
 		IntakeConfig config,
@@ -203,6 +204,26 @@ public class IntakeScenario {
 		this.starter.submit(email);
 
 		return email.messageId().orElse("");
+	}
+
+	/**
+	 * Sends the email to the claims address. GreenMail has delivered it when the send returns, so a watcher may already have
+	 * moved it.
+	 *
+	 * @return The email's {@code Message-ID}
+	 */
+	public String deliver(Mail mail) {
+		try {
+			var message = toMessage(mail);
+			message.saveChanges();
+			message.setHeader("Message-ID", mail.messageId);
+			sendOverSmtp(message);
+
+			return mail.messageId;
+		}
+		catch (MessagingException | java.io.UnsupportedEncodingException e) {
+			throw new IllegalStateException(e);
+		}
 	}
 
 	/**

@@ -28,7 +28,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.parasol.claim.model.ClaimImageContentType;
-import org.parasol.intake.IntakeConfig;
+import org.parasol.intake.config.IntakeConfig;
 import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.mailbox.SkippedAttachment.Reason;
 import org.parasol.testing.mail.GreenMailMailbox;

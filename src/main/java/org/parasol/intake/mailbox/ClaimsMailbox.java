@@ -7,18 +7,23 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.function.Function;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.mail.Flags;
 import jakarta.mail.Flags.Flag;
 import jakarta.mail.Folder;
+import jakarta.mail.FolderClosedException;
 import jakarta.mail.Message;
 import jakarta.mail.MessagingException;
 import jakarta.mail.Session;
 import jakarta.mail.Store;
+import jakarta.mail.StoreClosedException;
 import jakarta.mail.search.MessageIDTerm;
 
-import org.parasol.intake.IntakeConfig;
+import org.parasol.intake.config.IntakeConfig;
+
+import io.quarkus.logging.Log;
 
 /**
  * The claims mailbox, over IMAP.
@@ -86,6 +91,55 @@ public class ClaimsMailbox {
 	public boolean move(String messageId, MailFolder from, MailFolder to) {
 		return withFolder(from, Folder.READ_WRITE, source -> moveMessages(source, search(source, messageId), to))
 			.orElse(false);
+	}
+
+	/**
+	 * Moves the oldest email of a folder to another, and returns it. Only one email is ever held in memory, so a large backlog
+	 * can be worked through, and emails come out in the order they arrived.
+	 * <p>
+	 *   An email that can't be read is moved to {@link MailFolder#FAILED} instead, and logged, and the next one is tried, so an
+	 *   empty result always means the folder is empty. Losing the connection throws.
+	 * </p>
+	 *
+	 * @param from The folder to take the email from
+	 * @param to The folder to move it to
+	 * @return The email, or empty if {@code from} is empty (or doesn't exist)
+	 * @throws MailboxException if the connection to the mailbox fails
+	 */
+	public Optional<InboundEmail> moveOldest(MailFolder from, MailFolder to) {
+		return withFolder(from, Folder.READ_WRITE, source -> moveOldest(source, to))
+			.flatMap(Function.identity());
+	}
+
+	private Optional<InboundEmail> moveOldest(Folder source, MailFolder to) throws MessagingException {
+		while (source.getMessageCount() > 0) {
+			var oldest = source.getMessage(1);
+			var email = tryParse(oldest);
+
+			moveMessages(source, new Message[] { oldest }, email.isPresent() ? to : MailFolder.FAILED);
+			source.expunge();
+
+			if (email.isPresent()) {
+				return email;
+			}
+		}
+
+		return Optional.empty();
+	}
+
+	// A dropped connection is the caller's to handle; anything else means this one message is bad
+	private Optional<InboundEmail> tryParse(Message message) throws MessagingException {
+		try {
+			return Optional.of(this.parser.parse(message));
+		}
+		catch (FolderClosedException | StoreClosedException e) {
+			throw e;
+		}
+		catch (MessagingException | IOException | RuntimeException e) {
+			Log.errorf(e, "Couldn't read the oldest email of the claims mailbox, moving it to the %s folder", folderName(MailFolder.FAILED));
+
+			return Optional.empty();
+		}
 	}
 
 	/**

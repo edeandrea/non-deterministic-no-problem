@@ -10,7 +10,7 @@ import java.util.Optional;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.parasol.intake.IntakeConfig;
+import org.parasol.intake.config.IntakeConfig;
 
 import io.quarkus.mailer.Mail;
 import io.quarkus.mailer.MailTemplate.MailTemplateInstance;

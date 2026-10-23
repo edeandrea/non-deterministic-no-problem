@@ -1,5 +1,6 @@
-package org.parasol.intake;
+package org.parasol.intake.config;
 
+import java.time.Duration;
 import java.util.Optional;
 
 import jakarta.validation.constraints.Positive;
@@ -50,6 +51,13 @@ public interface IntakeConfig {
 	 * @return the limits
 	 */
 	Limits limits();
+
+	/**
+	 * How the claims inbox is watched.
+	 *
+	 * @return the watcher timings
+	 */
+	Watcher watcher();
 
 	/**
 	 * The IMAP connection to the claims mailbox.
@@ -146,5 +154,36 @@ public interface IntakeConfig {
 		@WithDefault("10")
 		@Positive
 		int maxImages();
+	}
+
+	/**
+	 * Timings of the IMAP IDLE watcher.
+	 */
+	interface Watcher {
+		/**
+		 * How often the watcher ends its IMAP IDLE and issues it again (RFC 2177 asks for at most every 29 minutes). The
+		 * IDLE connection's read timeout is twice this, so a connection that goes silent is noticed.
+		 *
+		 * @return the refresh interval
+		 */
+		@WithDefault("1m")
+		Duration idleRefresh();
+
+		/**
+		 * How long the watcher waits before its first attempt to reconnect. It doubles on every failure up to
+		 * {@link #maxReconnectDelay()}.
+		 *
+		 * @return the first delay
+		 */
+		@WithDefault("1s")
+		Duration reconnectDelay();
+
+		/**
+		 * The longest the watcher waits between attempts to reconnect.
+		 *
+		 * @return the longest delay
+		 */
+		@WithDefault("1m")
+		Duration maxReconnectDelay();
 	}
 }

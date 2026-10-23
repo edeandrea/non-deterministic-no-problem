@@ -10,7 +10,7 @@ workflow, and the agents are one of its steps. This replaces the agentic human-i
 Customers open a claim by emailing `claims@parasol.com`. The **intake system** classifies each email,
 extracts the details, asks the **customer** for anything missing and updates the claim as replies
 arrive. A **claims processor** then does one last completeness look-over (not an approval).
-The existing chat (`ClaimService`), `NotificationService` and `GenerateEmailService` behave as today.
+The existing chat ([`ClaimService`](../../src/main/java/org/parasol/chat/ai/ClaimService.java)), [`NotificationService`](../../src/main/java/org/parasol/notification/service/NotificationService.java) and [`GenerateEmailService`](../../src/main/java/org/parasol/notification/ai/GenerateEmailService.java) behave as today.
 They share the email sign-off with the new templates, and the chat's conversation handling moves onto the
 new conversation package described under Observability, with no behavior change. Out of scope: non-English email, several
 incidents in one email, the reviewer editing extracted fields, and drift detection for the new agents.
@@ -90,36 +90,36 @@ and are never updated. Intake never sets `New`.
 
 ![Email claim intake: workflow and agents](claim-intake-agents.png)
 
-**The workflow.** `ClaimIntakeFlow` is one quarkus-flow workflow, and its steps do the side effects
+**The workflow.** [`ClaimIntakeFlow`](../../src/main/java/org/parasol/intake/workflow/ClaimIntakeFlow.java) is one quarkus-flow workflow, and its steps do the side effects
 (apart from filing skipped mail and handling a failed run, which a failure listener does): cancel a superseded run, check the policy number, save the claim and photos, send the reply
-(`IntakeReplySender`, Qute templates), and file the email. For a complete claim, a `listen` step then
+([`IntakeReplySender`](../../src/main/java/org/parasol/intake/reply/IntakeReplySender.java), Qute templates), and file the email. For a complete claim, a `listen` step then
 waits for a `REVIEW_DECIDED` event for that claim, and a `switch` applies the decision. Flow's Dev UI
-draws the workflow as a diagram. `ClaimIntakeStarter` does the checks before a run (loop and duplicate checks,
+draws the workflow as a diagram. [`ClaimIntakeDispatcher`](../../src/main/java/org/parasol/intake/dispatch/ClaimIntakeDispatcher.java) does the checks before a run (loop and duplicate checks,
 claim match, sender check), keeps each sender's emails in order, and starts the run; nothing waits for
 it. Ordering by sender covers ordering by claim, because a claim only ever matches its own address.
 The app runs as a **single replica**: canceling a run and delivering the decision event both happen
 in-process.
 
 **Resolving the claim.** Before the agents, a `resolveClaim` step handles an email that code couldn't
-match but whose sender has pending claims. `ClaimResolver` (an LLM service, not part of the agent
+match but whose sender has pending claims. [`ClaimResolver`](../../src/main/java/org/parasol/intake/agent/triage/ClaimResolver.java) (an LLM service, not part of the agent
 topology) gets the email and those claims (number, short summary, what we asked for) and answers one of
 them, a new claim, or unsure; code accepts only a claim from that list. It only ever offers the sender
 their own claims, so the "which claim?" reply leaks nothing even if `From:` is spoofed.
 
-**The agents** are one workflow step. `ClaimsMailboxAgent` is the root (a sequence), called with the
+**The agents** are one workflow step. [`ClaimsMailboxAgent`](../../src/main/java/org/parasol/intake/agent/ClaimsMailboxAgent.java) is the root (a sequence), called with the
 email, the matched claim (or none) and the claim's history:
 
-- `EmailClassifierAgent` (LLM) returns the email type.
-- `EmailRouter` (no LLM) routes on the matched claim first, then on the type:
-  - matched pending claims, and unmatched new claims, go to `ClaimExtractionWorkflow`: three LLM agents
-    in parallel, `ClaimSummaryAgent`, `ClaimSentimentAgent` and `IncidentDetailsAgent` (description,
+- [`EmailClassifierAgent`](../../src/main/java/org/parasol/intake/agent/triage/EmailClassifierAgent.java) (LLM) returns the email type.
+- [`EmailRouter`](../../src/main/java/org/parasol/intake/agent/EmailRouter.java) (no LLM) routes on the matched claim first, then on the type:
+  - matched pending claims, and unmatched new claims, go to [`ClaimExtractionWorkflow`](../../src/main/java/org/parasol/intake/agent/extraction/ClaimExtractionWorkflow.java): three LLM agents
+    in parallel, [`ClaimSummaryAgent`](../../src/main/java/org/parasol/intake/agent/extraction/ClaimSummaryAgent.java), [`ClaimSentimentAgent`](../../src/main/java/org/parasol/intake/agent/extraction/ClaimSentimentAgent.java) and [`IncidentDetailsAgent`](../../src/main/java/org/parasol/intake/agent/extraction/IncidentDetailsAgent.java) (description,
     date, optional time, location, category, stated policy number).
-  - matched claims in any other status go to `ClaimFollowUpAgent` (LLM), which writes the status
+  - matched claims in any other status go to [`ClaimFollowUpAgent`](../../src/main/java/org/parasol/intake/agent/triage/ClaimFollowUpAgent.java) (LLM), which writes the status
     answer using a read-only status tool.
-  - unmatched "not a claim" and "follow-up" emails go to `UnmatchedEmailAgent` (no LLM) for those two outcomes.
+  - unmatched "not a claim" and "follow-up" emails go to [`UnmatchedEmailAgent`](../../src/main/java/org/parasol/intake/agent/triage/UnmatchedEmailAgent.java) (no LLM) for those two outcomes.
 
 Flow runs each composite (sequence, router, parallel) as its own sub-workflow, and the parallel one really
-runs in parallel. The agents only decide: they return an `IntakeOutcome`, have no side effects, and never
+runs in parallel. The agents only decide: they return an [`IntakeOutcome`](../../src/main/java/org/parasol/intake/model/IntakeOutcome.java), have no side effects, and never
 pause. All LLM agents use the `claim-intake` model. They're stateless (no chat memory, no retrieval over
 the policy PDF): the workflow passes the claim's history (correspondence, fields extracted so far, items
 requested) in on every run.

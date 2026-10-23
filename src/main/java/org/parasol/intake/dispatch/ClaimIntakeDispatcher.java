@@ -14,9 +14,10 @@ import jakarta.enterprise.event.Observes;
 import jakarta.enterprise.inject.Instance;
 
 import org.eclipse.microprofile.context.ManagedExecutor;
-import org.parasol.intake.IntakeConfig;
+import org.parasol.intake.config.IntakeConfig;
 import org.parasol.intake.failure.IntakeFailureHandler;
 import org.parasol.intake.mailbox.ClaimsMailbox;
+import org.parasol.intake.mailbox.EmailReceived;
 import org.parasol.intake.mailbox.InboundEmail;
 import org.parasol.intake.mailbox.MailLoopGuard;
 import org.parasol.intake.mailbox.MailFolder;
@@ -48,7 +49,7 @@ import io.smallrye.mutiny.Uni;
  * </p>
  */
 @ApplicationScoped
-public class ClaimIntakeStarter implements WorkflowExecutionListener {
+public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 	private static final Set<WorkflowStatus> RELEASES = EnumSet.of(WorkflowStatus.WAITING, WorkflowStatus.COMPLETED, WorkflowStatus.CANCELLED, WorkflowStatus.FAULTED);
 	private static final Set<WorkflowStatus> ENDED = EnumSet.of(WorkflowStatus.COMPLETED, WorkflowStatus.CANCELLED, WorkflowStatus.FAULTED);
 	private static final String DECISION_TASK = "routeDecision";
@@ -68,7 +69,7 @@ public class ClaimIntakeStarter implements WorkflowExecutionListener {
 	private final Map<String, String> senderByInstance = new ConcurrentHashMap<>();
 	private final Map<String, Integer> requeues = new ConcurrentHashMap<>();
 
-	ClaimIntakeStarter(
+	ClaimIntakeDispatcher(
 		IntakeConfig config,
 		ClaimsMailbox mailbox,
 		CorrespondenceRecorder recorder,
@@ -86,6 +87,16 @@ public class ClaimIntakeStarter implements WorkflowExecutionListener {
 		this.conversationContext = conversationContext;
 		this.flow = flow;
 		this.executor = executor;
+	}
+
+	/**
+	 * Takes the email the watcher hands over. The event is synchronous, so this runs on the watcher's thread and each
+	 * sender's emails are queued in the order they arrived.
+	 *
+	 * @param received The event
+	 */
+	public void onEmailReceived(@Observes EmailReceived received) {
+		submit(received.email());
 	}
 
 	/**

@@ -25,7 +25,7 @@ database "PostgreSQL\nclaims, photos;\nFlow: running and waiting runs" as DB
 
 package "Parasol app" {
   component "ClaimsInboxWatcher\nIMAP IDLE; records the Message-ID,\nmoves the email to processing" as W <<app>>
-  component "ClaimIntakeStarter\nskips auto-replies, self-sent mail\nand duplicates; matches the claim\nand checks the sender (code);\nkeeps a sender's emails in order;\nstarts one run (doesn't wait)" as S <<app>>
+  component "ClaimIntakeDispatcher\nskips auto-replies, self-sent mail\nand duplicates; matches the claim\nand checks the sender (code);\nkeeps a sender's emails in order;\nstarts one run (doesn't wait)" as S <<app>>
   component "Failure listener\nfailed run → failed folder,\nprocessing-problem reply" as FL <<app>>
   component "Review REST API\nPOST /api/db/claims/{id}/review-decisions\nchecks the run is waiting;\npublishes REVIEW_DECIDED" as RR <<app>>
   component "IntakeReplySender\nQute templates" as RS <<app>>

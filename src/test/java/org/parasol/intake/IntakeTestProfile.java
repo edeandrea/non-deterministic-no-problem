@@ -1,6 +1,9 @@
 package org.parasol.intake;
 
+import java.util.List;
 import java.util.Map;
+
+import org.parasol.testing.mail.ToxiproxyTestResource;
 
 import io.quarkus.test.junit.QuarkusTestProfile;
 
@@ -18,6 +21,8 @@ import io.quarkus.test.junit.QuarkusTestProfile;
  *   renames it, and the request body must be the same under every profile.</li>
  *   <li><b>Hibernate statistics on</b>, for the tests that assert what a request loads.</li>
  *   <li><b>Spans exported every 100 ms</b>, so {@link WorkflowSpans} sees a run's span soon after it ends.</li>
+ *   <li><b>A Toxiproxy container</b> ({@link ToxiproxyTestResource}) for the tests that cut the watcher's connection. It's a
+ *   test resource of the profile, so it starts once with the profile's one boot.</li>
  * </ul>
  */
 public class IntakeTestProfile implements QuarkusTestProfile {
@@ -42,5 +47,10 @@ public class IntakeTestProfile implements QuarkusTestProfile {
 			Map.entry("quarkus.hibernate-orm.statistics", "true"),
 			Map.entry("quarkus.otel.bsp.schedule.delay", "100ms")
 		);
+	}
+
+	@Override
+	public List<TestResourceEntry> testResources() {
+		return List.of(new TestResourceEntry(ToxiproxyTestResource.class));
 	}
 }

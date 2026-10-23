@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
+import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
 
 import org.awaitility.Awaitility;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.parasol.intake.IntakeFlowTestBase;
 import org.parasol.intake.IntakeScenario.Mail;
 import org.parasol.intake.IntakeTestProfile;
+import org.parasol.intake.mailbox.EmailReceived;
 import org.parasol.intake.mailbox.MailFolder;
 import org.parasol.intake.model.EmailType;
 
@@ -27,9 +29,25 @@ import io.quarkus.test.junit.TestProfile;
 @QuarkusTest
 @TestProfile(IntakeTestProfile.class)
 @ConnectWireMock
-class ClaimIntakeStarterTests extends IntakeFlowTestBase {
+class ClaimIntakeDispatcherTests extends IntakeFlowTestBase {
 	@Inject
-	ClaimIntakeStarter starter;
+	ClaimIntakeDispatcher starter;
+
+	@Inject
+	Event<EmailReceived> emailReceived;
+
+	// The observer runs on the real bean, so the effect is asserted: @InjectMock disables observers, and an @InjectSpy never sees the call
+	@Test
+	void anEmailReceivedEventStartsARunForItsEmail() {
+		var marker = marker();
+		classify(marker, EmailType.NOT_A_CLAIM);
+		var email = this.scenario.deliverToProcessing(Mail.from(SENDER).body("Newsletter please. " + marker));
+
+		this.emailReceived.fire(new EmailReceived(email));
+
+		this.scenario.awaitFiled(email.messageId().orElseThrow());
+		assertThat(this.scenario.awaitReplies(SENDER, 1)).hasSize(1);
+	}
 
 	@Test
 	void submitReturnsBeforeTheRunsFirstStepFinishes() {
