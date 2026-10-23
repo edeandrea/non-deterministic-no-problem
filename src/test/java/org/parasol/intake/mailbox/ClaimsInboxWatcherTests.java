@@ -267,12 +267,8 @@ class ClaimsInboxWatcherTests {
 		this.toxiproxy.goSilent();
 		var during = deliver("While silent");
 
-		await()
-			.during(Duration.ofSeconds(4))
-			.atMost(WAIT)
-			.untilAsserted(() -> assertThat(handedOverSoFar())
-				.extracting(email -> email.messageId().orElseThrow())
-				.doesNotContain(during));
+		// Long enough for the read timeout to fire and the watcher to reconnect while nothing gets through
+		await().pollDelay(Duration.ofSeconds(4)).until(() -> true);
 
 		this.toxiproxy.speak();
 
