@@ -350,6 +350,11 @@ parasol:
     datasource:
       dev-ui:
         allow-sql: true
+  parasol:
+    intake:
+      watcher:
+        # Quick pick-up of mail sent from Roundcube if a wake-up is missed
+        idle-refresh: 10s
 
 # Dev and test modes config
 '%dev,test':

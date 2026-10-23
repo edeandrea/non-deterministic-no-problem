@@ -166,7 +166,7 @@ public interface IntakeConfig {
 		 *
 		 * @return the refresh interval
 		 */
-		@WithDefault("10m")
+		@WithDefault("1m")
 		Duration idleRefresh();
 
 		/**

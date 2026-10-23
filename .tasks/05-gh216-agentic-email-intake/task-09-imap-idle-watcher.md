@@ -33,7 +33,7 @@ Decisions:
   `ClaimsInboxWatcher` runs the pipeline. Not the `org.parasol.intake` root: that package keeps only what every sub-package
   shares. The watcher doesn't call the starter; it fires an event (D7), so `mailbox` never depends on `dispatch`.
 - **D2 Configurable timings.** A new `IntakeConfig.Watcher` group (`parasol.intake.watcher.*`): `idle-refresh` (default
-  `10m`), `reconnect-delay` (first backoff, default `1s`, doubling) and `max-reconnect-delay` (default `1m`). The IDLE
+  `1m`, `10s` in dev mode), `reconnect-delay` (first backoff, default `1s`, doubling) and `max-reconnect-delay` (default `1m`). The IDLE
   session's read timeout is derived from `idle-refresh` (twice it), not configured separately.
 - **D3 One email at a time.** A new `ClaimsMailbox.moveOldest(MailFolder from, MailFolder to)` returns
   `Optional<InboundEmail>`. It copies the oldest message to the target, deletes and expunges the original, then parses it.
