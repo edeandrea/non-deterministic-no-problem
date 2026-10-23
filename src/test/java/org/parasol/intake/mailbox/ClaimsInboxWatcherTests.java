@@ -3,6 +3,7 @@ package org.parasol.intake.mailbox;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -56,8 +57,9 @@ import io.quarkus.test.junit.virtual.VirtualThreadUnit;
 // Network faults come from Toxiproxy, which the watcher's IDLE connection (and only that) goes through.
 @QuarkusTest
 @TestProfile(IntakeTestProfile.class)
+// Pinning is only asserted by the tests that log no stack trace: formatting one loads classes under a JDK monitor, which pins
+// for microseconds and is no concern of the watcher's, but it makes the tests that log a lost connection flaky
 @VirtualThreadUnit
-@ShouldNotPin
 class ClaimsInboxWatcherTests {
 	private static final Duration WAIT = Duration.ofSeconds(30);
 	private static final Duration QUIET = Duration.ofSeconds(2);
@@ -109,6 +111,7 @@ class ClaimsInboxWatcherTests {
 	}
 
 	@Test
+	@ShouldNotPin
 	void messageDeliveredWhileWatchingIsHandedOver() {
 		startWatcher(LONG_REFRESH);
 
@@ -123,6 +126,7 @@ class ClaimsInboxWatcherTests {
 	}
 
 	@Test
+	@ShouldNotPin
 	void backlogIsHandedOverInArrivalOrder() {
 		var messageIds = IntStream.range(0, 4)
 			.mapToObj(i -> deliver("Backlog " + i))
@@ -136,6 +140,7 @@ class ClaimsInboxWatcherTests {
 	}
 
 	@Test
+	@ShouldNotPin
 	void emailsAreHandedOverWithoutWaitingForTheirRuns() {
 		startWatcher(LONG_REFRESH);
 
@@ -168,6 +173,7 @@ class ClaimsInboxWatcherTests {
 	}
 
 	@Test
+	@ShouldNotPin
 	void emailIsInProcessingWhenHandedOverAndNeverHandedOverTwice() {
 		var states = new CopyOnWriteArrayList<String>();
 		doAnswer(invocation -> {
@@ -264,11 +270,13 @@ class ClaimsInboxWatcherTests {
 		await()
 			.during(Duration.ofSeconds(4))
 			.atMost(WAIT)
-			.untilAsserted(() -> verify(this.received, times(1)).fire(any()));
+			.untilAsserted(() -> assertThat(handedOverSoFar())
+				.extracting(email -> email.messageId().orElseThrow())
+				.doesNotContain(during));
 
 		this.toxiproxy.speak();
 
-		assertThat(handedOver(2))
+		assertThat(handedOverUntil(during))
 			.extracting(email -> email.messageId().orElseThrow())
 			.contains(during);
 	}
@@ -293,6 +301,7 @@ class ClaimsInboxWatcherTests {
 	}
 
 	@Test
+	@ShouldNotPin
 	void shutdownStopsWatching() {
 		var watcher = startWatcher(LONG_REFRESH);
 		deliver("Connected");
@@ -346,6 +355,26 @@ class ClaimsInboxWatcherTests {
 
 	private String deliver(String subject) {
 		return this.scenario.deliver(Mail.from(SENDER).subject(subject));
+	}
+
+	private List<InboundEmail> handedOverSoFar() {
+		var captor = ArgumentCaptor.forClass(EmailReceived.class);
+		verify(this.received, atLeast(0)).fire(captor.capture());
+
+		return captor.getAllValues()
+			.stream()
+			.map(EmailReceived::email)
+			.toList();
+	}
+
+	private List<InboundEmail> handedOverUntil(String messageId) {
+		await()
+			.atMost(WAIT)
+			.untilAsserted(() -> assertThat(handedOverSoFar())
+				.extracting(email -> email.messageId().orElseThrow())
+				.contains(messageId));
+
+		return handedOverSoFar();
 	}
 
 	private List<InboundEmail> handedOver(int count) {
