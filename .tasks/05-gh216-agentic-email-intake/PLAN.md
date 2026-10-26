@@ -87,6 +87,39 @@ Before starting any task:
    on.
 3. Otherwise say so in one line in the findings and carry on — the override in `application.yml` stays.
 
+### 2c. Re-check the remaining upstream items (every task, while each workaround stays)
+*Added 2026-10-26. 2a and 2b each watch one item; these three were tracked only in prose (Caveats and the task files),
+so nobody re-checked them unless they happened to open that file. Same shape as 2a/2b: check, act if it shipped,
+otherwise one line in the findings.*
+
+Before starting any task, check each of these. **"Fixed" means released**, not merged — the same bar 2a and 2b use.
+
+1. **[quarkusio/quarkus#54354](https://github.com/quarkusio/quarkus/issues/54354) / PR
+   [#56805](https://github.com/quarkusio/quarkus/pull/56805)** — the OTel context-propagation provider doesn't restore
+   a pool thread's context, which is why task 10b carries the `ThreadContextProvider` guard (Caveats → the two
+   observability workarounds; evidence in follow-up spikes 3 and 4). The fix is in 4.0.0.Beta1 and labeled
+   `triage/backport-3.40`. `gh pr view 56805 --repo quarkusio/quarkus`, then check whether the backport is in a 3.40.x
+   we can move to.
+   **If it ships in a 3.40.x (or we move to 4.0):** delete the guard class and its `META-INF/services` entry as part of
+   that task, and rely on spike 3's `managedExecutorPropagationIsClean` as the regression test.
+2. **[quarkiverse/quarkus-langchain4j#2950](https://github.com/quarkiverse/quarkus-langchain4j/issues/2950) / PR
+   [#2951](https://github.com/quarkiverse/quarkus-langchain4j/pull/2951)** — the agentic build check doesn't skip an
+   agent's `InvocationParameters` parameter, so the root `ClaimsMailboxAgent` carries one it never uses
+   (`task-06-triage-agents.md`, and CLAUDE.md's agentic gotchas). `gh issue view 2950 --repo
+   quarkiverse/quarkus-langchain4j`.
+   **If it's in a released quarkus-langchain4j we can move to:** drop the `InvocationParameters` parameter from the
+   root agent's signature and fill it from a `@BeforeCall` (`agenticScope.writeExecutionContext(...)`), and update
+   CLAUDE.md's gotcha.
+3. **[quarkiverse/quarkus-network-faults#14](https://github.com/quarkiverse/quarkus-network-faults/issues/14)** (IMAP
+   support) — it could replace the Toxiproxy test harness `ClaimsInboxWatcherTests` uses
+   (`task-09-imap-idle-watcher.md`). `gh issue view 14 --repo quarkiverse/quarkus-network-faults`.
+   **If it's released with IMAP support and the extension targets a Quarkus version we're on:** say so in the findings
+   — replacing `ToxiproxyTestResource` and `org.parasol.testing.mail.Toxiproxy` is a decision for the user, not an
+   automatic swap.
+
+Otherwise say so in one line each in the findings and carry on. Drop an item from this step once its workaround is
+gone.
+
 ### 3. Execute the Task
 - Follow the global rules in `AGENTS.md` (coding style, AssertJ, records, `Optional`, constructor injection, commit rules, documentation policy).
 - Make sure the code compiles: `./mvnw -B clean test-compile -Pollama` and `./mvnw -B clean test-compile`.
@@ -463,7 +496,8 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
 - Never hold a transaction open across an LLM call. Persist in a `@Transactional(REQUIRES_NEW)` method of its own (task 08 review: prefer `@Transactional` to `QuarkusTransaction`).
 - **Two observability workarounds with exit conditions:** the quarkus#54354 `ThreadContextProvider` guard (task 10b;
   delete when quarkusio/quarkus#56805 ships) and the agentic conversation adapter (task 11; delete when
-  quarkus-flow#1056 is fixed). Re-check both, and #1057/#1058, whenever Quarkus or Flow is upgraded.
+  quarkus-flow#1056 is fixed). Re-check both, and #1057/#1058, whenever Quarkus or Flow is upgraded. The #54354 guard
+  is also a standing per-task check (Execution Steps → 2c), together with the other open upstream items.
   - **2026-10-09: #1056 is fixed in Flow 1.2.0, which task 06b adopts.** Task 11 now expects to drop both its Flow task
     proxy and the agentic adapter, after a concurrent test proves the baggage id reaches every span (see task 11's
     "Check first"). The quarkus#54354 guard stays: #56805 is in no 3.40 release yet (3.40.1 is the latest).
