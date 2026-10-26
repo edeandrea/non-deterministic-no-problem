@@ -117,6 +117,19 @@ Before starting any task, check each of these. **"Fixed" means released**, not m
    — replacing `ToxiproxyTestResource` and `org.parasol.testing.mail.Toxiproxy` is a decision for the user, not an
    automatic swap.
 
+**Findings log (most recent check first; drop an item once it's resolved):**
+- **2026-10-26, before task 10:** 2a — latest platform `quarkus-flow-bom` is still 3.40.1 (Flow 1.1.3); override stays.
+  2b — [#1111](https://github.com/quarkiverse/quarkus-flow/issues/1111) still open; `quarkus.flow.validation.input.enabled=false`
+  stays. 2c.1 — [#56805](https://github.com/quarkusio/quarkus/pull/56805) merged for 4.0.0.Beta1 only, no 3.40.x backport
+  yet; task 10b's `ThreadContextProvider` guard stays. 2c.2 — issue #2950 is closed and its fix, PR
+  [#2951](https://github.com/quarkiverse/quarkus-langchain4j/pull/2951), merged to `main` 2026-10-10, but 1.14.2
+  (2026-10-15, the latest release) is a 1.14-branch patch that doesn't carry it; `ClaimsMailboxAgent`'s
+  `InvocationParameters` workaround stays. **2c.3 — changed: issue #14 is closed and quarkus-network-faults
+  [0.3.0](https://github.com/quarkiverse/quarkus-network-faults/releases/tag/0.3.0) (2026-10-25) ships "Add mailer
+  support" (PR [#15](https://github.com/quarkiverse/quarkus-network-faults/pull/15)).** This is a real candidate to
+  replace the Toxiproxy harness. User decision (2026-10-26): record it here and keep Toxiproxy for now; the swap is
+  its own task, not folded into task 10.
+
 Otherwise say so in one line each in the findings and carry on. Drop an item from this step once its workaround is
 gone.
 
@@ -173,7 +186,7 @@ file's header link to it.**
 - ~~[task-07-human-review-step.md](task-07-human-review-step.md): Human review step~~ — **merged into task 08** (user decision, 2026-10-07); tracked under task 08's issue [#255](https://github.com/edeandrea/non-deterministic-no-problem/issues/255)
 - [x] [task-08-intake-processor.md](task-08-intake-processor.md): The intake workflow and business rules (includes the human review) — **done**, squash-merged into `gh216-email-intake` as `ae2885c` ([#240](https://github.com/edeandrea/non-deterministic-no-problem/pull/240)) — issue [#255](https://github.com/edeandrea/non-deterministic-no-problem/issues/255) (includes task 07)
 - [x] [task-09-imap-idle-watcher.md](task-09-imap-idle-watcher.md): IMAP IDLE watcher — **done**, squash-merged into `gh216-email-intake` as `e41c44c` ([#245](https://github.com/edeandrea/non-deterministic-no-problem/pull/245)) — issue [#256](https://github.com/edeandrea/non-deterministic-no-problem/issues/256)
-- [ ] [task-09b-flow-1-3-0.md](task-09b-flow-1-3-0.md): Adopt quarkus-flow 1.3.0, delete the agentic-run workaround and bump the container images (user decision, 2026-10-26) — task 08 found a quarkus-flow 1.2.0 leak when an agent throws on 2026-10-19 (workaround in `org.parasol.intake.agent`, upstream issue [quarkiverse/quarkus-flow#1096](https://github.com/quarkiverse/quarkus-flow/issues/1096), PR [#1095](https://github.com/quarkiverse/quarkus-flow/pull/1095)); 1.3.0 ships the fix — issue [#257](https://github.com/edeandrea/non-deterministic-no-problem/issues/257) — **built 2026-10-26 on `gh216/09b-flow-1.3.0`, awaiting review (not committed)**; found and filed a new upstream regression, [quarkiverse/quarkus-flow#1111](https://github.com/quarkiverse/quarkus-flow/issues/1111) (#1077's input validation breaks every generated agentic workflow), worked around in `application.yml`; otel-lgtm held back (no OpenShift cluster available here) — see Outcome
+- [x] [task-09b-flow-1-3-0.md](task-09b-flow-1-3-0.md): Adopt quarkus-flow 1.3.0, delete the agentic-run workaround and bump the container images (user decision, 2026-10-26) — task 08 found a quarkus-flow 1.2.0 leak when an agent throws on 2026-10-19 (workaround in `org.parasol.intake.agent`, upstream issue [quarkiverse/quarkus-flow#1096](https://github.com/quarkiverse/quarkus-flow/issues/1096), PR [#1095](https://github.com/quarkiverse/quarkus-flow/pull/1095)); 1.3.0 ships the fix — **done**, squash-merged into `gh216-email-intake` as `6d610b1` ([#264](https://github.com/edeandrea/non-deterministic-no-problem/pull/264)) — issue [#257](https://github.com/edeandrea/non-deterministic-no-problem/issues/257); found and filed a new upstream regression, [quarkiverse/quarkus-flow#1111](https://github.com/quarkiverse/quarkus-flow/issues/1111) (#1077's input validation breaks every generated agentic workflow), worked around in `application.yml`; otel-lgtm held back (no OpenShift cluster available here) — see Outcome
 - [ ] [task-10-review-api-and-ui.md](task-10-review-api-and-ui.md): Review API and UI — issue [#258](https://github.com/edeandrea/non-deterministic-no-problem/issues/258)
 - [ ] [task-10b-conversation-core.md](task-10b-conversation-core.md): Generic conversation context core (`ai.scoring.conversation`; changes the chat's scoring trigger) — issue [#259](https://github.com/edeandrea/non-deterministic-no-problem/issues/259)
 - [ ] [task-11-observability.md](task-11-observability.md): Observability for the intake workflow (Flow and agentic adapters) — issue [#260](https://github.com/edeandrea/non-deterministic-no-problem/issues/260)
