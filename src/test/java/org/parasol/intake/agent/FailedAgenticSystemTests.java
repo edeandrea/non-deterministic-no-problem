@@ -31,12 +31,15 @@ import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 
 /**
  * A failed root invocation leaves none of the Flow runs quarkus-flow generated for it, and no worker thread blocked in
- * one of them, which quarkus-flow 1.2.0 would otherwise leave behind ({@link AgenticWorkflowRuns}).
+ * one of them. quarkus-flow 1.2.0 left both behind on a failure (a worker thread parked forever in
+ * {@code AgenticFlow.executeAgent}'s join); 1.3.0 fixes it upstream, in
+ * <a href="https://github.com/quarkiverse/quarkus-flow/pull/1095">quarkiverse/quarkus-flow#1095</a>. This test is kept
+ * unchanged as the regression guard for that fix.
  */
 @QuarkusTest
 @TestProfile(IntakeTestProfile.class)
 @ConnectWireMock
-class FailedAgenticSystemListenerTests {
+class FailedAgenticSystemTests {
 	// Where a generated workflow's task waits for its agent call: FlowPlanner.executeAgent(i).join()
 	private static final String AGENT_CALL_CLASS = "io.quarkiverse.flow.langchain4j.workflow.flow.AgenticFlow";
 	private static final String AGENT_CALL_METHOD = "executeAgent";
@@ -112,7 +115,7 @@ class FailedAgenticSystemListenerTests {
 		return Thread.getAllStackTraces()
 			.entrySet()
 			.stream()
-			.filter(thread -> Stream.of(thread.getValue()).anyMatch(FailedAgenticSystemListenerTests::isAgentCall))
+			.filter(thread -> Stream.of(thread.getValue()).anyMatch(FailedAgenticSystemTests::isAgentCall))
 			.map(Map.Entry::getKey)
 			.collect(Collectors.toUnmodifiableSet());
 	}

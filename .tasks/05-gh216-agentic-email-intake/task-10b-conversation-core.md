@@ -2,6 +2,8 @@
 
 **Type:** Code Modification (existing `main` code: the chat's session scoring path changes)
 
+**Issue:** [#259](https://github.com/edeandrea/non-deterministic-no-problem/issues/259)
+
 ## Goal
 
 The "conversation" concept (which interaction belongs to which conversation, and what happens when one ends)

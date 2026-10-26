@@ -2,6 +2,8 @@
 
 **Type:** Code Modification
 
+**Issue:** [#252](https://github.com/edeandrea/non-deterministic-no-problem/issues/252)
+
 ## Goal
 
 Every fixed reply the intake sends is a Qute mail template (HTML + text), sent by one sender

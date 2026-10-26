@@ -2,6 +2,8 @@
 
 **Type:** Code Modification
 
+**Issue:** [#260](https://github.com/edeandrea/non-deterministic-no-problem/issues/260)
+
 ## Goal
 
 Every span of a claim's intake runs carries the claim's `gen_ai.conversation.id`, so Langfuse shows the claim as one
@@ -191,10 +193,11 @@ The sections below were written for 1.1.3 and still describe both adapters; they
   `noMatchingClaim`, `whichClaim`), plus the AI-written status answer sent as text. Still open: the
   `claim.intake.replies` `template` values, and where the counter lives given "no observability code in any step".
 - Each leaf agent belongs to one root, so the agentic listener only ever sees the intake's agents.
-- When an agent throws, task 08's deprecated workaround (`AgenticWorkflowRuns`, until quarkus-flow#1095 is released) makes
-  every generated agentic run of that invocation **fault**: each level should then export a faulted `workflow.execute` span
-  (not verified yet), and `FlowPlanner` logs one "Workflow failed" ERROR for each, besides the intake run's own failure. Without it those runs never end
-  (no span at all). The upstream fix logs them at DEBUG.
+- When an agent throws, quarkus-flow 1.3.0's own fix (quarkiverse/quarkus-flow#1095; adopted in task 09b, which deleted
+  the app's workaround) makes every generated agentic run of that invocation **fault**: each level should then export a
+  faulted `workflow.execute` span (not verified yet). Check what it logs for each — task 08's deprecated workaround
+  logged one "Workflow failed" ERROR per run from `FlowPlanner`; confirm whether 1.3.0's own fix logs at the same level
+  or lower.
 
 ## Done When
 

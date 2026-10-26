@@ -2,6 +2,8 @@
 
 **Type:** Documentation
 
+**Issue:** [#250](https://github.com/edeandrea/non-deterministic-no-problem/issues/250)
+
 ## Goal
 
 A short, reviewable design for the email claim intake exists in the repository and is opened as a

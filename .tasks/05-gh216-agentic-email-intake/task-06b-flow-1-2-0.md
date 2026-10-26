@@ -2,6 +2,8 @@
 
 **Type:** Dependency upgrade
 
+**Issue:** [#254](https://github.com/edeandrea/non-deterministic-no-problem/issues/254)
+
 > **Branch and PR (user decision, 2026-10-09):** branch `gh216/flow-1.2.0` off `gh216-email-intake`, its own PR into
 > the feature branch, squash-merged like the other tasks. It lands **before task 08**, so task 08's diff holds only
 > task 08.

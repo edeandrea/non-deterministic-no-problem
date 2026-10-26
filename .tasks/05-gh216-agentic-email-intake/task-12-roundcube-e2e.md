@@ -2,6 +2,8 @@
 
 **Type:** Verification
 
+**Issue:** [#261](https://github.com/edeandrea/non-deterministic-no-problem/issues/261)
+
 ## Goal
 
 A Playwright test drives the full demo through the real Roundcube UI and the Parasol review panel, with

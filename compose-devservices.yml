@@ -9,7 +9,7 @@
 #   address -> name map in config/parasol-identities.php must follow the claimants in import.sql.
 services:
   greenmail:
-    image: docker.io/greenmail/standalone:2.1.14
+    image: docker.io/greenmail/standalone:2.1.15
     ports:
       - '3025'
       - '3143'
@@ -21,7 +21,7 @@ services:
       io.quarkus.devservices.compose.config_map.port.8080: parasol.mail.greenmail-api-port
 
   roundcube:
-    image: docker.io/roundcube/roundcubemail:1.7.4-apache-nonroot
+    image: docker.io/roundcube/roundcubemail:1.7.5-apache-nonroot
     profiles:
       - webmail
     depends_on:

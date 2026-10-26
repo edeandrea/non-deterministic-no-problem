@@ -2,6 +2,8 @@
 
 **Type:** Code Modification
 
+**Issue:** [#253](https://github.com/edeandrea/non-deterministic-no-problem/issues/253) (shared with task 06)
+
 ## Goal
 
 A `ClaimExtractionWorkflow` (`@ParallelAgent`) turns a claim's whole correspondence into structured
