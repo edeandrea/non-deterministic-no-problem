@@ -443,32 +443,27 @@ deploys the app with `-Dquarkus.profile=openshift`. It ends by printing the Roun
 
 - **`dependencies.yml`** holds PostgreSQL, LGTM and the mail stack, plus the `parasol-app-config` ConfigMap the app
   reads (`quarkus.mailer.host: greenmail`, port `3025`).
-- **LGTM's Grafana needs two env vars or it shows no datasources.** Grafana 13 (`grafana/otel-lgtm` ≥ `0.32.0`)
-  ships the Prometheus, Loki, Tempo and Pyroscope datasources in `<grafana-home>/data/plugins-bundled` rather than
-  as core plugins under `public/app/plugins/datasource`. Two separate things then go wrong, and **fixing only the
-  first leaves the symptom unchanged** — the `grafana-lgtm` Deployment sets both:
-  - **`GF_PATHS_BUNDLED_PLUGINS=/otel-lgtm/grafana/data/plugins-bundled`.** The image's `run-grafana.sh`
-    unconditionally exports `GF_PATHS_HOME=/data/grafana`, and Grafana resolves `[paths] bundled_plugins` relative
-    to that home (`cfg.PluginsPaths = [makeAbsolute(plugins, HomePath), makeAbsolute(bundledPlugins, HomePath)]`),
-    so it looks in `/data/grafana/data/plugins-bundled` — a path the image never creates. The value here is
-    absolute, so Grafana uses it verbatim.
-  - **`GF_PLUGINS_PREINSTALL_AUTO_UPDATE=false`.** With the path fixed the plugins register, but Grafana's
-    background installer immediately tries to update each one from grafana.com, which begins by deleting the
-    existing directory. Those files belong to the image's uid 1000 and OpenShift runs the container as an arbitrary
-    UID, so the delete fails (`unlinkat …/prometheus/1008.js: permission denied`) and the failed install drops the
-    plugin that had already registered. This does **not** stop the Drilldown apps from installing: they aren't in
-    the image at all, so they're still downloaded into `GF_PATHS_PLUGINS` on the `/data` PVC.
-
-  The failure mode either way is that every picker (Explore, Drilldown) offers only `-- Mixed --` / `-- Grafana --`.
-  The datasources themselves *are* provisioned — `/api/datasources` lists all four. They vanish in `/api/plugins`
-  and `/api/frontend/settings` (which is what the UI builds the picker from), so diagnose there, and read the
-  Grafana log for `Could not find plugin definition for data source` — it needs `ENABLE_LOGS_GRAFANA=true`, since
-  the image swallows Grafana's stdout by default.
-
-  The path problem is an upstream bug, not a side effect of the `/data` PVC — the image creates `/data` at runtime
-  and never populates it. It is unfixed on `main`, so **bumping the image tag does not make either env var
-  redundant**; don't delete them. Local dev mode is unaffected: the Quarkus LGTM Dev Service still runs `0.24.0`
-  (Grafana 12), where these were still core plugins.
+- **LGTM's Grafana needs `GF_PLUGINS_PREINSTALL_AUTO_UPDATE=false` or it shows no datasources.** Grafana 13
+  (`grafana/otel-lgtm` ≥ `0.32.0`) ships the Prometheus, Loki, Tempo and Pyroscope datasources as bundled plugins
+  inside the image, at `/otel-lgtm/grafana/data/plugins-bundled`. Grafana loads them fine; what breaks is that its
+  background installer then tries to **auto-update** each one from grafana.com, and an update begins by deleting
+  the existing directory. Those files belong to the image's uid 1000 while OpenShift runs the container as an
+  arbitrary UID, so the delete fails (`unlinkat …/prometheus/1008.js: permission denied`) and the failed install
+  drops the plugin that had already registered. The `grafana-lgtm` Deployment therefore pins the bundled versions
+  rather than updating them. This does **not** stop the Drilldown apps installing — they aren't in the image at
+  all, so they're still downloaded into `GF_PATHS_PLUGINS` on the `/data` PVC.
+  - **The symptom is non-obvious:** every picker (Explore, Drilldown) offers only `-- Mixed --` / `-- Grafana --`,
+    while the datasources themselves *are* provisioned and `/api/datasources` happily lists all four. They vanish
+    in `/api/plugins` and `/api/frontend/settings` (what the UI actually builds the picker from), so diagnose
+    there.
+  - **To read Grafana's own log you need `ENABLE_LOGS_GRAFANA=true`** — the image swallows Grafana's stdout by
+    default, which hides both `Failed to install plugin … permission denied` and the resulting `Could not find
+    plugin definition for data source`.
+  - **This is UID-specific, not universal.** A plain `docker`/`podman run` of the same image is fine: as root the
+    delete succeeds and the plugin is replaced by a fresh download. Don't expect to reproduce it locally, and
+    don't expect an image bump to remove the need for the env var.
+  - Local dev mode is unaffected for a different reason: the Quarkus LGTM Dev Service still runs `0.24.0`
+    (Grafana 12), where these were ordinary core plugins with no bundled-plugin update path.
 - **The two PVC-backed Deployments (`grafana-lgtm`, `non-deterministic-db`) use `strategy: Recreate`.** Their PVCs
   are `ReadWriteOnce`, so a rolling update deadlocks: the new pod can't attach the volume until the old one
   releases it, and the old one isn't terminated until the new one is ready (`Multi-Attach error for volume …`,

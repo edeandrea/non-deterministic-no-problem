@@ -160,26 +160,21 @@ spec:
             - containerPort: 3000
             - containerPort: 4317
             - containerPort: 4318
-          # Both of these are needed for Grafana to offer the Prometheus, Loki, Tempo and Pyroscope
-          # datasources at all. Without them every datasource picker shows only "-- Mixed --" and
-          # "-- Grafana --", even though the datasources themselves are provisioned fine.
           env:
-            # Grafana 13 (otel-lgtm >= 0.32.0) ships those four datasources under
-            # <grafana-home>/data/plugins-bundled instead of as core plugins in
-            # public/app/plugins/datasource. The image's run-grafana.sh unconditionally exports
-            # GF_PATHS_HOME=/data/grafana, and Grafana resolves [paths] bundled_plugins relative to
-            # that home, so it looks in /data/grafana/data/plugins-bundled -- which nothing creates.
-            # Point Grafana at the real directory inside the image; absolute, so it is used verbatim.
-            - name: GF_PATHS_BUNDLED_PLUGINS
-              value: /otel-lgtm/grafana/data/plugins-bundled
-            # With the path fixed, Grafana registers the bundled plugins and its background installer
-            # then tries to update each one from grafana.com, which starts by deleting the existing
-            # directory. Those files belong to the image's uid 1000 and OpenShift runs the container
-            # as an arbitrary UID, so the delete fails ("unlinkat .../prometheus/1008.js: permission
-            # denied") and the failed install drops the already-registered plugin -- leaving
-            # "Could not find plugin definition for data source" for all four. Keep the bundled
-            # versions instead. This does not affect the Drilldown apps: they aren't present in the
-            # image, so they are still downloaded into GF_PATHS_PLUGINS on the /data PVC.
+            # Without this, Grafana offers no Prometheus, Loki, Tempo or Pyroscope datasource at all
+            # and every picker shows only "-- Mixed --" / "-- Grafana --".
+            #
+            # Grafana 13 (otel-lgtm >= 0.32.0) ships those four as bundled plugins in the image, at
+            # /otel-lgtm/grafana/data/plugins-bundled. Grafana loads them fine, but its background
+            # installer then tries to auto-update each one from grafana.com, and an update starts by
+            # deleting the existing directory. Those files belong to the image's uid 1000 while
+            # OpenShift runs the container as an arbitrary UID, so the delete fails ("unlinkat
+            # .../prometheus/1008.js: permission denied") and the failed install drops the plugin
+            # that had already registered -- leaving "Could not find plugin definition for data
+            # source" for all four. Keep the bundled versions instead of updating them.
+            #
+            # This does not stop the Drilldown apps installing: they aren't in the image at all, so
+            # they are still downloaded into GF_PATHS_PLUGINS on the /data PVC.
             - name: GF_PLUGINS_PREINSTALL_AUTO_UPDATE
               value: "false"
           resources:
