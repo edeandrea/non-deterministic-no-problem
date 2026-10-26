@@ -11,6 +11,18 @@ langfuse:
   image:
     pullSecrets:
       - name: dockerhub-auth
+  # langfuse-web runs the Prisma (457) and ClickHouse (53) migrations before it binds :3000.
+  # The chart's default liveness probe (20s delay, 10s period, 3 failures) SIGKILLs the container
+  # ~50s in, which kills golang-migrate mid-statement and leaves the ClickHouse `schema_migrations`
+  # table marked dirty ("Dirty database version 47. Fix and force version."), after which every
+  # subsequent boot refuses outright. Recovering from that needs a manual `migrate force` - see the
+  # OpenShift deployment section of CLAUDE.md. Chart 2.1.6 has no startupProbe for the web pod, so
+  # the grace period has to come from failureThreshold: 20s + 60*10s = ~10 minutes.
+  web:
+    livenessProbe:
+      failureThreshold: 60
+    readinessProbe:
+      failureThreshold: 60
   encryptionKey:
     value: e098f1e3f571be035b2bcc5a94bdb77515ff8838819203601e14ec597a59579a
   salt:
