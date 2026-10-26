@@ -443,6 +443,33 @@ deploys the app with `-Dquarkus.profile=openshift`. It ends by printing the Roun
 
 - **`dependencies.yml`** holds PostgreSQL, LGTM and the mail stack, plus the `parasol-app-config` ConfigMap the app
   reads (`quarkus.mailer.host: greenmail`, port `3025`).
+- **`langfuse-web` must not be killed while it migrates.** It runs the Prisma and ClickHouse migrations *before* it
+  binds `:3000`, which on a fresh install takes longer than the chart's stock liveness probe allows (20s delay, 10s
+  period, 3 failures → SIGKILL ~50s in). The kill lands mid-statement, golang-migrate leaves ClickHouse's
+  `default.schema_migrations` marked dirty, and **every subsequent boot then refuses outright** with
+  `error: Dirty database version N. Fix and force version.` — a crash loop that no restart, redeploy or chart/operator
+  upgrade clears.
+  - `langfuse-helm.values.yml` therefore overrides `langfuse.web.livenessProbe.failureThreshold` (and the readiness
+    one) to `60`, giving ~10 minutes of boot grace. Chart 2.1.6 exposes **no `startupProbe`** for the web pod, so
+    `failureThreshold` is the only lever. The cost is that a genuinely hung *running* web pod also takes ~10 minutes
+    to be restarted.
+  - **Recovering a dirty marker is manual.** golang-migrate's ClickHouse driver reads
+    `SELECT version, dirty FROM schema_migrations ORDER BY sequence DESC LIMIT 1` and records versions by *appending*
+    a row, so `migrate force N-1` is just an insert:
+    `INSERT INTO default.schema_migrations (version, dirty, sequence) VALUES (N-1, 0, toUnixTimestamp64Nano(now64(9)))`
+    via `clickhouse-client` in `langfuse-clickhouse-0-0-0`, then `oc rollout restart deployment/langfuse-web`. Replaying
+    a migration is safe — Langfuse's ClickHouse migrations are `ADD COLUMN IF NOT EXISTS` / `ADD INDEX IF NOT EXISTS` /
+    `MODIFY QUERY`. Apply the probe fix first, or the replay gets killed the same way.
+  - **Diagnose with ClickHouse, not the pod log.** The web log only ever shows the *refusal* from a later boot; the
+    original failure is in `system.query_log` (`WHERE exception_code != 0`). A `Code: 210 … Broken pipe, while writing
+    to socket` whose inner `/* ddl_entry=… */` statement shows `QueryFinish` means the DDL succeeded and the *client*
+    died — i.e. the kubelet killed it, not ClickHouse. Cross-check with
+    `oc get events | grep langfuse-web` for `failed liveness probe`.
+  - The script gates on `oc rollout status deployment/langfuse-web` (and the worker) after the Helm install, so a
+    broken Langfuse aborts the run instead of letting `parasol-app` deploy against it and printing success.
+  - The ClickHouse operator chart is pinned to `0.0.8` — the latest release, and the version Langfuse's own
+    `examples/minimal-installation` prescribes. Dirty-migration crash loops are **not** an operator version problem;
+    don't go bumping it.
 - **The mail stack mirrors `compose-devservices.yml`:** same images and tags, same environment variables. Change
   both together.
   - **GreenMail** is internal only (ClusterIP Service for SMTP 3025, IMAP 3143 and the API on 8080; no Route). It keeps
@@ -653,6 +680,18 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
   `Langfuse API error (404): ` prefix. The broad trailing `catch (Exception)` blocks in
   `LangfuseEvaluationInitializer` are intentional: they run inside `onStartup(@Observes StartupEvent)`,
   where an escaping exception aborts application boot.
+- **A Langfuse `412` on evaluator creation is a failed provider call, not a bad payload.** Langfuse
+  test-calls the evaluator's LLM connection before it will save it, and answers
+  `412 EvaluatorConfigurationError` ("The LLM provider could not complete the model request during
+  evaluator validation") when that call fails. **It never passes the provider's own error through** —
+  not in the response body, and not in the `langfuse-web` container log either, which carries only the
+  `EvaluatorConfigurationError` stack. So the cause has to be found by calling the provider directly;
+  `LangfuseEvaluationInitializer.logEvaluatorValidationHint` logs the suspects and the `generateContent`
+  curl that settles it. Seen in the wild as a Gemini project over its **monthly spend cap**
+  (`429 RESOURCE_EXHAUSTED`, https://ai.studio/spend) — note that `upsert`ing the `google-ai-studio`
+  LLM connection *succeeds* regardless, because Langfuse does not validate the key at that point, so a
+  present, correct-looking connection proves nothing. Don't read a 412 as a reason to change the
+  configured model.
 - **The observation `fields` parameter is unvalidated free-form text** — an unknown field group is
   silently ignored, not rejected with a 400 — which is how the earlier `meta` typo survived so long
   (the group is spelled `metadata`). `LangfuseSessionScoringService.fetchSessionObservations`

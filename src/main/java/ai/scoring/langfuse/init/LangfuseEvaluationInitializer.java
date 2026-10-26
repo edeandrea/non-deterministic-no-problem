@@ -52,6 +52,9 @@ import io.quarkiverse.langfuse.api.LangfuseOperations;
 public class LangfuseEvaluationInitializer {
 	private static final String EVALUATOR_NAME = "Continuous Evaluation Evaluator";
 
+	/** The status Langfuse answers when its pre-save validation call to the evaluator's LLM connection fails. */
+	private static final int EVALUATOR_VALIDATION_FAILED = 412;
+
 	private static final String PROMPT = """
 		You are an AI evaluating a response and the expected output.
 		You need to evaluate whether the response is relevant to the question.
@@ -279,11 +282,35 @@ public class LangfuseEvaluationInitializer {
 		catch (LangfuseApiException e) {
 			// getMessage() carries the whole raw response body; getServerMessage() is the server's own sentence.
 			Log.warnf(e, "Failed to initialize Continuous Evaluation LLM Evaluator (HTTP %d): %s", e.getStatusCode(), e.getServerMessage());
+			logEvaluatorValidationHint(e);
 			return Optional.empty();
 		}
 		catch (Exception e) {
 			Log.warnf(e, "Failed to initialize Continuous Evaluation LLM Evaluator: %s", e.getMessage());
 			return Optional.empty();
+		}
+	}
+
+	/**
+	 * Langfuse validates an LLM-as-a-judge evaluator by making a live call to the configured LLM connection before it
+	 * will save it, and answers {@value #EVALUATOR_VALIDATION_FAILED} when that call fails. It does not pass the
+	 * provider's own error through — neither in the response nor in its own server log — so the warning above says
+	 * nothing about the actual cause. Spell the usual suspects out rather than making the next person find them by
+	 * calling Gemini by hand.
+	 */
+	private void logEvaluatorValidationHint(LangfuseApiException e) {
+		if (e.getStatusCode() == EVALUATOR_VALIDATION_FAILED) {
+			Log.warnf(
+				"""
+				Langfuse test-calls the LLM connection before saving an evaluator and does not report the provider's error. \
+				Check, for the Gemini project behind GEMINI_API_KEY: its quota and monthly spend cap (https://ai.studio/spend), \
+				that the key is still valid, and that it can address model '%s'. Verify directly with: \
+				curl -X POST -H "x-goog-api-key: $GEMINI_API_KEY" -H 'Content-Type: application/json' \
+				-d '{"contents":[{"parts":[{"text":"hi"}]}]}' \
+				'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent'""",
+				this.scoringConfig.gemini().modelName(),
+				this.scoringConfig.gemini().modelName()
+			);
 		}
 	}
 

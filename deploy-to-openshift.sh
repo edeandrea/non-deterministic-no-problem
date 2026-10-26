@@ -65,8 +65,13 @@ oc secrets link default dockerhub-auth --for=pull
 helm repo add langfuse https://langfuse.github.io/langfuse-k8s
 helm repo update langfuse
 helm upgrade --install langfuse langfuse/langfuse \
-  --version 2.1.3 \
+  --version 2.1.6 \
   -f langfuse-helm.values.yml
+
+# Fail loudly instead of deploying the app against a half-migrated Langfuse. langfuse-web runs the
+# Prisma and ClickHouse migrations on startup and can take several minutes on a fresh install.
+oc rollout status deployment/langfuse-web --timeout=15m
+oc rollout status deployment/langfuse-worker --timeout=15m
 
 oc delete secret parasol-app-creds --ignore-not-found
 oc create secret generic parasol-app-creds \
