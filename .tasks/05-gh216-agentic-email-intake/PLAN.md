@@ -54,17 +54,18 @@ Find the next incomplete task, and read the key decisions, spike results and not
 ### 2. Understand Your Task
 Read your task file in `.tasks/05-gh216-agentic-email-intake/task-XX-*.md`: Goal, Key Points, Done When.
 
-### 2a. Check for a platform that pins quarkus-flow 1.2.0 or later (every task, while the override stays)
+### 2a. Check for a platform that pins quarkus-flow 1.3.0 or later (every task, while the override stays)
 *History: until 2026-10-09 this step waited for quarkus-flow 1.2.0 itself. It was released that day, the reproducers
 passed against it, and task 06b overrides the platform's Flow 1.1.3 with it (user decision; see Caveats →
-quarkus-flow 1.2.0).*
+quarkus-flow 1.2.0). 2026-10-26: task 09b moves the override to 1.3.0, so this step now watches for a platform that
+pins Flow ≥ 1.3.0 (see Caveats → quarkus-flow 1.3.0).*
 
 Before starting any task:
 1. Check which Flow version the newest Quarkus platform's `quarkus-flow-bom` pins:
    `curl -s https://repo1.maven.org/maven2/io/quarkus/platform/quarkus-flow-bom/maven-metadata.xml | grep -E '<latest>|<release>'`,
    then grep that version's `quarkus-flow-bom-<v>.pom` for `<artifactId>quarkus-flow</artifactId>`. The platform side is
    tracked in quarkusio/quarkus-platform (`gh search prs --repo quarkusio/quarkus-platform "Quarkus Flow"`).
-2. **If a platform we can move to pins Flow 1.2.0 or later**, say so in the findings: dropping the override (the
+2. **If a platform we can move to pins Flow 1.3.0 or later**, say so in the findings: dropping the override (the
    `io.quarkiverse.flow:quarkus-flow-bom` import and `quarkus.flow.version` in `pom.xml`) is a decision for the user,
    usually taken together with that platform upgrade.
 3. Otherwise say so in one line in the findings and carry on.
@@ -73,6 +74,18 @@ Before starting any task:
    `quarkus.flow.version` in its `pom.xml`**. A `-Dquarkus.flow.version=` on the command line doesn't reach Quarkus's
    test bootstrap, which then runs the old Flow (found on 2026-10-09). Check what ran with
    `strings -n 8 target/quarkus/bootstrap/test-app-model.dat | grep -oE 'io.quarkiverse.flow:quarkus-flow[a-z-]*::jar:[0-9.A-Z]+' | sort | uniq -c`.
+
+### 2b. Check the status of quarkus-flow#1111 (every task, while `quarkus.flow.validation.input.enabled` stays off)
+*Added by task 09b (2026-10-26): see Caveats → quarkus-flow 1.3.0 for the full writeup.*
+
+1. Check [quarkiverse/quarkus-flow#1111](https://github.com/quarkiverse/quarkus-flow/issues/1111): `gh issue view 1111
+   --repo quarkiverse/quarkus-flow`.
+2. **If it's fixed in a released version** (not just merged — check the milestone/release, the same way 2a checks for
+   a release rather than a merged PR), re-enable `quarkus.flow.validation.input.enabled` in `application.yml` (delete
+   the override and its comment) as part of that task, and re-run the full `org.parasol.intake.**` suite to confirm
+   the generated agentic workflows (`ClaimsMailboxAgent`, `ClaimExtractionWorkflow`) still pass with validation back
+   on.
+3. Otherwise say so in one line in the findings and carry on — the override in `application.yml` stays.
 
 ### 3. Execute the Task
 - Follow the global rules in `AGENTS.md` (coding style, AssertJ, records, `Optional`, constructor injection, commit rules, documentation policy).
@@ -101,12 +114,15 @@ Edit or create task files and update `## Task Plan`.
 
 ## Task Plan
 
-- [x] [task-01-agentic-spike.md](task-01-agentic-spike.md): Agentic module spike (runs first, throwaway)
-- [x] [task-02-design-and-review.md](task-02-design-and-review.md): Design document and review gate
-- [x] [task-01b-flow-spike.md](task-01b-flow-spike.md): quarkus-flow spike (throwaway; decided task 07) — **verdict: ADOPT**; follow-up (b1, whole intake as one workflow) **feasible**
+**Each task is tracked as a GitHub sub-issue of #216 (created retroactively, 2026-10-26); the Task Plan and each task
+file's header link to it.**
+
+- [x] [task-01-agentic-spike.md](task-01-agentic-spike.md): Agentic module spike (runs first, throwaway) — [#248](https://github.com/edeandrea/non-deterministic-no-problem/issues/248)
+- [x] [task-02-design-and-review.md](task-02-design-and-review.md): Design document and review gate — [#250](https://github.com/edeandrea/non-deterministic-no-problem/issues/250)
+- [x] [task-01b-flow-spike.md](task-01b-flow-spike.md): quarkus-flow spike (throwaway; decided task 07) — **verdict: ADOPT**; follow-up (b1, whole intake as one workflow) **feasible** — [#249](https://github.com/edeandrea/non-deterministic-no-problem/issues/249)
 - [x] **Design gate re-run (blocking):** update `docs/design/email-claim-intake.md` and its diagrams for b1, open a PR
   ending `Part of #216`, wait for the review; then update the #216 issue body to match — **passed:** PR #231 merged
-  (`26d8b83`, no review feedback); the issue body matches it
+  (`26d8b83`, no review feedback); the issue body matches it — tracked under [#250](https://github.com/edeandrea/non-deterministic-no-problem/issues/250)
 - [x] **Follow-up spike 5 (blocking, user decisions 2026-10-07)**: **verdict: all four answered** (see
   `spike-results-flow.md` → Follow-up spike 5; branch `spike/flow-followup5`):
   1. the agentic adapter carries the baggage id onto every AI call inside the generated sub-workflows (8 concurrent
@@ -115,20 +131,22 @@ Edit or create task files and update `## Task Plan`.
   2. per-sender order works with a CDI status listener driving the queue
   3. `MonitoredAgent` works under Flow and holds nothing for waiting runs; **keep both Dev UIs** (user decision)
   4. the three-way router (parallel LLM, tool-calling LLM, plain Java) works under Flow's translation
-- [x] [task-03-intake-config-and-mailbox.md](task-03-intake-config-and-mailbox.md): Intake configuration, Flow dependencies and claims mailbox — **done 2026-10-08**, squash-merged into `gh216-email-intake` as `fcfb8e8` ([#233](https://github.com/edeandrea/non-deterministic-no-problem/pull/233))
-- [x] [task-04-email-templates.md](task-04-email-templates.md): Qute reply templates and sender — **done 2026-10-08**, squash-merged into `gh216-email-intake` as `9c719cb` ([#234](https://github.com/edeandrea/non-deterministic-no-problem/pull/234))
-- [x] [task-05-extraction-agents.md](task-05-extraction-agents.md): Claim extraction agents — **done 2026-10-09**, squash-merged into `gh216-email-intake` with task 06 as `1b232cc` ([#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235))
-- [x] [task-06-triage-agents.md](task-06-triage-agents.md): Triage agents — **done 2026-10-09**, in the same squash commit `1b232cc` ([#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235))
-- [x] [task-06b-flow-1-2-0.md](task-06b-flow-1-2-0.md): Adopt quarkus-flow 1.2.0 ahead of the platform (user decision, 2026-10-09) — **done**, squash-merged into `gh216-email-intake` as `9c2d0b7` ([#236](https://github.com/edeandrea/non-deterministic-no-problem/pull/236))
-- ~~[task-07-human-review-step.md](task-07-human-review-step.md): Human review step~~ — **merged into task 08** (user decision, 2026-10-07)
-- [ ] [task-08-intake-processor.md](task-08-intake-processor.md): The intake workflow and business rules (includes the human review) — **built 2026-10-11 on `gh216/08-intake-workflow`, awaiting review (not committed)**; 2026-10-19: found a quarkus-flow 1.2.0 leak when an agent throws (workaround in `org.parasol.intake.agent`, upstream issue quarkiverse/quarkus-flow#1096, PR #1095)
-- [ ] [task-09-imap-idle-watcher.md](task-09-imap-idle-watcher.md): IMAP IDLE watcher
-- [ ] [task-10-review-api-and-ui.md](task-10-review-api-and-ui.md): Review API and UI
-- [ ] [task-10b-conversation-core.md](task-10b-conversation-core.md): Generic conversation context core (`ai.scoring.conversation`; changes the chat's scoring trigger)
-- [ ] [task-11-observability.md](task-11-observability.md): Observability for the intake workflow (Flow and agentic adapters)
-- [ ] [task-12-roundcube-e2e.md](task-12-roundcube-e2e.md): Roundcube end-to-end test
-- [ ] [task-13-demo-and-docs.md](task-13-demo-and-docs.md): Demo guide and documentation
-- [ ] [task-14-verification.md](task-14-verification.md): Verification
+  — tracked under [#249](https://github.com/edeandrea/non-deterministic-no-problem/issues/249)
+- [x] [task-03-intake-config-and-mailbox.md](task-03-intake-config-and-mailbox.md): Intake configuration, Flow dependencies and claims mailbox — **done 2026-10-08**, squash-merged into `gh216-email-intake` as `fcfb8e8` ([#233](https://github.com/edeandrea/non-deterministic-no-problem/pull/233)) — issue [#251](https://github.com/edeandrea/non-deterministic-no-problem/issues/251)
+- [x] [task-04-email-templates.md](task-04-email-templates.md): Qute reply templates and sender — **done 2026-10-08**, squash-merged into `gh216-email-intake` as `9c719cb` ([#234](https://github.com/edeandrea/non-deterministic-no-problem/pull/234)) — issue [#252](https://github.com/edeandrea/non-deterministic-no-problem/issues/252)
+- [x] [task-05-extraction-agents.md](task-05-extraction-agents.md): Claim extraction agents — **done 2026-10-09**, squash-merged into `gh216-email-intake` with task 06 as `1b232cc` ([#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235)) — issue [#253](https://github.com/edeandrea/non-deterministic-no-problem/issues/253) (shared with task 06)
+- [x] [task-06-triage-agents.md](task-06-triage-agents.md): Triage agents — **done 2026-10-09**, in the same squash commit `1b232cc` ([#235](https://github.com/edeandrea/non-deterministic-no-problem/pull/235)) — issue [#253](https://github.com/edeandrea/non-deterministic-no-problem/issues/253) (shared with task 05)
+- [x] [task-06b-flow-1-2-0.md](task-06b-flow-1-2-0.md): Adopt quarkus-flow 1.2.0 ahead of the platform (user decision, 2026-10-09) — **done**, squash-merged into `gh216-email-intake` as `9c2d0b7` ([#236](https://github.com/edeandrea/non-deterministic-no-problem/pull/236)) — issue [#254](https://github.com/edeandrea/non-deterministic-no-problem/issues/254)
+- ~~[task-07-human-review-step.md](task-07-human-review-step.md): Human review step~~ — **merged into task 08** (user decision, 2026-10-07); tracked under task 08's issue [#255](https://github.com/edeandrea/non-deterministic-no-problem/issues/255)
+- [x] [task-08-intake-processor.md](task-08-intake-processor.md): The intake workflow and business rules (includes the human review) — **done**, squash-merged into `gh216-email-intake` as `ae2885c` ([#240](https://github.com/edeandrea/non-deterministic-no-problem/pull/240)) — issue [#255](https://github.com/edeandrea/non-deterministic-no-problem/issues/255) (includes task 07)
+- [x] [task-09-imap-idle-watcher.md](task-09-imap-idle-watcher.md): IMAP IDLE watcher — **done**, squash-merged into `gh216-email-intake` as `e41c44c` ([#245](https://github.com/edeandrea/non-deterministic-no-problem/pull/245)) — issue [#256](https://github.com/edeandrea/non-deterministic-no-problem/issues/256)
+- [ ] [task-09b-flow-1-3-0.md](task-09b-flow-1-3-0.md): Adopt quarkus-flow 1.3.0, delete the agentic-run workaround and bump the container images (user decision, 2026-10-26) — task 08 found a quarkus-flow 1.2.0 leak when an agent throws on 2026-10-19 (workaround in `org.parasol.intake.agent`, upstream issue [quarkiverse/quarkus-flow#1096](https://github.com/quarkiverse/quarkus-flow/issues/1096), PR [#1095](https://github.com/quarkiverse/quarkus-flow/pull/1095)); 1.3.0 ships the fix — issue [#257](https://github.com/edeandrea/non-deterministic-no-problem/issues/257) — **built 2026-10-26 on `gh216/09b-flow-1.3.0`, awaiting review (not committed)**; found and filed a new upstream regression, [quarkiverse/quarkus-flow#1111](https://github.com/quarkiverse/quarkus-flow/issues/1111) (#1077's input validation breaks every generated agentic workflow), worked around in `application.yml`; otel-lgtm held back (no OpenShift cluster available here) — see Outcome
+- [ ] [task-10-review-api-and-ui.md](task-10-review-api-and-ui.md): Review API and UI — issue [#258](https://github.com/edeandrea/non-deterministic-no-problem/issues/258)
+- [ ] [task-10b-conversation-core.md](task-10b-conversation-core.md): Generic conversation context core (`ai.scoring.conversation`; changes the chat's scoring trigger) — issue [#259](https://github.com/edeandrea/non-deterministic-no-problem/issues/259)
+- [ ] [task-11-observability.md](task-11-observability.md): Observability for the intake workflow (Flow and agentic adapters) — issue [#260](https://github.com/edeandrea/non-deterministic-no-problem/issues/260)
+- [ ] [task-12-roundcube-e2e.md](task-12-roundcube-e2e.md): Roundcube end-to-end test — issue [#261](https://github.com/edeandrea/non-deterministic-no-problem/issues/261)
+- [ ] [task-13-demo-and-docs.md](task-13-demo-and-docs.md): Demo guide and documentation — issue [#262](https://github.com/edeandrea/non-deterministic-no-problem/issues/262)
+- [ ] [task-14-verification.md](task-14-verification.md): Verification — issue [#263](https://github.com/edeandrea/non-deterministic-no-problem/issues/263)
 
 > **Ordering:** the task files describe the b1 design (rewritten 2026-10-07). The design gate re-run has passed
 > (PR #231), so implementation starts at task 03. Task 10b may run any time before task 11 (it only touches `ai.scoring` and the chat);
@@ -144,6 +162,9 @@ Edit or create task files and update `## Task Plan`.
 >   on its own, then marked ready and **squash-merged like the rest**, so the two tasks are one commit in the history.
 > - **Link task and PR both ways:** the PR body opens with "Implements task NN of #216" linking the task file (pinned to
 >   the PR's commit), and the task's line in the Task Plan plus the task file's Outcome name the PR.
+> - **Each task also has a GitHub sub-issue of #216** (created retroactively 2026-10-26; see the Task Plan list above
+>   for the numbers). A task's PR body should also reference its sub-issue (e.g. "Part of #257"), and the sub-issue
+>   gets closed with a link to the merging PR, the same way #220–#245 were closed for tasks 01–09.
 > - **Task 10b is the exception:** it's complete on its own (the generic conversation core, the chat moved onto it
 >   with no behavior change, the quarkus#54354 guard), so its PR goes **straight to `main`**. Merge `main` into the
 >   feature branch afterwards, before task 11.
@@ -475,7 +496,8 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
     `cron-utils` in through `quarkus-flow-persistence-common`, for 1.2.0's periodic re-scan of persisted runs (#1064).
     The re-scan is off unless `quarkus.flow.persistence.scan-interval` is set (it's `Optional`, no default), and it skips
     instances already active in this JVM.
-  - **Dropping the override** (Execution Steps → 2a): once a platform we move to pins Flow ≥ 1.2.0.
+  - **Dropping the override** (Execution Steps → 2a): superseded on 2026-10-26 by the 1.3.0 bullet below — the override
+    now stays until a platform pins Flow ≥ 1.3.0 (see the 1.3.0 bullet below).
 
   *History (2026-10-08): the maintainer's plan and the state before the release, kept as written.*
 - **quarkus-flow 1.2.0 (expected EOD 2026-10-09; recorded 2026-10-08).** The maintainer, on
@@ -506,6 +528,38 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
     | 11 | Our Flow task proxy plus the agentic conversation adapter; several traces per run (#1056) | #1065 replaces both (it propagates the whole OTel `Context`, so the baggage id rides along); one trace per run; the sub-workflows' own spans get the id. Keep the `invoke_agent` typing and the concurrent no-mixing test. Recheck the log trace-id step against #1013 |
     | 13 | Documents the workarounds and their exit conditions | Document what 1.2.0 fixed instead |
     | 14 | Re-check #1056/#1057/#1058 for the pinned Flow version | Same, against 1.2.0 |
+- **quarkus-flow 1.3.0: released 2026-10-23, adopted in task 09b (user decision, 2026-10-26) — done.** It supersedes
+  the 1.2.0 override above; that bullet and its history stay as written.
+  - **Why:** 1.3.0's release notes include [#1095](https://github.com/quarkiverse/quarkus-flow/pull/1095) ("End
+    generated agentic workflows when one of their agents throws", the user's own PR), the upstream fix for
+    [#1096](https://github.com/quarkiverse/quarkus-flow/issues/1096) — the leak task 08 hit on 2026-10-19 and worked
+    around in `org.parasol.intake.agent` by reflecting into `FlowPlanner`'s private internals. Task 09b deleted all
+    three workaround pieces (`AgenticWorkflowRuns`, `FailedAgenticSystemListener` and
+    `ClaimsMailboxAgent.endFlowRunsOnFailure()`) and kept `FailedAgenticSystemListenerTests`, renamed to
+    `FailedAgenticSystemTests`, as the regression guard against upstream — it passes unchanged against 1.3.0 with the
+    workaround gone. The known remaining leak
+    (`ClaimExtractionWorkflowTests.malformedJsonThatIsNeverFixedStillFailsTheRun`, which calls the extraction workflow
+    directly, without the root's listener) is fixed too: `FlowAgentContextListener` sees every agent's failure, not
+    just the root's.
+  - **What to watch in the 1.2.0 → 1.3.0 delta:** [#1077](https://github.com/quarkiverse/quarkus-flow/pull/1077) turns
+    workflow **input schema validation on by default** (`quarkus.flow.validation.input.enabled`) — confirmed
+    `ClaimIntakeFlow`'s `IntakeRun` passes, but it broke every generated agentic workflow (`ClaimsMailboxAgent`,
+    `ClaimExtractionWorkflow`). Investigated by decompiling `quarkus-flow-langchain4j-deployment`'s
+    `JandexMethodInputJsonSchema`: the generated schema marks every field of every record in the agent topology
+    `required`, unconditionally, with no nullable/`Optional` support — including fields that are the agentic system's
+    own not-yet-computed outputs, and `InvocationParameters` (which `langchain4j-agentic` deliberately keeps out of
+    `AgenticScope.state()`, so a parameter every caller correctly supplies is still reported missing). There is no
+    input shape that satisfies this schema, and no per-workflow scoping for the flag, so "fix the input instead of
+    disabling the flag" isn't achievable here — turned off app-wide in `application.yml` instead. Filed upstream as
+    [quarkiverse/quarkus-flow#1111](https://github.com/quarkiverse/quarkus-flow/issues/1111); re-enable once it's
+    addressed there — tracked as Execution Steps → 2b, a standing per-task check like 2a's. [#1086](https://github.com/quarkiverse/quarkus-flow/pull/1086) consolidates the `quarkus.flow`
+    config roots, which is low-risk here because no other `quarkus.flow.*` property is set anywhere in `src/` (re-grep
+    rather than assume). #1106/#1105 (JQ expression-factory priority, native reflection registration), #1079 (a
+    synchronous runner interface) and #1108 (member lease renewal conditional on ownership) are not obviously ours.
+  - **Version alignment:** `quarkus.langchain4j.version` is already 1.14.2, which is what 1.3.0's parent aligns to, so
+    no reconciliation is needed. Expect cloudevents 5.0.0 → 5.1.0 and new managed `quarkus-flow-db-migration` entries
+    we don't depend on.
+  - **Dropping the override** (Execution Steps → 2a): once a platform we move to pins Flow ≥ 1.3.0.
 - **Flow comes in through the platform BOM** (`io.quarkus.platform:quarkus-flow-bom`, task 03), not the Quarkiverse
   `io.quarkiverse.flow:quarkus-flow-bom`. The Quarkiverse BOM's parent imports an older Quarkus BOM (3.39.0 for Flow
   1.1.3), so it brings stale entries. Platform 3.40.1 ships Flow 1.1.3, the version the spikes verified.

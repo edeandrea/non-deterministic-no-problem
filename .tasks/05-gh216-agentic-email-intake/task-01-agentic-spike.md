@@ -2,6 +2,8 @@
 
 **Type:** Exploration
 
+**Issue:** [#248](https://github.com/edeandrea/non-deterministic-no-problem/issues/248)
+
 ## Goal
 
 Prove, with throwaway tests, every `quarkus-langchain4j-agentic` behaviour this issue relies on, and

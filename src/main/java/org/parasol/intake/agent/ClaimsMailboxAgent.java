@@ -12,10 +12,8 @@ import org.parasol.intake.model.MatchedClaim;
 
 import dev.langchain4j.agentic.agent.ErrorContext;
 import dev.langchain4j.agentic.agent.ErrorRecoveryResult;
-import dev.langchain4j.agentic.declarative.AgentListenerSupplier;
 import dev.langchain4j.agentic.declarative.ErrorHandler;
 import dev.langchain4j.agentic.declarative.SequenceAgent;
-import dev.langchain4j.agentic.observability.AgentListener;
 import dev.langchain4j.invocation.InvocationParameters;
 
 /**
@@ -73,18 +71,5 @@ public interface ClaimsMailboxAgent {
 	@ErrorHandler
 	static ErrorRecoveryResult treatUncorrectedDatesAsMissing(ErrorContext errorContext) {
 		return ClaimExtractionWorkflow.treatUncorrectedDatesAsMissing(errorContext);
-	}
-
-	/**
-	 * Ends the Flow runs of a failed invocation, which quarkus-flow 1.2.0 leaves running with a worker thread blocked.
-	 *
-	 * @return the listener
-	 * @deprecated A workaround, see {@code AgenticWorkflowRuns}. Remove it once a quarkus-flow release includes
-	 * <a href="https://github.com/quarkiverse/quarkus-flow/pull/1095">quarkiverse/quarkus-flow#1095</a>.
-	 */
-	@Deprecated
-	@AgentListenerSupplier
-	static AgentListener endFlowRunsOnFailure() {
-		return FailedAgenticSystemListener.INSTANCE;
 	}
 }

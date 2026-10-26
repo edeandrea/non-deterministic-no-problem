@@ -2,6 +2,8 @@
 
 **Type:** Code Modification
 
+**Issue:** [#256](https://github.com/edeandrea/non-deterministic-no-problem/issues/256)
+
 ## Goal
 
 New mail in the claims INBOX is processed automatically, without polling. Mail that arrived while the

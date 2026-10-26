@@ -2,6 +2,8 @@
 
 **Type:** Code Modification
 
+**Issue:** [#255](https://github.com/edeandrea/non-deterministic-no-problem/issues/255) (includes task 07)
+
 ## Goal
 
 One quarkus-flow workflow, `ClaimIntakeFlow`, carries an inbound email from start to finish: it supersedes a waiting
@@ -501,8 +503,10 @@ default profile and `-Pollama`. The Outcome below is current.
 
 **2026-10-19:** the one failing test (`everyEndedOrCanceledRunLeavesNoFlowRows`) exposed a quarkus-flow 1.2.0 leak when an
 agent throws; see Outcome → *A quarkus-flow 1.2.0 leak*. The test is scoped to its run, a deprecated workaround is in
-`org.parasol.intake.agent`, and the upstream fix is quarkiverse/quarkus-flow#1095 (issue #1096; user's fork, branch
+`org.parasol.intake.agent`, and the upstream fix is [quarkiverse/quarkus-flow#1095](https://github.com/quarkiverse/quarkus-flow/pull/1095)
+(issue [#1096](https://github.com/quarkiverse/quarkus-flow/issues/1096); user's fork, branch
 `fix-agentic-run-on-agent-failure`; the user marked the PR ready for review). Both full runs now pass (Verification).
+**2026-10-26: superseded by task 09b** — quarkus-flow 1.3.0 ships #1095, and the workaround is deleted.
 
 **Next, in order:**
 1. `./mvnw -B clean verify` if time allows (10 Playwright tests are known to fail locally and pass in CI).
@@ -656,6 +660,9 @@ parameters. Everything else follows the Implementation Handoff.
     `FlowAgentContextListener.onAgentInvocationError` aborts it, so every level of a failing system (and a nested one its parent
     recovers from) ends; 4 new tests, red without the change; runtime, deployment and langchain4j ITs pass. Opened as a draft;
     the issue was filed at the user's request. Delete the workaround once a release includes it.
+  - **Superseded by task 09b, 2026-10-26.** quarkus-flow 1.3.0 shipped #1095; task 09b deleted `AgenticWorkflowRuns`,
+    `FailedAgenticSystemListener` and `ClaimsMailboxAgent.endFlowRunsOnFailure()`, and confirmed the "not covered" case
+    above (`ClaimExtractionWorkflow` called directly) is fixed too — the upstream fix isn't root-only.
 
 ### Tests
 

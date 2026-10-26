@@ -2,14 +2,19 @@
 
 **Type:** Verification
 
+**Issue:** [#263](https://github.com/edeandrea/non-deterministic-no-problem/issues/263)
+
 ## Goal
 
 Confirm the feature compiles and its test suites pass with stub keys, get an independent review across
 code, tests and docs, and hand the real-key and live-demo checks to the user.
 
-**quarkus-flow 1.2.0 (2026-10-09):** adopted in task 06b, ahead of the platform. Here: re-check #1056, #1057 and #1058
-against the Flow version the app then pins (the reproducers, with the version set in their `pom.xml`), and whether a
-platform now pins Flow ≥ 1.2.0 so the override can go (`PLAN.md` → Execution Steps → 2a).
+**quarkus-flow 1.3.0 (2026-10-26):** adopted in task 09b, ahead of the platform, superseding the 1.2.0 override (task
+06b) and fixing [#1096](https://github.com/quarkiverse/quarkus-flow/issues/1096) upstream
+([#1095](https://github.com/quarkiverse/quarkus-flow/pull/1095)) — task 09b deleted the app's own workaround for it.
+Here: re-check #1056, #1057 and #1058 against the Flow version the app then pins (the reproducers, with the version
+set in their `pom.xml`), and whether a platform now pins Flow ≥ 1.3.0 so the override can go (`PLAN.md` → Execution
+Steps → 2a).
 
 ## What to Do
 

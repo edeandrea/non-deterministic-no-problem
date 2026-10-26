@@ -2,6 +2,8 @@
 
 **Type:** Code Modification
 
+**Issue:** [#262](https://github.com/edeandrea/non-deterministic-no-problem/issues/262)
+
 ## Goal
 
 The demo can be run from a written guide, and every project document describes the email intake accurately.
@@ -9,6 +11,12 @@ The demo can be run from a written guide, and every project document describes t
 **quarkus-flow 1.2.0 (2026-10-09):** adopted in task 06b, ahead of the platform. Document what 1.2.0 fixed, not the
 workarounds it replaced, and the override in `pom.xml` with its removal condition. Check `PLAN.md` → Execution Steps →
 2a first.
+
+**quarkus-flow 1.3.0 (2026-10-26):** adopted in task 09b, ahead of the platform, superseding the 1.2.0 override. It
+fixes [quarkiverse/quarkus-flow#1096](https://github.com/quarkiverse/quarkus-flow/issues/1096) upstream
+([#1095](https://github.com/quarkiverse/quarkus-flow/pull/1095)), and task 09b deleted the app's own workaround for it
+(`AgenticWorkflowRuns`, `FailedAgenticSystemListener`, `ClaimsMailboxAgent.endFlowRunsOnFailure()`). Document what
+1.3.0 fixed, not the workaround it replaced.
 
 ## What to Do
 
@@ -62,13 +70,13 @@ workarounds it replaced, and the override in `pom.xml` with its removal conditio
     - agent span names (`langchain4j.aiservices.<SimpleClassName>.<method>`; the dataset-name invariant, D11)
     - **quarkus-flow:** `quarkus-flow-langchain4j` and `-opentelemetry` are Preview; no `@ParallelExecutor` (Flow
       forks on the `ManagedExecutor` and, since 1.2.0, carries the OTel context; before 1.2.0 one broke every run,
-      quarkus-flow#1057); Flow 1.2.0 is pinned ahead of the platform by a BOM override in `pom.xml` (task 06b), removed
-      once a platform pins it; every terminal `switch` branch needs `.then(FlowDirectiveEnum.END)`; pass ids, not
-      payloads, in workflow data; the "is it waiting?" check uses `PersistenceInstanceReader`, never the raw status
-      column; `quarkus.application.name` is part of Flow's table keys; **an agent that throws leaves its generated agentic
-      run unended in 1.2.0** (worker thread blocked, Flow rows kept): the deprecated `AgenticWorkflowRuns` /
-      `FailedAgenticSystemListener` workaround (task 08) fails those runs by reflection until a release includes
-      quarkus-flow#1095; document whether it's still needed
+      quarkus-flow#1057); Flow 1.3.0 is pinned ahead of the platform by a BOM override in `pom.xml` (task 06b, bumped
+      to 1.3.0 by task 09b), removed once a platform pins it; every terminal `switch` branch needs
+      `.then(FlowDirectiveEnum.END)`; pass ids, not payloads, in workflow data; the "is it waiting?" check uses
+      `PersistenceInstanceReader`, never the raw status column; `quarkus.application.name` is part of Flow's table
+      keys; **an agent that threw used to leave its generated agentic run unended (1.2.0)** (worker thread blocked,
+      Flow rows kept) — fixed upstream in 1.3.0 (quarkus-flow#1095); task 09b deleted the app's own workaround
+      (`AgenticWorkflowRuns` / `FailedAgenticSystemListener`) now that it's no longer needed
     - agent outputs hold no `LocalDate`/`Optional` (ISO strings), unless task 05's round-trip test relaxed it
     - **no durable state across restarts** (user decision): a restart wipes the database and GreenMail, so a waiting
       review doesn't survive it
@@ -76,7 +84,8 @@ workarounds it replaced, and the override in `pom.xml` with its removal conditio
       during review and a decision are serialized by optimistic locking on the claim (`@Version`)
     - **observability workarounds with exit conditions:** the quarkus#54354 `ThreadContextProvider` guard (delete when
       quarkusio/quarkus#56805 ships), and whatever task 11 kept of its Flow and agentic adapters (Flow 1.2.0 fixes
-      quarkus-flow#1056, so task 11 expects to need neither)
+      quarkus-flow#1056, so task 11 expects to need neither); the agentic-run-on-failure workaround is already gone
+      (task 09b, quarkus-flow 1.3.0)
   - **Observability** (task 11): one claim = one Langfuse session via `gen_ai.conversation.id` (baggage, entered once
     by the starter); the Flow task proxy; the trace shape and its known gaps (#1056); typed Flow spans; the
     persistence-span decision; the `claim.intake.*` metrics; the `%test` Langfuse span export switch

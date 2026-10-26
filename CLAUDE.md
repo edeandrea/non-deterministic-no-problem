@@ -43,7 +43,7 @@ The Java source is split into two top-level packages representing two distinct c
 | `org.parasol.intake.workflow.review` | `SupersedeStep`, `ReviewDecisionSteps` (the review wait's decision steps and its match check), `AfterDecision` (what the run does next: `END` or `WAIT_AGAIN`), and `ReviewRecoverer` (hands a faulted run's review to a new run) |
 | `org.parasol.intake.workflow.mail` | `IntakeEmailReader` (re-reads a run's email from the processing folder), `ReplySteps`, `FileEmailStep` |
 | `org.parasol.intake.review` | The reviewer's side of the wait: `ReviewOutcome`, `ReviewDecision`, the `ReviewDecided` event data and `ReviewDecisionPublisher` (publishes the CloudEvent the waiting run listens for; task 10 calls it) |
-| `org.parasol.intake.agent` | The root `ClaimsMailboxAgent` (`@SequenceAgent`: classifier → `EmailRouter`), the `@ConditionalAgent` `EmailRouter` and its package-private `EmailRoute` rule (matched claim first, then the label); the deprecated quarkus-flow 1.2.0 workaround `AgenticWorkflowRuns` / `FailedAgenticSystemListener` (see Testing → Agentic gotchas) |
+| `org.parasol.intake.agent` | The root `ClaimsMailboxAgent` (`@SequenceAgent`: classifier → `EmailRouter`), the `@ConditionalAgent` `EmailRouter` and its package-private `EmailRoute` rule (matched claim first, then the label) |
 | `org.parasol.intake.agent.extraction` | Everything behind `ClaimExtractionWorkflow` (`@ParallelAgent` over `ClaimSummaryAgent`, `ClaimSentimentAgent` and `IncidentDetailsAgent`): its package-private output guardrails and `IsoValues`, plus `ClaimExtractionRules.findMissingItems` |
 | `org.parasol.intake.agent.triage` | `EmailClassifierAgent`, `ClaimFollowUpAgent` and its read-only `ClaimStatusTools`, the non-LLM `UnmatchedEmailAgent`, and `ClaimResolver` (a plain AI service, outside the agent topology) |
 
@@ -729,7 +729,7 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   `ClaimExtractionValueRoundTripTests` and `IntakeOutcomeRoundTripTests` (`org.parasol.intake.model`) round-trip the
   records through the Quarkus `ObjectMapper` (what Flow persists with); `IntakeOutcomeTests` checks `@JsonSubTypes`
   lists every permitted `IntakeOutcome` variant. `ClaimExtractionWorkflowTests`,
-  `ClaimsMailboxAgentTests`, `FailedAgenticSystemListenerTests` and `ClaimResolverTests` run the real agents against WireMock:
+  `ClaimsMailboxAgentTests`, `FailedAgenticSystemTests` and `ClaimResolverTests` run the real agents against WireMock:
   - they share `IntakeTestProfile` (one app boot) and the `ChatStubs` helper;
   - stubs match on the **last** message (`matchingJsonPath("$.messages[-1:].content", ...)`), so a reprompt or a tool
     result gets its own stub;
@@ -743,7 +743,7 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   - an agent that **returns** an enum (or a record holding one) needs no list in its prompt: Quarkus appends
     LangChain4j's format instructions built from the return type. `EmailType`'s constants and `ClaimResolution`'s `kind`
     field carry LangChain4j's `@Description` for the meanings, and tests assert the generated text in the request.
-- **Agentic gotchas (quarkus-langchain4j 1.14.1):**
+- **Agentic gotchas (quarkus-langchain4j 1.14.2):**
   - `@ModelName` must sit on the `@Agent` **method**; on the interface it's silently ignored and the agent uses the
     default model. Also set `@RegisterAiService(modelName = ...)` to the same name: the core extension reads only that
     attribute when it registers the AI service, so without it the build asks for the default chat model, which is
@@ -757,23 +757,32 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   - **An `@Output` method on a router reads the scope** (`AgenticScope` parameter): one parameter per branch output
     would throw for the branches that didn't run.
   - **The status tool is scoped through `InvocationParameters`**, not a tool argument, so the model can't pick another
-    claim. 1.14.1's build check doesn't skip an agent's `InvocationParameters` parameter, so the root takes one too
+    claim. 1.14.2's build check doesn't skip an agent's `InvocationParameters` parameter, so the root takes one too
     (callers pass `ClaimStatusTools.scopedTo(matchedClaim)`); it's an execution context, never a prompt variable.
     Upstream: quarkiverse/quarkus-langchain4j#2950 (fix #2951); once released, a root `@BeforeCall` can fill it instead.
-  - **An agent that throws leaves its Flow-generated agentic run unended (quarkus-flow 1.2.0).** LangChain4j never tells
-    `FlowPlanner` that an agent failed, so the continuation the generated workflow's task joins on
-    (`AgenticFlow.executeAgent`) never completes: the run stays active, **a worker thread stays blocked forever**, and its
-    rows (agentic scope included, so the correspondence text) stay in Flow's tables. `cancel()` deletes the rows but can't
-    release the thread (`join()` ignores interrupts). The deprecated workaround: `AgenticWorkflowRuns` (a Flow listener)
-    tracks every run whose input is an `AgenticScope`, and `FailedAgenticSystemListener` (an `@AgentListenerSupplier` on
-    the root only, because a leaf's error is reported before its error handler decides to recover) fails that scope's
-    runs when the root invocation fails, by completing `FlowPlanner`'s private pending calls exceptionally (reflection;
-    falls back to `cancel()` with a WARN). The runs then fault, Flow deletes their rows, and `FlowPlanner` logs one
-    `Workflow failed` ERROR per run. It isn't a CDI `AgentListener`: quarkus-langchain4j attaches those to every leaf
-    agent. Upstream: issue quarkiverse/quarkus-flow#1096, fix #1095; delete the workaround once a release has it.
-    `FailedAgenticSystemListenerTests` is the guard (no new agentic run rows, no thread blocked in `AgenticFlow.executeAgent`).
-    `ClaimExtractionWorkflowTests.malformedJsonThatIsNeverFixedStillFailsTheRun` still leaks one run: it calls the
-    extraction workflow directly, without the root's listener.
+  - **An agent that throws used to leave its Flow-generated agentic run unended (quarkus-flow 1.2.0), fixed upstream in
+    1.3.0.** LangChain4j never told `FlowPlanner` that an agent failed, so the continuation the generated workflow's
+    task joined on (`AgenticFlow.executeAgent`) never completed: the run stayed active, **a worker thread stayed
+    blocked forever**, and its rows (agentic scope included, so the correspondence text) stayed in Flow's tables.
+    `cancel()` deleted the rows but couldn't release the thread (`join()` ignores interrupts). quarkus-flow
+    [#1095](https://github.com/quarkiverse/quarkus-flow/pull/1095) (the user's own PR, fixing
+    [#1096](https://github.com/quarkiverse/quarkus-flow/issues/1096)) fixes it from `FlowAgentContextListener`, which
+    sees every agent's failure, not just the root's — so task 09b (2026-10-26) deleted the app-level workaround this
+    repo carried (`AgenticWorkflowRuns`, `FailedAgenticSystemListener`, `ClaimsMailboxAgent.endFlowRunsOnFailure()`).
+    `FailedAgenticSystemTests` (renamed from `FailedAgenticSystemListenerTests`) is kept unchanged as the regression
+    guard (no new agentic run rows, no thread blocked in `AgenticFlow.executeAgent`), and passes against 1.3.0.
+    `ClaimExtractionWorkflowTests.malformedJsonThatIsNeverFixedStillFailsTheRun`'s leak (it calls the extraction
+    workflow directly, without the root's listener) is fixed too, since the upstream fix isn't root-only — verified
+    2026-10-26.
+  - **`quarkus.flow.validation.input.enabled` (on by default since quarkus-flow 1.3.0, quarkiverse/quarkus-flow#1077)
+    is turned off app-wide** (`application.yml`). The generated schema for `ClaimsMailboxAgent` /
+    `ClaimExtractionWorkflow` marks every field of every record in the agent topology `required`, with no
+    nullable/`Optional` support, including fields that are the agentic system's own not-yet-computed outputs and
+    `InvocationParameters` (which `langchain4j-agentic` deliberately keeps out of `AgenticScope.state()`, so it's
+    never actually present to validate against). There is no per-workflow scoping for the flag, so turning it off is
+    app-wide; `ClaimIntakeFlow`'s own `IntakeRun` input is unaffected either way. Filed upstream as
+    [quarkiverse/quarkus-flow#1111](https://github.com/quarkiverse/quarkus-flow/issues/1111); re-enable once it's
+    addressed there.
 - **Claim image tests:** `ClaimImageTests` (entity, `@TestTransaction`), `ClaimImageResourceTests` (REST and Problem
   Details), `ClaimImageContentTypeTests` (allow-list, no Quarkus), `ClaimImageSeederTests` and the Playwright
   `ClaimImagesPageTests`.

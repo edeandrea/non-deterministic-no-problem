@@ -68,6 +68,19 @@ quarkus:
     # application orphans every waiting intake run
     name: parasol-app
 
+  flow:
+    validation:
+      input:
+        # quarkus-flow 1.3.0 turns this on by default (quarkiverse/quarkus-flow#1077). For a quarkus-flow-langchain4j
+        # generated agentic workflow (ClaimsMailboxAgent, ClaimExtractionWorkflow) the generated schema is
+        # unsatisfiable: it marks every field of every record in the agent topology as required, with no
+        # nullable/Optional support, including fields that are the agentic system's own not-yet-computed outputs and
+        # the InvocationParameters execution-context parameter (which langchain4j-agentic deliberately keeps out of
+        # AgenticScope.state()). There is no way to scope this flag to just the hand-authored ClaimIntakeFlow, whose
+        # own IntakeRun input is unaffected. Filed upstream as quarkiverse/quarkus-flow#1111; re-enable once it's
+        # addressed there.
+        enabled: false
+
   langfuse:
     environment: dev
 
