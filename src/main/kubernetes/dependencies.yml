@@ -65,6 +65,11 @@ metadata:
     app.kubernetes.io/part-of: parasol-insurance
 spec:
   replicas: 1
+  # db-data-pvc is ReadWriteOnce, so a rolling update deadlocks: the new pod can't attach the
+  # volume until the old one releases it, and the old one isn't terminated until the new one is
+  # ready ("Multi-Attach error for volume ...").
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       name: non-deterministic-db
@@ -137,6 +142,9 @@ metadata:
     app.kubernetes.io/part-of: observability
 spec:
   replicas: 1
+  # otel-lgtm-data-pvc is ReadWriteOnce -- see the note on non-deterministic-db above.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: lgtm
@@ -152,6 +160,28 @@ spec:
             - containerPort: 3000
             - containerPort: 4317
             - containerPort: 4318
+          # Both of these are needed for Grafana to offer the Prometheus, Loki, Tempo and Pyroscope
+          # datasources at all. Without them every datasource picker shows only "-- Mixed --" and
+          # "-- Grafana --", even though the datasources themselves are provisioned fine.
+          env:
+            # Grafana 13 (otel-lgtm >= 0.32.0) ships those four datasources under
+            # <grafana-home>/data/plugins-bundled instead of as core plugins in
+            # public/app/plugins/datasource. The image's run-grafana.sh unconditionally exports
+            # GF_PATHS_HOME=/data/grafana, and Grafana resolves [paths] bundled_plugins relative to
+            # that home, so it looks in /data/grafana/data/plugins-bundled -- which nothing creates.
+            # Point Grafana at the real directory inside the image; absolute, so it is used verbatim.
+            - name: GF_PATHS_BUNDLED_PLUGINS
+              value: /otel-lgtm/grafana/data/plugins-bundled
+            # With the path fixed, Grafana registers the bundled plugins and its background installer
+            # then tries to update each one from grafana.com, which starts by deleting the existing
+            # directory. Those files belong to the image's uid 1000 and OpenShift runs the container
+            # as an arbitrary UID, so the delete fails ("unlinkat .../prometheus/1008.js: permission
+            # denied") and the failed install drops the already-registered plugin -- leaving
+            # "Could not find plugin definition for data source" for all four. Keep the bundled
+            # versions instead. This does not affect the Drilldown apps: they aren't present in the
+            # image, so they are still downloaded into GF_PATHS_PLUGINS on the /data PVC.
+            - name: GF_PLUGINS_PREINSTALL_AUTO_UPDATE
+              value: "false"
           resources:
             limits:
               memory: 1Gi

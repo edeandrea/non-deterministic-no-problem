@@ -443,6 +443,36 @@ deploys the app with `-Dquarkus.profile=openshift`. It ends by printing the Roun
 
 - **`dependencies.yml`** holds PostgreSQL, LGTM and the mail stack, plus the `parasol-app-config` ConfigMap the app
   reads (`quarkus.mailer.host: greenmail`, port `3025`).
+- **LGTM's Grafana needs two env vars or it shows no datasources.** Grafana 13 (`grafana/otel-lgtm` ≥ `0.32.0`)
+  ships the Prometheus, Loki, Tempo and Pyroscope datasources in `<grafana-home>/data/plugins-bundled` rather than
+  as core plugins under `public/app/plugins/datasource`. Two separate things then go wrong, and **fixing only the
+  first leaves the symptom unchanged** — the `grafana-lgtm` Deployment sets both:
+  - **`GF_PATHS_BUNDLED_PLUGINS=/otel-lgtm/grafana/data/plugins-bundled`.** The image's `run-grafana.sh`
+    unconditionally exports `GF_PATHS_HOME=/data/grafana`, and Grafana resolves `[paths] bundled_plugins` relative
+    to that home (`cfg.PluginsPaths = [makeAbsolute(plugins, HomePath), makeAbsolute(bundledPlugins, HomePath)]`),
+    so it looks in `/data/grafana/data/plugins-bundled` — a path the image never creates. The value here is
+    absolute, so Grafana uses it verbatim.
+  - **`GF_PLUGINS_PREINSTALL_AUTO_UPDATE=false`.** With the path fixed the plugins register, but Grafana's
+    background installer immediately tries to update each one from grafana.com, which begins by deleting the
+    existing directory. Those files belong to the image's uid 1000 and OpenShift runs the container as an arbitrary
+    UID, so the delete fails (`unlinkat …/prometheus/1008.js: permission denied`) and the failed install drops the
+    plugin that had already registered. This does **not** stop the Drilldown apps from installing: they aren't in
+    the image at all, so they're still downloaded into `GF_PATHS_PLUGINS` on the `/data` PVC.
+
+  The failure mode either way is that every picker (Explore, Drilldown) offers only `-- Mixed --` / `-- Grafana --`.
+  The datasources themselves *are* provisioned — `/api/datasources` lists all four. They vanish in `/api/plugins`
+  and `/api/frontend/settings` (which is what the UI builds the picker from), so diagnose there, and read the
+  Grafana log for `Could not find plugin definition for data source` — it needs `ENABLE_LOGS_GRAFANA=true`, since
+  the image swallows Grafana's stdout by default.
+
+  The path problem is an upstream bug, not a side effect of the `/data` PVC — the image creates `/data` at runtime
+  and never populates it. It is unfixed on `main`, so **bumping the image tag does not make either env var
+  redundant**; don't delete them. Local dev mode is unaffected: the Quarkus LGTM Dev Service still runs `0.24.0`
+  (Grafana 12), where these were still core plugins.
+- **The two PVC-backed Deployments (`grafana-lgtm`, `non-deterministic-db`) use `strategy: Recreate`.** Their PVCs
+  are `ReadWriteOnce`, so a rolling update deadlocks: the new pod can't attach the volume until the old one
+  releases it, and the old one isn't terminated until the new one is ready (`Multi-Attach error for volume …`,
+  then `oc rollout status` times out). Don't drop back to the default `RollingUpdate`.
 - **`langfuse-web` must not be killed while it migrates.** It runs the Prisma and ClickHouse migrations *before* it
   binds `:3000`, which on a fresh install takes longer than the chart's stock liveness probe allows (20s delay, 10s
   period, 3 failures → SIGKILL ~50s in). The kill lands mid-statement, golang-migrate leaves ClickHouse's
