@@ -41,6 +41,7 @@ import org.parasol.intake.mailbox.MailFolder;
 import org.parasol.intake.model.ClaimIntakeState;
 import org.parasol.intake.review.ReviewDecided;
 import org.parasol.intake.review.ReviewDecision;
+import org.parasol.intake.review.ReviewedFields;
 import org.parasol.intake.review.ReviewDecisionPublisher;
 import org.parasol.intake.review.ReviewOutcome;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
@@ -451,7 +452,7 @@ public class IntakeScenario {
 	public void decide(long claimId, ReviewOutcome outcome, java.util.Set<MissingItem> items) {
 		var run = awaitWaitingRun(claimId);
 		var runId = claimReview(claimId);
-		publishUntilWoken(run, new ReviewDecided(claimId, runId, new ReviewDecision(outcome, items)));
+		publishUntilWoken(run, new ReviewDecided(claimId, runId, new ReviewDecision(outcome, items, ReviewedFields.none())));
 	}
 
 	@Transactional(TxType.REQUIRES_NEW)

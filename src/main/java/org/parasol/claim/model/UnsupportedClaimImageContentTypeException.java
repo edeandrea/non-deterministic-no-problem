@@ -12,4 +12,11 @@ public class UnsupportedClaimImageContentTypeException extends IllegalArgumentEx
 	public UnsupportedClaimImageContentTypeException(String mediaType) {
 		super("Unsupported claim image content type: %s".formatted(mediaType));
 	}
+
+	// IllegalArgumentException has no constructor to skip the trace. This is an expected outcome that is mapped to a
+	// response, so no stack trace is ever shown or logged
+	@Override
+	public Throwable fillInStackTrace() {
+		return this;
+	}
 }

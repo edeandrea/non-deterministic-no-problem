@@ -21,7 +21,7 @@ The Java source is split into two top-level packages representing two distinct c
 
 | Package | Contents |
 |---|---|
-| `org.parasol.claim.model` | `Claim` (Panache entity, table `claims`), `ClaimImage` (table `claim_images`), `ClaimCorrespondence` (table `claim_correspondence`: every inbound email the intake accepted, by unique `Message-ID`), `ClaimImageKind`, `ClaimImageContentType`, `ClaimCategory`, claim-number generation, the domain exceptions (`ClaimNotFoundException`, `ClaimImageNotFoundException`, `UnknownClaimCategoryException`, `UnsupportedClaimImageContentTypeException`) |
+| `org.parasol.claim.model` | `Claim` (Panache entity, table `claims`), `ClaimImage` (table `claim_images`), `ClaimCorrespondence` (table `claim_correspondence`: every inbound email the intake accepted, by unique `Message-ID`), `ClaimImageKind`, `ClaimImageContentType`, `ClaimCategory`, `IntakeClaimStatus` (the intake's status labels; `isIntakeOpen` is true for `Pending Review` / `Pending Information`), claim-number generation, the domain exceptions (`ClaimNotFoundException`, `ClaimImageNotFoundException`, `UnknownClaimCategoryException`, `UnsupportedClaimImageContentTypeException`) |
 | `org.parasol.claim.rest` | `ClaimResource` (`/api/db/claims`), `ClaimImageResource` (`/api/db/claims/{id}/images`), the `ClaimDetails` / `ClaimImageMetadata` DTOs + `ClaimMapper` (MapStruct), `ClaimExceptionMappings` (Problem Details) |
 | `org.parasol.claim.seed` | `ClaimImageSeeder` (attaches the sample images to the six seeded claims) |
 | `org.parasol.chat.ai` | `ClaimService` (the chat-bot AI service) |
@@ -30,7 +30,7 @@ The Java source is split into two top-level packages representing two distinct c
 | `org.parasol.notification.ai` | `GenerateEmailService` |
 | `org.parasol.notification.model` | `Email`, `ClaimInfo` |
 | `org.parasol.notification.guardrail` | The four email output guardrails, their `GenerateEmailOutputGuardrail` base, `PolitenessService`, `StringUtils` |
-| `org.parasol.intake` | The email claim intake ([#216](https://github.com/edeandrea/non-deterministic-no-problem/issues/216), being built). Only what every sub-package shares: `MissingItem`, `IntakeClaimStatus` |
+| `org.parasol.intake` | The email claim intake ([#216](https://github.com/edeandrea/non-deterministic-no-problem/issues/216), being built). Only what every sub-package shares: `MissingItem` |
 | `org.parasol.intake.config` | `IntakeConfig` (`parasol.intake.*`) |
 | `org.parasol.intake.mailbox` | `ClaimsMailbox` (the `claims@parasol.com` IMAP mailbox: list, find by `Message-ID`, move between `MailFolder`s, `moveOldest`), `ClaimsInboxWatcher` (the IMAP IDLE watcher, a Mutiny pipeline on a virtual thread (`@VirtualThreads` executor): scans the INBOX, moves each email to `processing`, fires `EmailReceived`; `ClaimIntakeDispatcher` observes it), `InboxIdle` (its own IMAP session for IDLE), `InboundEmail` and its attachment records, `MailLoopGuard` (auto-replies and mail from the claims address), the package-private MIME parser, HTML-to-text and quoted-text helpers |
 | `org.parasol.intake.dispatch` | What happens to an inbound email before its run: `ClaimIntakeDispatcher` (`submit(email)`: loop/duplicate/`Message-ID` checks, then a per-sender queue of immutable `SenderState`s; also the Flow status listener that drives the queue), `ClaimMatcher`, `CorrespondenceRecorder` and the package-private `ClaimReference` |
@@ -42,7 +42,9 @@ The Java source is split into two top-level packages representing two distinct c
 | `org.parasol.intake.workflow.outcome` | `ApplyOutcomeStep` (persists a new claim or a merged reply) and its helpers `ClaimFields` and the package-private `InceptionDates` |
 | `org.parasol.intake.workflow.review` | `SupersedeStep`, `ReviewDecisionSteps` (the review wait's decision steps and its match check), `AfterDecision` (what the run does next: `END` or `WAIT_AGAIN`), and `ReviewRecoverer` (hands a faulted run's review to a new run) |
 | `org.parasol.intake.workflow.mail` | `IntakeEmailReader` (re-reads a run's email from the processing folder), `ReplySteps`, `FileEmailStep` |
-| `org.parasol.intake.review` | The reviewer's side of the wait: `ReviewOutcome`, `ReviewDecision`, the `ReviewDecided` event data and `ReviewDecisionPublisher` (publishes the CloudEvent the waiting run listens for; task 10 calls it) |
+| `org.parasol.intake.dev` | `DevClaimEmailSeeder`: the bean exists only with the build property `parasol.dev-seed.enabled=true` (`%dev`, and the two Ollama Maven profiles' `quarkus-maven-plugin` `systemProperties`, since they run dev as `prod`, so `@IfBuildProfile("dev")` wouldn't match), and it acts in `LaunchMode.DEVELOPMENT` only, mails two sample claims to the claims address at startup (one complete, one with no date or place) so the real intake produces a `Pending Review` and a `Pending Information` claim to look at. Needs the same model as any intake email; GreenMail is in memory, so it re-sends on every start |
+| `org.parasol.intake.review` | The reviewer's side of the wait: `ReviewOutcome`, `ReviewDecision`, the `ReviewDecided` event data, `ReviewedFields` (the values the reviewer confirmed or corrected, carried in the decision and set by the decision step), `ReviewDecisionPublisher` (publishes the CloudEvent the waiting run listens for), `ClaimReviewService` (checks the review is open at the reviewer's version and the reviewed values fit the claim, claims it under the claim's optimistic lock, confirms the run is waiting, then publishes), `ClaimSentimentReassessor` (assesses the claimant's sentiment again for a reviewer) and the package-private `ReviewGuard` (the open-review check both start with), plus its domain exceptions (`ReviewNotOpenException`, `ReviewLockLostException`, `ReviewRunNotFoundException`, `ReviewRunNotWaitingException`, `ReviewedFieldsRejectedException`, `SentimentAssessmentFailedException`) |
+| `org.parasol.intake.review.rest` | `ClaimReviewResource` (`GET /api/db/claims/{id}/review`, `POST /api/db/claims/{id}/review-decision`, `POST /api/db/claims/{id}/sentiment`), the `ClaimReviewState` / `ReviewDecisionRequest` (with its nested `Fields`) / `SentimentAssessmentRequest` / `SentimentAssessment` DTOs (the decision's outcome/items/fields pairing enforced by the package-private `@ValidReviewDecision` Bean Validation constraint) and `ReviewExceptionMappings` (Problem Details) |
 | `org.parasol.intake.agent` | The root `ClaimsMailboxAgent` (`@SequenceAgent`: classifier → `EmailRouter`), the `@ConditionalAgent` `EmailRouter` and its package-private `EmailRoute` rule (matched claim first, then the label) |
 | `org.parasol.intake.agent.extraction` | Everything behind `ClaimExtractionWorkflow` (`@ParallelAgent` over `ClaimSummaryAgent`, `ClaimSentimentAgent` and `IncidentDetailsAgent`): its package-private output guardrails and `IsoValues`, plus `ClaimExtractionRules.findMissingItems` |
 | `org.parasol.intake.agent.triage` | `EmailClassifierAgent`, `ClaimFollowUpAgent` and its read-only `ClaimStatusTools`, the non-LLM `UnmatchedEmailAgent`, and `ClaimResolver` (a plain AI service, outside the agent topology) |
@@ -209,7 +211,16 @@ buys here is its deliberately strict plain `ObjectMapper` and a reprompt — rat
 
 The project has **seven guardrail classes in total and they are all output guardrails** — the four
 email ones above plus `DriftDetectionOutputGuardrail`, `SessionSentimentGuardrail` and
-`EvaluatorResultOutputGuardrail`. There are **zero input guardrails**.
+`EvaluatorResultOutputGuardrail`. There are **zero (LLM) input guardrails**; the one *tool* input guardrail is below.
+
+**The chat bot can't act on a claim still in intake,** enforced twice. `IntakeCompleteToolInputGuardrail`
+(`@ToolInputGuardrails` on `updateClaimStatus`, quarkus-langchain4j's tool input guardrail) reads `claimId` from the tool call's
+JSON arguments and refuses before the tool runs, returning the reason to the model. It fails closed: a call whose `claimId` is missing or unreadable is refused too, while an
+unknown claim goes through (the tool answers "no claim found"). It is a separate read, so `updateClaimStatus` repeats the check as the authoritative one,
+`IntakeClaimStatus.isIntakeOpen` inside the same transaction that would change the status: for a `Pending Review` or `Pending Information` claim it changes nothing,
+sends no email and tells the model why (`NotificationService.INTAKE_NOT_COMPLETE`). `IntakeClaimStatus` lives in
+`org.parasol.claim.model` rather than `intake` so `notification` doesn't depend on `intake`. The UI's `StatusLabel` shows the
+same reason as a tooltip on those two statuses (list and detail page).
 
 **Email flow:** the chat bot calls the `NotificationService.updateClaimStatus` tool → updates the
 `Claim` Panache entity → `GenerateEmailService` produces the email → sent via Quarkus Mailer
@@ -232,9 +243,64 @@ and map to DTO records with `ClaimMapper`.
   `Claim` at all** (see *The intake's state* below), so fetching a claim neither returns nor loads it;
   `ClaimRetrievalHasNoIntakeBookkeepingTests` measures that with Hibernate statistics.
 - **Errors:** domain exceptions are mapped once, by `ClaimExceptionMappings` (Quarkus `@ServerExceptionMapper`), to RFC
-  9457 Problem Details (`application/problem+json`, `type: about:blank`, `instance` = request path).
+  9457 Problem Details (`application/problem+json`, `type: about:blank`, `instance` = request path), through the shared
+  `org.parasol.problem.ProblemDetail` record (`MEDIA_TYPE` constant and `of(status, detail, uriInfo)` factory). RFC 9457
+  is a named standard in its own right, not generic REST plumbing, so it gets its own package rather than a domain's or a
+  top-level technical-layer bucket (which would violate the domain-first package structure).
   `ClaimNotFoundException` and `ClaimImageNotFoundException` are `404`. An image that exists but belongs to another
   claim is the same `404` as an unknown image.
+- **The email intake's review endpoints** (`org.parasol.intake.review.rest.ClaimReviewResource`, task 10): `GET
+  /api/db/claims/{id}/review` returns a `ClaimReviewState` (the claim's status, the `ClaimIntakeState` version, whether a
+  review is open, its requested items and the full `MissingItem` list for the UI's checklist) — its own read rather than
+  widening `ClaimDetails`, since the intake's bookkeeping stays off the claim DTO. `POST
+  /api/db/claims/{id}/review-decision` takes a `ReviewDecisionRequest` (`outcome`, `missing_items`, `fields`, `version`),
+  claims the review under the claim's optimistic lock (`ClaimReviewService`), confirms the run is `WAITING` via `@Inject
+  PersistenceInstanceReader`, publishes the decision and returns `202 Accepted` with no body — the UI re-fetches the claim
+  itself, since the call returns once the decision is published, not once the workflow has applied it. Errors: `404` for
+  an unknown claim or a vanished run, `409` for a claim not open for review, already being decided, a run that isn't
+  waiting, or a lost optimistic lock (a stale `version`, or a reply that superseded the review first); each maps through
+  `ReviewExceptionMappings`, reusing the shared `org.parasol.problem.ProblemDetail`. A Bean Validation failure is a `400`
+  whose `detail` names each violation as the request does (snake_case, like the DTOs' `@JsonNaming`, e.g.
+  `fields.incident_date must be a date in the past or in the present`): the resource method and its parameter are left
+  off the path, and a class-level violation (`@ValidReviewDecision`) is just its message.
+  - **The reviewer edits the claim, so nothing is published before every check passes.** `fields` (`description`, which
+    is the claim's `summary`, `incident_date`, `incident_time`, `location`, `category`) is the whole form, not a patch:
+    `@ValidReviewDecision` requires every `MissingItem` to have a value **or** be in `missing_items`, never both and never
+    neither (so `READY` carries every value), `NEEDS_INFORMATION` to ask for at least one item and `READY` for none, and an
+    `incident_time` only with an `incident_date`. Field constraints: `incident_date` `@PastOrPresent`, `description` ≤ 5000
+    characters (the `summary` column), `location` ≤ 1000, blank text counts as no value, and `version` is a required `Long`
+    (a primitive would turn an omitted version into `0`, which a fresh `ClaimIntakeState` can match). All of these are
+    `400`, as is a body Jackson can't read (malformed JSON, a bad date, an unknown category): Quarkus REST wraps most of
+    those in a bare `WebApplicationException(400)`, so `ClaimReviewResource` carries its own `@ServerExceptionMapper`s
+    for them, scoped to its endpoints rather than app-wide. Then, in the claim transaction, the order is: the claim exists
+    (`404`), it's `Pending Review` with its review open (`409`), it's at the reviewer's `version` (`409`), and the reviewed
+    values fit the claim (`422`: an incident date before the policy's `inceptionDate`). Jakarta REST 4.0's `Status` has no
+    422, so `ProblemDetail.of` takes a `StatusType`.
+  - **The reviewed values ride in the decision** (`ReviewDecision.fields`, a `ReviewedFields`, JSON-safe through Flow's
+    persistence) and `ReviewDecisionSteps` sets them in the same transaction as the status change, after re-checking the
+    claim is still `Pending Review` and being decided by that run. A decision that faults before its commit leaves none of
+    them set. Asked fields keep their current value until the customer answers.
+  - **`POST /api/db/claims/{id}/sentiment`** (`{ "version": … }` → `200 { "sentiment": … }`) runs
+    `ClaimSentimentAgent` again over the claim's stored body (the whole correspondence, capped at
+    `parasol.intake.limits.max-body-characters`) and stores the result. Only the sentiment changes, the version isn't
+    bumped, and the run isn't touched. It checks the open review and the version (`404`/`409`) before the model call, which
+    runs outside any transaction, and again under a `PESSIMISTIC_WRITE` lock on the `ClaimIntakeState` row before it
+    stores, so a reply or decision that lands during the call wins (`409`, result discarded). A failed or blank answer is
+    `502`; the claim keeps its sentiment. This resource depends only on
+  `org.parasol.claim.model` (the established `intake → claim` direction) — never on `org.parasol.claim.rest`'s DTOs, so a
+  `ClaimDetails` field addition can't silently go stale here the way a hand-rolled copy would. `ProblemDetail` itself
+  moved out of `org.parasol.claim.rest` (where it first lived, nested in `ClaimExceptionMappings`) into the neutral
+  `org.parasol.problem` once this resource needed it too — it carries no claim-specific fields, so leaving it under one
+  domain's package would have been the same kind of accidental coupling, just one step removed.
+  - **A documented, deliberately-not-worked-around race (F2b):** `ReviewDecisionPublisher`'s Javadoc and
+    `serverlessworkflow-impl-core`'s `ListenExecutor.internalExecute` show a run's `WAITING` status can become visible a
+    couple of statements before its `listen` task actually registers a consumer. `ClaimReviewService` doesn't retry or
+    block for this: `InMemoryEvents.publish` always hops to an executor before it reads the registered consumer, and that
+    hop structurally outlasts two sequential method calls on the thread that's already running, so any real caller doing
+    actual work in between (a DB transaction, JSON (de)serialization, an HTTP round trip) can't observe the gap in
+    practice. Only a synthetic caller that calls `publish` back-to-back with nothing else could — which is why
+    `ReviewDecisionPublisher`'s republish-until-woken loop stays a caller concern (`IntakeScenario.publishUntilWoken`),
+    not something this service retries for.
 
 **The `Claim` entity** (`org.parasol.claim.model`, table `claims`; serialized only through `ClaimDetails`):
 - **`id`** is the Panache numeric primary key (`claims_seq`). REST paths, UI routes, `ClaimBotQuery.claimId`
@@ -256,7 +322,9 @@ and map to DTO records with `ClaimMapper`.
     and throws `UnknownClaimCategoryException` otherwise.
 - **`incidentDate`** (`LocalDate`) and **`incidentTime`** (`LocalTime`, nullable) replaced the old free-text
   `time` / `claim_time`. `ZonedDateTime` was rejected because claim emails rarely state a time zone.
-  The UI formats them with `src/main/webui/src/app/utils/formatIncident.ts`.
+  The UI formats them with `src/main/webui/src/app/utils/formatIncident.ts`, whose `toLocalIsoDate` also gives the
+  review form's latest selectable date in the user's time zone (`toISOString()` is UTC, already tomorrow in the evening
+  west of it, which the backend's `@PastOrPresent` would reject).
 - **Sizes:** `subject`, `body` and `location` are unbounded `text` (`Length.LONG32`; not `@Lob`, which
   maps to `oid` on PostgreSQL). `summary` and `sentiment` stay `length = 5000`. `status` is free text.
 
@@ -598,6 +666,18 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
 - Playwright E2E tests in `org.parasol.ui`, extending the `@WithPlaywright` `PlaywrightTests` base
   class (records video to `target/playwright`). They use Quinoa's `EnableAndRunTests` profile, which
   also runs the frontend Jest suite (see Frontend above).
+  - **`ClaimReviewPanelPageTests` is the one exception**, on `IntakeUiTestProfile` (`EnableAndRunTests` plus
+    `IntakeTestProfile`'s overrides and `@ConnectWireMock`) — one more full application boot, needed because the review
+    panel only renders its buttons for a claim whose review is genuinely open (`ClaimReviewState.open`), which only a real
+    waiting `ClaimIntakeFlow` run produces. It drives a real email through `IntakeScenario` to get one, then uses the
+    panel: the controls (every "Ask customer" checkbox, the edit fields, Submit/Request more information and Regenerate)
+    are absent for an `In Process` and a `Pending Information` claim and present for `Pending Review`; submitting an
+    edited claim persists the edit and removes the controls; checking "Ask customer" disables that field and moves the
+    claim to `Pending Information` with the read-only list of what was asked; Regenerate shows the new sentiment; a `409`
+    (forced with a Playwright route) reloads the claim and remounts the panel, which re-reads the review so the next submit
+    uses the current version. All
+    through the real endpoints, not stubs. The status labels/filters are covered against two directly-persisted fixture
+    claims, no Flow run needed for that one.
 - `ai.scoring.it.DriftDetectionTests` is annotated with the custom meta-annotation
   `ai.scoring.it.DriftDetectionTest`, which combines `@QuarkusTest` with **four** independent
   enablement conditions, each carrying its own `disabledReason`:
@@ -702,11 +782,13 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   starter (it doesn't wait; per-sender order). They share `IntakeTestProfile` (one boot; it also pins `claim-intake` to WireMock and turns Hibernate statistics on, so every test of what the intake stores or loads uses it too, and **a new intake test uses it rather than adding a profile**: each profile is another full application boot) and:
   - `IntakeScenario` (`org.parasol.intake`, an `@ApplicationScoped` test helper) sends a real MIME message to the claims address, moves it to
     the processing folder and calls `ClaimIntakeDispatcher.submit`, as the watcher will; it also reads replies, finds a
-    claim's waiting run, claims the review (as task 10 will), publishes decisions with `publishUntilWoken` (a decision
-    published the moment a run says `WAITING` can be lost, so it republishes until the run leaves `WAITING`), and cleans
-    up (every Flow run canceled, claims beyond the six seeded ones, recorded emails and intake state). It also owns the
-    tests' database reads and fixtures, as `@Transactional(REQUIRES_NEW)` methods, so the test classes need no
-    `QuarkusTransaction`.
+    claim's waiting run, simulates claiming the review (`claimReview`, the same `reviewRunId` → `decidingRunId` move the
+    real `ClaimReviewService` does — these workflow-level tests exercise the decision steps directly, not through the
+    REST layer, so the simulation stays), publishes decisions with `publishUntilWoken` (a decision published the moment a
+    run says `WAITING` can be lost, so it republishes until the run leaves `WAITING`; see **Review tests** below for why
+    the real endpoint doesn't need to), and cleans up (every Flow run canceled, claims beyond the six seeded ones,
+    recorded emails and intake state). It also owns the tests' database reads and fixtures, as `@Transactional(REQUIRES_NEW)`
+    methods, so the test classes need no `QuarkusTransaction`.
   - `IntakeFlowTestBase` (`org.parasol.intake`, public with `protected` members so every intake test package can extend it: `createClaim`, `stubNewClaim`, `stubFollowUp`) and `ChatStubs.answerWhenAll`: a stub matches the
     last message on **two** texts, a phrase from the agent's prompt and a per-test marker in the email, so each test
     stubs only its own email. A reply's correspondence carries the first email's marker too; the most recently
@@ -815,6 +897,12 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
 - Constructor injection in `ai.scoring`; `org.parasol.notification.service.NotificationService` still uses `@Inject`
   fields (legacy — prefer constructor injection for new code).
 - Hand-written fluent builders (e.g. `DriftDetectionException.builder()`), records for value types.
+- **An exception that only exists to be mapped to a response computes no stack trace** (`super(message, null, false,
+  false)`; an `IllegalArgumentException` subclass has no such constructor, so it overrides `fillInStackTrace()` to return
+  `this`). RESTEasy Reactive neither logs nor shows a mapped exception's trace, so building one is waste. That covers the
+  claim not-found, unknown category and unsupported content type exceptions and the review exceptions. One that wraps a
+  failure someone needs to see (`SentimentAssessmentFailedException` keeps its cause; `ClaimSentimentReassessor` logs it)
+  or faults a Flow run (`MailboxException`, `IntakeEmailMissingException`) keeps a trace.
 - **Type names are nouns for what the type is, not activities** (no `Threading`, `Filing`, `Recovery`): a bean is named for
   its role (`…Sender`, `…Handler`, `…Recoverer`, `…Guard`), a value for what it holds (`ThreadingHeaders`), a CDI event in the
   past tense (`ReviewDecided`, `EmailRequeued`). In the intake workflow, a bean that is the body of one Flow task is a
@@ -825,6 +913,9 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
   Quarkus LangChain4j uses the simple interface name, `AiServiceDatasetSpanProcessor` and `ConversationExchange`
   copy the span name, and `DriftDetectionOutputGuardrail` rebuilds it from the simple name. A rename
   orphans the recorded datasets, and drift detection then passes silently.
+- **JAX-RS resource classes are package-private, their endpoint methods stay `public`.** Quarkus REST serves a 404 for every endpoint
+  whose method isn't public (tried on `ClaimReviewResource`: all 17 `ClaimReviewResourceTests` failed), but the class itself needn't be.
+  Exception-mapper methods can be package-private.
 - `Optional` chains over null checks and guard-clause early returns.
 
 ## Gotchas
@@ -955,7 +1046,14 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
   - **Block on the mailer only off the caller's thread.** The reactive mailer stalls until the SMTP server's own timeout (a
     `421` after 30 s from GreenMail) when it's blocked on a thread that carries a captured Vert.x context, which depends on
     where a run was started (a `ManagedExecutor` or Flow task thread). `IntakeReplySender` runs every send on
-    `ForkJoinPool.commonPool()` for that reason, as `NotificationService` does.
+    a new virtual thread (`CompletableFuture.runAsync(send, Thread::startVirtualThread)`) for that reason; it has no
+    captured Vert.x context. Text and templated replies both send through the `ReactiveMailer` and share one await,
+    `quarkus.mailer.timeout` (forever when 0). It's not `ForkJoinPool.commonPool()` (as `NotificationService` still uses for a plain mail):
+    a virtual thread inherits the caller's context class loader, a common pool thread has the JVM's system loader, which
+    in dev mode isn't the Quarkus application loader, and a template's `{config:…}` lookup then fails with
+    `ServiceConfigurationError: … QuarkusConfigFactory not a subtype of SmallRyeConfigFactory`. Tests don't reproduce it
+    (their class loading is flat), so `IntakeReplySenderThreadTests` (a plain Mockito test) checks the cause instead: the
+    sending thread is a virtual one carrying the caller's context class loader. It fails with `commonPool()`.
   - **Panache statics through a method reference throw** ("did you forget to annotate your entity"): use a lambda
     (`id -> Claim.<Claim>findById(id)`), never `Claim::<Claim>findById`.
   - **The per-sender lock covers a woken review run.** `ClaimIntakeDispatcher` (also Flow's status listener) holds the sender

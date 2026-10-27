@@ -23,9 +23,9 @@ component and covered by rendering tests.
   - **Missing information:** claim number, status `Pending Information`, a bullet list of exactly the
     missing items (incident description, date, location, category), the photos note if no images were
     received, and an instruction to reply to this email. Also used for the reviewer's "Needs more
-    information" decision, listing exactly the items the reviewer ticked.
+    information" decision, listing exactly the items the reviewer checked.
   - **Still missing:** a follow-up variant listing only what's still missing (including any
-    reviewer-ticked items the reply didn't answer).
+    reviewer-checked items the reply didn't answer).
   - **Processing problem:** we received your email but couldn't process it automatically; a team
     member will follow up, or call 1-800-CAR-SAFE. **No details** about the failure.
 
@@ -110,9 +110,10 @@ Done 2026-10-08, on branch `gh216/04-reply-templates`; squash-merged into `gh216
   - The mailer generates our own `Message-ID` (Vert.x `MailEncoder`, read in the source, not tested), so the sender
     doesn't set one.
   - **It blocks**, rather than returning a `Uni`: the callers are Flow steps on worker threads that must know the reply
-    went out before they file the email. Text replies use the blocking `Mailer`. Templated replies can only send
-    through the `ReactiveMailer`, and `MailTemplateInstance.sendAndAwait()` waits forever, so the sender awaits
-    `send()` for `quarkus.mailer.timeout` (forever when 0, as the `Mailer` does).
+    went out before they file the email. (Superseded 2026-10-27: both kinds now send through the
+    `ReactiveMailer`.) Templated replies can only send through the `ReactiveMailer`, and `MailTemplateInstance.sendAndAwait()`
+    waits forever, so the sender awaits `send()` for `quarkus.mailer.timeout` (forever when 0, as the `Mailer` does), on a
+    virtual thread so the class loader and Vert.x context are right.
   - `sendTextReply` is for the AI-written status answer (tasks 06 and 08).
 - **Package boundaries** (review, 2026-10-08): `notification` doesn't use `IntakeReplySender`. `NotificationService`
   still sends its status emails from `noreply@parasol.com` through its own `ReactiveMailer`.

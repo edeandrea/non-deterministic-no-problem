@@ -197,7 +197,7 @@ When this lands: close Dependabot PRs #209, #210 and #211.
     - NITs: "project root" should be "working directory"; the dimension isn't needed with an empty store.
     - Pre-existing: `CLAUDE.md:330-331` says every WireMock profile redirects `session-sentiment`/`judge`, but `DriftHandlerTestProfile` doesn't.
     - Pre-existing on `main`: `NotificationServiceTests`/`ClaimsDetailPageTests` lack key stubs under `-Pollama-openai`.
-  - **The user's real-key runs passed.** Committed `150b9f9` and pushed to PR #219. The PR body's Verification section is updated, and #212's Verify item is ticked.
+  - **The user's real-key runs passed.** Committed `150b9f9` and pushed to PR #219. The PR body's Verification section is updated, and #212's Verify item is checked.
   - **PR state:** BEHIND main (`ec1ca14`, #220) and still BLOCKED by the Java 21 required checks. Squash auto-merge is still enabled.
 
 ### Merged

@@ -2,6 +2,8 @@ package org.parasol.intake.workflow;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Set;
 
@@ -16,6 +18,7 @@ import org.parasol.intake.model.IntakeOutcome;
 import org.parasol.intake.review.ReviewDecided;
 import org.parasol.intake.review.ReviewDecision;
 import org.parasol.intake.review.ReviewOutcome;
+import org.parasol.intake.review.ReviewedFields;
 import org.parasol.intake.workflow.IntakeState.Disposition;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -62,8 +65,11 @@ class IntakeJsonRoundTripTests {
 
 	@Test
 	void aReviewDecidedRoundTrips() throws Exception {
-		assertRoundTrips(new ReviewDecided(7L, "run-1", new ReviewDecision(ReviewOutcome.NEEDS_INFORMATION, Set.of(MissingItem.LOCATION, MissingItem.INCIDENT_DATE))));
-		assertRoundTrips(new ReviewDecided(7L, "run-1", new ReviewDecision(ReviewOutcome.READY, Set.of())));
+		assertRoundTrips(new ReviewDecided(7L, "run-1", new ReviewDecision(ReviewOutcome.NEEDS_INFORMATION, Set.of(MissingItem.LOCATION, MissingItem.INCIDENT_DATE),
+			new ReviewedFields("Car hit a post.", null, null, null, ClaimCategory.SINGLE_VEHICLE))));
+		assertRoundTrips(new ReviewDecided(7L, "run-1", new ReviewDecision(ReviewOutcome.READY, Set.of(),
+			new ReviewedFields("Car hit a post.", LocalDate.of(2026, 10, 7), LocalTime.of(15, 30), "Elm Street", ClaimCategory.MULTIPLE_VEHICLE))));
+		assertRoundTrips(new ReviewDecided(7L, "run-1", new ReviewDecision(ReviewOutcome.READY, Set.of(), ReviewedFields.none())));
 	}
 
 	private void assertRoundTrips(Object value) throws Exception {

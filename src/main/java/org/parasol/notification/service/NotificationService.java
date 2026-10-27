@@ -8,9 +8,12 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import org.parasol.claim.model.Claim;
+import org.parasol.claim.model.IntakeClaimStatus;
 import org.parasol.notification.ai.GenerateEmailService;
+import org.parasol.notification.guardrail.IntakeCompleteToolInputGuardrail;
 import org.parasol.notification.model.ClaimInfo;
 
+import io.quarkiverse.langchain4j.guardrails.ToolInputGuardrails;
 import io.quarkus.mailer.Mail;
 import io.quarkus.mailer.reactive.ReactiveMailer;
 import io.quarkus.narayana.jta.QuarkusTransaction;
@@ -30,6 +33,9 @@ public class NotificationService {
 	// Respond to the AI with the fact that we couldn't find a claim record for some reason (shouldn't ever happen, but who knows...)
 	static final String NOTIFICATION_NO_CLAIMANT_FOUND = "No claim record found in the database for the given claim";
 
+	// The claim is still in intake (waiting for a reviewer or for the customer), so the chat bot can't act on it yet
+	static final String INTAKE_NOT_COMPLETE = "Claim %s has status \"%s\", which means intake isn't complete. No action can be taken on it yet, so its status was not changed and no email was sent";
+
 	// Who the email is from
 	static final String MESSAGE_FROM = "noreply@parasol.com";
 
@@ -44,6 +50,7 @@ public class NotificationService {
 		This should only be used if the user explicitly asks to update the status of a claim.
 		Do not decide on your own to update the status.
 		""")
+	@ToolInputGuardrails(IntakeCompleteToolInputGuardrail.class)
 	@WithSpan("NotificationService.updateClaimStatus")
 	public String updateClaimStatus(@SpanAttribute("arg.claimId") long claimId, @SpanAttribute("arg.status") String status) {
 		// Only want to actually do anything if the passed in status has at least 3 characters
@@ -56,23 +63,28 @@ public class NotificationService {
 	private String updateStatus(long claimId, String status) {
 		// Only want to actually do anything if there is a corresponding claim in the database for the given claimId
 		return updateStatusIfFound(claimId, status)
-			.map(this::sendEmail)
+			.map(update -> update.applied() ? sendEmail(update.claim()) : INTAKE_NOT_COMPLETE.formatted(update.claim().claimNumber, update.claim().status))
 			.orElse(NOTIFICATION_NO_CLAIMANT_FOUND);
 	}
 
-	private Optional<Claim> updateStatusIfFound(long claimId, String status) {
+	private Optional<StatusUpdate> updateStatusIfFound(long claimId, String status) {
 		return QuarkusTransaction.joiningExisting().call(() ->
 				Claim.<Claim>findByIdOptional(claimId)
-					.map(claim -> {
-						// Capitalize the first letter
-						claim.status = status.strip().substring(0, 1).toUpperCase() + status.strip().substring(1);
-
-						// Save the claim with updated status
-						Claim.persist(claim);
-
-						return claim;
-					})
+					.map(claim -> IntakeClaimStatus.isIntakeOpen(claim.status) ? new StatusUpdate(claim, false) : new StatusUpdate(applyStatus(claim, status), true))
 			);
+	}
+
+	private static Claim applyStatus(Claim claim, String status) {
+		// Capitalize the first letter
+		claim.status = status.strip().substring(0, 1).toUpperCase() + status.strip().substring(1);
+
+		// Save the claim with updated status
+		Claim.persist(claim);
+
+		return claim;
+	}
+
+	private record StatusUpdate(Claim claim, boolean applied) {
 	}
 
 	private String sendEmail(Claim claim) {

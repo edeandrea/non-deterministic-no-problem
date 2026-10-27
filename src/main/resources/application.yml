@@ -364,6 +364,9 @@ parasol:
       dev-ui:
         allow-sql: true
   parasol:
+    # A build property: the Ollama Maven profiles set it for quarkus:dev in the pom
+    dev-seed:
+      enabled: true
     intake:
       watcher:
         # Quick pick-up of mail sent from Roundcube if a wake-up is missed

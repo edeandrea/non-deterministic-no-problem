@@ -424,6 +424,7 @@
 						<configuration>
 							<systemProperties>
 								<quarkus.profile>ollama,prod</quarkus.profile>
+								<parasol.dev-seed.enabled>true</parasol.dev-seed.enabled>
 							</systemProperties>
 						</configuration>
 					</plugin>
@@ -466,6 +467,7 @@
 						<configuration>
 							<systemProperties>
 								<quarkus.profile>ollama-openai,prod</quarkus.profile>
+								<parasol.dev-seed.enabled>true</parasol.dev-seed.enabled>
 							</systemProperties>
 						</configuration>
 					</plugin>

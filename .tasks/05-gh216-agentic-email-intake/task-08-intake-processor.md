@@ -98,7 +98,7 @@ Execution Steps → 2a first (a platform that pins Flow ≥ 1.2.0).
       covers the routing).
   - **`runAgents`:** `ClaimsMailboxAgent.process(…)` (task 06), with the claim history passed explicitly: the combined
     correspondence, the matched claim (or none), the fields extracted so far, and the **requested items**, including
-    any reviewer-ticked items stored on the claim. Output: the `IntakeOutcome`.
+    any reviewer-checked items stored on the claim. Output: the `IntakeOutcome`.
     - *From task 06:* the signature is `process(correspondence, matchedClaim, extractedSoFar, requestedItems, sentDate,
       invocationParameters)`. Pass `MatchedClaim.none()` (never `null`) when nothing matched, and always
       `ClaimStatusTools.scopedTo(matchedClaim)` as the last argument: it scopes the status tool to that claim (see the
@@ -146,7 +146,7 @@ Execution Steps → 2a first (a platform that pins Flow ≥ 1.2.0).
       wins**, whatever the classifier said):
       - append the stripped reply to `body` (separated, dated) and record the correspondence
       - merge newly supplied fields (never overwrite with null); store new images
-      - **Completeness** (gap 8): complete only when no required detail is missing **and** every reviewer-ticked item
+      - **Completeness** (gap 8): complete only when no required detail is missing **and** every reviewer-checked item
         was answered (`missingInformation`, task 05; built as `ClaimExtractionRules.findMissingItems`). A blank reply answers nothing.
       - complete → `Pending Review` (new `reviewRunId`), clear the requested items; incomplete →
         `Pending Information`, store the still-requested items
@@ -165,12 +165,12 @@ Execution Steps → 2a first (a platform that pins Flow ≥ 1.2.0).
     correlated on **both the run's own instance id and the claim id** carried in the event data (decided by the user,
     2026-10-11, D6: a new claim's id isn't in the run's input). The event data is `ReviewDecided(claimId, runId, decision)`.
     `ReviewDecision` is a record: a `ReviewOutcome` enum
-    (`READY` / `NEEDS_INFORMATION`) plus the `Set<MissingItem>` the reviewer ticked. Task 10 publishes it.
+    (`READY` / `NEEDS_INFORMATION`) plus the `Set<MissingItem>` the reviewer checked. Task 10 publishes it.
   - **`routeDecision`** (a `switch`), then:
     - **`markInProcess`:** `In Process`, clear `decidingRunId` (task 10 moved `reviewRunId` there when it claimed the
       review), and the thank-you template. **This is the only place the
       thank-you email is sent.**
-    - **`markPendingInformation`:** `Pending Information`, store the ticked items as the requested items, clear
+    - **`markPendingInformation`:** `Pending Information`, store the checked items as the requested items, clear
       `decidingRunId`, and the missing-information template listing exactly them. **The run ends** (no second wait);
       the customer's next email starts a new run.
 - **Failures:** one **failure listener** (a CDI `WorkflowExecutionListener`, `onWorkflowFailed`) handles every faulted
@@ -202,7 +202,7 @@ leaves `WAITING`; F2b). One test per rule:
 - **matched claim wins:** a reply on a pending claim labeled `NOT_A_CLAIM` is still merged
 - an unmatched email classified as a follow-up → "no matching claim", nothing created
 - after Needs more information, an **empty reply** stays `Pending Information` (still-missing email); a reply answering
-  the ticked items → `Pending Review`
+  the checked items → `Pending Review`
 - **supersede:** a reply during `Pending Review` cancels the waiting run (0 Flow instance and task rows left for it).
   The claim stays `Pending Review` with the new `reviewRunId`, the during-review variant is sent, and a later decision
   reaches **only** the new run. A superseding reply that makes the claim incomplete → `Pending Information`.
@@ -212,7 +212,7 @@ leaves `WAITING`; F2b). One test per rule:
   "being decided" state directly, since the review endpoint is task 10's. **The decision's side, and the two run
   concurrently (latched), are task 10's race test**: a losing decision needs the endpoint to return its 409.
 - decision `READY` → `In Process` + exactly one thank-you; `NEEDS_INFORMATION` → `Pending Information` + an email listing
-  exactly the ticked items; `reviewRunId` and `decidingRunId` cleared in both; **zero LLM calls** after the decision (WireMock request
+  exactly the checked items; `reviewRunId` and `decidingRunId` cleared in both; **zero LLM calls** after the decision (WireMock request
   counts unchanged since the wait started)
 - a follow-up on an `In Process`/later/seeded `New` claim → status reply, claim unchanged
 - a follow-up from a different address → "no matching claim"; matched by header vs by subject number
@@ -274,7 +274,7 @@ leaves `WAITING`; F2b). One test per rule:
 - [x] The starter does the checks, enters the conversation id once, keeps each sender's emails in order, and doesn't wait for runs.
 - [x] `resolveClaim` routes fresh emails to the sender's pending claim, a new claim, or the which-claim reply, and never to a claim outside the sender's list.
 - [x] The policy check runs after the agents; a rejection creates nothing.
-- [x] Completeness accounts for reviewer-ticked items; the empty-reply test passes.
+- [x] Completeness accounts for reviewer-checked items; the empty-reply test passes.
 - [x] A reply during review cancels the waiting run; a reply that finds the claim being decided goes back in the queue (the reply's side of the race; the decision's side is task 10's); no Flow rows remain for ended runs.
 - [x] The thank-you email is sent only from `markInProcess`; a decision makes no LLM call.
 - [x] The failure listener handles faults before and after `WAITING`, with tests (run 2026-10-19, see Outcome → Verification).

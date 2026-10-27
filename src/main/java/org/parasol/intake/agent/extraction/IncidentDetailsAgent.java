@@ -33,7 +33,7 @@ public interface IncidentDetailsAgent {
 	 *
 	 * @param correspondence the combined correspondence, oldest first, with the newest reply marked
 	 * @param extractedSoFar the fields extracted on earlier runs; all {@code null} for a new claim
-	 * @param requestedItems what we last asked the customer for, including reviewer-ticked items; empty if nothing
+	 * @param requestedItems what we last asked the customer for, including reviewer-checked items; empty if nothing
 	 * @param sentDate the newest email's sent date as an ISO {@code yyyy-MM-dd} string
 	 * @return the extracted details
 	 */

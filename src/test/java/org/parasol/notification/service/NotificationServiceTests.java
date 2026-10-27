@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.List;
 
 import jakarta.inject.Inject;
@@ -15,6 +16,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.parasol.claim.model.Claim;
+import org.parasol.claim.model.ClaimCategory;
 import org.parasol.notification.ai.GenerateEmailService;
 import org.parasol.notification.guardrail.EmailEndsAppropriatelyOutputGuardrail;
 import org.parasol.testing.mail.GreenMailMailbox;
@@ -109,6 +111,29 @@ class NotificationServiceTests {
 		assertThat(this.emailService.updateClaimStatus(1L, status))
 			.isNotNull()
 			.isEqualTo(NotificationService.INVALID_STATUS, status);
+
+		assertNoEmailSent();
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "Pending Review", "Pending Information" })
+	@TestTransaction
+	void noActionWhileIntakeIsNotComplete(String status) {
+		var claim = new Claim();
+		claim.category = ClaimCategory.OTHER;
+		claim.clientName = "Intake Test Client";
+		claim.emailAddress = "intake.test@example.com";
+		claim.policyNumber = "AC-0000001";
+		claim.inceptionDate = LocalDate.of(2020, 1, 1);
+		claim.status = status;
+		claim.persistAndFlush();
+
+		assertThat(this.emailService.updateClaimStatus(claim.id, "Approved"))
+			.isEqualTo(NotificationService.INTAKE_NOT_COMPLETE.formatted(claim.claimNumber, status));
+
+		assertThat(Claim.<Claim>findById(claim.id))
+			.extracting(c -> c.status)
+			.isEqualTo(status);
 
 		assertNoEmailSent();
 	}

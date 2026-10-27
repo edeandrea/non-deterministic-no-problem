@@ -187,13 +187,13 @@ class ClaimExtractionWorkflowTests {
 			--- Newest reply, sent 2026-10-09 ---
 			""".formatted(NEW_CLAIM);
 		var soFar = details("2026-10-07", "14:30", "Elm Street junction", ClaimCategory.MULTIPLE_VEHICLE, Set.of());
-		var ticked = Set.of(MissingItem.INCIDENT_DESCRIPTION, MissingItem.LOCATION);
+		var checked = Set.of(MissingItem.INCIDENT_DESCRIPTION, MissingItem.LOCATION);
 		// The model wrongly claims the blank reply answered both
 		stub(DETAILS_PROMPT, detailsJson("2026-10-07", "14:30", "Elm Street junction", "MULTIPLE_VEHICLE", "[\"INCIDENT_DESCRIPTION\",\"LOCATION\"]"));
 
-		var extraction = this.workflow.extractClaim(combined, soFar, ticked, "2026-10-09");
+		var extraction = this.workflow.extractClaim(combined, soFar, checked, "2026-10-09");
 
-		assertThat(ClaimExtractionRules.findMissingItems(extraction, ticked, true))
+		assertThat(ClaimExtractionRules.findMissingItems(extraction, checked, true))
 			.containsExactly(MissingItem.INCIDENT_DESCRIPTION, MissingItem.LOCATION);
 		assertThat(userMessage(requestFor(DETAILS_PROMPT)))
 			.contains("Items we asked the customer for: INCIDENT_DESCRIPTION, LOCATION");

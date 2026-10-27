@@ -533,6 +533,18 @@ exports[`App tests should render default App component 1`] = `
                     </option>
                     <option
                       class=""
+                      value="Pending Information"
+                    >
+                      Pending Information
+                    </option>
+                    <option
+                      class=""
+                      value="Pending Review"
+                    >
+                      Pending Review
+                    </option>
+                    <option
+                      class=""
                       value="In Process"
                     >
                       In Process
