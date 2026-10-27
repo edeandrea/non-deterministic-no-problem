@@ -58,3 +58,12 @@ export const formatIncident = (isoDate?: string | null, isoTime?: string | null)
 
     return time ? `${date} at ${time}` : date;
 };
+
+// The ISO date ("2024-02-03") of a moment in the user's own time zone. toISOString() is UTC, which is already tomorrow
+// in the evening west of UTC.
+export const toLocalIsoDate = (date: Date): string => {
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${date.getFullYear()}-${month}-${day}`;
+};

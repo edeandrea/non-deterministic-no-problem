@@ -33,7 +33,7 @@ the LLM mocked, and runs on every CI build.
   5. Click **Ready for processing**. Check the claim becomes `In Process`, and the thank-you email arrives.
 - **Scenario 3, reviewer requests more information:**
   1. Send a complete claim, and wait for `Pending Review`.
-  2. Click **Request more information**, tick only the category, and submit.
+  2. Click **Request more information**, check only the category, and submit.
   3. Check the claim shows `Pending Information`, and the missing-information email lists only the category.
   4. Reply in Roundcube with the category. Check the claim becomes `Pending Review`.
   5. Click **Ready for processing**. Check the claim becomes `In Process`.

@@ -48,7 +48,7 @@ fixes [quarkiverse/quarkus-flow#1096](https://github.com/quarkiverse/quarkus-flo
   - **Architecture:** the `org.parasol.intake` package; the intake as one quarkus-flow workflow (`ClaimIntakeFlow`)
     with the agentic root as one step; the non-waiting watcher and starter (parallel runs, per-sender order, failure listener); `resolveClaim` and the which-claim reply; the review as the workflow's `listen` + `switch`
     steps; and `ai.scoring.conversation` (core + chat/flow/agentic adapters, `ConversationEndedEvent`)
-  - **REST:** `POST /api/db/claims/{id}/review-decisions` (asynchronous, 202; no authentication, it's a demo app;
+  - **REST:** `POST /api/db/claims/{id}/review-decision` (asynchronous, 202; no authentication, it's a demo app;
     404 missing run, 409 not waiting / being decided / lost lock)
   - **Statuses:** intake uses `Pending Information`, `Pending Review` and `In Process`, never `New`
   - **Models table:** add `claim-intake`
@@ -93,7 +93,7 @@ fixes [quarkiverse/quarkus-flow#1096](https://github.com/quarkiverse/quarkus-flo
     topology and per-run agent detail; Flow: the workflow and the review wait) and that `MonitoredAgent`
     keeps finished sessions only in dev mode
 - Update `README.md` ("What it demonstrates": agentic workflows inside a quarkus-flow workflow, and human-in-the-loop
-  review; REST endpoints, including `review-decisions`; prerequisites; the single-replica requirement; the claim
+  review; REST endpoints, including `review-decision`; prerequisites; the single-replica requirement; the claim
   session in Langfuse, `claim.intake.*` metrics and the Flow Dev UI) and `docs/application-flow.puml` (add the intake
   flow, including the review step). Re-render with `./docs/render-diagrams.sh`.
 - Check `images/arch.png` and `langfuse-evaluation.md` for statements the feature makes stale. Report them rather than pixel-editing the raster.

@@ -18,7 +18,7 @@ import org.parasol.claim.model.ClaimNotFoundException;
  */
 @Produces(MediaType.APPLICATION_JSON)
 @Path("/api/db/claims")
-public class ClaimResource {
+class ClaimResource {
 	private final ClaimMapper mapper;
 
 	ClaimResource(ClaimMapper mapper) {

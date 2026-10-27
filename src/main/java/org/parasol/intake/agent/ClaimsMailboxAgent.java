@@ -33,7 +33,7 @@ public interface ClaimsMailboxAgent {
 	 * scope treats {@code null} as missing)
 	 * @param extractedSoFar the fields extracted on earlier runs; all {@code null} for a new claim, never {@code null}
 	 * itself
-	 * @param requestedItems what we last asked the customer for, including reviewer-ticked items; empty if nothing
+	 * @param requestedItems what we last asked the customer for, including reviewer-checked items; empty if nothing
 	 * @param sentDate the newest email's sent date as an ISO {@code yyyy-MM-dd} string
 	 * @param invocationParameters always {@link ClaimStatusTools#scopedTo ClaimStatusTools.scopedTo(matchedClaim)}: scopes
 	 * the follow-up agent's status tool to the matched claim, so the model can't pick another claim. It goes into the

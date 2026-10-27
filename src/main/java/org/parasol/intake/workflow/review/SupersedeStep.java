@@ -12,13 +12,13 @@ import jakarta.enterprise.inject.Instance;
 import jakarta.persistence.OptimisticLockException;
 
 import org.parasol.claim.model.Claim;
-import org.parasol.intake.IntakeClaimStatus;
+import org.parasol.claim.model.IntakeClaimStatus;
 import org.parasol.intake.model.ClaimIntakeState;
 import org.parasol.intake.model.IntakeOutcome;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
 import org.parasol.intake.workflow.EmailRequeued;
-import org.parasol.intake.workflow.IntakeState;
 import org.parasol.intake.workflow.IntakeState.Disposition;
+import org.parasol.intake.workflow.IntakeState;
 
 import io.quarkus.logging.Log;
 import io.serverlessworkflow.impl.WorkflowInstance;
@@ -83,7 +83,7 @@ public class SupersedeStep {
 		var claim = Claim.<Claim>findById(claimId);
 		var state = ClaimIntakeState.findForClaim(claimId);
 		var isDecided = state.filter(intake -> intake.decidingRunId != null).isPresent()
-			|| !(IntakeClaimStatus.PENDING_REVIEW.label().equals(claim.status) || IntakeClaimStatus.PENDING_INFORMATION.label().equals(claim.status));
+			|| !IntakeClaimStatus.isIntakeOpen(claim.status);
 
 		return isDecided ? new Result.Requeue() : clear(state);
 	}

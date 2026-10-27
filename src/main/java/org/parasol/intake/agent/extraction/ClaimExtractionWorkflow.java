@@ -33,7 +33,7 @@ public interface ClaimExtractionWorkflow {
 	 * at {@code parasol.intake.limits.max-body-characters} first, keeping the newest text
 	 * @param extractedSoFar the fields extracted on earlier runs; all {@code null} for a new claim, never {@code null}
 	 * itself (the agentic scope treats a {@code null} input as missing)
-	 * @param requestedItems what we last asked the customer for, including reviewer-ticked items; empty if nothing
+	 * @param requestedItems what we last asked the customer for, including reviewer-checked items; empty if nothing
 	 * @param sentDate the newest email's sent date as an ISO {@code yyyy-MM-dd} string
 	 * @return the combined extraction
 	 */

@@ -187,12 +187,14 @@ file's header link to it.**
 - [x] [task-08-intake-processor.md](task-08-intake-processor.md): The intake workflow and business rules (includes the human review) — **done**, squash-merged into `gh216-email-intake` as `ae2885c` ([#240](https://github.com/edeandrea/non-deterministic-no-problem/pull/240)) — issue [#255](https://github.com/edeandrea/non-deterministic-no-problem/issues/255) (includes task 07)
 - [x] [task-09-imap-idle-watcher.md](task-09-imap-idle-watcher.md): IMAP IDLE watcher — **done**, squash-merged into `gh216-email-intake` as `e41c44c` ([#245](https://github.com/edeandrea/non-deterministic-no-problem/pull/245)) — issue [#256](https://github.com/edeandrea/non-deterministic-no-problem/issues/256)
 - [x] [task-09b-flow-1-3-0.md](task-09b-flow-1-3-0.md): Adopt quarkus-flow 1.3.0, delete the agentic-run workaround and bump the container images (user decision, 2026-10-26) — task 08 found a quarkus-flow 1.2.0 leak when an agent throws on 2026-10-19 (workaround in `org.parasol.intake.agent`, upstream issue [quarkiverse/quarkus-flow#1096](https://github.com/quarkiverse/quarkus-flow/issues/1096), PR [#1095](https://github.com/quarkiverse/quarkus-flow/pull/1095)); 1.3.0 ships the fix — **done**, squash-merged into `gh216-email-intake` as `6d610b1` ([#264](https://github.com/edeandrea/non-deterministic-no-problem/pull/264)) — issue [#257](https://github.com/edeandrea/non-deterministic-no-problem/issues/257); found and filed a new upstream regression, [quarkiverse/quarkus-flow#1111](https://github.com/quarkiverse/quarkus-flow/issues/1111) (#1077's input validation breaks every generated agentic workflow), worked around in `application.yml`; otel-lgtm held back (no OpenShift cluster available here) — see Outcome
-- [ ] [task-10-review-api-and-ui.md](task-10-review-api-and-ui.md): Review API and UI — issue [#258](https://github.com/edeandrea/non-deterministic-no-problem/issues/258)
+- [x] [task-10-review-api-and-ui.md](task-10-review-api-and-ui.md): Review API and UI — done on `gh216/10-review-api-and-ui` (branch not yet pushed/PR'd) — issue [#258](https://github.com/edeandrea/non-deterministic-no-problem/issues/258); see Outcome
 - [ ] [task-10b-conversation-core.md](task-10b-conversation-core.md): Generic conversation context core (`ai.scoring.conversation`; changes the chat's scoring trigger) — issue [#259](https://github.com/edeandrea/non-deterministic-no-problem/issues/259)
 - [ ] [task-11-observability.md](task-11-observability.md): Observability for the intake workflow (Flow and agentic adapters) — issue [#260](https://github.com/edeandrea/non-deterministic-no-problem/issues/260)
 - [ ] [task-12-roundcube-e2e.md](task-12-roundcube-e2e.md): Roundcube end-to-end test — issue [#261](https://github.com/edeandrea/non-deterministic-no-problem/issues/261)
 - [ ] [task-13-demo-and-docs.md](task-13-demo-and-docs.md): Demo guide and documentation — issue [#262](https://github.com/edeandrea/non-deterministic-no-problem/issues/262)
 - [ ] [task-14-verification.md](task-14-verification.md): Verification — issue [#263](https://github.com/edeandrea/non-deterministic-no-problem/issues/263)
+- [ ] [task-15-claim-correspondence-transcript.md](task-15-claim-correspondence-transcript.md): Show a claim's full email correspondence as a transcript on the Documents tab (user decision, 2026-10-26: for the future, doesn't block #216's close-out, sequenced after task 14) — found while designing task 10's review UI: the Documents tab shows only the first email, and a reviewer deciding a `Pending Review` claim would benefit from the actual back-and-forth — issue [#265](https://github.com/edeandrea/non-deterministic-no-problem/issues/265)
+- [ ] [task-16-consolidate-description-into-summary.md](task-16-consolidate-description-into-summary.md): Consolidate incident description into the claim summary (user decision, 2026-10-26: for the future, doesn't block #216's close-out, sequenced after task 14) — found while designing task 10's review UI: `IncidentDetailsAgent`'s `description` is extracted only to be thrown away, while a separate `ClaimSummaryAgent` output is what's actually persisted — issue [#266](https://github.com/edeandrea/non-deterministic-no-problem/issues/266)
 
 > **Ordering:** the task files describe the b1 design (rewritten 2026-10-07). The design gate re-run has passed
 > (PR #231), so implementation starts at task 03. Task 10b may run any time before task 11 (it only touches `ai.scoring` and the chat);
@@ -276,7 +278,7 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
                                                                ▼
                          ClaimIntakeFlow: supersede → runAgents (ClaimsMailboxAgent) → policy → persist
                                           → reply → file → [complete] waitReview (listen, kept in PostgreSQL)
-                         claims processor (UI) → POST review-decisions → publish REVIEW_DECIDED ⇢ apply decision
+                         claims processor (UI) → POST review-decision → publish REVIEW_DECIDED ⇢ apply decision
 ```
 
 ### Project Context
@@ -345,10 +347,10 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
   or after any number of replies), the claim moves to **`Pending Review`**, not `In Process`. A claims
   processor then does one last look-over on the claim detail page:
   - **Ready** → `In Process`, and the customer gets the "thank you, we're working on your claim" email.
-  - **Needs more information** → the processor ticks the missing items → `Pending Information`, and
-    the customer gets the missing-information email listing exactly the ticked items. That run ends
+  - **Needs more information** → the processor checks the missing items → `Pending Information`, and
+    the customer gets the missing-information email listing exactly the checked items. That run ends
     there (no re-suspension); the customer's next email starts a new run, and the claim stays
-    incomplete until the ticked items are answered, so an empty reply stays `Pending Information` (gap 8).
+    incomplete until the checked items are answered, so an empty reply stays `Pending Information` (gap 8).
 - **Design review:** the design lives in the repository as `docs/design/email-claim-intake.md` (plus
   PlantUML diagrams), opened as PR #220 (task 02) and **merged as-is with no review feedback** (`ec1ca14`).
   The spike (task 01) ran before the design, because its results shape it: it ran ahead of issue 1, on a
@@ -366,7 +368,7 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
   `AgenticScopePersister` by a lowest-priority `StartupEvent` observer, reset on `ShutdownEvent`) saves the
   scope in PostgreSQL, so the pause survives restarts.
   - Memory id = the inbound email's `Message-ID`. The claim stores it in a `reviewRunId` column.
-  - `ClaimReviewService.decide` (behind `POST /api/db/claims/{id}/review-decisions`, task 10) claims the
+  - `ClaimReviewService.decide` (behind `POST /api/db/claims/{id}/review-decision`, task 10) claims the
     review under optimistic locking, completes the pending response, re-invokes the root with the original
     arguments read back from the scope (`readState`), hands the outcome to
     `ClaimEmailProcessor.applyReviewOutcome` (task 08) and evicts the scope. A non-LLM router turns the
@@ -502,8 +504,12 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
     mode, not by profile, because dev runs activate `prod,ollama`, not `dev`. The monitor itself can't be made
     dev-only: it isn't a CDI bean, and `extends MonitoredAgent` is fixed at compile time (details in task 11).
   - Grafana panels are a separate issue: #218 (Clean up the Grafana AI dashboard).
-- **Out of scope:** non-English email, multiple incidents per email, drift detection for the agents,
-  the reviewer editing extracted fields.
+- **Out of scope:** non-English email, multiple incidents per email, drift detection for the agents.
+  ~~the reviewer editing extracted fields~~ — **reversed, 2026-10-26, in task 10**: reviewing the built review panel
+  surfaced that checking an abstract "category" checkbox with no indication of the claim's current value gave the
+  reviewer nothing to actually judge. The user decided a reviewer should see and correct the claim's own extracted
+  fields directly (a human's correction becomes the claim's truth with no customer round-trip), with a per-field
+  toggle for "I don't know this, ask the customer" instead. See task 10's *Resume Here* for the full design.
 
 ### Caveats & Problems
 - Never hold a transaction open across an LLM call. Persist in a `@Transactional(REQUIRES_NEW)` method of its own (task 08 review: prefer `@Transactional` to `QuarkusTransaction`).
@@ -685,8 +691,8 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
      before any claim is created or changed. On rejection it **evicts the run state (including a paused
      review)**, sends the policy-inconsistency reply, and creates no claim. Fold this into task-08 (rule,
      eviction and a test).
-  8. **Reviewer-ticked items (from the design review):** after **Needs more information**, completeness
-     also requires answers to the items the reviewer ticked, so a reply without content stays
+  8. **Reviewer-checked items (from the design review):** after **Needs more information**, completeness
+     also requires answers to the items the reviewer checked, so a reply without content stays
      `Pending Information`. Fold this into task-05 (extraction receives the requested items),
      task-08 (completeness rule) and their tests, including an empty-reply test.
   9. **"No matching claim" is one template** used for both the wrong-sender case and an unmatched
@@ -1018,7 +1024,7 @@ not only non-suspended ones (policy rejection and superseding evict a paused rev
 - **task-09 (IMAP watcher):** start after the store registrar (`@Startup`/default priority); no agent calls in
   low-priority startup observers.
 - **task-10 (review API/UI):**
-  - `POST …/review-decisions` → `getAgenticScope` (404 on `null`)
+  - `POST …/review-decision` → `getAgenticScope` (404 on `null`)
   - check `review:<messageId>` is pending (409)
   - `completePendingResponse` → re-invoke with `readState` arguments
   - evict on completion; handle NEEDS_INFO re-suspension

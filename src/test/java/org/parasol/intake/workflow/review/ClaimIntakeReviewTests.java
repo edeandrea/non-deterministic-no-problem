@@ -25,6 +25,7 @@ import org.parasol.intake.model.EmailType;
 import org.parasol.intake.review.ReviewDecided;
 import org.parasol.intake.review.ReviewDecision;
 import org.parasol.intake.review.ReviewOutcome;
+import org.parasol.intake.review.ReviewedFields;
 
 import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 import io.quarkus.test.junit.QuarkusTest;
@@ -152,7 +153,7 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 		var run = this.scenario.awaitWaitingRun(created.claim().id);
 
 		for (var attempt = 0; attempt < 3; attempt++) {
-			this.scenario.publish(new ReviewDecided(created.claim().id, "some-other-run", new ReviewDecision(ReviewOutcome.READY, Set.of())));
+			this.scenario.publish(new ReviewDecided(created.claim().id, "some-other-run", new ReviewDecision(ReviewOutcome.READY, Set.of(), ReviewedFields.none())));
 		}
 
 		Awaitility.await().pollDelay(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(5)).until(() -> true);
@@ -231,7 +232,7 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 		assertThat(this.scenario.inFolder(MailFolder.PROCESSING)).hasSize(1);
 		assertThat(this.scenario.replies(SENDER)).hasSize(1);
 
-		this.scenario.publishUntilWoken(run, new ReviewDecided(created.claim().id, runId, new ReviewDecision(ReviewOutcome.READY, Set.of())));
+		this.scenario.publishUntilWoken(run, new ReviewDecided(created.claim().id, runId, new ReviewDecision(ReviewOutcome.READY, Set.of(), ReviewedFields.none())));
 
 		this.scenario.awaitFiled(id);
 		assertThat(this.scenario.claim(created.claim().id).status).isEqualTo("In Process");
@@ -270,7 +271,7 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 			return invocation.callRealMethod();
 		}).when(this.decisionSteps).applyReady(any(), any());
 
-		this.scenario.publishUntilWoken(run, new ReviewDecided(created.claim().id, runId, new ReviewDecision(ReviewOutcome.READY, Set.of())));
+		this.scenario.publishUntilWoken(run, new ReviewDecided(created.claim().id, runId, new ReviewDecision(ReviewOutcome.READY, Set.of(), ReviewedFields.none())));
 
 		var marker = marker();
 		stubFollowUp(marker, COMPLETE_DETAILS);

@@ -65,7 +65,7 @@ no `@ParallelExecutor` (Flow forks on the `ManagedExecutor` and #1065 carries th
   - the combined correspondence (the first email plus every reply, dated and separated; the newest
     reply marked as such), capped at `IntakeConfig`'s max characters
   - the fields extracted so far (as ISO strings)
-  - the requested items: what we last asked the customer for, **including the items a reviewer ticked**
+  - the requested items: what we last asked the customer for, **including the items a reviewer checked**
     under Needs more information
   - the newest email's sent date, so relative dates ("last night") resolve correctly
 
@@ -90,16 +90,16 @@ no `@ParallelExecutor` (Flow forks on the `ManagedExecutor` and #1065 carries th
   that returns the set of missing items *(built as `ClaimExtractionRules.findMissingItems`, taking any
   `Collection<MissingItem>`; renamed in the task 05 review)*:
   - any of description, date, location or category that is absent (`OTHER` is not missing)
-  - **plus every reviewer-ticked item not in `answeredItems`** (gap 8): after Needs more information, the
-    claim stays incomplete until the customer answers the ticked items, even though those fields
+  - **plus every reviewer-checked item not in `answeredItems`** (gap 8): after Needs more information, the
+    claim stays incomplete until the customer answers the checked items, even though those fields
     already had values
   - a blank newest reply (after quote stripping) answers nothing, whatever the LLM says
 - The workflow's `applyOutcome` step (task 08) converts the ISO strings to `LocalDate`/`LocalTime` when it persists the claim.
 - **Tests:**
   - **Unit:**
     - `@Output` combination
-    - `missingInformation` for each combination, including `OTHER` vs null, reviewer-ticked items
-      answered vs not, and a blank reply with ticked items (stays missing)
+    - `missingInformation` for each combination, including `OTHER` vs null, reviewer-checked items
+      answered vs not, and a blank reply with checked items (stays missing)
     - the JSON guardrail (fenced JSON, malformed JSON → reprompt)
     - the length guardrail at 5000 and 5001 characters
     - the date rules (future date, invalid ISO string, invalid time)
@@ -111,7 +111,7 @@ no `@ParallelExecutor` (Flow forks on the `ManagedExecutor` and #1065 carries th
     - a relative date resolved against the sent date
     - a category that maps to `OTHER`
     - a reply on a pending claim, extracted over the combined correspondence
-    - an **empty reply** after a reviewer ticked items: the ticked items stay missing
+    - an **empty reply** after a reviewer checked items: the checked items stay missing
     - each request carries exactly one user message (no chat history, no RAG content)
     - the two halves really run in parallel: both requests reach WireMock before either response (a delayed stub)
 
@@ -144,7 +144,7 @@ no `@ParallelExecutor` (Flow forks on the `ManagedExecutor` and #1065 carries th
 
 - [x] Every extraction agent carries both opt-outs and `@ModelName("claim-intake")`; requests carry one user message and no RAG content.
 - [x] `ClaimExtractionWorkflow` returns a JSON-safe `ClaimExtraction` (ISO-string dates, no `Optional`), and declares **no** `@ParallelExecutor`.
-- [x] `missingInformation` (`findMissingItems`) exists and accounts for reviewer-ticked items and blank replies.
+- [x] `missingInformation` (`findMissingItems`) exists and accounts for reviewer-checked items and blank replies.
 - [x] The JSON, length and date guardrails are in place.
 - [x] All the unit and WireMock tests listed above pass under `-Pollama`, including the empty-reply test.
   *(2026-10-09, local `clean verify`: all 42 intake agent and model tests pass under default, `-Pollama` and
@@ -222,8 +222,8 @@ lands.
   summary or sentiment. The retry limit is quarkus-langchain4j's default (`quarkus.langchain4j.guardrails.max-retries`,
   3); it isn't set here.
 - **`ClaimExtractionRules.findMissingItems`:** each absent core field (a blank string; an incident date that isn't a
-  valid ISO date; a `null` category; `OTHER` counts), plus every reviewer-ticked item not in `answeredItems`, or every
-  ticked item when the reply is blank. Returns an unmodifiable set in `MissingItem` declaration order, the order the
+  valid ISO date; a `null` category; `OTHER` counts), plus every reviewer-checked item not in `answeredItems`, or every
+  checked item when the reply is blank. Returns an unmodifiable set in `MissingItem` declaration order, the order the
   reply templates list items in. `requestedByReviewer` is required (pass an empty collection), any `Collection`
   (duplicates collapse). Incident time is never missing.
 - **The correspondence cap moved to task 08** (review decision): no agent uses it, it's part of building the text
@@ -234,7 +234,7 @@ lands.
   place the strings are parsed.
 
 **Tests** (`src/test/java/org/parasol/intake/agent/extraction/`, plus the round trip in `.../intake/model/`):
-- Unit: `ClaimExtractionRulesTests` (each absent field, `OTHER` vs `null`, ticked items answered/unanswered, ticked
+- Unit: `ClaimExtractionRulesTests` (each absent field, `OTHER` vs `null`, checked items answered/unanswered, checked
   items as a `List` with a duplicate, blank reply, order), `IncidentDetailsOutputGuardrailTests` (valid, fenced,
   malformed, invalid/future date, the sent date itself, invalid time, both at once, null fields, missing/malformed
   sent date, and each fallback), `MaxLengthOutputGuardrailTests` (5000 and 5001), `ClaimExtractionWorkflowOutputTests`
@@ -243,7 +243,7 @@ lands.
 - `ClaimExtractionWorkflowTests` (WireMock, stubs on the last message only): complete extraction; missing fields; a
   relative date with the sent date reaching only the details agent; `OTHER`; a reply on a pending claim over the
   combined correspondence, with the fields so far and the requested items in the prompt; every `ClaimCategory` in the
-  prompt; the empty reply after ticked items; a reprompted date; a date never corrected → missing; malformed JSON
+  prompt; the empty reply after checked items; a reprompted date; a date never corrected → missing; malformed JSON
   never corrected → the run fails.
   Every request is system + one user message (no history, no RAG), and **parallelism is measured on WireMock's own
   timings:** the last request arrives before the first is answered (750 ms stubs).

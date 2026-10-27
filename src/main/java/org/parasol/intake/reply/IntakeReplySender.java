@@ -3,7 +3,6 @@ package org.parasol.intake.reply;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.ForkJoinPool;
 import java.util.LinkedHashSet;
 import java.util.Optional;
 
@@ -14,7 +13,8 @@ import org.parasol.intake.config.IntakeConfig;
 
 import io.quarkus.mailer.Mail;
 import io.quarkus.mailer.MailTemplate.MailTemplateInstance;
-import io.quarkus.mailer.Mailer;
+import io.quarkus.mailer.reactive.ReactiveMailer;
+import io.smallrye.mutiny.Uni;
 
 /**
  * Sends intake replies from the claims inbox, with threading headers and claim-number subject prefixes.
@@ -31,12 +31,12 @@ public class IntakeReplySender {
 	private static final String REFERENCES = "References";
 
 	private final IntakeConfig config;
-	private final Mailer mailer;
+	private final ReactiveMailer mailer;
 	private final Duration sendTimeout;
 
-	// quarkus.mailer.timeout is the blocking Mailer's own timeout, so templated replies give up at the same point as text
-	// replies. It's a single Quarkus-owned key, so a @ConfigProperty rather than a mapping of our own
-	IntakeReplySender(IntakeConfig config, Mailer mailer, @ConfigProperty(name = "quarkus.mailer.timeout") Duration sendTimeout) {
+	// Every reply gives up at quarkus.mailer.timeout, the blocking Mailer's own timeout. It's a single Quarkus-owned key, so
+	// a @ConfigProperty rather than a mapping of our own
+	IntakeReplySender(IntakeConfig config, ReactiveMailer mailer, @ConfigProperty(name = "quarkus.mailer.timeout") Duration sendTimeout) {
 		this.config = config;
 		this.mailer = mailer;
 		this.sendTimeout = sendTimeout;
@@ -104,39 +104,42 @@ public class IntakeReplySender {
 
 		addThreadingHeaders(mail, threadingHeaders);
 
-		// The blocking Mailer applies quarkus.mailer.timeout itself
-		offCallerThread(() -> this.mailer.send(mail));
+		awaitSent(this.mailer.send(mail));
 	}
 
 	private void sendTemplate(MailTemplateInstance template, String recipient, String subject, ThreadingHeaders threadingHeaders) {
-		// MailTemplateInstance only sends through the ReactiveMailer, and its sendAndAwait() waits forever (a stalled SMTP
-		// server would hang the workflow step). So this awaits the Uni the way the blocking Mailer does: up to
-		// quarkus.mailer.timeout, or indefinitely when it's 0
-		var send = template
+		awaitSent(template
 			.mail(baseMail(threadingHeaders))
 			.to(recipient)
 			.from(this.config.address())
 			.subject(subject)
-			.send()
-			.await();
+			.send());
+	}
+
+	// Waits up to quarkus.mailer.timeout, or indefinitely when it's 0, the way the blocking Mailer does. (A template's
+	// sendAndAwait() waits forever, so a stalled SMTP server would hang the workflow step.) The wait is off the caller's
+	// thread, see below
+	private void awaitSent(Uni<Void> send) {
+		var await = send.await();
 
 		offCallerThread(() -> {
 			if (this.sendTimeout.isZero()) {
-				send.indefinitely();
+				await.indefinitely();
 			}
 			else {
-				send.atMost(this.sendTimeout);
+				await.atMost(this.sendTimeout);
 			}
 		});
 	}
 
 	// The reactive mailer deadlocks, until the SMTP server's own timeout, when it's blocked on a thread that carries a
-	// captured Vert.x context (a ManagedExecutor or Flow task thread, depending on where the run was started). A plain
-	// ForkJoinPool thread has none; NotificationService moves its sends there for the same reason. The sender blocks until
-	// the mail server accepts the reply either way
+	// captured Vert.x context (a ManagedExecutor or Flow task thread, depending on where the run was started). A new virtual
+	// thread has none, and unlike a ForkJoinPool thread it inherits the caller's context class loader, which a template's
+	// {config:...} lookup (ConfigProvider.getConfig()) needs in dev mode. The sender blocks until the mail server accepts
+	// the reply either way
 	private static void offCallerThread(Runnable send) {
 		try {
-			CompletableFuture.runAsync(send, ForkJoinPool.commonPool()).join();
+			CompletableFuture.runAsync(send, Thread::startVirtualThread).join();
 		}
 		catch (CompletionException e) {
 			throw (e.getCause() instanceof RuntimeException cause) ? cause : e;

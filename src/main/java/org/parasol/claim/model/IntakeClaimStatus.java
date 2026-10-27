@@ -1,4 +1,4 @@
-package org.parasol.intake;
+package org.parasol.claim.model;
 
 import io.quarkus.qute.TemplateEnum;
 
@@ -31,5 +31,16 @@ public enum IntakeClaimStatus {
 	@JsonValue
 	public String label() {
 		return this.label;
+	}
+
+	/**
+	 * Whether a claim with this status hasn't completed intake yet: it's waiting for a reviewer's decision or for the customer's
+	 * reply, so nothing else (the chat bot included) may act on it.
+	 *
+	 * @param status the claim's status, which is free text
+	 * @return {@code true} for {@code Pending Review} and {@code Pending Information}
+	 */
+	public static boolean isIntakeOpen(String status) {
+		return PENDING_REVIEW.label.equalsIgnoreCase(status) || PENDING_INFORMATION.label.equalsIgnoreCase(status);
 	}
 }

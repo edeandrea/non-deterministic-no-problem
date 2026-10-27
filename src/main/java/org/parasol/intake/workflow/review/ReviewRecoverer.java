@@ -7,7 +7,7 @@ import jakarta.enterprise.inject.Instance;
 import jakarta.transaction.Transactional;
 import jakarta.transaction.Transactional.TxType;
 
-import org.parasol.intake.IntakeClaimStatus;
+import org.parasol.claim.model.IntakeClaimStatus;
 import org.parasol.intake.model.ClaimIntakeState;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
 import org.parasol.intake.workflow.IntakeRun;

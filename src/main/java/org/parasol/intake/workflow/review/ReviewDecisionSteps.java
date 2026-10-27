@@ -11,7 +11,7 @@ import jakarta.transaction.Transactional;
 
 import org.parasol.claim.model.Claim;
 import org.parasol.claim.model.ClaimImage;
-import org.parasol.intake.IntakeClaimStatus;
+import org.parasol.claim.model.IntakeClaimStatus;
 import org.parasol.intake.model.ClaimIntakeState;
 import org.parasol.intake.reply.IntakeReplySender;
 import org.parasol.intake.reply.IntakeTemplates;
@@ -28,9 +28,9 @@ import io.serverlessworkflow.impl.WorkflowException;
  * The workflow's steps after a reviewer's decision, and the review wait's check that a decision is for its run. They make
  * no LLM call.
  * <p>
- *   Each commits the status change first and sends the email after it, so a send that fails after the commit only logs a
- *   problem (the claim has moved on; a retry would mean a second email). A fault before the commit puts the claim back for
- *   the reviewer to retry: {@link #restoreReview}.
+ *   Each commits the reviewed values and the status change together, then sends the email, so a send that fails after the
+ *   commit only logs a problem (the claim has moved on; a retry would mean a second email). A fault before the commit puts
+ *   the claim back for the reviewer to retry, with none of the reviewed values set: {@link #restoreReview}.
  * </p>
  */
 @ApplicationScoped
@@ -69,6 +69,7 @@ public class ReviewDecisionSteps {
 	@Transactional(TxType.REQUIRES_NEW)
 	public Snapshot applyReady(ReviewDecided decided, String runId) {
 		var intake = stateBeingDecided(decided, runId);
+		decided.decision().fields().applyTo(intake.claim);
 		intake.claim.status = IntakeClaimStatus.IN_PROCESS.label();
 		intake.decidingRunId = null;
 		intake.requestedItems = new HashSet<>();
@@ -79,6 +80,7 @@ public class ReviewDecisionSteps {
 	@Transactional(TxType.REQUIRES_NEW)
 	public Snapshot applyNeedsInformation(ReviewDecided decided, String runId) {
 		var intake = stateBeingDecided(decided, runId);
+		decided.decision().fields().applyTo(intake.claim);
 		intake.claim.status = IntakeClaimStatus.PENDING_INFORMATION.label();
 		intake.decidingRunId = null;
 		intake.requestedItems = new HashSet<>(decided.decision().missingItems());

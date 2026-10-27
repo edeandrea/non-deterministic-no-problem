@@ -16,7 +16,7 @@ import org.parasol.claim.model.ClaimCategory;
 import org.parasol.claim.model.ClaimImage;
 import org.parasol.claim.model.ClaimImageContentType;
 import org.parasol.claim.model.ClaimImageKind;
-import org.parasol.claim.rest.ClaimExceptionMappings.ProblemDetail;
+import org.parasol.problem.ProblemDetail;
 
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
@@ -166,7 +166,7 @@ class ClaimImageResourceTests {
 	private static void assertProblem(Response response, String expectedDetail, String expectedInstance) {
 		var problem = response.then()
 			.statusCode(Status.NOT_FOUND.getStatusCode())
-			.contentType(ClaimExceptionMappings.PROBLEM_JSON)
+			.contentType(ProblemDetail.MEDIA_TYPE)
 			.extract()
 			.as(ProblemDetail.class);
 

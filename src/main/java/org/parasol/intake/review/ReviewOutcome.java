@@ -10,7 +10,7 @@ public enum ReviewOutcome {
 	READY,
 
 	/**
-	 * The claim needs more information: it goes back to {@code Pending Information}, asking for the ticked items.
+	 * The claim needs more information: it goes back to {@code Pending Information}, asking for the checked items.
 	 */
 	NEEDS_INFORMATION
 }

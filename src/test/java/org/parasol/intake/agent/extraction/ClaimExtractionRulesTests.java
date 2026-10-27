@@ -114,9 +114,9 @@ class ClaimExtractionRulesTests {
 
 	@Test
 	void reviewerTickedItemsCanComeInAnyCollectionAndDuplicatesCollapse() {
-		var ticked = List.of(MissingItem.LOCATION, MissingItem.INCIDENT_DATE, MissingItem.LOCATION);
+		var checked = List.of(MissingItem.LOCATION, MissingItem.INCIDENT_DATE, MissingItem.LOCATION);
 
-		assertThat(ClaimExtractionRules.findMissingItems(extraction(COMPLETE), ticked, false))
+		assertThat(ClaimExtractionRules.findMissingItems(extraction(COMPLETE), checked, false))
 			.containsExactly(MissingItem.INCIDENT_DATE, MissingItem.LOCATION);
 	}
 

@@ -1,8 +1,8 @@
 import config from '@app/config';
 import { faCalendarDays, faCommentDots, faFaceSmile, faFileLines } from '@fortawesome/free-regular-svg-icons';
-import { faCaretDown, faLocationDot, faRectangleList, faShieldHalved, faUser } from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faLocationDot, faRectangleList, faShieldHalved, faTags, faUser } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { Accordion, AccordionContent, AccordionItem, AccordionToggle, Breadcrumb, BreadcrumbItem, Button, Card, CardBody, Divider, EmptyState, EmptyStateBody, EmptyStateFooter, EmptyStateHeader, EmptyStateIcon, Flex, FlexItem, Grid, GridItem, Label, Page, PageSection, Tab, Tabs, TabTitleText, Text, TextContent, TextVariants, Title } from '@patternfly/react-core';
+import { Accordion, AccordionContent, AccordionItem, AccordionToggle, Alert, Breadcrumb, BreadcrumbItem, Button, Card, CardBody, Divider, EmptyState, EmptyStateBody, EmptyStateFooter, EmptyStateHeader, EmptyStateIcon, Flex, FlexItem, Grid, GridItem, Page, PageSection, Tab, Tabs, TabTitleText, Text, TextContent, TextVariants, Title } from '@patternfly/react-core';
 import { ExclamationTriangleIcon } from '@patternfly/react-icons';
 import axios from 'axios';
 import * as React from 'react';
@@ -12,6 +12,9 @@ import { ClaimImage, imagesToDisplay } from '@app/utils/claimImages';
 import { isNotFound } from '@app/utils/httpErrors';
 import { Chat } from '../Chat/Chat';
 import { ImageCarousel } from '../ImageCarousel/ImageCarousel';
+import { StatusLabel } from '../StatusLabel/StatusLabel';
+import { PendingInformation } from './PendingInformation';
+import { ReviewDecisionResult, ReviewPanel } from './ReviewPanel';
 
 
 interface ClaimProps { }
@@ -54,6 +57,78 @@ const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
     return () => controller.abort();
   }, [claim_id]);
 
+  // A reviewer's decision is asynchronous (it returns once published, not once the claim changes), so once one is
+  // submitted, poll the claim until its status actually changes or 10 seconds pass
+  const [reviewMessage, setReviewMessage] = React.useState<string | null>(null);
+  const isMountedRef = React.useRef(false);
+  const timersRef = React.useRef<Set<number>>(new Set());
+
+  // Set on every mount, not just the first: StrictMode mounts, unmounts and mounts again in development
+  React.useEffect(() => {
+    const timers = timersRef.current;
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+      timers.forEach(timer => window.clearTimeout(timer));
+      timers.clear();
+    };
+  }, []);
+
+  const schedule = React.useCallback((callback: () => void, delayMs: number) => {
+    const timer = window.setTimeout(() => {
+      timersRef.current.delete(timer);
+      callback();
+    }, delayMs);
+    timersRef.current.add(timer);
+  }, []);
+
+  const pollClaimUntilChanged = React.useCallback((previousStatus: string, deadline: number) => {
+    axios.get(config.backend_api_url + `/db/claims/${claim_id}`)
+      .then(response => {
+        if (!isMountedRef.current) {
+          return;
+        }
+        setClaim(response.data);
+        if ((response.data.status !== previousStatus) || (Date.now() >= deadline)) {
+          setReviewMessage(null);
+        } else {
+          schedule(() => pollClaimUntilChanged(previousStatus, deadline), 1000);
+        }
+      })
+      .catch(() => {
+        if (isMountedRef.current) {
+          setReviewMessage(null);
+        }
+      });
+  }, [claim_id, schedule]);
+
+  // Bumped after a conflict so the review panel remounts, re-reading the review (its version) and the claim's values
+  const [reviewRevision, setReviewRevision] = React.useState(0);
+
+  const reloadAfterConflict = () => {
+    setReviewMessage('This claim changed; reloaded');
+
+    axios.get(config.backend_api_url + `/db/claims/${claim_id}`)
+      .then(response => {
+        if (isMountedRef.current) {
+          setClaim(response.data);
+          setReviewRevision(revision => revision + 1);
+        }
+      })
+      .catch(error => console.error(error))
+      .finally(() => schedule(() => setReviewMessage(null), 5000));
+  };
+
+  const handleReviewResult = (result: ReviewDecisionResult) => {
+    if (result === 'conflict') {
+      reloadAfterConflict();
+    } else {
+      setReviewMessage('Decision sent');
+      schedule(() => pollClaimUntilChanged(claim.status, Date.now() + 10000), 1000);
+    }
+  };
+
   const { originalImages, panelImages } = imagesToDisplay(images);
 
   // Tabs control
@@ -84,13 +159,56 @@ const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
     setIsChatOpen(!isChatOpen);
   };
 
-  // Custom render for the status
-  const labelColors = {
-        'Processed': 'green',
-        'New': 'blue',
-        'Denied': 'red',
-        'In Process': 'gold'
-    };
+  // Read-only while nobody is reviewing; a Pending Review claim shows the review form in its place
+  const summaryDetails = (
+                    <Grid span={12} hasGutter>
+                      <GridItem span={1} className='padding-top-25'>
+                        <FontAwesomeIcon icon={faCalendarDays} className='icon-circle' />
+                      </GridItem >
+                      <GridItem span={11} className='padding-top-25'>
+                        <TextContent>
+                          <Text component={TextVariants.h3}>Date and time</Text>
+                          <Text data-testid='incident-date-time'>{formatIncident(claim.incident_date, claim.incident_time) ?? 'Not processed yet'}</Text>
+                        </TextContent>
+                      </GridItem>
+                      <GridItem span={1} className='padding-top-25'>
+                        <FontAwesomeIcon icon={faTags} className='icon-circle' />
+                      </GridItem >
+                      <GridItem span={11} className='padding-top-25'>
+                        <TextContent>
+                          <Text component={TextVariants.h3}>Category</Text>
+                          <Text data-testid='claim-category'>{claim.category ? claim.category : 'Not processed yet'}</Text>
+                        </TextContent>
+                      </GridItem>
+                      <GridItem span={1} className='padding-top-25'>
+                        <FontAwesomeIcon icon={faLocationDot} className='icon-circle' />
+                      </GridItem >
+                      <GridItem span={11} className='padding-top-25'>
+                        <TextContent>
+                          <Text component={TextVariants.h3}>Location of event</Text>
+                          <Text>{claim.location ? claim.location : 'Not processed yet'}</Text>
+                        </TextContent>
+                      </GridItem>
+                      <GridItem span={1} className='padding-top-25'>
+                        <FontAwesomeIcon icon={faRectangleList} className='icon-circle' />
+                      </GridItem >
+                      <GridItem span={11} className='padding-top-25'>
+                        <TextContent>
+                          <Text component={TextVariants.h3}>Summary</Text>
+                          <Text>{claim.summary ? claim.summary : 'Not processed yet'}</Text>
+                        </TextContent>
+                      </GridItem>
+                      <GridItem span={1} className='padding-top-25'>
+                        <FontAwesomeIcon icon={faFaceSmile} className='icon-circle' />
+                      </GridItem >
+                      <GridItem span={11} className='padding-top-25'>
+                        <TextContent>
+                          <Text component={TextVariants.h3}>Customer Sentiment</Text>
+                          <Text>{claim.sentiment ? claim.sentiment : 'Not processed yet'}</Text>
+                        </TextContent>
+                      </GridItem>
+                    </Grid>
+  );
 
   if (claimNotFound) {
     return (
@@ -127,7 +245,7 @@ const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
                     </Title>
                   </FlexItem>
                   <FlexItem>
-                    <Label color={labelColors[String(claim.status)]}>{claim.status}</Label>
+                    <StatusLabel status={claim.status} />
                   </FlexItem>
                   <FlexItem align={{ default: 'alignRight' }}>
                     <TextContent>
@@ -152,6 +270,14 @@ const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
                     <Button className="disabled-link" variant="primary" isDisabled={true}>Edit</Button>
                   </FlexItem>
                 </Flex>
+                {reviewMessage && (
+                  <Flex>
+                    <FlexItem>
+                      <Alert variant="info" title={reviewMessage} isInline />
+                    </FlexItem>
+                  </Flex>
+                )}
+                {(claim.status === 'Pending Information') && <PendingInformation claimId={claim_id} />}
                 <Flex>
                   <FlexItem className='width-100'>
                     <Tabs
@@ -162,44 +288,9 @@ const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
                       role="region"
                     >
                       <Tab eventKey={0} title={<TabTitleText>Summary</TabTitleText>} aria-label="Summary">
-                        <Grid span={12} hasGutter>
-                          <GridItem span={1} className='padding-top-25'>
-                            <FontAwesomeIcon icon={faCalendarDays} className='icon-circle' />
-                          </GridItem >
-                          <GridItem span={11} className='padding-top-25'>
-                            <TextContent>
-                              <Text component={TextVariants.h3}>Date and time</Text>
-                              <Text data-testid='incident-date-time'>{formatIncident(claim.incident_date, claim.incident_time) ?? 'Not processed yet'}</Text>
-                            </TextContent>
-                          </GridItem>
-                          <GridItem span={1} className='padding-top-25'>
-                            <FontAwesomeIcon icon={faLocationDot} className='icon-circle' />
-                          </GridItem >
-                          <GridItem span={11} className='padding-top-25'>
-                            <TextContent>
-                              <Text component={TextVariants.h3}>Location of event</Text>
-                              <Text>{claim.location ? claim.location : 'Not processed yet'}</Text>
-                            </TextContent>
-                          </GridItem>
-                          <GridItem span={1} className='padding-top-25'>
-                            <FontAwesomeIcon icon={faRectangleList} className='icon-circle' />
-                          </GridItem >
-                          <GridItem span={11} className='padding-top-25'>
-                            <TextContent>
-                              <Text component={TextVariants.h3}>Summary</Text>
-                              <Text>{claim.summary ? claim.summary : 'Not processed yet'}</Text>
-                            </TextContent>
-                          </GridItem>
-                          <GridItem span={1} className='padding-top-25'>
-                            <FontAwesomeIcon icon={faFaceSmile} className='icon-circle' />
-                          </GridItem >
-                          <GridItem span={11} className='padding-top-25'>
-                            <TextContent>
-                              <Text component={TextVariants.h3}>Customer Sentiment</Text>
-                              <Text>{claim.sentiment ? claim.sentiment : 'Not processed yet'}</Text>
-                            </TextContent>
-                          </GridItem>
-                        </Grid>
+                        {(claim.status === 'Pending Review')
+                          ? <ReviewPanel key={`${claim_id}-${reviewRevision}`} claimId={claim_id} claim={claim} onDecisionResult={handleReviewResult} fallback={summaryDetails} />
+                          : summaryDetails}
                       </Tab>
                       <Tab eventKey={1} title={<TabTitleText>Insurance</TabTitleText>} aria-label="Insurance" isDisabled></Tab>
                       <Tab eventKey={2} title={<TabTitleText>Damages</TabTitleText>} aria-label="Damages" isDisabled></Tab>

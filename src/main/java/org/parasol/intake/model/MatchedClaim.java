@@ -1,9 +1,8 @@
 package org.parasol.intake.model;
 
 import java.util.Objects;
-import java.util.stream.Stream;
 
-import org.parasol.intake.IntakeClaimStatus;
+import org.parasol.claim.model.IntakeClaimStatus;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
@@ -68,8 +67,6 @@ public record MatchedClaim(String claimNumber, String status) {
 	 */
 	@JsonIgnore
 	public boolean isPending() {
-		return Stream.of(IntakeClaimStatus.PENDING_INFORMATION, IntakeClaimStatus.PENDING_REVIEW)
-			.map(IntakeClaimStatus::label)
-			.anyMatch(label -> label.equalsIgnoreCase(this.status));
+		return IntakeClaimStatus.isIntakeOpen(this.status);
 	}
 }

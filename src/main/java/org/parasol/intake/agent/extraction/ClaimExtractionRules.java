@@ -28,13 +28,13 @@ public final class ClaimExtractionRules {
 	 * <ul>
 	 * <li>any core field (description, incident date, location, category) has no value; {@code OTHER} counts as a
 	 * category, and an incident date that isn't a valid ISO date counts as no value</li>
-	 * <li>a reviewer ticked the item, and the customer's newest reply did not answer it</li>
-	 * <li>a reviewer ticked the item, and the newest reply is blank (it answers nothing, whatever the model says)</li>
+	 * <li>a reviewer checked the item, and the customer's newest reply did not answer it</li>
+	 * <li>a reviewer checked the item, and the newest reply is blank (it answers nothing, whatever the model says)</li>
 	 * </ul>
 	 * The incident time is optional and never missing.
 	 *
 	 * @param extraction the extraction result
-	 * @param requestedByReviewer items ticked by a reviewer under Needs More Information, in any collection (duplicates
+	 * @param requestedByReviewer items checked by a reviewer under Needs More Information, in any collection (duplicates
 	 * collapse); empty if none
 	 * @param replyIsBlank whether the newest reply's body (after quote stripping) is blank
 	 * @return the missing items in {@link MissingItem} declaration order (the order the reply templates list them in),

@@ -37,7 +37,7 @@ Steps → 2a).
   - no step contains observability code; the starter's `ConversationContext.callIn` is the intake's only one
   - the conversation core depends on no adapter, and the adapters don't depend on each other (layering test)
   - every customer-submission case gets a reply (the "Every submission gets a reply" list in `PLAN.md`)
-  - the matched claim wins; one "no matching claim" template; reviewer-ticked items gate completeness
+  - the matched claim wins; one "no matching claim" template; reviewer-checked items gate completeness
   - the policy check runs after the agents and creates nothing on rejection
   - a reply during review cancels the waiting run, and no Flow rows leak (in the app or in tests)
   - a reply during review and a decision are serialised by optimistic locking (race test)

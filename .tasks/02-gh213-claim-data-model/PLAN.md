@@ -277,7 +277,7 @@ Also confirmed: a natural-id `find` in the **same** session right after `persist
   - **No diagram changes:** `docs/*.puml` and `docs/design/*.puml` don't show claim fields (only the `claims` table
     name), and the design doc's references to "claim number" / "category (`Other` counts)" are still accurate.
   - **#213 issue body:** the "Spike first (open question)" section was replaced by "Spike outcome (decided)", the
-    seed bullet now says the INSERTs omit `claim_number`, and the documentation task is ticked. The local copy
+    seed bullet now says the INSERTs omit `claim_number`, and the documentation task is checked. The local copy
     `issue-02.md` was synced.
 - **Expected test-log noise (user decision, 2026-10-05: leave as is):** `ClaimTests` logs two WARNs on success, and neither is a failure.
   - `ARJUNA012125` + stack trace from `changingClaimNumberFailsTheFlush`. The test commits so it can also assert claim 1 keeps its

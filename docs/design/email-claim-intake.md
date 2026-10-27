@@ -58,7 +58,7 @@ workflow run**, and the steps below are that run's steps.
 9. The run files the email before it waits or ends. If any step fails, before or after the wait, a
    failure listener moves the email to a failed folder and the customer gets a "processing problem" reply.
 10. Later, and separately, the claims processor decides on the claim detail page, which wakes the
-    waiting run. **Ready** → `In Process` and a thank-you email. **Needs more information** (ticking
+    waiting run. **Ready** → `In Process` and a thank-you email. **Needs more information** (checking
     items) → `Pending Information` and an email listing exactly those items; the claim stays incomplete
     until the customer answers them, so an empty reply doesn't go straight back to review. Applying the
     decision makes no LLM call.
@@ -124,9 +124,13 @@ pause. All LLM agents use the `claim-intake` model. They're stateless (no chat m
 the policy PDF): the workflow passes the claim's history (correspondence, fields extracted so far, items
 requested) in on every run.
 
-**The review decision** (`POST /api/db/claims/{id}/review-decisions`) claims the review under the claim's
+**The review decision** (`POST /api/db/claims/{id}/review-decision`) claims the review under the claim's
 lock, checks that the claim's run is still waiting (404 if it's gone, 409 if it isn't waiting), and
 publishes the decision event. It returns once the event is published (202), and the waiting run applies it.
+The decision also carries the claim's fields as the reviewer confirmed or corrected them: every field is either given a
+value or asked of the customer, and nothing is published unless the claim is still `Pending Review` at the version the
+reviewer saw and the values fit the claim (400/409/422). The run sets them along with the new status. A separate
+`POST /api/db/claims/{id}/sentiment` re-runs only the sentiment agent for a claim under review.
 
 **Observability.** The goal is that every span of a claim's runs carries the same
 `gen_ai.conversation.id`, so Langfuse groups each claim into one session. One run is still several

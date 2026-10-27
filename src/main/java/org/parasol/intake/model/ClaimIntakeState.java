@@ -21,6 +21,7 @@ import jakarta.persistence.Version;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.parasol.claim.model.Claim;
+import org.parasol.claim.model.IntakeClaimStatus;
 import org.parasol.intake.MissingItem;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
@@ -70,7 +71,7 @@ public class ClaimIntakeState extends PanacheEntityBase {
 	public boolean policyNumberGenerated;
 
 	/**
-	 * What the customer was asked to supply: the details a new claim lacked, or the items a reviewer ticked. Empty unless the
+	 * What the customer was asked to supply: the details a new claim lacked, or the items a reviewer checked. Empty unless the
 	 * claim is {@code Pending Information}. The constant names are stored, not the labels.
 	 */
 	@ElementCollection(fetch = FetchType.EAGER)
@@ -79,6 +80,22 @@ public class ClaimIntakeState extends PanacheEntityBase {
 	@Enumerated(EnumType.STRING)
 	@OnDelete(action = OnDeleteAction.CASCADE)
 	public Set<MissingItem> requestedItems = new HashSet<>();
+
+	/**
+	 * Whether this row's own bookkeeping says a review is open: the claim is {@code Pending Review}, {@code reviewRunId}
+	 * is set, and no other decision is already in flight ({@code decidingRunId} unset). This alone isn't enough to know a
+	 * decision would actually succeed: {@code reviewRunId} is set in the workflow's {@code applyOutcome} step, before the
+	 * run has necessarily reached its {@code waitReview} wait and gone {@code WAITING} (it still sends the reply and
+	 * files the email first). Use {@code org.parasol.intake.review.ClaimReviewService#isReadyForDecision} for the live
+	 * check against the workflow.
+	 *
+	 * @return {@code true} if this row's bookkeeping says a review is open
+	 */
+	public boolean isOpenForReview() {
+		return IntakeClaimStatus.PENDING_REVIEW.label().equals(this.claim.status)
+			&& (this.reviewRunId != null)
+			&& (this.decidingRunId == null);
+	}
 
 	/**
 	 * Finds the intake state of a claim.

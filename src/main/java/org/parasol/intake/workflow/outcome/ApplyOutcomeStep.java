@@ -16,7 +16,7 @@ import org.parasol.claim.model.Claim;
 import org.parasol.claim.model.ClaimCorrespondence;
 import org.parasol.claim.model.ClaimImage;
 import org.parasol.claim.model.ClaimImageKind;
-import org.parasol.intake.IntakeClaimStatus;
+import org.parasol.claim.model.IntakeClaimStatus;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.agent.extraction.ClaimExtractionRules;
 import org.parasol.intake.agent.extraction.IsoValues;
