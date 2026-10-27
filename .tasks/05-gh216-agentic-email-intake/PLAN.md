@@ -98,10 +98,16 @@ Before starting any task, check each of these. **"Fixed" means released**, not m
    [#56805](https://github.com/quarkusio/quarkus/pull/56805)** — the OTel context-propagation provider doesn't restore
    a pool thread's context, which is why task 10b carries the `ThreadContextProvider` guard (Caveats → the two
    observability workarounds; evidence in follow-up spikes 3 and 4). The fix is in 4.0.0.Beta1; the 3.40 backport is
-   PR [#57879](https://github.com/quarkusio/quarkus/pull/57879). `gh pr view 57879 --repo quarkusio/quarkus --json
-   state,mergedAt,milestone`, then check whether a released 3.40.x we can move to carries it.
-   **If it ships in a 3.40.x (or we move to 4.0):** delete the guard class and its `META-INF/services` entry as part of
-   that task, and rely on spike 3's `managedExecutorPropagationIsClean` as the regression test.
+   PR [#57879](https://github.com/quarkusio/quarkus/pull/57879).
+   1. `gh pr view 57879 --repo quarkusio/quarkus --json state,mergedAt,milestone`: is the backport merged, and into
+      which 3.40.x milestone?
+   2. If merged, `gh release list --repo quarkusio/quarkus --limit 10`: is that 3.40.x released, and does the platform
+      (`io.quarkus.platform:quarkus-bom`) we pin have it?
+   **If it ships in a 3.40.x we can move to (or we move to 4.0):** as part of that task, bump the platform, delete
+   `ai.scoring.conversation.quarkus.OtelContextLeakGuard` and its
+   `META-INF/services/org.eclipse.microprofile.context.spi.ThreadContextProvider` entry, and run
+   `OtelContextLeakGuardTests` (keep it, as the regression test): it must pass without the guard. If it fails, the
+   fix isn't what we need; restore the guard and say so in the findings.
 2. **[quarkiverse/quarkus-langchain4j#2950](https://github.com/quarkiverse/quarkus-langchain4j/issues/2950) / PR
    [#2951](https://github.com/quarkiverse/quarkus-langchain4j/pull/2951)** — the agentic build check doesn't skip an
    agent's `InvocationParameters` parameter, so the root `ClaimsMailboxAgent` carries one it never uses
@@ -521,9 +527,10 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
 ### Caveats & Problems
 - Never hold a transaction open across an LLM call. Persist in a `@Transactional(REQUIRES_NEW)` method of its own (task 08 review: prefer `@Transactional` to `QuarkusTransaction`).
 - **Two observability workarounds with exit conditions:** the quarkus#54354 `ThreadContextProvider` guard (task 10b;
-  delete when quarkusio/quarkus#56805 ships) and the agentic conversation adapter (task 11; delete when
-  quarkus-flow#1056 is fixed). Re-check both, and #1057/#1058, whenever Quarkus or Flow is upgraded. The #54354 guard
-  is also a standing per-task check (Execution Steps → 2c), together with the other open upstream items.
+  delete when quarkusio/quarkus#56805 ships in 4.0, or its 3.40 backport #57879 in a 3.40.x we're on) and the agentic
+  conversation adapter (task 11; delete when quarkus-flow#1056 is fixed). Re-check both, and #1057/#1058, whenever
+  Quarkus or Flow is upgraded. The #54354 guard is also a standing per-task check (Execution Steps → 2c.1), together
+  with the other open upstream items.
   - **2026-10-09: #1056 is fixed in Flow 1.2.0, which task 06b adopts.** Task 11 now expects to drop both its Flow task
     proxy and the agentic adapter, after a concurrent test proves the baggage id reaches every span (see task 11's
     "Check first"). The quarkus#54354 guard stays: #56805 is in no 3.40 release yet (3.40.1 is the latest).
