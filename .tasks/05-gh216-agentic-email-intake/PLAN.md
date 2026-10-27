@@ -97,11 +97,17 @@ Before starting any task, check each of these. **"Fixed" means released**, not m
 1. **[quarkusio/quarkus#54354](https://github.com/quarkusio/quarkus/issues/54354) / PR
    [#56805](https://github.com/quarkusio/quarkus/pull/56805)** — the OTel context-propagation provider doesn't restore
    a pool thread's context, which is why task 10b carries the `ThreadContextProvider` guard (Caveats → the two
-   observability workarounds; evidence in follow-up spikes 3 and 4). The fix is in 4.0.0.Beta1 and labeled
-   `triage/backport-3.40`. `gh pr view 56805 --repo quarkusio/quarkus`, then check whether the backport is in a 3.40.x
-   we can move to.
-   **If it ships in a 3.40.x (or we move to 4.0):** delete the guard class and its `META-INF/services` entry as part of
-   that task, and rely on spike 3's `managedExecutorPropagationIsClean` as the regression test.
+   observability workarounds; evidence in follow-up spikes 3 and 4). The fix is in 4.0.0.Beta1; the 3.40 backport is
+   PR [#57879](https://github.com/quarkusio/quarkus/pull/57879).
+   1. `gh pr view 57879 --repo quarkusio/quarkus --json state,mergedAt,milestone`: is the backport merged, and into
+      which 3.40.x milestone?
+   2. If merged, `gh release list --repo quarkusio/quarkus --limit 10`: is that 3.40.x released, and does the platform
+      (`io.quarkus.platform:quarkus-bom`) we pin have it?
+   **If it ships in a 3.40.x we can move to (or we move to 4.0):** as part of that task, bump the platform, delete
+   `ai.scoring.conversation.quarkus.OtelContextLeakGuard` and its
+   `META-INF/services/org.eclipse.microprofile.context.spi.ThreadContextProvider` entry, and run
+   `OtelContextLeakGuardTests` (keep it, as the regression test): it must pass without the guard. If it fails, the
+   fix isn't what we need; restore the guard and say so in the findings.
 2. **[quarkiverse/quarkus-langchain4j#2950](https://github.com/quarkiverse/quarkus-langchain4j/issues/2950) / PR
    [#2951](https://github.com/quarkiverse/quarkus-langchain4j/pull/2951)** — the agentic build check doesn't skip an
    agent's `InvocationParameters` parameter, so the root `ClaimsMailboxAgent` carries one it never uses
@@ -118,6 +124,12 @@ Before starting any task, check each of these. **"Fixed" means released**, not m
    automatic swap.
 
 **Findings log (most recent check first; drop an item once it's resolved):**
+- **2026-10-27, before task 10b:** 2a — latest platform `quarkus-flow-bom` is still 3.40.1 (Flow 1.1.3); override stays.
+  2b — [#1111](https://github.com/quarkiverse/quarkus-flow/issues/1111) closed by PR #1115 (milestone 1.4.0), but
+  1.3.0 is still the latest release; input validation stays off. 2c.1 — the 3.40 backport of #56805 is
+  [#57879](https://github.com/quarkusio/quarkus/pull/57879) (open, not merged); 3.40.1 is the latest 3.40.x; the guard
+  stays. 2c.2 — 1.14.2 is still the latest quarkus-langchain4j release; the `InvocationParameters` workaround stays.
+  2c.3 — no change (0.3.0 still latest; the swap stays a separate decision).
 - **2026-10-26, before task 10:** 2a — latest platform `quarkus-flow-bom` is still 3.40.1 (Flow 1.1.3); override stays.
   2b — [#1111](https://github.com/quarkiverse/quarkus-flow/issues/1111) still open; `quarkus.flow.validation.input.enabled=false`
   stays. 2c.1 — [#56805](https://github.com/quarkusio/quarkus/pull/56805) merged for 4.0.0.Beta1 only, no 3.40.x backport
@@ -187,8 +199,8 @@ file's header link to it.**
 - [x] [task-08-intake-processor.md](task-08-intake-processor.md): The intake workflow and business rules (includes the human review) — **done**, squash-merged into `gh216-email-intake` as `ae2885c` ([#240](https://github.com/edeandrea/non-deterministic-no-problem/pull/240)) — issue [#255](https://github.com/edeandrea/non-deterministic-no-problem/issues/255) (includes task 07)
 - [x] [task-09-imap-idle-watcher.md](task-09-imap-idle-watcher.md): IMAP IDLE watcher — **done**, squash-merged into `gh216-email-intake` as `e41c44c` ([#245](https://github.com/edeandrea/non-deterministic-no-problem/pull/245)) — issue [#256](https://github.com/edeandrea/non-deterministic-no-problem/issues/256)
 - [x] [task-09b-flow-1-3-0.md](task-09b-flow-1-3-0.md): Adopt quarkus-flow 1.3.0, delete the agentic-run workaround and bump the container images (user decision, 2026-10-26) — task 08 found a quarkus-flow 1.2.0 leak when an agent throws on 2026-10-19 (workaround in `org.parasol.intake.agent`, upstream issue [quarkiverse/quarkus-flow#1096](https://github.com/quarkiverse/quarkus-flow/issues/1096), PR [#1095](https://github.com/quarkiverse/quarkus-flow/pull/1095)); 1.3.0 ships the fix — **done**, squash-merged into `gh216-email-intake` as `6d610b1` ([#264](https://github.com/edeandrea/non-deterministic-no-problem/pull/264)) — issue [#257](https://github.com/edeandrea/non-deterministic-no-problem/issues/257); found and filed a new upstream regression, [quarkiverse/quarkus-flow#1111](https://github.com/quarkiverse/quarkus-flow/issues/1111) (#1077's input validation breaks every generated agentic workflow), worked around in `application.yml`; otel-lgtm held back (no OpenShift cluster available here) — see Outcome
-- [x] [task-10-review-api-and-ui.md](task-10-review-api-and-ui.md): Review API and UI — done on `gh216/10-review-api-and-ui` (branch not yet pushed/PR'd) — issue [#258](https://github.com/edeandrea/non-deterministic-no-problem/issues/258); see Outcome
-- [ ] [task-10b-conversation-core.md](task-10b-conversation-core.md): Generic conversation context core (`ai.scoring.conversation`; changes the chat's scoring trigger) — issue [#259](https://github.com/edeandrea/non-deterministic-no-problem/issues/259)
+- [x] [task-10-review-api-and-ui.md](task-10-review-api-and-ui.md): Review API and UI — **done**, squash-merged into `gh216-email-intake` as `9647d24` ([#267](https://github.com/edeandrea/non-deterministic-no-problem/pull/267)) — issue [#258](https://github.com/edeandrea/non-deterministic-no-problem/issues/258); see Outcome
+- [x] [task-10b-conversation-core.md](task-10b-conversation-core.md): Generic conversation context core (`ai.scoring.conversation`; changes the chat's scoring trigger) — **done** on `gh216/10b-conversation-core` off the feature branch (not yet committed/PR'd; user decision 2026-10-27 dropped the straight-to-`main` exception) — issue [#259](https://github.com/edeandrea/non-deterministic-no-problem/issues/259); real-key suite left for the user: `ai.scoring.it.DriftDetectionTests`; see Outcome
 - [ ] [task-11-observability.md](task-11-observability.md): Observability for the intake workflow (Flow and agentic adapters) — issue [#260](https://github.com/edeandrea/non-deterministic-no-problem/issues/260)
 - [ ] [task-12-roundcube-e2e.md](task-12-roundcube-e2e.md): Roundcube end-to-end test — issue [#261](https://github.com/edeandrea/non-deterministic-no-problem/issues/261)
 - [ ] [task-13-demo-and-docs.md](task-13-demo-and-docs.md): Demo guide and documentation — issue [#262](https://github.com/edeandrea/non-deterministic-no-problem/issues/262)
@@ -213,9 +225,10 @@ file's header link to it.**
 > - **Each task also has a GitHub sub-issue of #216** (created retroactively 2026-10-26; see the Task Plan list above
 >   for the numbers). A task's PR body should also reference its sub-issue (e.g. "Part of #257"), and the sub-issue
 >   gets closed with a link to the merging PR, the same way #220–#245 were closed for tasks 01–09.
-> - **Task 10b is the exception:** it's complete on its own (the generic conversation core, the chat moved onto it
->   with no behavior change, the quarkus#54354 guard), so its PR goes **straight to `main`**. Merge `main` into the
->   feature branch afterwards, before task 11.
+> - **Task 10b is no longer an exception (user decision, 2026-10-27):** it was planned to go straight to `main`, but
+>   task 08's D1 (2026-10-11) put a minimal `ConversationContext` on the feature branch, which the intake already uses.
+>   A `main` PR would re-create that class (an add/add conflict on the next merge back) and has nothing on `main` to
+>   build on, so 10b branches off `gh216-email-intake` like every other task.
 > - **Keeping up with `main`:** merge `main` into the feature branch locally and push (no PR needed: the `main`
 >   ruleset doesn't cover it). Its required checks are strict, so the final PR must be up to date anyway.
 > - **Final PR** after task 14: `gh216-email-intake` → `main`, linking every task PR, merged with a **merge commit**
@@ -514,9 +527,10 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
 ### Caveats & Problems
 - Never hold a transaction open across an LLM call. Persist in a `@Transactional(REQUIRES_NEW)` method of its own (task 08 review: prefer `@Transactional` to `QuarkusTransaction`).
 - **Two observability workarounds with exit conditions:** the quarkus#54354 `ThreadContextProvider` guard (task 10b;
-  delete when quarkusio/quarkus#56805 ships) and the agentic conversation adapter (task 11; delete when
-  quarkus-flow#1056 is fixed). Re-check both, and #1057/#1058, whenever Quarkus or Flow is upgraded. The #54354 guard
-  is also a standing per-task check (Execution Steps → 2c), together with the other open upstream items.
+  delete when quarkusio/quarkus#56805 ships in 4.0, or its 3.40 backport #57879 in a 3.40.x we're on) and the agentic
+  conversation adapter (task 11; delete when quarkus-flow#1056 is fixed). Re-check both, and #1057/#1058, whenever
+  Quarkus or Flow is upgraded. The #54354 guard is also a standing per-task check (Execution Steps → 2c.1), together
+  with the other open upstream items.
   - **2026-10-09: #1056 is fixed in Flow 1.2.0, which task 06b adopts.** Task 11 now expects to drop both its Flow task
     proxy and the agentic adapter, after a concurrent test proves the baggage id reaches every span (see task 11's
     "Check first"). The quarkus#54354 guard stays: #56805 is in no 3.40 release yet (3.40.1 is the latest).

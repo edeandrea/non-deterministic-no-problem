@@ -50,8 +50,8 @@ use `CONVERSATION_ID_KEY` instead of its own private constant.
     - `endContext()` attaches `Context.root()` only when it's on another thread, there's no Vert.x context, and the
       current context is still the captured one (`==`)
     - `clearedContext()` is a no-op
-    - the Javadoc links quarkus#54354 and quarkusio/quarkus#56805 and says **delete this when the fix ships** (4.0, or
-      the 3.40 backport)
+    - the Javadoc links quarkus#54354, quarkusio/quarkus#56805 and its 3.40 backport quarkusio/quarkus#57879, and says
+      **delete this when the fix ships** (4.0, or a 3.40.x carrying #57879)
 
     This is the **one** core class that touches a Quarkus type (`QuarkusContextStorage`). Keep it in its own
     sub-package (e.g. `ai.scoring.conversation.quarkus`) so it's obvious it stays behind if the core is extracted.
@@ -59,7 +59,7 @@ use `CONVERSATION_ID_KEY` instead of its own private constant.
   - activate/deactivate through `ConversationContext` (same baggage key, same behavior)
   - on `ChatScopeEnded`, fire `ConversationEndedEvent`; it **no longer depends on `SessionScoringService`**
 - **Session scoring reacts to the event:** one `@ObservesAsync ConversationEndedEvent` observer (e.g.
-  `SessionScoringListener`, next to `SessionScoringService` in `ai.scoring.evaluation`) calls
+  `ConversationEndedScorer`, next to `SessionScoringService` in `ai.scoring.evaluation`) calls
   `SessionScoringService.scoreSession`. That replaces the `Infrastructure.getDefaultExecutor()` hand-off; the async
   observer runs on a worker thread, so the blocking poll in `LangfuseSessionScoringService` is still fine.
   - Keep `score-session` gating where it is (`LangfuseSessionScoringService`).
@@ -104,9 +104,34 @@ use `CONVERSATION_ID_KEY` instead of its own private constant.
 
 ## Done When
 
-- [ ] `ConversationContext`, `ConversationIdSpanProcessor`, `ConversationEndedEvent` and the async firing helper exist in `ai.scoring.conversation`, depending on no adapter.
-- [ ] The quarkus#54354 guard is registered, documented with its delete condition, and its regression test passes.
-- [ ] `ConversationalBaggageHandler` lives in the chat adapter, uses the core, fires `ConversationEndedEvent`, and no longer references `SessionScoringService`.
-- [ ] Session scoring runs from a single `@ObservesAsync ConversationEndedEvent` observer; failures are logged.
-- [ ] The layering test passes; the docs and diagrams match.
-- [ ] All the tests listed above pass under `-Pollama`; `PLAN.md` lists the real-key suites for the user to run.
+- [x] `ConversationContext`, `ConversationIdSpanProcessor`, `ConversationEndedEvent` and the async firing helper exist in `ai.scoring.conversation`, depending on no adapter.
+- [x] The quarkus#54354 guard is registered, documented with its delete condition, and its regression test passes.
+- [x] `ConversationalBaggageHandler` lives in the chat adapter, uses the core, fires `ConversationEndedEvent`, and no longer references `SessionScoringService`.
+- [x] Session scoring runs from a single `@ObservesAsync ConversationEndedEvent` observer; failures are logged.
+- [x] The layering test passes; the docs and diagrams match.
+- [x] All the tests listed above pass under `-Pollama`; `PLAN.md` lists the real-key suites for the user to run.
+
+## Outcome (2026-10-27)
+
+- **Branch:** `gh216/10b-conversation-core`, off `gh216-email-intake` @ `9647d24`, not off `main` as first planned
+  (user decision, 2026-10-27; see `PLAN.md` → Branching). Task 08's D1 `ConversationContext` was kept as is.
+- **Core:** `ConversationIdSpanProcessor`, `ConversationEndedEvent`, `ConversationEvents` (`ended(id)` → `fireAsync`,
+  logs a failed observer through JBoss Logging, so the core stays Quarkus-free). No `ConversationStartedEvent`: nothing
+  consumes it.
+- **Guard:** `ai.scoring.conversation.quarkus.OtelContextLeakGuard` is spike 4's class without the evidence counter.
+  Its Javadoc names the 3.40 backport, [quarkusio/quarkus#57879](https://github.com/quarkusio/quarkus/pull/57879) (open
+  on 2026-10-27), as a delete trigger alongside 4.0.
+- **Chat:** `ai.scoring.conversation.chat.ConversationalBaggageHandler` enters/leaves through
+  `ConversationContext.enter` and calls `ConversationEvents.ended`. `ConversationEndedScorer` (package-private, in
+  `ai.scoring.evaluation`) is the one observer. `score-session` gating is unchanged.
+- **Layering test:** `ConversationLayeringTests` reads each compiled class's constant pool with the JDK's
+  `java.lang.classfile` (no ArchUnit, no new dependency). No `pom.xml` change was needed: the span test reads the
+  application's own spans as the SDK's `ReadableSpan`.
+- **Tests:** `ConversationIdSpanProcessorTests` (3), `OtelContextLeakGuardTests` (2), `ConversationalBaggageHandlerTests`
+  (3), `ConversationEndedScorerTests` (2), `ConversationLayeringTests` (2), plus task 08's `ConversationContextTests` (5).
+  The full `-Pollama` suite passed: 496 tests, 0 failures, 1 skipped (`DriftDetectionTests`). The first full run
+  hit a one-off `NoHttpResponse` from the WireMock admin port in `ClaimReviewPanelPageTests.setUp`. It passed alone and
+  in a second full run.
+- **Real-key suites for the user:** `LangfuseSessionScoringServiceTests` and `ClaimWebsocketChatBotTests` now run
+  under `-Pollama` and passed. Only `ai.scoring.it.DriftDetectionTests` (the `drift` profile, real OpenAI and Cohere
+  keys) still needs a manual run.

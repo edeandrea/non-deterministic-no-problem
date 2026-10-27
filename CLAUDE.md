@@ -407,9 +407,13 @@ The three evaluation tiers (see `langfuse-evaluation.md` for the full rationale)
    (`langfuse-llm-as-a-judge`, `llm-as-judge`) — which is what stops the judge from scoring its own
    output — and `type` not in (`SPAN`, `EVENT`), so only generations get scored.
 2. **Session-level** — Langfuse has no session evaluation target, so this is custom code.
-   `ConversationalBaggageHandler` observes `ChatScopeStarted/Activated/Deactivated/Ended`,
-   propagates the conversation id as OTel baggage (`gen_ai.conversation.id`), and on session end
-   hands off to `SessionScoringService` on a background executor.
+   `ConversationalBaggageHandler` (the chat adapter, `ai.scoring.conversation.chat`) observes
+   `ChatScopeStarted/Activated/Deactivated/Ended`, makes the scope id the current conversation through
+   `ConversationContext` (OTel baggage, `gen_ai.conversation.id`), and on session end fires a
+   `ConversationEndedEvent` through `ConversationEvents.ended` (`fireAsync`; a failed observer is logged there).
+   `ConversationEndedScorer` (`ai.scoring.evaluation`) is the one `@ObservesAsync` observer: it calls
+   `SessionScoringService.scoreSession` on the async-observer worker thread, so the handler doesn't know scoring
+   exists. Only the chat fires the event today.
    `LangfuseSessionScoringService` polls Langfuse until the session's observations are ingested
    (OTel flush + async ClickHouse ingest), reconstructs `ConversationExchange`s, asks
    `SessionSentimentService` for a `SessionSentiment` (that AI service carries
@@ -472,6 +476,28 @@ name verbatim: `langchain4j.aiservices.<AiServiceClassName>.<methodName>`.
 All sides share `AiServiceAttributes.AI_SERVICES_PREFIX` — **if you change the naming on one side,
 change it on the others or drift detection silently finds no samples** (it returns `success` on
 `SampleLoadException`, so a broken name looks like a pass, not a failure).
+
+### Conversation core — `ai.scoring.conversation`
+
+Which work belongs to which conversation, and what happens when one ends. Generic and framework-neutral, ready to
+be extracted: the core depends only on the OTel API/SDK, CDI and MicroProfile Context Propagation (no Quarkus,
+LangChain4j, chat-scope or Flow types). Frameworks feed it through adapters in sub-packages; consumers observe its
+events and never call an adapter.
+
+- **Core:** `ConversationContext` (`currentId`, `enter`, `callIn`, `runIn`; the id is OTel baggage under
+  `CONVERSATION_ID_KEY` = `gen_ai.conversation.id`), `ConversationIdSpanProcessor` (copies the baggage entry onto every
+  span at `onStart`, read from the parent context; the same value quarkus-langfuse's processor writes, so Tempo and the
+  tests see it with Langfuse export off), `ConversationEndedEvent` and `ConversationEvents` (`fireAsync`, logging any
+  observer failure).
+- **Adapters:** `chat` (`ConversationalBaggageHandler`, chat scopes). Task 11 of #216 adds the Flow/agentic ones.
+- **`quarkus.OtelContextLeakGuard`** — a **temporary** `ThreadContextProvider` (registered in
+  `META-INF/services/org.eclipse.microprofile.context.spi.ThreadContextProvider`) working around quarkusio/quarkus#54354:
+  Quarkus's OTel context-propagation provider leaves a task's context, and its conversation id, on a pool thread.
+  **Delete it, and its services entry, once a Quarkus we're on ships quarkusio/quarkus#56805** (4.0, or the 3.40
+  backport quarkusio/quarkus#57879); `OtelContextLeakGuardTests` passing without it is the signal. It's the one class
+  touching a Quarkus type, which is why it has its own package.
+- **Layering is enforced** by `ConversationLayeringTests` (reads the compiled classes' constant pools with
+  `java.lang.classfile`): the core references no adapter or framework, adapters never reference each other.
 
 ### Models
 

@@ -72,7 +72,9 @@ rectangle "<$quarkus>\nParasol Application (single Quarkus container)" as App <<
 		}
 
 		rectangle "Tier 2 — session scoring (async, after chat ends)" as Tier2 <<Tier>> {
-			component "ConversationalBaggageHandler\n<i>ChatScopeStarted/Activated/</i>\n<i>Deactivated/Ended</i>" as Baggage
+			component "ConversationalBaggageHandler\n<i>ai.scoring.conversation.chat</i>\n<i>ChatScopeStarted/Activated/</i>\n<i>Deactivated/Ended</i>" as Baggage
+			component "ConversationEvents\n<i>ai.scoring.conversation (core)</i>\n<i>fireAsync ConversationEndedEvent,</i>\n<i>logs observer failures</i>" as ConvEvents
+			component "ConversationEndedScorer\n<i>@ObservesAsync ConversationEndedEvent</i>" as Scorer
 			component "LangfuseSessionScoringService\n<i>poll observations · build</i>\n<i>ConversationExchanges · datasets</i>" as SessionScoring
 			component "<$robot>\nSessionSentimentService\n<i>model: session-sentiment</i>" as Sentiment
 		}
@@ -134,7 +136,9 @@ Evaluator -up-> Cohere : <<sync HTTP>> judge verdict
 
 ' Tier wiring
 ClaimService .right.> Baggage : @ChatScoped CDI events
-Baggage .down.> SessionScoring : ChatScopeEnded\n<i>Infrastructure.getDefaultExecutor()</i>
+Baggage .down.> ConvEvents : ChatScopeEnded\n<i>ended(conversationId)</i>
+ConvEvents .down.> Scorer : ConversationEndedEvent\n<i>async observer, worker thread</i>
+Scorer -down-> SessionScoring : scoreSession(conversationId)
 SessionScoring -right-> Sentiment : evaluate(exchanges)
 ClaimService .down.> Drift : @OutputGuardrails
 Drift -right-> SampleLoader : load samples\n<i>via SampleLoader SPI</i>

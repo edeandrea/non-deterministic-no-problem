@@ -116,7 +116,8 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 	 * Implemented as a Mutiny pipeline and then collapsed back to blocking with {@code await()}, purely because
 	 * {@code retry().withBackOff().expireIn()} expresses "poll until condition or deadline" more clearly than a
 	 * hand-rolled loop with sleeps, deadline arithmetic and interrupt handling. This method is always called on a
-	 * background worker thread (see {@code ConversationalBaggageHandler}), so blocking here is fine.
+		 * background worker thread (the async {@code ConversationEndedEvent} observer, {@code ConversationEndedScorer}), so
+	 * blocking here is fine.
 	 */
 	private List<ObservationV2> awaitSessionObservations(String conversationId) {
 		var sessionConfig = this.langfuseConfig.evaluation().session();
