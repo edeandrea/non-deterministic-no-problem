@@ -83,7 +83,7 @@ rectangle "AI replacing software\n<i>code a developer used to write</i>" as Soft
 ' =====================================================================
 rectangle "ai.scoring — AI quality layer\n<i>how we test a non-deterministic system</i>" as Scoring <<Scoring>> {
 	component "Tier 1\nLangfuseEvaluationInitializer\n<i>provisions the Langfuse</i>\n<i>LLM-as-a-judge (Gemini)</i>" as Tier1
-	component "Tier 2\nConversationalBaggageHandler ->\nLangfuseSessionScoringService ->\nSessionSentimentService" as Tier2
+	component "Tier 2\nConversationalBaggageHandler ->\nConversationEndedEvent ->\nConversationEndedScorer ->\nLangfuseSessionScoringService ->\nSessionSentimentService" as Tier2
 	component "Tier 3\nDriftDetectionOutputGuardrail +\nLangfuseDatasetSampleLoader +\nEvaluator / EvaluatorAgent" as Tier3
 }
 
