@@ -38,11 +38,9 @@ import com.langfuse.api.scores.ScoresApi.APIScoresGetManyRequest;
 import io.quarkiverse.langchain4j.chatscopes.ChatScopeEnded;
 import io.quarkiverse.langchain4j.chatscopes.LocalChatRoutes;
 import io.quarkiverse.langfuse.api.LangfuseOperations;
-import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 
 @QuarkusTest
 @TestProfile(LangfuseExportTestProfile.class)
-@ConnectWireMock
 class LangfuseSessionScoringServiceTests {
 	private static final String OPENAI_RESPONSE = """
 		{

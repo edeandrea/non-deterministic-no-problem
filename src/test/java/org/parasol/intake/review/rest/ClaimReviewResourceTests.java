@@ -35,7 +35,6 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.junit.mockito.InjectSpy;
 
-import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 import io.serverlessworkflow.impl.WorkflowInstance;
@@ -48,7 +47,6 @@ import io.serverlessworkflow.impl.WorkflowStatus;
  */
 @QuarkusTest
 @TestProfile(StubbedModelsTestProfile.class)
-@ConnectWireMock
 class ClaimReviewResourceTests extends IntakeFlowTestBase {
 	// A seeded claim, never Pending Review: no intake state exists for it, so the review is never open
 	private static final long NEVER_REVIEWED_CLAIM_ID = 1L;

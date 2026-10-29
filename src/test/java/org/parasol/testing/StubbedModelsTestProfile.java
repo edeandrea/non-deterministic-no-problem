@@ -10,6 +10,8 @@ import org.parasol.testing.mail.ToxiproxyTestResource;
 
 import io.quarkus.test.junit.QuarkusTestProfile;
 
+import io.quarkiverse.wiremock.devservice.ConnectWireMock;
+
 /**
  * The one profile for every test whose models are stubbed or never called: the intake tests, the tests of what the intake
  * stores, and the drift and Langfuse dataset tests. Stubbed API keys, no Easy RAG ingestion at boot, and the {@code claim-intake},
@@ -32,8 +34,13 @@ import io.quarkus.test.junit.QuarkusTestProfile;
  *   <li><b>Spans exported every 100 ms</b>, so {@link WorkflowSpans} sees a run's span soon after it ends.</li>
  *   <li><b>A Toxiproxy container</b> ({@link ToxiproxyTestResource}) for the tests that cut the watcher's connection. It's a
  *   test resource of the profile, so it starts once with the profile's one boot.</li>
+ *   <li><b>{@code @ConnectWireMock} on the profile</b>, not on the test classes: it's a test resource, and Quarkus restarts the
+ *   application whenever two classes' test resources differ, so a class with it and one without would each boot. Quarkus reads
+ *   test resource annotations on the profile class too, which gives every class on the profile (and its subclasses) the same
+ *   set. A {@code WireMock} field in a test class is still injected.</li>
  * </ul>
  */
+@ConnectWireMock
 public class StubbedModelsTestProfile implements QuarkusTestProfile {
 	/**
 	 * The model name every stubbed {@code claim-intake} request carries, under every profile.

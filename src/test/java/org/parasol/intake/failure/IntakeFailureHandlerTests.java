@@ -13,7 +13,6 @@ import org.parasol.intake.IntakeFlowTestBase;
 import org.parasol.intake.mailbox.MailFolder;
 import org.parasol.testing.StubbedModelsTestProfile;
 
-import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 
@@ -23,7 +22,6 @@ import io.quarkus.test.junit.TestProfile;
  */
 @QuarkusTest
 @TestProfile(StubbedModelsTestProfile.class)
-@ConnectWireMock
 class IntakeFailureHandlerTests extends IntakeFlowTestBase {
 	@Test
 	void anEmailWithoutAMessageIdIsFailedWithAProblemReplyAndNoRun() {

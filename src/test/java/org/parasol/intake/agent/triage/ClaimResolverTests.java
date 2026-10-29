@@ -22,11 +22,9 @@ import com.github.tomakehurst.wiremock.client.WireMock;
 import dev.langchain4j.model.output.structured.Description;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
-import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 
 @QuarkusTest
 @TestProfile(StubbedModelsTestProfile.class)
-@ConnectWireMock
 class ClaimResolverTests {
 	private static final String RESOLVE = "Decide which of the customer's pending claims the following email is about";
 	private static final List<PendingClaim> PENDING = List.of(

@@ -14,7 +14,7 @@ import com.github.tomakehurst.wiremock.client.WireMock;
 
 /**
  * Shared setup of the intake workflow tests. Each subclass carries the annotations ({@code @QuarkusTest},
- * {@code @TestProfile(StubbedModelsTestProfile.class)}, {@code @ConnectWireMock}) so every class shares one app boot.
+ * {@code @TestProfile(StubbedModelsTestProfile.class)}) so every class shares one app boot; the profile connects WireMock.
  * <p>
  *   Stubs match on a prompt phrase (which agent) and a marker in the email (which test), so each email is stubbed on its own.
  * </p>

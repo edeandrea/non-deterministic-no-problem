@@ -26,14 +26,12 @@ import com.github.tomakehurst.wiremock.client.WireMock;
 import dev.langchain4j.model.output.structured.Description;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
-import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 
 /**
  * The root agent end to end against a stubbed model: classify, route, and each branch's outcome.
  */
 @QuarkusTest
 @TestProfile(StubbedModelsTestProfile.class)
-@ConnectWireMock
 class ClaimsMailboxAgentTests {
 	private static final String SENT_DATE = "2026-10-08";
 	private static final IncidentDetails NOTHING_YET = new IncidentDetails(null, null, null, null, null, null, Set.of());

@@ -27,7 +27,6 @@ import com.github.tomakehurst.wiremock.client.WireMock;
 import dev.langchain4j.guardrails.JsonExtractorOutputGuardrail;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
-import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 
 /**
  * A failed root invocation leaves none of the Flow runs quarkus-flow generated for it, and no worker thread blocked in
@@ -38,7 +37,6 @@ import io.quarkiverse.wiremock.devservice.ConnectWireMock;
  */
 @QuarkusTest
 @TestProfile(StubbedModelsTestProfile.class)
-@ConnectWireMock
 class FailedAgenticSystemTests {
 	// Where a generated workflow's task waits for its agent call: FlowPlanner.executeAgent(i).join()
 	private static final String AGENT_CALL_CLASS = "io.quarkiverse.flow.langchain4j.workflow.flow.AgenticFlow";

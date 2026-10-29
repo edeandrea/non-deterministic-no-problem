@@ -28,7 +28,6 @@ import com.microsoft.playwright.assertions.LocatorAssertions;
 import com.microsoft.playwright.assertions.PlaywrightAssertions;
 import com.microsoft.playwright.options.AriaRole;
 
-import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
@@ -40,7 +39,6 @@ import io.quarkus.test.junit.TestProfile;
  */
 @QuarkusTest
 @TestProfile(UiTestProfile.class)
-@ConnectWireMock
 class ClaimReviewPanelPageTests extends PlaywrightTests {
 	private static final String SENDER = "jane.doe@example.com";
 	private static final String SENDER_NAME = "Jane Doe";

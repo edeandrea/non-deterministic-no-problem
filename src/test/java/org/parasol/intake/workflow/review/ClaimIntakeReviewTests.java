@@ -27,7 +27,6 @@ import org.parasol.intake.review.ReviewOutcome;
 import org.parasol.intake.review.ReviewedFields;
 import org.parasol.testing.StubbedModelsTestProfile;
 
-import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.junit.mockito.InjectSpy;
@@ -38,7 +37,6 @@ import io.serverlessworkflow.impl.WorkflowStatus;
  */
 @QuarkusTest
 @TestProfile(StubbedModelsTestProfile.class)
-@ConnectWireMock
 class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 	private static final Duration DECISION_DELAY = Duration.ofSeconds(6);
 

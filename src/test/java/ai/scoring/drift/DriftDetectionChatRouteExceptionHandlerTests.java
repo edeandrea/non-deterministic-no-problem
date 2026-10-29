@@ -29,7 +29,6 @@ import com.github.tomakehurst.wiremock.client.WireMock;
 import dev.langchain4j.guardrail.OutputGuardrail;
 import dev.langchain4j.guardrail.OutputGuardrailRequest;
 import io.quarkiverse.langchain4j.chatscopes.LocalChatRoutes;
-import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 
 /**
  * End-to-end: a drift failure raised by the guardrail on {@code ClaimService.chat} must reach the websocket client
@@ -41,7 +40,6 @@ import io.quarkiverse.wiremock.devservice.ConnectWireMock;
  */
 @QuarkusTest
 @TestProfile(StubbedModelsTestProfile.class)
-@ConnectWireMock
 class DriftDetectionChatRouteExceptionHandlerTests {
 	private static final DriftDetectionException DRIFT = DriftDetectionException.builder()
 		.sampleSetName("langchain4j.aiservices.ClaimService.chat")

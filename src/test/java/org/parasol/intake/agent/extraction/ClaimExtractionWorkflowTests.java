@@ -33,7 +33,6 @@ import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
 import dev.langchain4j.guardrails.JsonExtractorOutputGuardrail;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
-import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 
 /**
  * The extraction workflow end to end against a stubbed model. Stubs match on the last message only (spike Q6), so a
@@ -41,7 +40,6 @@ import io.quarkiverse.wiremock.devservice.ConnectWireMock;
  */
 @QuarkusTest
 @TestProfile(StubbedModelsTestProfile.class)
-@ConnectWireMock
 class ClaimExtractionWorkflowTests {
 	private static final String SENT_DATE = "2026-10-08";
 	private static final String SUMMARY = "The claimant's car hit another vehicle at the Elm Street junction.";
