@@ -69,12 +69,12 @@ failure seen on the user's machine, whose cause is not found (see "Open" below).
    - Final hardened diagnostic against the current `folderLock`: 89 passes and one inconclusive invocation across default, `ollama`, and `ollama-openai`; all six final unsafe-policy controls failed as expected. The diagnostic remains opt-in, not an automatic CI guard. See the investigation's final adaptation verification.
    - Recommendation, not an additional user decision: retain the current fair read/write policy rather than introduce `StampedLock`. Its optimistic mode cannot protect a live IMAP fetch from concurrent expunge; ordinary stamped read/write locking offers no demonstrated benefit and loses fairness and reentrancy. This is API reasoning, not a measured `StampedLock` comparison.
 5. **Mail spans, metrics and failure attribution:** `@MailClientSpan` and `MailClientSpanInterceptor` (IMAP and SMTP `CLIENT` spans, no PII; a checked exception also ends the span in error); the OTel context wrapped onto the reply thread; `IntakeActivity` events published through `IntakeActivities` (logs and swallows an observer's failure, so telemetry can't change what the intake does) and observed by `IntakeMetrics`. `EmailHandled` is counted once, when the email is filed. `claim.intake.failures` carries `stage` and `outcome` (`fatal` or `recovered`). The stage comes from the exception: `MailboxMoveException` (`move`), `ReplyFailedException` (`reply`), `ProcessingEmailMissingException` (`fetch`); the package rules cover the rest.
-6. **Retention and test switches:** `ClaimsMailboxAgent extends MonitoredAgent`; `AgentMonitorConfigurer` sets retention to 0 outside dev mode. `%test` leaves the Langfuse span processor out; `SessionScoringTestProfile` and `LangfuseDeliveryProfile` turn it back on.
+6. **Retention and test switches:** `ClaimsMailboxAgent extends MonitoredAgent`; `AgentMonitorConfigurer` sets retention to 0 outside dev mode. *(Commented out 2026-10-29 until langchain4j/langchain4j#6885 and #6913 are released; see the open item's resolution below.)* `%test` leaves the Langfuse span processor out; `SessionScoringTestProfile` and `LangfuseDeliveryProfile` turn it back on (merged into `LangfuseExportTestProfile` by #273).
 7. **Langfuse delivery test (`IntakeLangfuseDeliveryTests`):** real Langfuse Dev Services ingestion for the custom `AI_ONLY` filtering, AGENT/CHAIN typing and session grouping across two exports. Tempo, Loki and Prometheus delivery is not covered.
 8. **Inbox watcher lifecycle lock (2026-10-29):** `ClaimsInboxWatcher.start()` and `stop()` no longer use `synchronized`; both take a private `ReentrantLock` (`lifecycle`). `stop()` holds it while it waits for the in-flight step, so a `start()` can't begin a session while the previous one drains. Behavior is unchanged. Only `ClaimsInboxWatcherTests` (16 tests) was run after this change; no test starts and stops the watcher concurrently.
 
 ### Open
-- **Default-profile `IntakeSpanPropagationTests` failure on the user's machine; cause not found.** In the first batch of 8 concurrent runs, 72 spans
+- **Default-profile `IntakeSpanPropagationTests` failure on the user's machine. Cause found 2026-10-29, see "Resolved" below this item.** In the first batch of 8 concurrent runs, 72 spans
   (the three parallel branches' model calls and `langchain4j.aiservices.*` spans for 8 runs) have no conversation id and sit in traces of their
   own; everything else keeps its id. The same 3 failures and 1 error appeared in 3 of 4 default-profile full runs on the user's machine
   (`user-verify.log`, `-2`, `-4`) and in none of the others: a default-profile full run there with the embeddings cache ignored (`-3`), a
@@ -87,6 +87,16 @@ failure seen on the user's machine, whose cause is not found (see "Open" below).
   `OtelContextLeakGuard` run on the fork's threads could differ per boot. The guard's comment claims either order is fine; that isn't verified
   for the parallel fork. Testing it means logging the order at boot and running the class without the guard's `META-INF/services` entry.
   Not pursued yet; whether to is the user's call.
+  - **Resolved (2026-10-29): not context propagation, the agent monitor.** It failed in CI too (#270's run on `858c71f`, ollama-openai job only).
+    Flow runs the parallel extraction agents on LangChain4j's executor (`PlannerBasedInvocationHandler.parallelExecution`) and activates the
+    run's OTel context on their threads from `FlowAgentContextListener.beforeAgentInvocation`. The `AgentMonitor` that `extends MonitoredAgent`
+    adds sits in the same `ComposedAgentListener`, throws `No ongoing parent invocation found for agent ID: extractClaim` for those agents on
+    every run (langchain4j/langchain4j#6885), and the composed listener stops at the first listener that throws. Its listeners are a
+    `HashSet`, so the order is fixed for a boot and differs between boots, which is why some boots failed and others didn't. The 72 spans are
+    8 runs × 3 agents × 3 spans. The SmallRye Context Propagation lead above was the wrong `HashSet`. Filed upstream as
+    langchain4j/langchain4j#6913, with PR #6914 (notify every listener, then rethrow). Until both fixes are released, `extends MonitoredAgent`,
+    `AgentMonitorConfigurer` and its test are commented out (user decision 2026-10-29: comment out, don't delete); `PLAN.md` 2c item 6 tracks
+    restoring them.
 
 
 ## The conversation id

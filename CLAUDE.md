@@ -512,8 +512,13 @@ events and never call an adapter.
     `IntakeActivityEvents.into(registry)` (test; it builds the package-private `IntakeMetrics` over that `MeterRegistry`) for its `IntakeActivities`. An annotation couldn't carry the tags, which the code computes (an outcome, a template, a status).
   - Log lines from a step carry `traceId`/`spanId` in the MDC (Quarkus does that). Flow's own lifecycle logs don't (quarkus-flow#1013).
   - Flow's persistence emits about 58 root traces per run. They are kept and unsampled.
-  - `ClaimsMailboxAgent extends MonitoredAgent`, and `AgentMonitorConfigurer` sets the monitor's retention to 0 unless `LaunchMode.DEVELOPMENT`
-    (the monitor otherwise keeps every execution, correspondence included, forever).
+  - **`ClaimsMailboxAgent`'s `extends MonitoredAgent` is commented out**, with `AgentMonitorConfigurer` (which set the monitor's retention to 0
+    unless `LaunchMode.DEVELOPMENT`; the monitor otherwise keeps every execution, correspondence included, forever) and its test, so the
+    agentic Dev UI doesn't show the intake. The monitor throws `No ongoing parent invocation found` for the parallel extraction agents
+    (langchain4j/langchain4j#6885), and `ComposedAgentListener` stops at the first listener that throws, in `HashSet` order
+    (langchain4j/langchain4j#6913). In the boots where the monitor came first, Flow's `FlowAgentContextListener` never activated the run's
+    OTel context on those agents' threads, and their spans lost the run's trace and conversation id (`IntakeSpanPropagationTests` failed in
+    some boots only). Restore all three together once the fixes are released: `.tasks/05-gh216-agentic-email-intake/PLAN.md`, 2c item 6.
   - `%test` sets `quarkus.langfuse.otel.enabled: false` (build time; only the span processor goes), re-enabled in `org.parasol.testing.LangfuseExportTestProfile`.
   - Metrics: `claim.intake.emails{outcome}`, `.claim.status.transitions{status}`, `.replies{template}`, `.review.decisions{decision}`, the `.review.wait` timer,
     `.failures{stage,exception,outcome}` (`outcome` is `fatal` for a run that faulted, `recovered` for a decision that couldn't be applied (the claim goes back in review) or whose email couldn't be sent (`ReviewDecisionSteps` fires these, since neither reaches `IntakeFailureHandler`); `stage` is `fetch`, `move`, `agent`, `persist`, `reply` or `unknown`: the mailbox throws `MailboxMoveException` for a change and the reply sender wraps every send failure or timeout in `ReplyFailedException`, so the stage names the operation, not the library underneath), gauges `.reviews.pending` (a DB count) and `.watcher.connected`, counter `.watcher.reconnects`.

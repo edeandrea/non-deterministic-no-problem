@@ -14,7 +14,8 @@ import dev.langchain4j.agentic.agent.ErrorContext;
 import dev.langchain4j.agentic.agent.ErrorRecoveryResult;
 import dev.langchain4j.agentic.declarative.ErrorHandler;
 import dev.langchain4j.agentic.declarative.SequenceAgent;
-import dev.langchain4j.agentic.observability.MonitoredAgent;
+// Restore with `extends MonitoredAgent` below
+// import dev.langchain4j.agentic.observability.MonitoredAgent;
 import dev.langchain4j.invocation.InvocationParameters;
 
 /**
@@ -24,10 +25,15 @@ import dev.langchain4j.invocation.InvocationParameters;
  * persistence, mail and folder moves. There's no {@code @MemoryId}: every agent is stateless, and the history comes in
  * as arguments.
  * <p>
- * It is a {@link MonitoredAgent} so that {@link AgentMonitorConfigurer} can bound what the agent monitor keeps: outside dev mode, nothing.
+ * It isn't a {@code MonitoredAgent} for now, so the agentic Dev UI doesn't show it. The {@code AgentMonitor} that comes with
+ * one throws for the parallel extraction agents (langchain4j/langchain4j#6885), and {@code ComposedAgentListener} then skips
+ * the other agent listeners, Flow's context listener included (langchain4j/langchain4j#6913). In the boots where the monitor
+ * is notified first, those agents' spans lose their run's trace and conversation id. Restore {@code extends MonitoredAgent}
+ * and {@code AgentMonitorConfigurer} (which bounds what the monitor keeps: outside dev mode, nothing) together once both
+ * fixes are released ({@code .tasks/05-gh216-agentic-email-intake/PLAN.md}, 2c).
  * </p>
  */
-public interface ClaimsMailboxAgent extends MonitoredAgent {
+public interface ClaimsMailboxAgent /* extends MonitoredAgent */ {
 	/**
 	 * Decides what to do with an inbound email.
 	 *

@@ -138,6 +138,26 @@ Before starting any task, check each of these. **"Fixed" means released**, not m
 5. **[quarkiverse/quarkus-langfuse#160](https://github.com/quarkiverse/quarkus-langfuse/issues/160) — resolved in the adopted 0.9.1.**
    The `AI_ONLY` filter now retains `langfuse.observation.*` attributes. Removed the synthetic `gen_ai.operation.name=chain`
    from `LangfuseFlowSpanTypingProcessor`; retained `langfuse.observation.type=chain` and updated its assertions.
+6. **[langchain4j/langchain4j#6885](https://github.com/langchain4j/langchain4j/issues/6885) / PR
+   [#6886](https://github.com/langchain4j/langchain4j/pull/6886) and
+   [langchain4j/langchain4j#6913](https://github.com/langchain4j/langchain4j/issues/6913) / PR
+   [#6914](https://github.com/langchain4j/langchain4j/pull/6914)** *(added 2026-10-29)*. `MonitoredAgent` is commented out
+   on `ClaimsMailboxAgent`, along with `AgentMonitorConfigurer` and `AgentMonitorConfigurerTests.theAgentMonitorRetainsNothingOutsideDevMode`.
+   The `AgentMonitor` throws `No ongoing parent invocation found for agent ID: extractClaim` for the parallel extraction agents
+   (#6885). `ComposedAgentListener` keeps its listeners in a `HashSet` and stops at the first one that throws (#6913), so in
+   the boots where the monitor comes first, Flow's `FlowAgentContextListener` never activates the run's OTel context on those
+   agents' threads. That was task 11's open `IntakeSpanPropagationTests` failure: 72 spans (8 runs × 3 agents × 3 spans) with
+   no conversation id, in traces of their own, in some boots only.
+   1. `gh pr view 6886 --repo langchain4j/langchain4j --json state,mergedAt` and the same for `6914`: merged?
+   2. If merged, `gh release list --repo langchain4j/langchain4j --limit 5`: released? Then check which `langchain4j-agentic`
+      the quarkus-langchain4j version we can move to brings in (`./mvnw dependency:tree -Dincludes=dev.langchain4j:langchain4j-agentic`).
+   **If both fixes ship in a `langchain4j-agentic` we can move to:** uncomment `extends MonitoredAgent` (and its import) on
+   `ClaimsMailboxAgent`, `AgentMonitorConfigurer` and the monitor test, and restore CLAUDE.md's `MonitoredAgent` note. Then run
+   `IntakeSpanPropagationTests` across several separate boots (one `./mvnw test -Dtest=IntakeSpanPropagationTests` each):
+   it must pass every time, and the log must have no `No ongoing parent invocation found`. **If only #6914 ships:** the
+   monitor still throws (and still misses the parallel branches in the Dev UI), but no longer skips Flow's listener. Restoring
+   it is then the user's call.
+
    Verified at runtime on 2026-10-29 in a `-Pollama` full run on the user's machine: `LangfuseFlowSpanTypingProcessorTests`,
    `IntakeSpanPropagationTests` and `IntakeLangfuseDeliveryTests` passed.
 
