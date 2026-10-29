@@ -12,11 +12,7 @@ import java.util.Set;
 
 
 import org.awaitility.Awaitility;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInfo;
-import org.mockito.Mockito;
 import org.parasol.intake.IntakeFlowTestBase;
 import org.parasol.intake.IntakeScenario;
 import org.parasol.intake.IntakeScenario.Mail;
@@ -29,9 +25,6 @@ import org.parasol.intake.review.ReviewOutcome;
 import org.parasol.intake.review.ReviewedFields;
 import org.parasol.testing.StubbedModelsTestProfile;
 
-import io.quarkus.arc.Arc;
-import io.quarkus.arc.ClientProxy;
-import io.quarkus.logging.Log;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.junit.mockito.InjectSpy;
@@ -47,28 +40,6 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 
 	@InjectSpy
 	ReviewDecisionSteps decisionSteps;
-
-	// TEMPORARY DIAGNOSTICS (#270): which ReviewDecisionSteps the flow reaches in CI. Remove before merging
-	@BeforeEach
-	void diagnoseBefore(TestInfo testInfo) {
-		var proxy = Arc.container().instance(ReviewDecisionSteps.class).get();
-		Log.infof("DIAG before %s: spy=%s proxyTarget=%s stubbings=%s",
-			testInfo.getDisplayName(),
-			System.identityHashCode(this.decisionSteps),
-			System.identityHashCode(ClientProxy.unwrap(proxy)),
-			Mockito.mockingDetails(this.decisionSteps).getStubbings());
-	}
-
-	@AfterEach
-	void diagnoseAfter(TestInfo testInfo) {
-		var proxy = Arc.container().instance(ReviewDecisionSteps.class).get();
-		Log.infof("DIAG after %s: spy=%s proxyTarget=%s invocations=%s stubbings=%s",
-			testInfo.getDisplayName(),
-			System.identityHashCode(this.decisionSteps),
-			System.identityHashCode(ClientProxy.unwrap(proxy)),
-			Mockito.mockingDetails(this.decisionSteps).getInvocations(),
-			Mockito.mockingDetails(this.decisionSteps).getStubbings());
-	}
 
 	@Test
 	void readyMovesTheClaimInProcessWithOneThankYouAndNoModelCall() {
@@ -380,8 +351,6 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 		doThrow(new IllegalStateException("The database is down"))
 			.doCallRealMethod()
 			.when(this.decisionSteps).applyReady(any(), any());
-		Log.infof("DIAG fault test: claim=%s run=%s spy=%s stubbings=%s", created.claim().id, run.id(), System.identityHashCode(this.decisionSteps),
-			Mockito.mockingDetails(this.decisionSteps).getStubbings());
 
 		this.scenario.decide(created.claim().id, ReviewOutcome.READY, Set.of());
 
