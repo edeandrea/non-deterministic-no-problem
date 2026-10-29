@@ -11,11 +11,11 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.ChatStubs;
-import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.model.ClaimResolution;
 import org.parasol.intake.model.ClaimResolution.Kind;
 import org.parasol.intake.model.PendingClaim;
+import org.parasol.testing.StubbedModelsTestProfile;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.client.WireMock;
@@ -25,7 +25,7 @@ import io.quarkus.test.junit.TestProfile;
 import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
+@TestProfile(StubbedModelsTestProfile.class)
 @ConnectWireMock
 class ClaimResolverTests {
 	private static final String RESOLVE = "Decide which of the customer's pending claims the following email is about";

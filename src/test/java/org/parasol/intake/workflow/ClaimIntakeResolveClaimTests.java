@@ -7,8 +7,8 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.IntakeFlowTestBase;
 import org.parasol.intake.IntakeScenario.Mail;
-import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.model.EmailType;
+import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 import io.quarkus.test.junit.QuarkusTest;
@@ -19,7 +19,7 @@ import io.quarkus.test.junit.TestProfile;
  * the customer is asked which claim it's about.
  */
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
+@TestProfile(StubbedModelsTestProfile.class)
 @ConnectWireMock
 class ClaimIntakeResolveClaimTests extends IntakeFlowTestBase {
 	private static final String NO_LOCATION = details("Car hit a post.", "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());

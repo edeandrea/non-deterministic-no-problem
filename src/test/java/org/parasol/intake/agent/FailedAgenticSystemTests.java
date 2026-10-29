@@ -16,11 +16,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.ChatStubs;
 import org.parasol.intake.IntakeScenario;
-import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.agent.triage.ClaimStatusTools;
 import org.parasol.intake.model.EmailType;
 import org.parasol.intake.model.IncidentDetails;
 import org.parasol.intake.model.MatchedClaim;
+import org.parasol.testing.StubbedModelsTestProfile;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.client.WireMock;
@@ -37,7 +37,7 @@ import io.quarkiverse.wiremock.devservice.ConnectWireMock;
  * unchanged as the regression guard for that fix.
  */
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
+@TestProfile(StubbedModelsTestProfile.class)
 @ConnectWireMock
 class FailedAgenticSystemTests {
 	// Where a generated workflow's task waits for its agent call: FlowPlanner.executeAgent(i).join()

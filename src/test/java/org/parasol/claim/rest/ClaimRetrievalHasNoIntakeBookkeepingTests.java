@@ -15,8 +15,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.parasol.claim.model.Claim;
 import org.parasol.intake.IntakeScenario;
-import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.model.ClaimIntakeState;
+import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
@@ -32,7 +32,7 @@ import io.restassured.path.json.JsonPath;
  * </p>
  */
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
+@TestProfile(StubbedModelsTestProfile.class)
 class ClaimRetrievalHasNoIntakeBookkeepingTests {
 	private static final List<String> BOOKKEEPING_KEYS = List.of(
 		"review_run_id", "reviewRunId", "deciding_run_id", "decidingRunId", "intake_conversation_id", "intakeConversationId",

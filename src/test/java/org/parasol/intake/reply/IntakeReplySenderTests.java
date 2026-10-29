@@ -11,8 +11,8 @@ import jakarta.inject.Inject;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.MissingItem;
+import org.parasol.testing.StubbedModelsTestProfile;
 import org.parasol.testing.mail.GreenMailMailbox;
 import org.parasol.testing.mail.ReceivedEmail;
 
@@ -20,7 +20,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
+@TestProfile(StubbedModelsTestProfile.class)
 class IntakeReplySenderTests {
 	private static final Duration WAIT_DURATION = Duration.ofSeconds(30);
 

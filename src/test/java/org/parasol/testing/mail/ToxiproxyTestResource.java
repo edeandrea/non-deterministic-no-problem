@@ -12,7 +12,7 @@ import io.quarkus.test.common.QuarkusTestResourceLifecycleManager.TestInjector.A
 
 /**
  * Starts a Toxiproxy container for the tests that need to break a TCP connection, and injects a {@link Toxiproxy} for it into the
- * test fields annotated with {@link InjectToxiproxy}. It's registered by {@code IntakeTestProfile}, so it lives and dies with that profile's one application boot.
+ * test fields annotated with {@link InjectToxiproxy}. It's registered by {@code StubbedModelsTestProfile}, so it lives and dies with that profile's one application boot.
  * <p>
  *   GreenMail is a Compose Dev Service, so there is no shared container network to put Toxiproxy on: it reaches GreenMail
  *   through the host (a Compose-mapped port), as {@link #HOST_ALIAS}.

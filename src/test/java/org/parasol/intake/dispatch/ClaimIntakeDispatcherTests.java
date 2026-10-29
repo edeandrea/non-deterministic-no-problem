@@ -13,10 +13,10 @@ import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.IntakeFlowTestBase;
 import org.parasol.intake.IntakeScenario.Mail;
-import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.mailbox.EmailReceived;
 import org.parasol.intake.mailbox.MailFolder;
 import org.parasol.intake.model.EmailType;
+import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 import io.quarkus.test.junit.QuarkusTest;
@@ -27,7 +27,7 @@ import io.quarkus.test.junit.TestProfile;
  * mail or a duplicate {@code Message-ID}.
  */
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
+@TestProfile(StubbedModelsTestProfile.class)
 @ConnectWireMock
 class ClaimIntakeDispatcherTests extends IntakeFlowTestBase {
 	@Inject

@@ -8,14 +8,14 @@ import java.util.regex.MatchResult;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
-import org.junit.jupiter.api.Test;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
+import org.junit.jupiter.api.Test;
 import org.parasol.claim.model.Claim;
-import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.mailbox.SkippedAttachment;
 import org.parasol.intake.mailbox.SkippedAttachment.Reason;
+import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkus.mailer.MailTemplate.MailTemplateInstance;
 import io.quarkus.narayana.jta.QuarkusTransaction;
@@ -28,7 +28,7 @@ import io.quarkus.test.junit.TestProfile;
 // instance), without sending anything. The HTML variant is checked through its visible text (jsoup), so both variants
 // get the same content assertions. Sending, the subject and the headers are IntakeReplySenderTests.
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
+@TestProfile(StubbedModelsTestProfile.class)
 class IntakeTemplatesTests {
 	private static final Optional<String> NO_NAME = Optional.empty();
 	private static final String CLAIM_NUMBER = "CLM09999999";

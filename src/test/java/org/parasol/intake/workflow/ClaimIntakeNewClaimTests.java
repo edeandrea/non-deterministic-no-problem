@@ -14,13 +14,13 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.parasol.claim.model.ClaimCategory;
 import org.parasol.claim.model.ClaimImageKind;
-import org.parasol.intake.config.IntakeConfig;
 import org.parasol.intake.IntakeFlowTestBase;
 import org.parasol.intake.IntakeScenario.Mail;
-import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.MissingItem;
+import org.parasol.intake.config.IntakeConfig;
 import org.parasol.intake.mailbox.MailFolder;
 import org.parasol.intake.model.EmailType;
+import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 import io.quarkus.test.junit.QuarkusTest;
@@ -33,7 +33,7 @@ import io.serverlessworkflow.impl.persistence.PersistenceInstanceReader;
  * New claims, end to end against the Compose GreenMail and a stubbed model.
  */
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
+@TestProfile(StubbedModelsTestProfile.class)
 @ConnectWireMock
 class ClaimIntakeNewClaimTests extends IntakeFlowTestBase {
 	@Inject

@@ -8,8 +8,8 @@ import jakarta.inject.Inject;
 
 import org.junit.jupiter.api.Test;
 import org.parasol.claim.model.ClaimCategory;
-import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.MissingItem;
+import org.parasol.testing.StubbedModelsTestProfile;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.test.junit.QuarkusTest;
@@ -20,7 +20,7 @@ import io.quarkus.test.junit.TestProfile;
  * survive a round trip through it.
  */
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
+@TestProfile(StubbedModelsTestProfile.class)
 class ClaimExtractionValueRoundTripTests {
 	@Inject
 	ObjectMapper objectMapper;

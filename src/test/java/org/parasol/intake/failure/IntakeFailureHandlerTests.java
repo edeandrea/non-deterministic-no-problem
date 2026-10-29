@@ -10,8 +10,8 @@ import org.junit.jupiter.api.Test;
 import org.parasol.intake.IntakeScenario.Mail;
 
 import org.parasol.intake.IntakeFlowTestBase;
-import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.mailbox.MailFolder;
+import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 import io.quarkus.test.junit.QuarkusTest;
@@ -22,7 +22,7 @@ import io.quarkus.test.junit.TestProfile;
  * reply. (Faults after the review wait are in {@code ClaimIntakeReviewTests}.)
  */
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
+@TestProfile(StubbedModelsTestProfile.class)
 @ConnectWireMock
 class IntakeFailureHandlerTests extends IntakeFlowTestBase {
 	@Test

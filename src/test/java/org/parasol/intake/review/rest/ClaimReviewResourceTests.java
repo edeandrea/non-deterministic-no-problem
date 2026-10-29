@@ -23,13 +23,13 @@ import org.parasol.claim.model.ClaimCategory;
 import org.parasol.intake.IntakeFlowTestBase;
 import org.parasol.intake.IntakeScenario;
 import org.parasol.intake.IntakeScenario.Mail;
-import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.review.ClaimReviewService;
 import org.parasol.intake.review.ReviewOutcome;
 import org.parasol.intake.review.rest.ReviewDecisionRequest.Fields;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
 import org.parasol.problem.ProblemDetail;
+import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
@@ -47,7 +47,7 @@ import io.serverlessworkflow.impl.WorkflowStatus;
  * races between a reply, a decision and a reassessment on the same claim.
  */
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
+@TestProfile(StubbedModelsTestProfile.class)
 @ConnectWireMock
 class ClaimReviewResourceTests extends IntakeFlowTestBase {
 	// A seeded claim, never Pending Review: no intake state exists for it, so the review is never open

@@ -11,8 +11,8 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.IntakeScenario;
-import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.mailbox.InboundEmail;
+import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 import io.quarkus.test.junit.QuarkusTest;
@@ -22,7 +22,7 @@ import io.quarkus.test.junit.TestProfile;
  * Matching an email to a claim, and which conversation id the run starts in. Uses the first seeded claim.
  */
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
+@TestProfile(StubbedModelsTestProfile.class)
 @ConnectWireMock
 class ClaimMatcherTests {
 	private static final long CLAIM_ID = 1L;
