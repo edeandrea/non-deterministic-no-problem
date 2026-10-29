@@ -7,7 +7,8 @@ import eu.rekawek.toxiproxy.ToxiproxyClient;
 import eu.rekawek.toxiproxy.model.ToxicDirection;
 
 /**
- * Test access to the Toxiproxy container started by {@link ToxiproxyTestResource}, which injects it into fields annotated with {@link InjectToxiproxy}, which sits between a client and GreenMail's
+ * Test access to the Toxiproxy container started by {@link ToxiproxyTestResource}, which injects it into fields annotated with {@link InjectToxiproxy},
+ * which sits between a client and GreenMail's
  * IMAP port so a test can break the connection. WireMock can't: it only speaks HTTP, and IMAP is a raw TCP stream.
  * <p>
  *   The proxy forwards to GreenMail's IMAP port through the host; {@link #host()} and {@link #imapPort()} are where a

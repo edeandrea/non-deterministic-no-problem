@@ -80,4 +80,12 @@ public class Claim extends PanacheEntity {
 			.map(number -> getSession().find(Claim.class, number, KeyType.NATURAL));
 	}
 
+	/**
+	 * Counts the claims waiting for a reviewer.
+	 *
+	 * @return the number of claims in {@link IntakeClaimStatus#PENDING_REVIEW}
+	 */
+	public static long countPendingReview() {
+		return count("status", IntakeClaimStatus.PENDING_REVIEW.label());
+	}
 }

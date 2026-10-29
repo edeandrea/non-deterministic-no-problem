@@ -36,21 +36,24 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.parasol.intake.config.IntakeConfig;
 import org.parasol.intake.IntakeScenario;
 import org.parasol.intake.IntakeScenario.Mail;
+import org.parasol.intake.config.IntakeConfig;
 import org.parasol.intake.mailbox.ClaimsInboxWatcher.Settings;
+import org.parasol.intake.observability.IntakeActivityEvents;
 import org.parasol.testing.StubbedModelsTestProfile;
 import org.parasol.testing.mail.InjectToxiproxy;
 import org.parasol.testing.mail.Toxiproxy;
 
 import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduler;
-import io.quarkus.virtual.threads.VirtualThreads;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.junit.virtual.ShouldNotPin;
 import io.quarkus.test.junit.virtual.VirtualThreadUnit;
+import io.quarkus.virtual.threads.VirtualThreads;
+
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 // Each test builds its own watcher with short timings and a mocked CDI event. @InjectMock disables the observers declared on the
 // mocked bean (quarkusio/quarkus#11122), so a mocked ClaimIntakeDispatcher would never see an event.
@@ -94,6 +97,7 @@ class ClaimsInboxWatcherTests {
 	@ConfigProperty(name = "quarkus.mailer.port")
 	int smtpPort;
 
+	private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
 	private final List<ClaimsInboxWatcher> watchers = new ArrayList<>();
 
 	@SuppressWarnings("unchecked")
@@ -323,10 +327,42 @@ class ClaimsInboxWatcherTests {
 	}
 
 	@Test
+	void theConnectedGaugeFollowsTheIdleConnection() {
+		var watcher = startWatcher(LONG_REFRESH);
+
+		await()
+			.atMost(WAIT)
+			.until(() -> this.meters.get("claim.intake.watcher.connected").gauge().value() == 1.0);
+
+		watcher.stop();
+
+		assertThat(this.meters.get("claim.intake.watcher.connected").gauge().value()).isZero();
+	}
+
+	@Test
+	void anUnreachableMailboxCountsReconnects() {
+		startWatcher("localhost", 1, LONG_REFRESH, SHORT_DELAY);
+
+		await()
+			.atMost(WAIT)
+			.until(() -> this.meters.get("claim.intake.watcher.reconnects").counter().count() >= 2);
+
+		assertThat(this.meters.get("claim.intake.watcher.connected").gauge().value()).isZero();
+	}
+
+	@Test
 	void disabledIntakeStartsNoWatching() {
 		var disabled = mock(IntakeConfig.class);
 		when(disabled.enabled()).thenReturn(false);
-		var watcher = new ClaimsInboxWatcher(disabled, this.mailbox, this.received, Settings.from(this.config), this.scheduler, this.virtualThreads);
+		var watcher = new ClaimsInboxWatcher(
+			disabled,
+			this.mailbox,
+			this.received,
+			Settings.from(this.config),
+			this.scheduler,
+			this.virtualThreads,
+			IntakeActivityEvents.into(new SimpleMeterRegistry())
+		);
 
 		watcher.onStart(new StartupEvent());
 
@@ -342,7 +378,7 @@ class ClaimsInboxWatcherTests {
 	}
 
 	private ClaimsInboxWatcher startWatcher(Settings settings) {
-		var watcher = new ClaimsInboxWatcher(this.config, this.mailbox, this.received, settings, this.scheduler, this.virtualThreads);
+		var watcher = new ClaimsInboxWatcher(this.config, this.mailbox, this.received, settings, this.scheduler, this.virtualThreads, IntakeActivityEvents.into(this.meters));
 		this.watchers.add(watcher);
 		watcher.start();
 

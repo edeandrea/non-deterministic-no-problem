@@ -18,7 +18,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import org.parasol.intake.review.ReviewDecided;
 import org.parasol.intake.review.ReviewDecisionPublisher;
 import org.parasol.intake.review.ReviewOutcome;
-import org.parasol.intake.workflow.IntakeState.Disposition;
 import org.parasol.intake.workflow.mail.FileEmailStep;
 import org.parasol.intake.workflow.mail.ReplySteps;
 import org.parasol.intake.workflow.outcome.ApplyOutcomeStep;
@@ -59,79 +58,89 @@ public class ClaimIntakeFlow extends Flow {
 	 */
 	public static final String NAME = "claim-intake";
 
-	private final ClaimMatchingSteps matching;
-	private final AgentStep agents;
-	private final PolicyCheckStep policy;
-	private final SupersedeStep superseding;
-	private final ApplyOutcomeStep applying;
-	private final ReplySteps replies;
-	private final FileEmailStep filing;
-	private final ReviewDecisionSteps decisions;
+	private final ClaimMatchingSteps claimMatchingSteps;
+	private final AgentStep agenticRoot;
+	private final PolicyCheckStep policyCheckStep;
+	private final SupersedeStep supersedeStep;
+	private final ApplyOutcomeStep applyOutcomeStep;
+	private final ReplySteps replySteps;
+	private final FileEmailStep fileEmailStep;
+	private final ReviewDecisionSteps reviewDecisionSteps;
 
 	ClaimIntakeFlow(
-		ClaimMatchingSteps matching,
-		AgentStep agents,
-		PolicyCheckStep policy,
-		SupersedeStep superseding,
-		ApplyOutcomeStep applying,
-		ReplySteps replies,
-		FileEmailStep filing,
-		ReviewDecisionSteps decisions) {
+		ClaimMatchingSteps claimMatchingSteps,
+		AgentStep agenticRoot,
+		PolicyCheckStep policyCheckStep,
+		SupersedeStep supersedeStep,
+		ApplyOutcomeStep applyOutcomeStep,
+		ReplySteps replySteps,
+		FileEmailStep fileEmailStep,
+		ReviewDecisionSteps reviewDecisionSteps) {
 
-		this.matching = matching;
-		this.agents = agents;
-		this.policy = policy;
-		this.superseding = superseding;
-		this.applying = applying;
-		this.replies = replies;
-		this.filing = filing;
-		this.decisions = decisions;
+		this.claimMatchingSteps = claimMatchingSteps;
+		this.agenticRoot = agenticRoot;
+		this.policyCheckStep = policyCheckStep;
+		this.supersedeStep = supersedeStep;
+		this.applyOutcomeStep = applyOutcomeStep;
+		this.replySteps = replySteps;
+		this.fileEmailStep = fileEmailStep;
+		this.reviewDecisionSteps = reviewDecisionSteps;
 	}
 
 	@Override
 	public Workflow descriptor() {
 		return workflow(NAME)
 			.tasks(tasks(
-				function("initialize", this.matching::initialize, IntakeRun.class, IntakeState.class),
+				function("initialize", this.claimMatchingSteps::initialize, IntakeRun.class, IntakeState.class),
 				switchCase("routeMatch",
 					caseOf(IntakeState::needsReview, IntakeState.class).then("waitReview"),
-					caseOf((IntakeState state) -> state.disposition() == Disposition.WRONG_SENDER, IntakeState.class).then("replyNoMatchingClaim"),
+					caseOf(IntakeState::isWrongSender, IntakeState.class).then("replyNoMatchingClaim"),
 					caseOf(IntakeState::mayResolve, IntakeState.class).then("resolveClaim"),
 					caseDefault("runAgents")),
-				function("resolveClaim", this.matching::resolveClaim, IntakeState.class, IntakeState.class),
-				switchWhenOrElse("routeResolution", (IntakeState state) -> state.disposition() == Disposition.WHICH_CLAIM, "replyWhichClaim", "runAgents", IntakeState.class),
-				function("runAgents", this.agents::run, IntakeState.class, IntakeState.class),
-				function("policyCheck", this.policy::check, IntakeState.class, IntakeState.class),
-				switchWhenOrElse("routePolicy", (IntakeState state) -> state.disposition() == Disposition.POLICY_REJECTED, "replyPolicyInconsistent", "supersede", IntakeState.class),
-				function("supersede", this.superseding::supersede, IntakeState.class, IntakeState.class),
-				switchWhenOrElse("routeSupersede", (IntakeState state) -> state.disposition() != Disposition.REQUEUE, "applyOutcome", FlowDirectiveEnum.END, IntakeState.class),
-				withContext("applyOutcome", (IntakeState state, WorkflowContextData context) ->
-					this.applying.apply(state, context.instanceData().id(), conversationId(context)), IntakeState.class, IntakeState.class),
-				function("reply", this.replies::reply, IntakeState.class, IntakeState.class)
+				function("resolveClaim", this.claimMatchingSteps::resolveClaim, IntakeState.class, IntakeState.class),
+				switchWhenOrElse("routeResolution", IntakeState::isWhichClaim, "replyWhichClaim", "runAgents", IntakeState.class),
+				function("runAgents", this.agenticRoot::run, IntakeState.class, IntakeState.class),
+				function("policyCheck", this.policyCheckStep::check, IntakeState.class, IntakeState.class),
+				switchWhenOrElse("routePolicy", IntakeState::isPolicyRejected, "replyPolicyInconsistent", "supersede", IntakeState.class),
+				function("supersede", this.supersedeStep::supersede, IntakeState.class, IntakeState.class),
+				switchWhenOrElse("routeSupersede", IntakeState::isNotRequeued, "applyOutcome", FlowDirectiveEnum.END, IntakeState.class),
+				withContext("applyOutcome", (state, context) ->
+					this.applyOutcomeStep.apply(state, context.instanceData().id(), conversationId(context)), IntakeState.class, IntakeState.class),
+				function("reply", this.replySteps::reply, IntakeState.class, IntakeState.class)
 					.then("file"),
-				function("replyNoMatchingClaim", this.replies::replyNoMatchingClaim, IntakeState.class, IntakeState.class)
+				function("replyNoMatchingClaim", this.replySteps::replyNoMatchingClaim, IntakeState.class, IntakeState.class)
 					.then("file"),
-				function("replyWhichClaim", this.replies::replyWhichClaim, IntakeState.class, IntakeState.class)
+				function("replyWhichClaim", this.replySteps::replyWhichClaim, IntakeState.class, IntakeState.class)
 					.then("file"),
-				function("replyPolicyInconsistent", this.replies::replyPolicyInconsistent, IntakeState.class, IntakeState.class)
+				function("replyPolicyInconsistent", this.replySteps::replyPolicyInconsistent, IntakeState.class, IntakeState.class)
 					.then("file"),
-				function("file", this.filing::file, IntakeState.class, IntakeState.class),
+				function("file", this.fileEmailStep::file, IntakeState.class, IntakeState.class),
 				switchWhenOrElse("routeAfterFile", IntakeState::needsReview, "waitReview", FlowDirectiveEnum.END, IntakeState.class),
 				listen("waitReview", toOne(consumed(ReviewDecisionPublisher.REVIEW_DECIDED).dataAs(ReviewDecided.class, this::isForThisRun)).first()),
-				switchWhenOrElse("routeDecision", (ReviewDecided decided) -> decided.decision().outcome() == ReviewOutcome.READY, "markInProcess", "markPendingInformation", ReviewDecided.class),
+				switchWhenOrElse(
+					"routeDecision",
+					ReviewDecided::isReviewReady,
+					"markInProcess",
+					"markPendingInformation",
+					ReviewDecided.class
+				),
 				tryCatch("markInProcess", attempt -> attempt
-					.tryCatch(tasks(withContext("applyReady", (ReviewDecided decided, WorkflowContextData context) ->
-						this.decisions.markInProcess(decided, runOf(context), context.instanceData().id()), ReviewDecided.class, AfterDecision.class)))
-					.catchType(ReviewDecisionSteps.DECISION_FAILED, tasks(withContext("restoreAfterReady", (Object ignored, WorkflowContextData context) ->
-						this.decisions.restoreReview(context.instanceData().id()), Object.class, AfterDecision.class)))
+					.tryCatch(tasks(withContext("applyReady", (decided, context) ->
+						this.reviewDecisionSteps.markInProcess(decided, runOf(context), context.instanceData().id()), ReviewDecided.class, AfterDecision.class)))
+					.catchType(ReviewDecisionSteps.DECISION_FAILED, tasks(withContext("restoreAfterReady", (_, context) ->
+						this.reviewDecisionSteps.restoreReview(context.instanceData().id()), Object.class, AfterDecision.class)))
 					.then("afterDecision")),
 				tryCatch("markPendingInformation", attempt -> attempt
-					.tryCatch(tasks(withContext("applyNeedsInformation", (ReviewDecided decided, WorkflowContextData context) ->
-						this.decisions.markPendingInformation(decided, runOf(context), context.instanceData().id()), ReviewDecided.class, AfterDecision.class)))
-					.catchType(ReviewDecisionSteps.DECISION_FAILED, tasks(withContext("restoreAfterNeedsInformation", (Object ignored, WorkflowContextData context) ->
-						this.decisions.restoreReview(context.instanceData().id()), Object.class, AfterDecision.class)))),
-				switchWhenOrElse("afterDecision", (AfterDecision next) -> next == AfterDecision.WAIT_AGAIN, "waitReview", FlowDirectiveEnum.END, AfterDecision.class)))
+					.tryCatch(tasks(withContext("applyNeedsInformation", (decided, context) ->
+						this.reviewDecisionSteps.markPendingInformation(decided, runOf(context), context.instanceData().id()), ReviewDecided.class, AfterDecision.class)))
+					.catchType(ReviewDecisionSteps.DECISION_FAILED, tasks(withContext("restoreAfterNeedsInformation", (_, context) ->
+						this.reviewDecisionSteps.restoreReview(context.instanceData().id()), Object.class, AfterDecision.class)))),
+				switchWhenOrElse("afterDecision", ClaimIntakeFlow::shouldWaitAgain, "waitReview", FlowDirectiveEnum.END, AfterDecision.class)))
 			.build();
+	}
+
+	private static boolean shouldWaitAgain(AfterDecision next) {
+		return next == AfterDecision.WAIT_AGAIN;
 	}
 
 	private static IntakeRun runOf(WorkflowContextData context) {
@@ -149,6 +158,6 @@ public class ClaimIntakeFlow extends Flow {
 	private boolean isForThisRun(ReviewDecided decided, WorkflowContextData context) {
 		var runId = context.instanceData().id();
 
-		return runId.equals(decided.runId()) && this.decisions.isDecisionFor(decided.claimId(), runId);
+		return runId.equals(decided.runId()) && this.reviewDecisionSteps.isDecisionFor(decided.claimId(), runId);
 	}
 }

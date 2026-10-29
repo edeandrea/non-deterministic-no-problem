@@ -402,6 +402,11 @@ parasol:
       devservices:
         profiles: ""
 
+    # Build-time: removes only the span processor that exports to Langfuse. The SDK, the dev service and LangfuseOperations stay
+    langfuse:
+      otel:
+        enabled: false
+
     aiscoring:
       langfuse:
         evaluation:

@@ -21,7 +21,7 @@
 		<quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
 		<quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
 		<quarkus.platform.version>3.40.1.1</quarkus.platform.version>
-		<quarkus.langfuse.version>0.9.0</quarkus.langfuse.version>
+		<quarkus.langfuse.version>0.9.1</quarkus.langfuse.version>
 		<surefire-plugin.version>3.6.1</surefire-plugin.version>
 	</properties>
 	<dependencyManagement>
@@ -54,14 +54,6 @@
 				<groupId>io.quarkiverse.flow</groupId>
 				<artifactId>quarkus-flow-bom</artifactId>
 				<version>${quarkus.flow.version}</version>
-				<type>pom</type>
-				<scope>import</scope>
-			</dependency>
-			<!-- The platform's Flow BOM, not io.quarkiverse.flow:quarkus-flow-bom: that one's parent imports an older Quarkus BOM -->
-			<dependency>
-				<groupId>${quarkus.platform.group-id}</groupId>
-				<artifactId>quarkus-flow-bom</artifactId>
-				<version>${quarkus.platform.version}</version>
 				<type>pom</type>
 				<scope>import</scope>
 			</dependency>

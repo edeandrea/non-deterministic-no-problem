@@ -21,6 +21,9 @@ import org.parasol.intake.mailbox.EmailReceived;
 import org.parasol.intake.mailbox.InboundEmail;
 import org.parasol.intake.mailbox.MailLoopGuard;
 import org.parasol.intake.mailbox.MailFolder;
+import org.parasol.intake.observability.IntakeActivities;
+import org.parasol.intake.observability.EmailOutcome;
+import org.parasol.intake.observability.IntakeActivity.EmailHandled;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
 import org.parasol.intake.workflow.EmailRequeued;
 import org.parasol.intake.workflow.IntakeRun;
@@ -62,6 +65,7 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 	private final ClaimMatcher matcher;
 	private final IntakeFailureHandler failureHandler;
 	private final ConversationContext conversationContext;
+	private final IntakeActivities activities;
 	private final Instance<ClaimIntakeFlow> flow;
 	private final ManagedExecutor executor;
 
@@ -76,6 +80,7 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 		ClaimMatcher matcher,
 		IntakeFailureHandler failureHandler,
 		ConversationContext conversationContext,
+		IntakeActivities activities,
 		Instance<ClaimIntakeFlow> flow,
 		ManagedExecutor executor) {
 
@@ -85,6 +90,7 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 		this.matcher = matcher;
 		this.failureHandler = failureHandler;
 		this.conversationContext = conversationContext;
+		this.activities = activities;
 		this.flow = flow;
 		this.executor = executor;
 	}
@@ -112,6 +118,7 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 	 */
 	public void submit(InboundEmail email) {
 		if (MailLoopGuard.shouldIgnore(email, this.config.address())) {
+			this.activities.publish(new EmailHandled(EmailOutcome.SKIPPED_AUTO_REPLY));
 			this.failureHandler.fileWithoutRun(email);
 		}
 		else {
@@ -128,6 +135,7 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 					 }
 					 else {
 						 Log.debugf("Ignoring %s: it was already accepted", messageId);
+						 this.activities.publish(new EmailHandled(EmailOutcome.DUPLICATE));
 						 this.failureHandler.fileWithoutRun(email);
 					 }
 					 },
@@ -173,7 +181,7 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 	private void startRun(String sender, String messageId) {
 		try {
 			var email = this.mailbox.find(MailFolder.PROCESSING, messageId)
-				.orElseThrow(() -> new IllegalStateException("%s isn't in the processing folder".formatted(messageId)));
+				.orElseThrow(() -> new ProcessingEmailMissingException(messageId));
 			var match = this.matcher.match(email);
 			var run = IntakeRun.forEmail(messageId, match.conversationId(), email.fromAddress().orElse(sender), match.claimId(), match.senderMatches());
 

@@ -41,6 +41,7 @@ The Java source is split into two top-level packages representing two distinct c
 | `org.parasol.intake.workflow.policy` | `PolicyCheckStep` and its package-private `SameCustomerRule` (same customer) and `PolicyNumbers` (generated `AC-` numbers) |
 | `org.parasol.intake.workflow.outcome` | `ApplyOutcomeStep` (persists a new claim or a merged reply) and its helpers `ClaimFields` and the package-private `InceptionDates` |
 | `org.parasol.intake.workflow.review` | `SupersedeStep`, `ReviewDecisionSteps` (the review wait's decision steps and its match check), `AfterDecision` (what the run does next: `END` or `WAIT_AGAIN`), and `ReviewRecoverer` (hands a faulted run's review to a new run) |
+| `org.parasol.intake.observability` | `IntakeActivity` (the sealed CDI events the intake fires) and `IntakeMetrics` (observes them into the `claim.intake.*` meters; tags are small fixed sets, never a claim number, `Message-ID`, address or conversation id) |
 | `org.parasol.intake.workflow.mail` | `IntakeEmailReader` (re-reads a run's email from the processing folder), `ReplySteps`, `FileEmailStep` |
 | `org.parasol.intake.dev` | `DevClaimEmailSeeder`: the bean exists only with the build property `parasol.dev-seed.enabled=true` (`%dev`, and the two Ollama Maven profiles' `quarkus-maven-plugin` `systemProperties`, since they run dev as `prod`, so `@IfBuildProfile("dev")` wouldn't match), and it acts in `LaunchMode.DEVELOPMENT` only, mails two sample claims to the claims address at startup (one complete, one with no date or place) so the real intake produces a `Pending Review` and a `Pending Information` claim to look at. Needs the same model as any intake email; GreenMail is in memory, so it re-sends on every start |
 | `org.parasol.intake.review` | The reviewer's side of the wait: `ReviewOutcome`, `ReviewDecision`, the `ReviewDecided` event data, `ReviewedFields` (the values the reviewer confirmed or corrected, carried in the decision and set by the decision step), `ReviewDecisionPublisher` (publishes the CloudEvent the waiting run listens for), `ClaimReviewService` (checks the review is open at the reviewer's version and the reviewed values fit the claim, claims it under the claim's optimistic lock, confirms the run is waiting, then publishes), `ClaimSentimentReassessor` (assesses the claimant's sentiment again for a reviewer) and the package-private `ReviewGuard` (the open-review check both start with), plus its domain exceptions (`ReviewNotOpenException`, `ReviewLockLostException`, `ReviewRunNotFoundException`, `ReviewRunNotWaitingException`, `ReviewedFieldsRejectedException`, `SentimentAssessmentFailedException`) |
@@ -347,7 +348,7 @@ and no intake columns (not even a version), so no claim fetch can load it, and `
   id and goes with it (`@OnDelete(CASCADE)`). A seeded claim has no row until the intake first touches it. Use
   `ClaimIntakeState.findForClaim` (empty if none), `forClaim` (find or create) and `createFor(claim, conversationId)`
   (the conversation id is `updatable = false`, so it must be set before the insert).
-- **Contents:** `reviewRunId` (the run waiting for the review), `decidingRunId` (task 10 moves it there when it claims the
+- **Contents:** `reviewOpenedAt` (when the claim went into `Pending Review`; read only by the review-wait timer), `reviewRunId` (the run waiting for the review), `decidingRunId` (task 10 moves it there when it claims the
   review), `intakeConversationId`, `policyNumberGenerated`, `requestedItems` (what the customer was asked for; table
   `claim_requested_items`, stored as constant names) and the `@Version`.
 - **The lock is on this row.** A reply that supersedes a review and a reviewer's decision both write it, so the race is
@@ -493,13 +494,42 @@ events and never call an adapter.
   span at `onStart`, read from the parent context; the same value quarkus-langfuse's processor writes, so Tempo and the
   tests see it with Langfuse export off), `ConversationEndedEvent` and `ConversationEvents` (`fireAsync`, logging any
   observer failure).
-- **Adapters:** `chat` (`ConversationalBaggageHandler`, chat scopes). Task 11 of #216 adds the Flow/agentic ones.
+- **Adapters:** `chat` (`ConversationalBaggageHandler`, chat scopes). Task 11 of #216 needed no Flow or agentic one (below).
 - **`quarkus.OtelContextLeakGuard`** — a **temporary** `ThreadContextProvider` (registered in
   `META-INF/services/org.eclipse.microprofile.context.spi.ThreadContextProvider`) working around quarkusio/quarkus#54354:
   Quarkus's OTel context-propagation provider leaves a task's context, and its conversation id, on a pool thread.
   **Delete it, and its services entry, once a Quarkus we're on ships quarkusio/quarkus#56805** (4.0, or the 3.40
   backport quarkusio/quarkus#57879); `OtelContextLeakGuardTests` passing without it is the signal. It's the one class
   touching a Quarkus type, which is why it has its own package.
+- **Task 11 needed no adapter.** Flow 1.3.0 carries the OTel context across its task threads and the agentic sub-workflows keep it
+  too (`IntakeSpanPropagationTests` pins it, including two concurrent runs), so every intake span carries its claim's
+  conversation id with no code in a step. What the intake adds:
+  - `ai.scoring.conversation.flow.FlowSpanTypingProcessor` types the `workflow.execute` span of a workflow Flow generated for an agentic interface (named after the interface in kebab case, `flow.workflow.namespace`/`name`; the interface is looked up and must have a `@SequenceAgent`/`@ParallelAgent`/… method; the run's own `claim-intake` workflow isn't one; a stand-in for quarkiverse/quarkus-flow#1122, relying on Flow's naming) as the standard `gen_ai.operation.name=invoke_agent` plus `gen_ai.agent.name` (**a documented workaround, reflection on Flow's naming, no good for native; delete with #1122**); the Langfuse-specific part is `ai.scoring.langfuse.otel.LangfuseFlowSpanTypingProcessor`: `task.execute` (a step, usually plain Java) is a `chain` (`langfuse.observation.type` only; quarkus-langfuse 0.9.1 retains it under `AI_ONLY` without a synthetic GenAI operation name).
+  - `@MailClientSpan` (an interceptor binding in `org.parasol.intake.observability`, handled by the package-private `MailClientSpanInterceptor`; a parameter marked
+    `@SpanAttribute` becomes a span attribute, as the folder does) wraps `ClaimsMailbox`'s IMAP operations (`imap list|find|move|moveOldest|moveWithoutMessageId`) and `IntakeReplySender`'s four
+    public send methods (`smtp send`) in `CLIENT` spans with `messaging.system`, `server.address`, `server.port` and the folder, plus, on a send, `claim.intake.reply.template` (a fixed set, set by `IntakeSpanAttributes` from `ReplySent`, so the sender has no tracing code), never an address or `Message-ID` (a failure
+    records only the exception type). `IntakeReplySender` wraps the OTel `Context` onto its virtual thread so the send stays in the run's trace. Only a call through the CDI proxy is
+    intercepted (a private method isn't); `unprocessed()` → `list(...)` is, since Quarkus intercepts self-invocation of non-private methods. The metrics are CDI events, not
+    calls: a step injects `IntakeActivities` and publishes a fact, which logs and swallows an observer's failure so telemetry never changes what the intake does (it fires the CDI `Event<IntakeActivity>` synchronously, since the status and decision observers are transactional and the reply observer needs the send's span current) (`EmailHandled`, `ClaimStatusChanged`, `ReplySent`, `ReviewDecisionApplied`, `IntakeFailed`,
+    `WatcherConnectionChanged`, `WatcherReconnecting`); `IntakeMetrics` (`@Startup`, so its gauges exist from boot) observes them. The status and decision
+    observers are `AFTER_SUCCESS`, so a rolled-back change isn't counted; the rest observe at once. A class a test builds by hand takes
+    `IntakeActivityEvents.into(registry)` (test; it builds the package-private `IntakeMetrics` over that `MeterRegistry`) for its `IntakeActivities`. An annotation couldn't carry the tags, which the code computes (an outcome, a template, a status).
+  - Log lines from a step carry `traceId`/`spanId` in the MDC (Quarkus does that). Flow's own lifecycle logs don't (quarkus-flow#1013).
+  - Flow's persistence emits about 58 root traces per run. They are kept and unsampled.
+  - **`ClaimsMailboxAgent`'s `extends MonitoredAgent` is commented out**, with `AgentMonitorConfigurer` (which set the monitor's retention to 0
+    unless `LaunchMode.DEVELOPMENT`; the monitor otherwise keeps every execution, correspondence included, forever) and its test, so the
+    agentic Dev UI doesn't show the intake. The monitor throws `No ongoing parent invocation found` for the parallel extraction agents
+    (langchain4j/langchain4j#6885), and `ComposedAgentListener` stops at the first listener that throws, in `HashSet` order
+    (langchain4j/langchain4j#6913). In the boots where the monitor came first, Flow's `FlowAgentContextListener` never activated the run's
+    OTel context on those agents' threads, and their spans lost the run's trace and conversation id (`IntakeSpanPropagationTests` failed in
+    some boots only). Restore all three together once the fixes are released: `.tasks/05-gh216-agentic-email-intake/PLAN.md`, 2c item 6.
+  - `%test` sets `quarkus.langfuse.otel.enabled: false` (build time; only the span processor goes), re-enabled in `org.parasol.testing.LangfuseExportTestProfile`.
+  - Metrics: `claim.intake.emails{outcome}`, `.claim.status.transitions{status}`, `.replies{template}`, `.review.decisions{decision}`, the `.review.wait` timer,
+    `.failures{stage,exception,outcome}` (`outcome` is `fatal` for a run that faulted, `recovered` for a decision that couldn't be applied (the claim goes back in review) or whose email couldn't be sent (`ReviewDecisionSteps` fires these, since neither reaches `IntakeFailureHandler`); `stage` is `fetch`, `move`, `agent`, `persist`, `reply` or `unknown`: the mailbox throws `MailboxMoveException` for a change and the reply sender wraps every send failure or timeout in `ReplyFailedException`, so the stage names the operation, not the library underneath), gauges `.reviews.pending` (a DB count) and `.watcher.connected`, counter `.watcher.reconnects`.
+    `.emails` counts what finally became of an email, once: `FileEmailStep` fires `EmailHandled` as the email is filed (every reply path ends there; a run that
+    hands the email back to the queue for a decision doesn't, so its rerun counts it), the dispatcher counts `skipped_auto_reply` and `duplicate`, and the failure handler `failed`
+    (also for a run that fails after its email was filed, which then counts twice).
+    In tests the composite registry's first child is the OTel bridge, which records nothing, so tests inject `SimpleMeterRegistry` (`TestMeterRegistry`).
 - **Layering is enforced** by `ConversationLayeringTests` (reads the compiled classes' constant pools with
   `java.lang.classfile`): the core references no adapter or framework, adapters never reference each other.
 
@@ -765,8 +795,9 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
     `parasol-chat`, the default OpenAI model and embeddings at WireMock with their providers pinned. It also turns Hibernate
     statistics on, exports spans every 100 ms and starts Toxiproxy.
   - **`org.parasol.ui.UiTestProfile`**: every Playwright test (see above).
-  - **`org.parasol.testing.LangfuseExportTestProfile`** (extends the stubbed one): session scoring, dataset creation and
-    startup initialization, with spans exported to Langfuse, for `LangfuseSessionScoringServiceTests`.
+  - **`org.parasol.testing.LangfuseExportTestProfile`** (extends the stubbed one): the build-time Langfuse exporter
+    (`AI_ONLY`), session scoring, dataset creation and startup initialization, for `LangfuseSessionScoringServiceTests` and
+    `IntakeLangfuseDeliveryTests`. The intake never ends a chat scope, so its runs aren't scored.
 - **A WireMock-backed profile must also pin the provider.** Redirecting `...openai.*.base-url` is
   not enough: `%ollama` sets `quarkus.langchain4j.parasol-chat.chat-model.provider: ollama` (and the
   same for `embedding-model`), so under `-Pollama` the request never goes near the OpenAI client and
@@ -832,8 +863,12 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
     claim's waiting run, simulates claiming the review (`claimReview`, the same `reviewRunId` → `decidingRunId` move the
     real `ClaimReviewService` does — these workflow-level tests exercise the decision steps directly, not through the
     REST layer, so the simulation stays), publishes decisions with `publishUntilWoken` (a decision published the moment a
-    run says `WAITING` can be lost, so it republishes until the run leaves `WAITING`; see **Review tests** below for why
-    the real endpoint doesn't need to), and cleans up (every Flow run canceled, claims beyond the six seeded ones,
+    run says `WAITING` can be lost, so it republishes, through Awaitility every 250 ms within `WAIT`, until the run takes
+    it: it leaves `WAITING`, or `decidingRunId` no longer names it. The second condition matters: a decision that faults
+    and puts the claim back in review can be back in `waitReview` between two polls, and a republish would then hand it a
+    second decision, which is how `aFaultInTheDecisionStepPutsTheClaimBackAndTheSameRunWaitsAgain` failed on slow CI
+    runners. Callers claim the review first; see **Review tests** below for why the real endpoint doesn't need to
+    republish), and cleans up (every Flow run canceled, claims beyond the six seeded ones,
     recorded emails and intake state). It also owns the tests' database reads and fixtures, as `@Transactional(REQUIRES_NEW)`
     methods, so the test classes need no `QuarkusTransaction`.
   - `IntakeFlowTestBase` (`org.parasol.intake`, public with `protected` members so every intake test package can extend it: `createClaim`, `stubNewClaim`, `stubFollowUp`) and `ChatStubs.answerWhenAll`: a stub matches the
@@ -846,8 +881,19 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
     (`IntakeRun`, `IntakeState`, `ReviewDecided` through the Quarkus `ObjectMapper`) and the helper unit tests
     (`CorrespondenceText`, `SameCustomerRule`, `PolicyNumbers`, `InceptionDates`, `ClaimReference`, `MailLoopGuard`,
     `ConversationContext`) need no LLM.
-  - `WorkflowSpans` (`org.parasol.intake`, test) is a `SpanExporter` CDI bean (Quarkus registers it on its own) that keeps
-    only `workflow.execute` spans; `StubbedModelsTestProfile` exports every 100 ms so a run's span shows up soon after it ends.
+  - `TestSpans` (`org.parasol.intake`, test) is a `SpanExporter` CDI bean (Quarkus registers it on its own) with capture off by default, with
+    lookups by run, trace and conversation id. `IntakeFlowTestBase` starts a fresh capture before each test and stops/clears it in teardown,
+    even if cleanup fails; standalone consumers manage that lifecycle too. Appends and lifecycle changes share a monitor, without copy-on-write
+    accumulation or a size cap that could hide evidence. `TestSpansTests` covers that lifecycle and concurrent export/stop.
+    `StubbedModelsTestProfile` exports every 100 ms so a run's spans show up soon after it ends. Tracing assertions use a bounded SDK
+    force-flush and per-run expected workflow/mail/AI/JDBC families rather than a fixed settle delay; setup also flushes already-ended
+    spans before capture starts. A flush does not end active work or guarantee that unrelated asynchronous work can never finish later.
+    `IntakeSpanPropagationTests`, `IntakeTracingTests`, `IntakeMetricsTests` and `AgentMonitorConfigurerTests` (`org.parasol.intake.observability`) cover task 11.
+    `IntakeLangfuseDeliveryTests` adds real Langfuse Dev Services ingestion coverage: first email, follow-up and review decision,
+    exact exported workflow/task observation IDs, AGENT/CHAIN types, and one session across two traces and separate exports. It shares
+    `LangfuseExportTestProfile` (extends `StubbedModelsTestProfile`) with `LangfuseSessionScoringServiceTests`: the build-time Langfuse
+    exporter with `AI_ONLY`, LGTM disabled. Session scoring and initialization are on for the other test; the intake never ends a
+    chat scope, so they don't touch its runs. WireMock stubs only model responses. Tempo/Loki/Prometheus delivery is not covered.
 - **Intake reply tests** (`org.parasol.intake.reply`): `IntakeTemplatesTests` renders both variants of every template
   without sending (the HTML through jsoup's visible text, so both get the same assertions): greetings, missing items,
   attachment notes, HTML escaping, and the no-leak checks against every seeded claim. `IntakeReplySenderTests` sends

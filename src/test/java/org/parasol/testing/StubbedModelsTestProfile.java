@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import org.parasol.intake.WorkflowSpans;
+import org.parasol.intake.TestSpans;
 import org.parasol.testing.mail.ToxiproxyTestResource;
 
 import io.quarkus.test.junit.QuarkusTestProfile;
@@ -31,7 +31,7 @@ import io.quarkiverse.wiremock.devservice.ConnectWireMock;
  *   for the chat route tests. The pins look redundant under the default profile; they are not: {@code %ollama} switches both
  *   to {@code ollama}, which would route the chat around the stubs and into a real model.</li>
  *   <li><b>Hibernate statistics on</b>, for the tests that assert what a request loads.</li>
- *   <li><b>Spans exported every 100 ms</b>, so {@link WorkflowSpans} sees a run's span soon after it ends.</li>
+ *   <li><b>Spans exported every 100 ms</b>, so {@link TestSpans} sees a run's spans soon after they end.</li>
  *   <li><b>A Toxiproxy container</b> ({@link ToxiproxyTestResource}) for the tests that cut the watcher's connection. It's a
  *   test resource of the profile, so it starts once with the profile's one boot.</li>
  *   <li><b>{@code @ConnectWireMock} on the profile</b>, not on the test classes: it's a test resource, and Quarkus restarts the

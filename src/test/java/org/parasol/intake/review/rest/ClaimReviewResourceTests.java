@@ -229,11 +229,20 @@ class ClaimReviewResourceTests extends IntakeFlowTestBase {
 		assertBadRequest(postDecision(created.claim().id, new ReviewDecisionRequest(ReviewOutcome.NEEDS_INFORMATION, Set.of(MissingItem.INCIDENT_DATE),
 				new Fields(UNCHANGED.description(), null, LocalTime.NOON, UNCHANGED.location(), UNCHANGED.category()), version)),
 			"incident_time needs an incident_date");
-		assertBadRequest(postDecision(created.claim().id, ready(new Fields(UNCHANGED.description(), LocalDate.now().plusDays(2), null, UNCHANGED.location(), UNCHANGED.category()), version)),
+		assertBadRequest(postDecision(created.claim().id, ready(
+				new Fields(UNCHANGED.description(), LocalDate.now().plusDays(2), null, UNCHANGED.location(), UNCHANGED.category()),
+				version
+			)),
 			"fields.incident_date must be a date in the past or in the present");
-		assertBadRequest(postDecision(created.claim().id, ready(new Fields("x".repeat(ReviewDecisionRequest.MAX_DESCRIPTION_LENGTH + 1), UNCHANGED.incidentDate(), null, UNCHANGED.location(), UNCHANGED.category()), version)),
+		assertBadRequest(postDecision(created.claim().id, ready(
+				new Fields("x".repeat(ReviewDecisionRequest.MAX_DESCRIPTION_LENGTH + 1), UNCHANGED.incidentDate(), null, UNCHANGED.location(), UNCHANGED.category()),
+				version
+			)),
 			"description");
-		assertBadRequest(postDecision(created.claim().id, ready(new Fields(UNCHANGED.description(), UNCHANGED.incidentDate(), null, "x".repeat(ReviewDecisionRequest.MAX_LOCATION_LENGTH + 1), UNCHANGED.category()), version)),
+		assertBadRequest(postDecision(created.claim().id, ready(
+				new Fields(UNCHANGED.description(), UNCHANGED.incidentDate(), null, "x".repeat(ReviewDecisionRequest.MAX_LOCATION_LENGTH + 1), UNCHANGED.category()),
+				version
+			)),
 			"location");
 
 		// What Jackson can't read never reaches Bean Validation, but is still a Problem Details 400

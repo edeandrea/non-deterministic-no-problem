@@ -1,6 +1,8 @@
 package org.parasol.intake.workflow.review;
 
 import java.util.HashSet;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -9,14 +11,20 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional.TxType;
 import jakarta.transaction.Transactional;
 
-import org.parasol.claim.model.Claim;
 import org.parasol.claim.model.ClaimImage;
 import org.parasol.claim.model.IntakeClaimStatus;
 import org.parasol.intake.model.ClaimIntakeState;
+import org.parasol.intake.observability.FailureOutcome;
+import org.parasol.intake.observability.FailureStage;
+import org.parasol.intake.observability.IntakeActivities;
+import org.parasol.intake.observability.IntakeActivity.ClaimStatusChanged;
+import org.parasol.intake.observability.IntakeActivity.IntakeFailed;
+import org.parasol.intake.observability.IntakeActivity.ReviewDecisionApplied;
 import org.parasol.intake.reply.IntakeReplySender;
 import org.parasol.intake.reply.IntakeTemplates;
 import org.parasol.intake.reply.ThreadingHeaders;
 import org.parasol.intake.review.ReviewDecided;
+import org.parasol.intake.review.ReviewOutcome;
 import org.parasol.intake.workflow.IntakeRun;
 
 import io.quarkus.logging.Log;
@@ -41,14 +49,17 @@ public class ReviewDecisionSteps {
 	public static final String DECISION_FAILED = "https://parasol.org/errors/intake-decision-failed";
 
 	private final IntakeReplySender sender;
+	private final IntakeActivities activities;
 
-	ReviewDecisionSteps(IntakeReplySender sender) {
+	ReviewDecisionSteps(IntakeReplySender sender, IntakeActivities activities) {
 		this.sender = sender;
+		this.activities = activities;
 	}
 
 	public AfterDecision markInProcess(ReviewDecided decided, IntakeRun run, String runId) {
 		var claim = committing(() -> applyReady(decided, runId));
 
+		recordDecision(ReviewOutcome.READY, IntakeClaimStatus.IN_PROCESS, claim);
 		sendAfterCommit(run, claim, IntakeTemplates.claimInProcess(Optional.ofNullable(claim.clientName()), claim.claimNumber()));
 
 		return AfterDecision.END;
@@ -56,6 +67,8 @@ public class ReviewDecisionSteps {
 
 	public AfterDecision markPendingInformation(ReviewDecided decided, IntakeRun run, String runId) {
 		var claim = committing(() -> applyNeedsInformation(decided, runId));
+
+		recordDecision(ReviewOutcome.NEEDS_INFORMATION, IntakeClaimStatus.PENDING_INFORMATION, claim);
 		var items = decided.decision().missingItems().isEmpty()
 			? List.<org.parasol.intake.MissingItem>of()
 			: List.copyOf(java.util.EnumSet.copyOf(decided.decision().missingItems()));
@@ -74,7 +87,7 @@ public class ReviewDecisionSteps {
 		intake.decidingRunId = null;
 		intake.requestedItems = new HashSet<>();
 
-		return snapshot(intake.claim);
+		return snapshot(intake);
 	}
 
 	@Transactional(TxType.REQUIRES_NEW)
@@ -85,7 +98,7 @@ public class ReviewDecisionSteps {
 		intake.decidingRunId = null;
 		intake.requestedItems = new HashSet<>(decided.decision().missingItems());
 
-		return snapshot(intake.claim);
+		return snapshot(intake);
 	}
 
 	/**
@@ -106,11 +119,13 @@ public class ReviewDecisionSteps {
 
 	// Flow's try/catch only catches a WorkflowException, never a plain Java exception, so a fault before the commit is
 	// rethrown as one, with a type the flow's catch names
-	private static Snapshot committing(Supplier<Snapshot> commit) {
+	private Snapshot committing(Supplier<Snapshot> commit) {
 		try {
 			return commit.get();
 		}
 		catch (RuntimeException e) {
+			recordFailure(e);
+
 			throw new WorkflowException(WorkflowError.error(DECISION_FAILED, 500).title("The decision couldn't be applied").details(e.getMessage()).build(), e);
 		}
 	}
@@ -150,8 +165,18 @@ public class ReviewDecisionSteps {
 			.orElseThrow(() -> new IllegalStateException("Claim %d isn't being decided by run %s".formatted(decided.claimId(), runId)));
 	}
 
-	private static Snapshot snapshot(Claim claim) {
-		return new Snapshot(claim.claimNumber, claim.clientName, claim.emailAddress, claim.subject, ClaimImage.count("claim", claim) > 0);
+	private static Snapshot snapshot(ClaimIntakeState intake) {
+		var claim = intake.claim;
+		var openedAt = intake.reviewOpenedAt;
+
+		intake.reviewOpenedAt = null;
+
+		return new Snapshot(claim.claimNumber, claim.clientName, claim.emailAddress, claim.subject, ClaimImage.count("claim", claim) > 0, openedAt);
+	}
+
+	private void recordDecision(ReviewOutcome decision, IntakeClaimStatus status, Snapshot claim) {
+		this.activities.publish(new ClaimStatusChanged(status));
+		this.activities.publish(new ReviewDecisionApplied(decision, Optional.ofNullable(claim.reviewOpenedAt()).map(openedAt -> Duration.between(openedAt, Instant.now()))));
 	}
 
 	private void sendAfterCommit(IntakeRun run, Snapshot claim, MailTemplateInstance template) {
@@ -160,9 +185,15 @@ public class ReviewDecisionSteps {
 		}
 		catch (RuntimeException e) {
 			Log.errorf(e, "The decision for claim %s was applied, but its email couldn't be sent", claim.claimNumber());
+			recordFailure(e);
 		}
 	}
 
-	public record Snapshot(String claimNumber, String clientName, String emailAddress, String subject, boolean hasPhotos) {
+	// Neither failure reaches IntakeFailureHandler, because the run carries on
+	private void recordFailure(RuntimeException failure) {
+		this.activities.publish(new IntakeFailed(FailureStage.of(failure), failure.getClass().getSimpleName(), FailureOutcome.RECOVERED));
+	}
+
+	public record Snapshot(String claimNumber, String clientName, String emailAddress, String subject, boolean hasPhotos, Instant reviewOpenedAt) {
 	}
 }

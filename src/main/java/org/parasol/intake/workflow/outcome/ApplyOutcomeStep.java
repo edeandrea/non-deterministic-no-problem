@@ -1,5 +1,6 @@
 package org.parasol.intake.workflow.outcome;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.HashSet;
@@ -28,6 +29,8 @@ import org.parasol.intake.model.IntakeOutcome.NoMatchingClaim;
 import org.parasol.intake.model.IntakeOutcome.NotAClaim;
 import org.parasol.intake.model.IntakeOutcome.PendingClaimUpdate;
 import org.parasol.intake.model.IntakeOutcome.StatusReply;
+import org.parasol.intake.observability.IntakeActivities;
+import org.parasol.intake.observability.IntakeActivity.ClaimStatusChanged;
 import org.parasol.intake.workflow.CorrespondenceText;
 import org.parasol.intake.workflow.IntakeState;
 import org.parasol.intake.workflow.mail.IntakeEmailReader;
@@ -43,13 +46,21 @@ public class ApplyOutcomeStep {
 	private static final Pattern ADDRESS_LIKE = Pattern.compile("\\S+@\\S+");
 
 	private final IntakeEmailReader emails;
+	private final IntakeActivities activities;
 
-	ApplyOutcomeStep(IntakeEmailReader emails) {
+	ApplyOutcomeStep(IntakeEmailReader emails, IntakeActivities activities) {
 		this.emails = emails;
+		this.activities = activities;
 	}
 
 	public IntakeState apply(IntakeState state, String runId, String conversationId) {
-		return persist(state, this.emails.require(state.messageId()), runId, conversationId);
+		var applied = persist(state, this.emails.require(state.messageId()), runId, conversationId);
+
+		if ((applied.outcome() instanceof NewClaim) || applied.outcome() instanceof PendingClaimUpdate) {
+			this.activities.publish(new ClaimStatusChanged(statusFor(applied.needsReview())));
+		}
+
+		return applied;
 	}
 
 	// One transaction for the claim, its images and its correspondence; the IMAP read above stays outside it
@@ -80,7 +91,7 @@ public class ApplyOutcomeStep {
 		claim.policyNumber = state.policyNumber();
 		claim.inceptionDate = InceptionDates.before(IsoValues.parseDate(details.incidentDate()).orElseGet(LocalDate::now), ThreadLocalRandom.current());
 		ClaimFields.merge(claim, extraction);
-		claim.status = statusFor(isComplete);
+		claim.status = statusFor(isComplete).label();
 		claim.persistAndFlush();
 
 		var intake = ClaimIntakeState.createFor(claim, conversationId);
@@ -108,7 +119,7 @@ public class ApplyOutcomeStep {
 			intake.policyNumberGenerated = state.policyNumberGenerated();
 		}
 
-		claim.status = statusFor(isComplete);
+		claim.status = statusFor(isComplete).label();
 		setReviewState(intake, isComplete, missing, runId);
 		storeImages(claim, email);
 		linkCorrespondence(email, claim);
@@ -125,12 +136,13 @@ public class ApplyOutcomeStep {
 		return state;
 	}
 
-	private static String statusFor(boolean isComplete) {
-		return (isComplete ? IntakeClaimStatus.PENDING_REVIEW : IntakeClaimStatus.PENDING_INFORMATION).label();
+	private static IntakeClaimStatus statusFor(boolean isComplete) {
+		return isComplete ? IntakeClaimStatus.PENDING_REVIEW : IntakeClaimStatus.PENDING_INFORMATION;
 	}
 
 	private static void setReviewState(ClaimIntakeState intake, boolean isComplete, Set<MissingItem> missing, String runId) {
 		intake.reviewRunId = isComplete ? runId : null;
+		intake.reviewOpenedAt = isComplete ? Instant.now() : null;
 		intake.requestedItems = isComplete ? new HashSet<>() : new HashSet<>(missing);
 	}
 

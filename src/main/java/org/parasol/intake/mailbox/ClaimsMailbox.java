@@ -7,6 +7,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -22,8 +24,12 @@ import jakarta.mail.StoreClosedException;
 import jakarta.mail.search.MessageIDTerm;
 
 import org.parasol.intake.config.IntakeConfig;
+import org.parasol.intake.observability.MailClientSpan;
+import org.parasol.intake.observability.MailClientSpan.Protocol;
 
 import io.quarkus.logging.Log;
+
+import io.opentelemetry.instrumentation.annotations.SpanAttribute;
 
 /**
  * The claims mailbox, over IMAP.
@@ -35,13 +41,14 @@ import io.quarkus.logging.Log;
  */
 @ApplicationScoped
 public class ClaimsMailbox {
-	private static final String INBOX = "INBOX";
+	private static final String FOLDER = "messaging.destination.name";
 	private static final Duration IMAP_TIMEOUT = Duration.ofSeconds(10);
 	private static final int FETCH_SIZE_BYTES = 1024 * 1024;
 
 	private final IntakeConfig config;
 	private final Session session = Session.getInstance(sessionProperties());
 	private final MimeMessageParser parser;
+	private final ReadWriteLock folderLock = new ReentrantReadWriteLock(true);
 
 	ClaimsMailbox(IntakeConfig config) {
 		this.config = config;
@@ -63,7 +70,8 @@ public class ClaimsMailbox {
 	 * @param folder The folder to read
 	 * @return The emails, or an empty list if the folder doesn't exist yet
 	 */
-	public List<InboundEmail> list(MailFolder folder) {
+	@MailClientSpan(protocol = Protocol.IMAP, operation = "list")
+	public List<InboundEmail> list(@SpanAttribute(FOLDER) MailFolder folder) {
 		return withFolder(folder, Folder.READ_ONLY, imapFolder -> parseAll(imapFolder.getMessages()))
 			.orElseGet(List::of);
 	}
@@ -75,7 +83,8 @@ public class ClaimsMailbox {
 	 * @param messageId The {@code Message-ID}, angle brackets included
 	 * @return The email, or empty if the folder holds no email with that {@code Message-ID}
 	 */
-	public Optional<InboundEmail> find(MailFolder folder, String messageId) {
+	@MailClientSpan(protocol = Protocol.IMAP, operation = "find")
+	public Optional<InboundEmail> find(@SpanAttribute(FOLDER) MailFolder folder, String messageId) {
 		return withFolder(folder, Folder.READ_ONLY, imapFolder -> parseAll(search(imapFolder, messageId)))
 			.flatMap(emails -> emails.stream().findFirst());
 	}
@@ -88,7 +97,8 @@ public class ClaimsMailbox {
 	 * @param to The folder to move it to
 	 * @return {@code true} if the email was moved, {@code false} if {@code from} holds no email with that {@code Message-ID}
 	 */
-	public boolean move(String messageId, MailFolder from, MailFolder to) {
+	@MailClientSpan(protocol = Protocol.IMAP, operation = "move")
+	public boolean move(String messageId, @SpanAttribute(FOLDER) MailFolder from, MailFolder to) {
 		return withFolder(from, Folder.READ_WRITE, source -> moveMessages(source, search(source, messageId), to))
 			.orElse(false);
 	}
@@ -106,7 +116,8 @@ public class ClaimsMailbox {
 	 * @return The email, or empty if {@code from} is empty (or doesn't exist)
 	 * @throws MailboxException if the connection to the mailbox fails
 	 */
-	public Optional<InboundEmail> moveOldest(MailFolder from, MailFolder to) {
+	@MailClientSpan(protocol = Protocol.IMAP, operation = "moveOldest")
+	public Optional<InboundEmail> moveOldest(@SpanAttribute(FOLDER) MailFolder from, MailFolder to) {
 		return withFolder(from, Folder.READ_WRITE, source -> moveOldest(source, to))
 			.flatMap(Function.identity());
 	}
@@ -150,7 +161,8 @@ public class ClaimsMailbox {
 	 * @param to The folder to move them to
 	 * @return {@code true} if any email was moved
 	 */
-	public boolean moveWithoutMessageId(MailFolder from, MailFolder to) {
+	@MailClientSpan(protocol = Protocol.IMAP, operation = "moveWithoutMessageId")
+	public boolean moveWithoutMessageId(@SpanAttribute(FOLDER) MailFolder from, MailFolder to) {
 		return withFolder(from, Folder.READ_WRITE, source -> moveMessages(source, withoutMessageId(source), to))
 			.orElse(false);
 	}
@@ -221,14 +233,24 @@ public class ClaimsMailbox {
 		return List.copyOf(emails);
 	}
 
+	// Concurrent runs hitting GreenMail together stall some of their moves, so a call that changes the mailbox has it to itself, while
+	// reads share it. The lock is fair, so a steady stream of reads can't starve a move
 	private <T> Optional<T> withFolder(MailFolder folder, int mode, FolderAction<T> action) {
+		var lock = (mode == Folder.READ_ONLY) ? this.folderLock.readLock() : this.folderLock.writeLock();
+		lock.lock();
+
 		try (var store = connect()) {
 			var imapFolder = store.getFolder(folderName(folder));
 
 			return imapFolder.exists() ? Optional.of(openAndRun(imapFolder, mode, action)) : Optional.empty();
 		}
 		catch (MessagingException | IOException e) {
-			throw new MailboxException("Couldn't access the %s folder of %s".formatted(folderName(folder), this.config.imap().user()), e);
+			var message = "Couldn't access the %s folder of %s".formatted(folderName(folder), this.config.imap().user());
+
+			throw (mode == Folder.READ_ONLY) ? new MailboxException(message, e) : new MailboxMoveException(message, e);
+		}
+		finally {
+			lock.unlock();
 		}
 	}
 
@@ -249,14 +271,7 @@ public class ClaimsMailbox {
 	}
 
 	private String folderName(MailFolder folder) {
-		var folders = this.config.folders();
-
-		return switch (folder) {
-			case INBOX -> INBOX;
-			case PROCESSING -> folders.processing();
-			case PROCESSED -> folders.processed();
-			case FAILED -> folders.failed();
-		};
+		return folder.folderName(this.config.folders());
 	}
 
 	// Jakarta Mail has no timeouts by default, so a stalled server would hang the caller forever.

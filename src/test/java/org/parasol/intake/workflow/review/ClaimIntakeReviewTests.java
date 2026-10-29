@@ -10,15 +10,12 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-import jakarta.inject.Inject;
-
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.IntakeFlowTestBase;
 import org.parasol.intake.IntakeScenario;
 import org.parasol.intake.IntakeScenario.Mail;
 import org.parasol.intake.MissingItem;
-import org.parasol.intake.WorkflowSpans;
 import org.parasol.intake.mailbox.MailFolder;
 import org.parasol.intake.model.EmailType;
 import org.parasol.intake.review.ReviewDecided;
@@ -42,9 +39,6 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 
 	@InjectSpy
 	ReviewDecisionSteps decisionSteps;
-
-	@Inject
-	WorkflowSpans workflowSpans;
 
 	@Test
 	void readyMovesTheClaimInProcessWithOneThankYouAndNoModelCall() {
@@ -171,7 +165,10 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 		stubFollowUp(marker, COMPLETE_DETAILS.replace("Elm Street", "Oak Avenue"));
 		this.scenario.awaitFiled(this.scenario.submit(Mail.from(SENDER).inReplyTo(created.messageId()).body("Actually Oak Avenue. " + marker)));
 
-		var newRun = Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> this.scenario.waitingRun(created.claim().id).filter(run -> !run.id().equals(oldRunId)), Optional::isPresent).orElseThrow();
+		var newRun = Awaitility.await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.scenario.waitingRun(created.claim().id).filter(run -> !run.id().equals(oldRunId)), Optional::isPresent)
+			.orElseThrow();
 
 		assertThat(oldRun.status()).isEqualTo(WorkflowStatus.CANCELLED);
 		assertThat(this.scenario.claim(created.claim().id))
@@ -186,7 +183,7 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 
 		// The canceled run leaves no Flow rows, and its workflow.execute span is still exported (quarkus-flow#1058, fixed in 1.2.0)
 		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> (this.scenario.instanceRows(oldRunId) == 0) && (this.scenario.taskRows(oldRunId) == 0));
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> this.workflowSpans.ofRun(oldRunId), Optional::isPresent);
+		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> this.spans.ofRun(oldRunId), Optional::isPresent);
 
 		// A later decision reaches only the new run
 		this.scenario.decide(created.claim().id, ReviewOutcome.READY, Set.of());

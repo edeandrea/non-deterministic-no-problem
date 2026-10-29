@@ -17,6 +17,9 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.Session;
 
 import org.parasol.intake.config.IntakeConfig;
+import org.parasol.intake.observability.IntakeActivities;
+import org.parasol.intake.observability.IntakeActivity.WatcherConnectionChanged;
+import org.parasol.intake.observability.IntakeActivity.WatcherReconnecting;
 
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
@@ -57,16 +60,30 @@ class ClaimsInboxWatcher {
 	private final Session session;
 	private final Scheduler scheduler;
 	private final ExecutorService executor;
+	private final IntakeActivities activities;
 
 	// Held while a blocking step runs, so stop() can wait for it. It guards no data
 	private final ReentrantLock stepInProgress = new ReentrantLock();
+
+	// Makes start() and stop() each atomic against the other. stop() holds it while it waits, so a start() can't begin a session
+	// while the previous one drains
+	private final ReentrantLock lifecycle = new ReentrantLock();
 
 	private volatile boolean isStopping;
 	private volatile boolean hasRecovered;
 	private volatile InboxIdle idle;
 	private volatile Cancellable subscription;
 
-	ClaimsInboxWatcher(IntakeConfig config, ClaimsMailbox mailbox, Event<EmailReceived> received, Settings settings, Scheduler scheduler, @VirtualThreads ExecutorService executor) {
+	ClaimsInboxWatcher(
+		IntakeConfig config,
+		ClaimsMailbox mailbox,
+		Event<EmailReceived> received,
+		Settings settings,
+		Scheduler scheduler,
+		@VirtualThreads ExecutorService executor,
+		IntakeActivities activities
+	) {
+		this.activities = activities;
 		this.config = config;
 		this.mailbox = mailbox;
 		this.received = received;
@@ -110,44 +127,58 @@ class ClaimsInboxWatcher {
 	/**
 	 * Starts watching and returns at once.
 	 */
-	synchronized void start() {
-		if (this.subscription == null) {
-			this.isStopping = false;
-			this.hasRecovered = false;
-			this.subscription = Multi.createBy()
-			                         .repeating()
-			                         .uni(this::session)
-			                         .indefinitely()
-			                         .runSubscriptionOn(this.executor)
-			                         .subscribe()
-			                         .with(_ -> { }, failure -> Log.error("The claims inbox watcher failed", failure));
-			Log.infof("Watching the inbox of %s", this.config.imap().user());
+	void start() {
+		this.lifecycle.lock();
+
+		try {
+			if (this.subscription == null) {
+				this.isStopping = false;
+				this.hasRecovered = false;
+				this.subscription = Multi.createBy()
+				                         .repeating()
+				                         .uni(this::session)
+				                         .indefinitely()
+				                         .runSubscriptionOn(this.executor)
+				                         .subscribe()
+				                         .with(_ -> { }, failure -> Log.error("The claims inbox watcher failed", failure));
+				Log.infof("Watching the inbox of %s", this.config.imap().user());
+			}
+		}
+		finally {
+			this.lifecycle.unlock();
 		}
 	}
 
 	/**
 	 * Stops watching and waits for the work in progress, even if it's blocked in IDLE or waiting to reconnect.
 	 */
-	synchronized void stop() {
-		if (this.subscription != null) {
-			this.isStopping = true;
-			this.subscription.cancel();
-			Optional.ofNullable(this.idle)
-			        .ifPresent(InboxIdle::close);
+	void stop() {
+		this.lifecycle.lock();
 
-			try {
-				if (this.stepInProgress.tryLock(STOP_TIMEOUT.toMillis(), MILLISECONDS)) {
-					this.stepInProgress.unlock();
-				}
-				else {
-					Log.warn("The claims inbox watcher didn't stop in time");
-				}
-			}
-			catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-			}
+		try {
+			if (this.subscription != null) {
+				this.isStopping = true;
+				this.subscription.cancel();
+				Optional.ofNullable(this.idle)
+				        .ifPresent(InboxIdle::close);
 
-			this.subscription = null;
+				try {
+					if (this.stepInProgress.tryLock(STOP_TIMEOUT.toMillis(), MILLISECONDS)) {
+						this.stepInProgress.unlock();
+					}
+					else {
+						Log.warn("The claims inbox watcher didn't stop in time");
+					}
+				}
+				catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+				}
+
+				this.subscription = null;
+			}
+		}
+		finally {
+			this.lifecycle.unlock();
 		}
 	}
 
@@ -160,7 +191,10 @@ class ClaimsInboxWatcher {
 	private Uni<Void> session() {
 		return Uni.createFrom().item(this::openAndScan)
 			.onFailure(_ -> !this.isStopping)
-				.invoke(failure -> Log.warnf(failure, "Can't reach the claims mailbox, retrying"))
+				.invoke(failure -> {
+					this.activities.publish(new WatcherReconnecting());
+					Log.warnf(failure, "Can't reach the claims mailbox, retrying");
+				})
 			.onFailure(_ -> !this.isStopping)
 				.retry().withBackOff(this.settings.reconnectDelay(), this.settings.maxReconnectDelay()).indefinitely()
 			.invoke(this::watch)
@@ -196,6 +230,7 @@ class ClaimsInboxWatcher {
 
 		try (connection) {
 			this.idle = connection;
+			this.activities.publish(new WatcherConnectionChanged(true));
 
 			while (!this.isStopping) {
 				connection.awaitChange();
@@ -207,6 +242,7 @@ class ClaimsInboxWatcher {
 		}
 		finally {
 			this.idle = null;
+			this.activities.publish(new WatcherConnectionChanged(false));
 			this.stepInProgress.unlock();
 		}
 	}
@@ -216,6 +252,7 @@ class ClaimsInboxWatcher {
 			return Uni.createFrom().voidItem();
 		}
 
+		this.activities.publish(new WatcherReconnecting());
 		Log.warnf(failure, "Lost the claims mailbox, reconnecting in %s", this.settings.reconnectDelay());
 
 		return Uni.createFrom().voidItem().onItem().delayIt().by(this.settings.reconnectDelay());

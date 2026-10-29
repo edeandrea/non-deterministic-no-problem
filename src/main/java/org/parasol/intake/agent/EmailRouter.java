@@ -25,7 +25,8 @@ import dev.langchain4j.agentic.scope.AgenticScope;
  * <tr><td>pending</td><td>any</td><td>{@link ClaimExtractionWorkflow}</td><td>{@link PendingClaimUpdate}</td></tr>
  * <tr><td>any other status</td><td>any</td><td>{@link ClaimFollowUpAgent}</td><td>{@link StatusReply}</td></tr>
  * <tr><td>none</td><td>{@code NEW_CLAIM}</td><td>{@link ClaimExtractionWorkflow}</td><td>{@link NewClaim}</td></tr>
- * <tr><td>none</td><td>{@code NOT_A_CLAIM}, {@code CLAIM_FOLLOW_UP}</td><td>{@link UnmatchedEmailAgent}</td><td>{@link IntakeOutcome.NotAClaim}, {@link IntakeOutcome.NoMatchingClaim}</td></tr>
+ * <tr><td>none</td><td>{@code NOT_A_CLAIM}, {@code CLAIM_FOLLOW_UP}</td><td>{@link UnmatchedEmailAgent}</td>
+ * <td>{@link IntakeOutcome.NotAClaim}, {@link IntakeOutcome.NoMatchingClaim}</td></tr>
  * </table>
  */
 public interface EmailRouter {

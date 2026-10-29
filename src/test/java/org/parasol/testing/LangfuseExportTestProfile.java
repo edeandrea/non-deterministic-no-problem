@@ -5,12 +5,15 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * {@link StubbedModelsTestProfile}, plus spans exported to the Langfuse dev service and the session scoring that reads them
- * back, for the tests of what Langfuse ingested. Share it rather than adding another: every profile class is another full
- * application boot.
+ * {@link StubbedModelsTestProfile}, plus spans exported to the Langfuse dev service, for the tests that read back what
+ * Langfuse ingested: the chat's session scoring and the intake's delivery. Its own boot, since the exporter is build-time
+ * config ({@code %test} leaves it out); share it rather than adding another.
  * <ul>
+ *   <li><b>The Langfuse exporter with the {@code AI_ONLY} span filter:</b> what the intake's delivery is checked against. The
+ *   chat's generation and the AI service span above it pass that filter too.</li>
  *   <li><b>Session scoring, dataset creation and startup initialization on:</b> what the session scoring test exercises. The
- *   stub Gemini key makes the initializer's evaluator fail validation, which it logs and survives.</li>
+ *   intake never ends a chat scope, so its runs aren't scored. The stub Gemini key makes the initializer's evaluator fail
+ *   validation, which it logs and survives.</li>
  *   <li><b>{@code session-sentiment} and {@code judge} on WireMock</b>, for the session scoring call.</li>
  *   <li><b>OTLP export on, LGTM off:</b> nothing reads Tempo, Loki or Prometheus here.</li>
  * </ul>
@@ -21,6 +24,8 @@ public class LangfuseExportTestProfile extends StubbedModelsTestProfile {
 	@Override
 	public Map<String, String> getConfigOverrides() {
 		var overrides = Map.ofEntries(
+			Map.entry("quarkus.langfuse.otel.enabled", "true"),
+			Map.entry("quarkus.langfuse.otel.span-filter", "AI_ONLY"),
 			Map.entry("quarkus.otel.exporter.otlp.enabled", "true"),
 			Map.entry("quarkus.observability.enabled", "false"),
 			Map.entry("quarkus.aiscoring.interaction-mode", "normal"),
