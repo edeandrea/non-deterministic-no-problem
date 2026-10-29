@@ -293,6 +293,8 @@ class LangfuseSessionScoringServiceTests {
 				Map.entry("quarkus.aiscoring.langfuse.evaluation.session.score-session", "true"),
 				Map.entry("quarkus.aiscoring.langfuse.evaluation.session.create-dataset-on-session-close", "true"),
 				Map.entry("quarkus.otel.exporter.otlp.enabled", "true"),
+				// The one test that needs spans exported to Langfuse; the %test default leaves the span processor out
+				Map.entry("quarkus.langfuse.otel.enabled", "true"),
 				// Pin the provider: %ollama switches these two to `ollama`, which would route the chat path around the
 				// WireMock stubs below and into a real model. That model can decide to call updateClaimStatus on its own,
 				// adding a second GENERATION and breaking this test's single-exchange assertions.

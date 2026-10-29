@@ -47,7 +47,19 @@ class SameCustomerRuleTests {
 	}
 
 	private static InboundEmail email(String from, String fromName) {
-		return new InboundEmail(Optional.of("<id@example.com>"), List.of(), Optional.of(from), Optional.ofNullable(fromName), "Subject", Instant.EPOCH, "Body", "Body", List.of(), List.of(), false);
+		return new InboundEmail(
+			Optional.of("<id@example.com>"),
+			List.of(),
+			Optional.of(from),
+			Optional.ofNullable(fromName),
+			"Subject",
+			Instant.EPOCH,
+			"Body",
+			"Body",
+			List.of(),
+			List.of(),
+			false
+		);
 	}
 
 	private static InboundEmail emailWithoutSender() {

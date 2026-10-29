@@ -70,6 +70,9 @@ public record IntakeState(
 		REQUEUE
 	}
 
+	/**
+	 * Copies the lists and sets, so the state can't change after a step hands it on; a {@code null} one becomes empty.
+	 */
 	public IntakeState {
 		pendingClaimNumbers = (pendingClaimNumbers == null) ? List.of() : List.copyOf(pendingClaimNumbers);
 		missingItems = (missingItems == null) ? Set.of() : Set.copyOf(missingItems);
@@ -79,34 +82,109 @@ public record IntakeState(
 		return new IntakeState(messageId, sender, null, Disposition.CONTINUE, false, List.of(), null, null, false, Set.of(), false, false);
 	}
 
+	/**
+	 * Sets the claim the run works on.
+	 *
+	 * @param newClaimId The matched claim, or the one this run created
+	 * @param newWasPendingReview Whether that claim was in {@code Pending Review} when the email arrived
+	 * @return A copy with the claim set
+	 */
 	public IntakeState withClaim(Long newClaimId, boolean newWasPendingReview) {
 		return new IntakeState(this.messageId, this.sender, newClaimId, this.disposition, this.mayResolve, this.pendingClaimNumbers, this.outcome,
 			this.policyNumber, this.policyNumberGenerated, this.missingItems, newWasPendingReview, this.needsReview);
 	}
 
+	/**
+	 * Moves the run onto, or off, the main path.
+	 *
+	 * @param newDisposition Why the run is on, or left, the main path
+	 * @return A copy with the disposition set
+	 */
 	public IntakeState withDisposition(Disposition newDisposition) {
 		return new IntakeState(this.messageId, this.sender, this.claimId, newDisposition, this.mayResolve, this.pendingClaimNumbers, this.outcome,
 			this.policyNumber, this.policyNumberGenerated, this.missingItems, this.wasPendingReview, this.needsReview);
 	}
 
+	/**
+	 * Records the sender's pending claims, which {@code resolveClaim} chooses from when the email matched none.
+	 *
+	 * @param newMayResolve Whether {@code resolveClaim} should try to tell which of the claims the email belongs to
+	 * @param numbers The sender's pending claim numbers
+	 * @return A copy with the pending claims set
+	 */
 	public IntakeState withPendingClaims(boolean newMayResolve, List<String> numbers) {
 		return new IntakeState(this.messageId, this.sender, this.claimId, this.disposition, newMayResolve, numbers, this.outcome,
 			this.policyNumber, this.policyNumberGenerated, this.missingItems, this.wasPendingReview, this.needsReview);
 	}
 
+	/**
+	 * Records what the agents decided.
+	 *
+	 * @param newOutcome The agents' outcome for the email
+	 * @return A copy with the outcome set
+	 */
 	public IntakeState withOutcome(IntakeOutcome newOutcome) {
 		return new IntakeState(this.messageId, this.sender, this.claimId, this.disposition, this.mayResolve, this.pendingClaimNumbers, newOutcome,
 			this.policyNumber, this.policyNumberGenerated, this.missingItems, this.wasPendingReview, this.needsReview);
 	}
 
+	/**
+	 * Records the policy number for the claim to create, or to put on an updated claim.
+	 *
+	 * @param newPolicyNumber The policy number
+	 * @param generated Whether the number was generated rather than stated in the email
+	 * @return A copy with the policy number set
+	 */
 	public IntakeState withPolicy(String newPolicyNumber, boolean generated) {
 		return new IntakeState(this.messageId, this.sender, this.claimId, this.disposition, this.mayResolve, this.pendingClaimNumbers, this.outcome,
 			newPolicyNumber, generated, this.missingItems, this.wasPendingReview, this.needsReview);
 	}
 
+	/**
+	 * Records what applying the outcome did to the claim.
+	 *
+	 * @param newClaimId The claim that was created or updated
+	 * @param missing What the claim still lacks after this email
+	 * @param newNeedsReview Whether the claim is now complete and waits for a reviewer
+	 * @return A copy with the applied result set
+	 */
 	public IntakeState withApplied(Long newClaimId, Set<MissingItem> missing, boolean newNeedsReview) {
 		return new IntakeState(this.messageId, this.sender, newClaimId, this.disposition, this.mayResolve, this.pendingClaimNumbers, this.outcome,
 			this.policyNumber, this.policyNumberGenerated, missing, this.wasPendingReview, newNeedsReview);
+	}
+
+	/**
+	 * Whether the email names a claim that isn't the sender's. The four {@code is...} methods are the flow's routing predicates, named so
+	 * its definition reads as the design does and a stack trace or breakpoint shows a name, not a lambda. {@code @JsonIgnore} on each keeps
+	 * Jackson from persisting them as properties, which the record has no component for.
+	 */
+	@JsonIgnore
+	public boolean isWrongSender() {
+		return this.disposition == Disposition.WRONG_SENDER;
+	}
+
+	/**
+	 * Whether the resolver couldn't tell which of the sender's pending claims the email belongs to.
+	 */
+	@JsonIgnore
+	public boolean isWhichClaim() {
+		return this.disposition == Disposition.WHICH_CLAIM;
+	}
+
+	/**
+	 * Whether the stated policy number belongs to another customer.
+	 */
+	@JsonIgnore
+	public boolean isPolicyRejected() {
+		return this.disposition == Disposition.POLICY_REJECTED;
+	}
+
+	/**
+	 * Whether the run goes on to apply its outcome: the claim isn't being decided, which would send the email back in the queue.
+	 */
+	@JsonIgnore
+	public boolean isNotRequeued() {
+		return this.disposition != Disposition.REQUEUE;
 	}
 
 	/**

@@ -5,6 +5,12 @@ import jakarta.enterprise.context.ApplicationScoped;
 import org.parasol.intake.mailbox.ClaimsMailbox;
 import org.parasol.intake.mailbox.InboundEmail;
 import org.parasol.intake.mailbox.MailFolder;
+import org.parasol.intake.observability.EmailOutcome;
+import org.parasol.intake.observability.FailureOutcome;
+import org.parasol.intake.observability.FailureStage;
+import org.parasol.intake.observability.IntakeActivities;
+import org.parasol.intake.observability.IntakeActivity.EmailHandled;
+import org.parasol.intake.observability.IntakeActivity.IntakeFailed;
 
 import io.quarkus.logging.Log;
 
@@ -16,10 +22,12 @@ import io.quarkus.logging.Log;
 public class IntakeFailureHandler {
 	private final ClaimsMailbox mailbox;
 	private final ProcessingProblemReplySender processingProblem;
+	private final IntakeActivities activities;
 
-	IntakeFailureHandler(ClaimsMailbox mailbox, ProcessingProblemReplySender processingProblem) {
+	IntakeFailureHandler(ClaimsMailbox mailbox, ProcessingProblemReplySender processingProblem, IntakeActivities activities) {
 		this.mailbox = mailbox;
 		this.processingProblem = processingProblem;
+		this.activities = activities;
 	}
 
 	/**
@@ -30,6 +38,8 @@ public class IntakeFailureHandler {
 	 */
 	public void handle(String messageId, Throwable cause) {
 		Log.errorf(cause, "Processing %s failed", messageId);
+		this.activities.publish(new EmailHandled(EmailOutcome.FAILED));
+		this.activities.publish(new IntakeFailed(FailureStage.of(cause), cause.getClass().getSimpleName(), FailureOutcome.FATAL));
 
 		try {
 			var inProcessing = this.mailbox.find(MailFolder.PROCESSING, messageId);
@@ -50,6 +60,8 @@ public class IntakeFailureHandler {
 	 * @param email The email
 	 */
 	public void handleWithoutMessageId(InboundEmail email) {
+		this.activities.publish(new EmailHandled(EmailOutcome.FAILED));
+		this.activities.publish(new IntakeFailed(FailureStage.FETCH, IllegalArgumentException.class.getSimpleName(), FailureOutcome.FATAL));
 		Log.warnf("An email from %s has no Message-ID, so it can't be processed: filing it as failed", email.fromAddress().orElse("an unknown sender"));
 
 		try {

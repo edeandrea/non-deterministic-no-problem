@@ -10,7 +10,12 @@ import jakarta.enterprise.context.ApplicationScoped;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.parasol.intake.config.IntakeConfig;
+import org.parasol.intake.observability.MailClientSpan;
+import org.parasol.intake.observability.MailClientSpan.Protocol;
+import org.parasol.intake.observability.IntakeActivities;
+import org.parasol.intake.observability.IntakeActivity.ReplySent;
 
+import io.opentelemetry.context.Context;
 import io.quarkus.mailer.Mail;
 import io.quarkus.mailer.MailTemplate.MailTemplateInstance;
 import io.quarkus.mailer.reactive.ReactiveMailer;
@@ -29,14 +34,17 @@ public class IntakeReplySender {
 	private static final String AUTO_REPLIED = "auto-replied";
 	private static final String IN_REPLY_TO = "In-Reply-To";
 	private static final String REFERENCES = "References";
+	private static final String STATUS_ANSWER = "status_answer";
 
 	private final IntakeConfig config;
 	private final ReactiveMailer mailer;
 	private final Duration sendTimeout;
+	private final IntakeActivities activities;
 
 	// Every reply gives up at quarkus.mailer.timeout, the blocking Mailer's own timeout. It's a single Quarkus-owned key, so
 	// a @ConfigProperty rather than a mapping of our own
-	IntakeReplySender(IntakeConfig config, ReactiveMailer mailer, @ConfigProperty(name = "quarkus.mailer.timeout") Duration sendTimeout) {
+	IntakeReplySender(IntakeConfig config, ReactiveMailer mailer, @ConfigProperty(name = "quarkus.mailer.timeout") Duration sendTimeout, IntakeActivities activities) {
+		this.activities = activities;
 		this.config = config;
 		this.mailer = mailer;
 		this.sendTimeout = sendTimeout;
@@ -52,6 +60,7 @@ public class IntakeReplySender {
 	 * @param claimNumber The claim the reply is about. It prefixes the subject as {@code [CLM…] Re: }
 	 * @param threadingHeaders The headers that thread the reply under the email it answers
 	 */
+	@MailClientSpan(protocol = Protocol.SMTP, operation = "send")
 	public void sendTextReply(String recipient, String subject, String body, String claimNumber, ThreadingHeaders threadingHeaders) {
 		sendText(recipient, subjectPrefix(Optional.of(claimNumber)) + normalizeSubject(subject), body, threadingHeaders);
 	}
@@ -65,6 +74,7 @@ public class IntakeReplySender {
 	 * @param body The reply text
 	 * @param threadingHeaders The headers that thread the reply under the email it answers
 	 */
+	@MailClientSpan(protocol = Protocol.SMTP, operation = "send")
 	public void sendTextReply(String recipient, String subject, String body, ThreadingHeaders threadingHeaders) {
 		sendText(recipient, subjectPrefix(Optional.empty()) + normalizeSubject(subject), body, threadingHeaders);
 	}
@@ -79,6 +89,7 @@ public class IntakeReplySender {
 	 * @param claimNumber The claim the reply is about. It prefixes the subject as {@code [CLM…] Re: }
 	 * @param threadingHeaders The headers that thread the reply under the email it answers
 	 */
+	@MailClientSpan(protocol = Protocol.SMTP, operation = "send")
 	public void sendTemplateReply(MailTemplateInstance template, String recipient, String subject, String claimNumber, ThreadingHeaders threadingHeaders) {
 		sendTemplate(template, recipient, subjectPrefix(Optional.of(claimNumber)) + normalizeSubject(subject), threadingHeaders);
 	}
@@ -93,8 +104,18 @@ public class IntakeReplySender {
 	 * @param subject The inbound email's subject. A leading {@code Re:} is dropped, so it isn't doubled
 	 * @param threadingHeaders The headers that thread the reply under the email it answers
 	 */
+	@MailClientSpan(protocol = Protocol.SMTP, operation = "send")
 	public void sendTemplateReply(MailTemplateInstance template, String recipient, String subject, ThreadingHeaders threadingHeaders) {
 		sendTemplate(template, recipient, subjectPrefix(Optional.empty()) + normalizeSubject(subject), threadingHeaders);
+	}
+
+	// The template's id is IntakeTemplates/<method>, optionally with a variant suffix
+	private static String templateName(MailTemplateInstance template) {
+		var id = template.templateInstance().getTemplate().getId();
+		var name = id.substring(id.lastIndexOf('/') + 1);
+		var variant = name.indexOf('.');
+
+		return (variant < 0) ? name : name.substring(0, variant);
 	}
 
 	private void sendText(String recipient, String subject, String body, ThreadingHeaders threadingHeaders) {
@@ -105,6 +126,7 @@ public class IntakeReplySender {
 		addThreadingHeaders(mail, threadingHeaders);
 
 		awaitSent(this.mailer.send(mail));
+		this.activities.publish(new ReplySent(STATUS_ANSWER));
 	}
 
 	private void sendTemplate(MailTemplateInstance template, String recipient, String subject, ThreadingHeaders threadingHeaders) {
@@ -114,6 +136,7 @@ public class IntakeReplySender {
 			.from(this.config.address())
 			.subject(subject)
 			.send());
+		this.activities.publish(new ReplySent(templateName(template)));
 	}
 
 	// Waits up to quarkus.mailer.timeout, or indefinitely when it's 0, the way the blocking Mailer does. (A template's
@@ -122,24 +145,29 @@ public class IntakeReplySender {
 	private void awaitSent(Uni<Void> send) {
 		var await = send.await();
 
-		offCallerThread(() -> {
-			if (this.sendTimeout.isZero()) {
-				await.indefinitely();
-			}
-			else {
-				await.atMost(this.sendTimeout);
-			}
-		});
+		try {
+			offCallerThread(() -> {
+				if (this.sendTimeout.isZero()) {
+					await.indefinitely();
+				}
+				else {
+					await.atMost(this.sendTimeout);
+				}
+			});
+		}
+		catch (RuntimeException e) {
+			throw new ReplyFailedException(e);
+		}
 	}
 
 	// The reactive mailer deadlocks, until the SMTP server's own timeout, when it's blocked on a thread that carries a
 	// captured Vert.x context (a ManagedExecutor or Flow task thread, depending on where the run was started). A new virtual
 	// thread has none, and unlike a ForkJoinPool thread it inherits the caller's context class loader, which a template's
 	// {config:...} lookup (ConfigProvider.getConfig()) needs in dev mode. The sender blocks until the mail server accepts
-	// the reply either way
+	// the reply either way. The OTel context goes along (it isn't the Vert.x one), so the send stays in the caller's span and trace
 	private static void offCallerThread(Runnable send) {
 		try {
-			CompletableFuture.runAsync(send, Thread::startVirtualThread).join();
+			CompletableFuture.runAsync(Context.current().wrap(send), Thread::startVirtualThread).join();
 		}
 		catch (CompletionException e) {
 			throw (e.getCause() instanceof RuntimeException cause) ? cause : e;

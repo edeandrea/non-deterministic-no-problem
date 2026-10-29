@@ -208,6 +208,18 @@ public class IntakeScenario {
 	}
 
 	/**
+	 * Submits an email {@link #deliverToProcessing} already moved to the processing folder, so a test can deliver a batch
+	 * first and then start its runs together.
+	 *
+	 * @return The email's {@code Message-ID}, or empty if it has none
+	 */
+	public String submit(InboundEmail email) {
+		this.starter.submit(email);
+
+		return email.messageId().orElse("");
+	}
+
+	/**
 	 * Sends the email to the claims address. GreenMail has delivered it when the send returns, so a watcher may already have
 	 * moved it.
 	 *

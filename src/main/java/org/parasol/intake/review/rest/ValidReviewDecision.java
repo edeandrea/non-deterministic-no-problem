@@ -77,7 +77,11 @@ import org.parasol.intake.review.ReviewedFields;
 
 		private static Optional<String> itemProblem(MissingItem item, boolean isAsked, boolean hasValue) {
 			return (isAsked == hasValue)
-				? Optional.of(isAsked ? "%s is asked of the customer, so it can't also have a value".formatted(item.label()) : "%s needs a value unless it's asked of the customer".formatted(item.label()))
+				? Optional.of(
+					isAsked
+						? "%s is asked of the customer, so it can't also have a value".formatted(item.label())
+						: "%s needs a value unless it's asked of the customer".formatted(item.label())
+				)
 				: Optional.empty();
 		}
 

@@ -40,10 +40,9 @@ fixes [quarkiverse/quarkus-flow#1096](https://github.com/quarkiverse/quarkus-flo
   "Status: proposed, for review before implementation" line to say the design is accepted and implemented
   (linking #216), and fix anything the implementation changed (e.g. the incident time, if still extracted; see
   `PLAN.md` → Caveats). Re-render its diagrams if they change.
-  - Its Observability section says the agentic adapter is
-    "proven before implementation starts": follow-up spike 5 proved it, so reword it (and the same line in the #216
-    issue body) to match what task 11 built, including whether quarkus-flow#1065 replaced the adapter. Its closing
-    line "quarkus-flow is 1.1.3" (and the issue body's) becomes 1.2.0, pinned ahead of the platform (task 06b).
+  - Its Observability section said the agentic adapter is "proven before implementation starts". *(Reworded in the
+    task 11 PR (2026-10-29): task 11 built no adapter, because Flow 1.3.0 carries the context; its closing line now says
+    quarkus-flow is 1.3.0, pinned ahead of the platform.)* Still to do here: the same two lines in the #216 issue body.
 - Update `CLAUDE.md`:
   - **Architecture:** the `org.parasol.intake` package; the intake as one quarkus-flow workflow (`ClaimIntakeFlow`)
     with the agentic root as one step; the non-waiting watcher and starter (parallel runs, per-sender order, failure listener); `resolveClaim` and the which-claim reply; the review as the workflow's `listen` + `switch`
@@ -83,11 +82,11 @@ fixes [quarkiverse/quarkus-flow#1096](https://github.com/quarkiverse/quarkus-flo
     - **single replica:** superseding a waiting review uses `activeInstance(id)`, which only sees this JVM; a reply
       during review and a decision are serialized by optimistic locking on the claim (`@Version`)
     - **observability workarounds with exit conditions:** the quarkus#54354 `ThreadContextProvider` guard (delete when
-      quarkusio/quarkus#56805 ships), and whatever task 11 kept of its Flow and agentic adapters (Flow 1.2.0 fixes
-      quarkus-flow#1056, so task 11 expects to need neither); the agentic-run-on-failure workaround is already gone
+      quarkusio/quarkus#56805 ships), and `FlowSpanTypingProcessor` (delete with quarkus-flow#1122); task 11 built no
+      Flow or agentic adapter (Flow 1.3.0 carries the context); the agentic-run-on-failure workaround is already gone
       (task 09b, quarkus-flow 1.3.0)
   - **Observability** (task 11): one claim = one Langfuse session via `gen_ai.conversation.id` (baggage, entered once
-    by the starter); the Flow task proxy; the trace shape and its known gaps (#1056); typed Flow spans; the
+    by the starter); no Flow task proxy was needed; the trace shape; typed Flow spans; the
     persistence-span decision; the `claim.intake.*` metrics; the `%test` Langfuse span export switch
     (`quarkus.langfuse.otel.enabled`, re-enabled only in `LangfuseSessionScoringServiceTests`); both Dev UIs (agentic:
     topology and per-run agent detail; Flow: the workflow and the review wait) and that `MonitoredAgent`

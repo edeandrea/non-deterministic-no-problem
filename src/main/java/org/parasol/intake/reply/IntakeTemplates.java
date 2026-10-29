@@ -21,6 +21,9 @@ import io.quarkus.qute.CheckedTemplate;
  */
 @CheckedTemplate(basePath = "IntakeTemplates")
 public class IntakeTemplates {
+	private IntakeTemplates() {
+	}
+
 	/**
 	 * The claim is complete and waiting for the reviewer's final check.
 	 *

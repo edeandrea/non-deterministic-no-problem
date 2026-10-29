@@ -150,6 +150,14 @@ class ClaimExtractionRulesTests {
 	}
 
 	private static IncidentDetails withAnswered(Set<MissingItem> answeredItems) {
-		return new IncidentDetails(COMPLETE.description(), COMPLETE.incidentDate(), COMPLETE.incidentTime(), COMPLETE.location(), COMPLETE.category(), COMPLETE.policyNumber(), answeredItems);
+		return new IncidentDetails(
+			COMPLETE.description(),
+			COMPLETE.incidentDate(),
+			COMPLETE.incidentTime(),
+			COMPLETE.location(),
+			COMPLETE.category(),
+			COMPLETE.policyNumber(),
+			answeredItems
+		);
 	}
 }

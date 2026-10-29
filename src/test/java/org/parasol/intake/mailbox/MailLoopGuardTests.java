@@ -27,6 +27,18 @@ class MailLoopGuardTests {
 	}
 
 	private static InboundEmail email(String from, boolean isAutoReply) {
-		return new InboundEmail(Optional.of("<id@example.com>"), List.of(), Optional.of(from), Optional.empty(), "Subject", Instant.EPOCH, "Body", "Body", List.of(), List.of(), isAutoReply);
+		return new InboundEmail(
+			Optional.of("<id@example.com>"),
+			List.of(),
+			Optional.of(from),
+			Optional.empty(),
+			"Subject",
+			Instant.EPOCH,
+			"Body",
+			"Body",
+			List.of(),
+			List.of(),
+			isAutoReply
+		);
 	}
 }

@@ -5,6 +5,8 @@ import java.util.Set;
 
 import org.parasol.intake.MissingItem;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 /**
  * A reviewer's decision.
  *
@@ -17,5 +19,14 @@ public record ReviewDecision(ReviewOutcome outcome, Set<MissingItem> missingItem
 		Objects.requireNonNull(outcome, "outcome");
 		missingItems = (missingItems == null) ? Set.of() : Set.copyOf(missingItems);
 		fields = (fields == null) ? ReviewedFields.none() : fields;
+	}
+
+	/**
+	 * Whether or not this decision's outcome is {@link ReviewOutcome#READY}.
+	 * @return True if this decision's outcome is {@link ReviewOutcome#READY}, false otherwise
+	 */
+	@JsonIgnore
+	public boolean isReady() {
+		return this.outcome == ReviewOutcome.READY;
 	}
 }

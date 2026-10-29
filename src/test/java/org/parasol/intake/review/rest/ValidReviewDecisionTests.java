@@ -47,7 +47,11 @@ class ValidReviewDecisionTests {
 
 	@Test
 	void needsInformationWithTheAskedFieldsLeftOutIsValid() {
-		assertThat(problems(ReviewOutcome.NEEDS_INFORMATION, Set.of(MissingItem.LOCATION, MissingItem.INCIDENT_DATE), new Fields("Car hit a post.", null, null, null, ClaimCategory.OTHER)))
+		assertThat(problems(
+			ReviewOutcome.NEEDS_INFORMATION,
+			Set.of(MissingItem.LOCATION, MissingItem.INCIDENT_DATE),
+			new Fields("Car hit a post.", null, null, null, ClaimCategory.OTHER)
+		))
 			.isEmpty();
 	}
 

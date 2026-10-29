@@ -14,6 +14,7 @@ import dev.langchain4j.agentic.agent.ErrorContext;
 import dev.langchain4j.agentic.agent.ErrorRecoveryResult;
 import dev.langchain4j.agentic.declarative.ErrorHandler;
 import dev.langchain4j.agentic.declarative.SequenceAgent;
+import dev.langchain4j.agentic.observability.MonitoredAgent;
 import dev.langchain4j.invocation.InvocationParameters;
 
 /**
@@ -22,8 +23,11 @@ import dev.langchain4j.invocation.InvocationParameters;
  * It has no side effects and never pauses: the intake workflow (task 08) runs it as one step and does all
  * persistence, mail and folder moves. There's no {@code @MemoryId}: every agent is stateless, and the history comes in
  * as arguments.
+ * <p>
+ * It is a {@link MonitoredAgent} so that {@link AgentMonitorConfigurer} can bound what the agent monitor keeps: outside dev mode, nothing.
+ * </p>
  */
-public interface ClaimsMailboxAgent {
+public interface ClaimsMailboxAgent extends MonitoredAgent {
 	/**
 	 * Decides what to do with an inbound email.
 	 *

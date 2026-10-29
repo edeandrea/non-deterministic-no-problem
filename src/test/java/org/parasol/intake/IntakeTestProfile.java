@@ -20,7 +20,7 @@ import io.quarkus.test.junit.QuarkusTestProfile;
  *   {@code ollama}, which would bypass the stubs and reach a real model. The model name is pinned too: {@code %ollama-openai}
  *   renames it, and the request body must be the same under every profile.</li>
  *   <li><b>Hibernate statistics on</b>, for the tests that assert what a request loads.</li>
- *   <li><b>Spans exported every 100 ms</b>, so {@link WorkflowSpans} sees a run's span soon after it ends.</li>
+ *   <li><b>Spans exported every 100 ms</b>, so {@link TestSpans} sees a run's spans soon after they end.</li>
  *   <li><b>A Toxiproxy container</b> ({@link ToxiproxyTestResource}) for the tests that cut the watcher's connection. It's a
  *   test resource of the profile, so it starts once with the profile's one boot.</li>
  * </ul>

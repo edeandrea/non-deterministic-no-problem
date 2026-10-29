@@ -139,16 +139,21 @@ ties them together. The id is OTel baggage, entered once when a run starts. The 
 the chat, Flow and the agents is our own framework-neutral package, `ai.scoring.conversation`, kept
 separate so it can later become its own library. It has a small core (the conversation context, a span
 processor that stamps the id, and a "conversation ended" event), one adapter per framework, and no intake
-code. Two parts of it are temporary workarounds:
-- a guard for a Quarkus context-propagation bug ([quarkus#54354](https://github.com/quarkusio/quarkus/issues/54354)),
-  which otherwise leaks one run's id onto another run's spans;
-- an agent adapter that carries the id into Flow's generated agent sub-workflows until #1056 is fixed. It's
-  proven before implementation starts.
+code. The intake needs no Flow or agent adapter: quarkus-flow 1.3.0 carries the OpenTelemetry context into its task
+threads and the generated agent sub-workflows, and `IntakeSpanPropagationTests` pins that. What the intake adds is typing
+and visibility, not propagation:
+- Flow's `workflow.execute` spans of generated agentic workflows are typed `invoke_agent` and its `task.execute` spans
+  `chain` for Langfuse (a stand-in until [quarkus-flow#1122](https://github.com/quarkiverse/quarkus-flow/issues/1122)),
+  IMAP and SMTP calls get `CLIENT` spans without addresses, and `claim.intake.*` meters count emails, replies, review
+  decisions and failures.
+- Two parts are temporary workarounds: a guard for a Quarkus context-propagation bug
+  ([quarkus#54354](https://github.com/quarkusio/quarkus/issues/54354)), which otherwise leaks one run's id onto another
+  run's spans, and the `invoke_agent` typing above.
 
 The chat moves onto the same package, and session scoring becomes a listener for a "conversation ended"
 event. Nothing in the intake ends a conversation yet, so intake LLM calls get tier-1 scores but claims get
 no session score.
 
-quarkus-flow is 1.1.3; its LangChain4j and OpenTelemetry integrations are Preview extensions. The spike
+quarkus-flow is 1.3.0 (pinned ahead of the platform, which still has 1.1.3); its LangChain4j and OpenTelemetry integrations are Preview extensions. The spike
 evidence behind this design is in
 [`spike-results-flow.md`](../../.tasks/05-gh216-agentic-email-intake/spike-results-flow.md).

@@ -11,7 +11,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.config.IntakeConfig;
+import org.parasol.intake.observability.IntakeActivityEvents;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.quarkus.mailer.Mail;
 import io.quarkus.mailer.reactive.ReactiveMailer;
 import io.smallrye.mutiny.Uni;
@@ -48,7 +50,7 @@ class IntakeReplySenderThreadTests {
 
 		Thread.currentThread().setContextClassLoader(callersLoader);
 
-		new IntakeReplySender(config, mailer, Duration.ofSeconds(5))
+		new IntakeReplySender(config, mailer, Duration.ofSeconds(5), IntakeActivityEvents.into(new SimpleMeterRegistry()))
 			.sendTextReply("jane.doe@example.com", "Car accident", "Thanks", "CLM01000000", ThreadingHeaders.none());
 
 		assertThat(sendingLoader).hasValue(callersLoader);

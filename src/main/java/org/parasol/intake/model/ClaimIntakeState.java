@@ -1,5 +1,6 @@
 package org.parasol.intake.model;
 
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -53,6 +54,11 @@ public class ClaimIntakeState extends PanacheEntityBase {
 	 * The id of the intake run waiting for a reviewer's decision, while the claim is {@code Pending Review}.
 	 */
 	public String reviewRunId;
+
+	/**
+	 * When the claim went into {@code Pending Review}; empty otherwise. Only the review-wait metric reads it.
+	 */
+	public Instant reviewOpenedAt;
 
 	/**
 	 * The id of the run a reviewer's decision is being applied to: the review claims it by moving {@link #reviewRunId} here.
