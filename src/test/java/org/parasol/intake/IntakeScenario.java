@@ -11,7 +11,6 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 import jakarta.activation.DataHandler;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -352,36 +351,33 @@ public class IntakeScenario {
 	}
 
 	/**
-	 * Publishes the decision until the run leaves {@code WAITING}: a decision published the moment the run says it's waiting
-	 * can be lost, and the run consumes only one.
+	 * Publishes the decision until the run takes it: a decision published the moment the run says it's waiting can be lost
+	 * without a trace, and the run consumes only one. The decision is taken once the run leaves {@code WAITING}, or once it
+	 * has already handled it and is waiting again ({@code decidingRunId} no longer names the run), which a decision that
+	 * faults and puts the claim back in review can do between two polls. Republishing then would hand the waiting run a
+	 * second decision. The caller must have claimed the review first ({@link #claimReview}).
 	 */
 	public void publishUntilWoken(WorkflowInstance run, ReviewDecided decided) {
-		var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
-		var isWoken = false;
+		this.publisher.publish(decided);
 
-		while (!isWoken && (System.nanoTime() < deadline)) {
-			this.publisher.publish(decided);
-			isWoken = awaitLeavesWaiting(run);
-		}
+		await()
+			.atMost(WAIT)
+			.pollInterval(Duration.ofMillis(250))
+			.until(() -> {
+				var isTaken = (run.status() != WorkflowStatus.WAITING) || isDecisionHandled(decided);
 
-		if (!isWoken) {
-			throw new AssertionError("The decision never woke " + run.id());
-		}
+				if (!isTaken) {
+					this.publisher.publish(decided);
+				}
+
+				return isTaken;
+			});
 	}
 
-	private static boolean awaitLeavesWaiting(WorkflowInstance run) {
-		var deadline = System.nanoTime() + Duration.ofMillis(250).toNanos();
-		var isWoken = false;
-
-		while (!isWoken && (System.nanoTime() < deadline)) {
-			isWoken = (run.status() != WorkflowStatus.WAITING);
-
-			if (!isWoken) {
-				await().pollDelay(Duration.ofMillis(10)).atMost(Duration.ofMillis(50)).until(() -> true);
-			}
-		}
-
-		return isWoken;
+	private boolean isDecisionHandled(ReviewDecided decided) {
+		return intake(decided.claimId())
+			.map(state -> !decided.runId().equals(state.decidingRunId))
+			.orElse(false);
 	}
 
 	public void publish(ReviewDecided decided) {

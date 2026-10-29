@@ -863,8 +863,12 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
     claim's waiting run, simulates claiming the review (`claimReview`, the same `reviewRunId` → `decidingRunId` move the
     real `ClaimReviewService` does — these workflow-level tests exercise the decision steps directly, not through the
     REST layer, so the simulation stays), publishes decisions with `publishUntilWoken` (a decision published the moment a
-    run says `WAITING` can be lost, so it republishes until the run leaves `WAITING`; see **Review tests** below for why
-    the real endpoint doesn't need to), and cleans up (every Flow run canceled, claims beyond the six seeded ones,
+    run says `WAITING` can be lost, so it republishes, through Awaitility every 250 ms within `WAIT`, until the run takes
+    it: it leaves `WAITING`, or `decidingRunId` no longer names it. The second condition matters: a decision that faults
+    and puts the claim back in review can be back in `waitReview` between two polls, and a republish would then hand it a
+    second decision, which is how `aFaultInTheDecisionStepPutsTheClaimBackAndTheSameRunWaitsAgain` failed on slow CI
+    runners. Callers claim the review first; see **Review tests** below for why the real endpoint doesn't need to
+    republish), and cleans up (every Flow run canceled, claims beyond the six seeded ones,
     recorded emails and intake state). It also owns the tests' database reads and fixtures, as `@Transactional(REQUIRES_NEW)`
     methods, so the test classes need no `QuarkusTransaction`.
   - `IntakeFlowTestBase` (`org.parasol.intake`, public with `protected` members so every intake test package can extend it: `createClaim`, `stubNewClaim`, `stubFollowUp`) and `ChatStubs.answerWhenAll`: a stub matches the
