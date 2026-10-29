@@ -20,22 +20,21 @@ import org.junit.jupiter.api.Test;
 import org.parasol.intake.IntakeFlowTestBase;
 import org.parasol.intake.IntakeScenario;
 import org.parasol.intake.IntakeScenario.Mail;
-import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.StartedRuns;
 import org.parasol.intake.StartedRuns.StartedRun;
 import org.parasol.intake.TestSpans;
-import org.parasol.intake.workflow.ClaimIntakeFlow;
 import org.parasol.intake.model.EmailType;
 import org.parasol.intake.observability.SpanCensus.Kind;
 import org.parasol.intake.review.ReviewOutcome;
+import org.parasol.intake.workflow.ClaimIntakeFlow;
 import org.parasol.intake.workflow.review.ReviewDecisionSteps;
+import org.parasol.testing.StubbedModelsTestProfile;
 
 import ai.scoring.langfuse.otel.LangfuseFlowSpanTypingProcessor;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.sdk.trace.data.SpanData;
 import io.opentelemetry.semconv.incubating.GenAiIncubatingAttributes;
 import io.opentelemetry.semconv.incubating.GenAiIncubatingAttributes.GenAiOperationNameIncubatingValues;
-import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 import io.quarkus.logging.Log;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
@@ -52,8 +51,7 @@ import io.serverlessworkflow.impl.WorkflowStatus;
  * </p>
  */
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
-@ConnectWireMock
+@TestProfile(StubbedModelsTestProfile.class)
 class IntakeSpanPropagationTests extends IntakeFlowTestBase {
 	private static final int CONCURRENT_RUNS = 8;
 	// No location, so each run asks for it and ends instead of waiting for review, and all its spans are exported

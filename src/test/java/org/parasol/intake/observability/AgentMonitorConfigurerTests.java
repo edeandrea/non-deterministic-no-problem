@@ -7,10 +7,9 @@ import jakarta.inject.Inject;
 
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.IntakeFlowTestBase;
-import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.agent.ClaimsMailboxAgent;
+import org.parasol.testing.StubbedModelsTestProfile;
 
-import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 import io.quarkiverse.langfuse.runtime.otel.LangfuseSpanProcessor;
@@ -20,8 +19,7 @@ import io.quarkiverse.langfuse.runtime.otel.LangfuseSpanProcessor;
  * and tests don't export their spans to Langfuse.
  */
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
-@ConnectWireMock
+@TestProfile(StubbedModelsTestProfile.class)
 class AgentMonitorConfigurerTests extends IntakeFlowTestBase {
 	@Inject
 	ClaimsMailboxAgent agent;

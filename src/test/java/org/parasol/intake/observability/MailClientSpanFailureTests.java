@@ -13,8 +13,8 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.TestSpans;
+import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
@@ -26,7 +26,7 @@ import io.opentelemetry.api.trace.StatusCode;
  * address or a {@code Message-ID}.
  */
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
+@TestProfile(StubbedModelsTestProfile.class)
 class MailClientSpanFailureTests {
 	private static final String SECRET = "someone@example.com";
 

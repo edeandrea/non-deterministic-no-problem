@@ -13,27 +13,25 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.parasol.claim.model.ClaimCategory;
 import org.parasol.intake.ChatStubs;
-import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.agent.triage.ClaimStatusTools;
 import org.parasol.intake.model.EmailType;
 import org.parasol.intake.model.IncidentDetails;
 import org.parasol.intake.model.IntakeOutcome;
 import org.parasol.intake.model.MatchedClaim;
+import org.parasol.testing.StubbedModelsTestProfile;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import dev.langchain4j.model.output.structured.Description;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
-import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 
 /**
  * The root agent end to end against a stubbed model: classify, route, and each branch's outcome.
  */
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
-@ConnectWireMock
+@TestProfile(StubbedModelsTestProfile.class)
 class ClaimsMailboxAgentTests {
 	private static final String SENT_DATE = "2026-10-08";
 	private static final IncidentDetails NOTHING_YET = new IncidentDetails(null, null, null, null, null, null, Set.of());
@@ -87,7 +85,7 @@ class ClaimsMailboxAgentTests {
 			.allSatisfy(request -> assertThat(this.stubs.roles(request))
 				.as("a system prompt and one user message: no chat history, no RAG content")
 				.containsExactly("system", "user"))
-			.allSatisfy(request -> assertThat(this.stubs.body(request).path("model").asText()).isEqualTo(IntakeTestProfile.MODEL_NAME));
+			.allSatisfy(request -> assertThat(this.stubs.body(request).path("model").asText()).isEqualTo(StubbedModelsTestProfile.MODEL_NAME));
 		assertThat(this.stubs.countRequestsFor(FOLLOW_UP)).isZero();
 	}
 

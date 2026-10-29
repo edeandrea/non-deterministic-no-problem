@@ -23,18 +23,17 @@ import org.junit.jupiter.api.Test;
 import org.parasol.intake.IntakeFlowTestBase;
 import org.parasol.intake.IntakeScenario;
 import org.parasol.intake.IntakeScenario.Mail;
-import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.StartedRuns;
 import org.parasol.intake.TestSpans;
 import org.parasol.intake.config.IntakeConfig;
 import org.parasol.intake.review.ReviewOutcome;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
 import org.parasol.intake.workflow.review.ReviewDecisionSteps;
+import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.sdk.trace.data.SpanData;
-import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.junit.mockito.InjectSpy;
@@ -45,8 +44,7 @@ import io.quarkus.test.junit.mockito.InjectSpy;
  * trace id in the MDC.
  */
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
-@ConnectWireMock
+@TestProfile(StubbedModelsTestProfile.class)
 class IntakeTracingTests extends IntakeFlowTestBase {
 	private static final String NO_LOCATION = details("Car hit a post.", "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());
 	private static final AttributeKey<String> MESSAGING_SYSTEM = AttributeKey.stringKey("messaging.system");

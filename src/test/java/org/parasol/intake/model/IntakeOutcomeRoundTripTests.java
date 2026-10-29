@@ -10,13 +10,13 @@ import jakarta.inject.Inject;
 
 import org.junit.jupiter.api.Test;
 import org.parasol.claim.model.ClaimCategory;
-import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.model.IntakeOutcome.NewClaim;
 import org.parasol.intake.model.IntakeOutcome.NoMatchingClaim;
 import org.parasol.intake.model.IntakeOutcome.NotAClaim;
 import org.parasol.intake.model.IntakeOutcome.PendingClaimUpdate;
 import org.parasol.intake.model.IntakeOutcome.StatusReply;
+import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
@@ -29,7 +29,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * a round trip through it.
  */
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
+@TestProfile(StubbedModelsTestProfile.class)
 class IntakeOutcomeRoundTripTests {
 	private static final ClaimExtraction EXTRACTION = new ClaimExtraction("summary", "sentiment", new IncidentDetails(
 		"car hit a tree", "2026-10-08", "14:30", "Elm Street", ClaimCategory.SINGLE_VEHICLE, "AC-1234567", Set.of(MissingItem.LOCATION)));

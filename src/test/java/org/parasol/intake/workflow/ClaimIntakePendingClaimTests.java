@@ -8,11 +8,10 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.IntakeFlowTestBase;
 import org.parasol.intake.IntakeScenario.Mail;
-import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.model.EmailType;
+import org.parasol.testing.StubbedModelsTestProfile;
 
-import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 
@@ -20,8 +19,7 @@ import io.quarkus.test.junit.TestProfile;
  * Follow-up emails: merging into pending claims, status replies, and emails that match no claim of the sender's.
  */
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
-@ConnectWireMock
+@TestProfile(StubbedModelsTestProfile.class)
 class ClaimIntakePendingClaimTests extends IntakeFlowTestBase {
 	private static final String NO_LOCATION = details("Car hit a post.", "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());
 	// A reply has to say which of the requested items it answers, as the agent does from its prompt

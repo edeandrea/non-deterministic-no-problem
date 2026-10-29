@@ -18,7 +18,6 @@ import org.parasol.claim.model.ClaimCategory;
 import org.parasol.intake.ChatStubs;
 import org.parasol.intake.IntakeScenario;
 import org.parasol.intake.IntakeScenario.Mail;
-import org.parasol.intake.IntakeTestProfile;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.client.WireMock;
@@ -29,19 +28,17 @@ import com.microsoft.playwright.assertions.LocatorAssertions;
 import com.microsoft.playwright.assertions.PlaywrightAssertions;
 import com.microsoft.playwright.options.AriaRole;
 
-import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 
 /**
  * The review panel on the claim detail page, against the Compose GreenMail, a real {@code ClaimIntakeFlow} run and a
- * stubbed model (one more full boot than {@link IntakeTestProfile} and the plain Playwright profile each pay for on their
- * own, since a claim only reaches {@code Pending Review} through a real waiting run; see {@link IntakeUiTestProfile}).
+ * stubbed {@code claim-intake} model, since a claim only reaches {@code Pending Review} through a real waiting run. It shares
+ * {@link UiTestProfile}, and so the boot, with the other Playwright tests.
  */
 @QuarkusTest
-@TestProfile(IntakeUiTestProfile.class)
-@ConnectWireMock
+@TestProfile(UiTestProfile.class)
 class ClaimReviewPanelPageTests extends PlaywrightTests {
 	private static final String SENDER = "jane.doe@example.com";
 	private static final String SENDER_NAME = "Jane Doe";

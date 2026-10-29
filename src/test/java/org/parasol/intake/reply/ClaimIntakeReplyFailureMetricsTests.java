@@ -9,17 +9,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.awaitility.Awaitility;
-import org.parasol.intake.IntakeScenario;
-import org.parasol.intake.failure.IntakeFailureHandler;
 import org.parasol.intake.IntakeFlowTestBase;
+import org.parasol.intake.IntakeScenario;
 import org.parasol.intake.IntakeScenario.Mail;
-import org.parasol.intake.IntakeTestProfile;
+import org.parasol.intake.failure.IntakeFailureHandler;
+import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.micrometer.core.instrument.Counter;
-import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.junit.mockito.InjectSpy;
@@ -29,8 +28,7 @@ import io.quarkus.test.junit.mockito.InjectSpy;
  * constructor is package-private: the sender throws it, nothing else does.
  */
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
-@ConnectWireMock
+@TestProfile(StubbedModelsTestProfile.class)
 class ClaimIntakeReplyFailureMetricsTests extends IntakeFlowTestBase {
 	private static final String NO_LOCATION = details("Car hit a post.", "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());
 

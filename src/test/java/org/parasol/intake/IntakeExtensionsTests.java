@@ -9,6 +9,7 @@ import jakarta.persistence.EntityManager;
 
 import org.hibernate.Session;
 import org.junit.jupiter.api.Test;
+import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkus.arc.Arc;
 import io.quarkus.test.junit.QuarkusTest;
@@ -18,7 +19,7 @@ import io.serverlessworkflow.impl.persistence.PersistenceInstanceReader;
 
 // The app boots with the agentic extension and the four quarkus-flow modules, and Flow's JPA persistence is live
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
+@TestProfile(StubbedModelsTestProfile.class)
 class IntakeExtensionsTests {
 	private static final List<String> FLOW_TABLES = List.of("cloud_event_entity", "task_info_entity", "workflow_instance_entity");
 

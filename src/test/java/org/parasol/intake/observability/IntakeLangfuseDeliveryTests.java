@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
@@ -19,10 +18,9 @@ import org.junit.jupiter.api.Test;
 import org.parasol.intake.IntakeFlowTestBase;
 import org.parasol.intake.IntakeScenario;
 import org.parasol.intake.IntakeScenario.Mail;
-import org.parasol.intake.IntakeTestProfile;
+import org.parasol.testing.LangfuseExportTestProfile;
 import org.parasol.intake.StartedRuns;
 import org.parasol.intake.TestSpans;
-import org.parasol.intake.observability.IntakeLangfuseDeliveryTests.LangfuseDeliveryProfile;
 import org.parasol.intake.review.ReviewOutcome;
 
 import io.quarkus.logging.Log;
@@ -34,15 +32,13 @@ import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.sdk.trace.data.SpanData;
 import io.quarkiverse.langfuse.api.LangfuseOperations;
 import io.quarkiverse.langfuse.api.ObservationFilter;
-import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 
 /**
  * Verifies real Langfuse Dev Services ingestion, not just locally stamped attributes: generated workflows and tasks
  * survive AI_ONLY filtering across exports and multiple intake traces group into one claim session.
  */
 @QuarkusTest
-@TestProfile(LangfuseDeliveryProfile.class)
-@ConnectWireMock
+@TestProfile(LangfuseExportTestProfile.class)
 class IntakeLangfuseDeliveryTests extends IntakeFlowTestBase {
 	private static final Set<String> GENERATED = Set.of("claims-mailbox-agent", "email-router", "claim-extraction-workflow");
 
@@ -137,21 +133,5 @@ class IntakeLangfuseDeliveryTests extends IntakeFlowTestBase {
 				});
 			});
 		Log.infof("Langfuse delivery verified: session %s, %d expected workflow/task observations", conversationId, expected.size());
-	}
-
-	/**
-	 * Keeps ordinary intake tests isolated from Langfuse export, with only one extra boot for real backend verification.
-	 */
-	public static class LangfuseDeliveryProfile extends IntakeTestProfile {
-		@Override
-		public Map<String, String> getConfigOverrides() {
-			return Stream.concat(super.getConfigOverrides().entrySet().stream(), Map.of(
-				"quarkus.langfuse.otel.enabled", "true",
-				"quarkus.langfuse.otel.span-filter", "AI_ONLY",
-				"quarkus.observability.enabled", "false",
-				"quarkus.aiscoring.langfuse.evaluation.initialize-on-startup", "false",
-				"quarkus.aiscoring.langfuse.evaluation.session.score-session", "false").entrySet().stream())
-				.collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue, (_, override) -> override));
-		}
 	}
 }

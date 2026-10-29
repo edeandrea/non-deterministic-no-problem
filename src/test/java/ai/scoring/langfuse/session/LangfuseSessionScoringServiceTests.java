@@ -22,13 +22,12 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.parasol.chat.model.ClaimBotQuery;
+import org.parasol.testing.LangfuseExportTestProfile;
 
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 
 import ai.scoring.langfuse.config.LangfuseConfig;
-import ai.scoring.langfuse.session.LangfuseSessionScoringServiceTests.SessionScoringTestProfile;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import com.langfuse.api.datasetItems.DatasetItemsApi.APIDatasetItemsListRequest;
@@ -39,11 +38,9 @@ import com.langfuse.api.scores.ScoresApi.APIScoresGetManyRequest;
 import io.quarkiverse.langchain4j.chatscopes.ChatScopeEnded;
 import io.quarkiverse.langchain4j.chatscopes.LocalChatRoutes;
 import io.quarkiverse.langfuse.api.LangfuseOperations;
-import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 
 @QuarkusTest
-@TestProfile(SessionScoringTestProfile.class)
-@ConnectWireMock
+@TestProfile(LangfuseExportTestProfile.class)
 class LangfuseSessionScoringServiceTests {
 	private static final String OPENAI_RESPONSE = """
 		{
@@ -278,40 +275,6 @@ class LangfuseSessionScoringServiceTests {
 
 		List<String> getSessionIds() {
 			return this.sessionIds;
-		}
-	}
-
-	public static class SessionScoringTestProfile implements QuarkusTestProfile {
-		private static final String WIREMOCK_URL = "http://localhost:${quarkus.wiremock.devservices.port}/v1";
-
-		@Override
-		public Map<String, String> getConfigOverrides() {
-			return Map.ofEntries(
-				Map.entry("quarkus.aiscoring.interaction-mode", "normal"),
-				Map.entry("quarkus.aiscoring.langfuse.evaluation.initialize-on-startup", "true"),
-				Map.entry("quarkus.aiscoring.langfuse.evaluation.gemini.api-key", "changeme"),
-				Map.entry("quarkus.aiscoring.langfuse.evaluation.session.score-session", "true"),
-				Map.entry("quarkus.aiscoring.langfuse.evaluation.session.create-dataset-on-session-close", "true"),
-				Map.entry("quarkus.otel.exporter.otlp.enabled", "true"),
-				// The one test that needs spans exported to Langfuse; the %test default leaves the span processor out
-				Map.entry("quarkus.langfuse.otel.enabled", "true"),
-				// Pin the provider: %ollama switches these two to `ollama`, which would route the chat path around the
-				// WireMock stubs below and into a real model. That model can decide to call updateClaimStatus on its own,
-				// adding a second GENERATION and breaking this test's single-exchange assertions.
-				Map.entry("quarkus.langchain4j.parasol-chat.chat-model.provider", "openai"),
-				Map.entry("quarkus.langchain4j.embedding-model.provider", "openai"),
-				Map.entry("quarkus.langchain4j.openai.api-key", "changeme"),
-				Map.entry("quarkus.langchain4j.openai.base-url", WIREMOCK_URL),
-				Map.entry("quarkus.langchain4j.openai.parasol-chat.api-key", "changeme"),
-				Map.entry("quarkus.langchain4j.openai.parasol-chat.base-url", WIREMOCK_URL),
-				Map.entry("quarkus.langchain4j.openai.session-sentiment.api-key", "changeme"),
-				Map.entry("quarkus.langchain4j.openai.session-sentiment.base-url", WIREMOCK_URL),
-				Map.entry("quarkus.langchain4j.openai.judge.api-key", "changeme"),
-				Map.entry("quarkus.langchain4j.openai.judge.base-url", WIREMOCK_URL),
-				// Boot-time Easy RAG ingestion would call /v1/embeddings before the @BeforeEach WireMock stubs exist, and the
-				// test must not depend on a cached easy-rag-embeddings.json. OFF also skips reading/writing that file.
-				Map.entry("quarkus.langchain4j.easy-rag.ingestion-strategy", "OFF")
-			);
 		}
 	}
 }

@@ -29,9 +29,8 @@ import org.mockito.ArgumentCaptor;
 import org.parasol.claim.model.Claim;
 import org.parasol.claim.model.IntakeClaimStatus;
 import org.parasol.intake.IntakeFlowTestBase;
-import org.parasol.intake.IntakeScenario.Mail;
 import org.parasol.intake.IntakeScenario;
-import org.parasol.intake.IntakeTestProfile;
+import org.parasol.intake.IntakeScenario.Mail;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.failure.IntakeFailureHandler;
 import org.parasol.intake.mailbox.ClaimsMailbox;
@@ -47,11 +46,11 @@ import org.parasol.intake.review.ReviewOutcome;
 import org.parasol.intake.review.ReviewedFields;
 import org.parasol.intake.workflow.outcome.ApplyOutcomeStep;
 import org.parasol.intake.workflow.review.ReviewDecisionSteps;
+import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 import io.quarkus.mailer.MailTemplate.MailTemplateInstance;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
@@ -63,8 +62,7 @@ import io.quarkus.test.junit.mockito.InjectSpy;
  * a person, an email's id or a claim.
  */
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
-@ConnectWireMock
+@TestProfile(StubbedModelsTestProfile.class)
 class IntakeMetricsTests extends IntakeFlowTestBase {
 	private static final String NO_LOCATION = details("Car hit a post.", "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());
 
