@@ -143,9 +143,13 @@ The Jest suite also runs inside the Maven build. The Playwright test classes use
 `src/main/webui/__mocks__/` stubs for CSS and asset imports, and maps deep
 `@patternfly/react-icons/dist/esm/...` imports to the CommonJS `dist/js/...` build. `jest.config.js` doesn't
 transform `node_modules`, so Jest can't load the ES-module build. `app.test.tsx` renders the app under jsdom with
-no backend, so the axios `GET …/api/db/claims` errors in the Maven/Quinoa output are expected on a green run. The
-snapshot is taken synchronously right after `render(<App />)`, before the claims request settles, so the committed
-snapshot always shows an empty claims table; claim rendering is covered by the Playwright tests, not Jest.
+no backend, so it stubs `axios.get` with a promise that never settles: no request, and no state update after the render
+(outside `act`). The committed snapshot therefore always shows an empty claims table; claim rendering is covered by the
+Playwright tests, not Jest. **A test that logs fails:** `jest.setup.ts` (`setupFilesAfterEnv`) records every
+`console.error`/`console.warn` and fails the test in `afterEach`, so a green run prints nothing (#269: React `act(...)`
+warnings and jsdom XHR errors used to fill the Quinoa output). A log that arrives after its test has finished is charged
+to whichever test is running, or missed after the last one. Fix the cause (wrap in `act`, stub the request), don't mute
+the console.
 
 ### CI
 
