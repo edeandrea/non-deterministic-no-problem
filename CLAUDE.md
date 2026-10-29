@@ -694,7 +694,7 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   overrides, which also run the frontend Jest suite (see Frontend above), plus only the `claim-intake` model on WireMock
   (`StubbedModelsTestProfile.claimIntakeOnWireMock()`). Every other model stays real, with Easy RAG ingestion at boot, because
   `ClaimsDetailPageTests.pageLoads` talks to the real chat bot.
-  - **`ClaimReviewPanelPageTests`** (with `@ConnectWireMock`) is why `claim-intake` is on WireMock there: the review
+  - **`ClaimReviewPanelPageTests`** is why `claim-intake` is on WireMock there (and `UiTestProfile` carries `@ConnectWireMock`): the review
     panel only renders its buttons for a claim whose review is genuinely open (`ClaimReviewState.open`), which only a real
     waiting `ClaimIntakeFlow` run produces. It drives a real email through `IntakeScenario` to get one, then uses the
     panel: the controls (every "Ask customer" checkbox, the edit fields, Submit/Request more information and Regenerate)
@@ -746,7 +746,14 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   run time. Quarkus already runs the classes grouped by profile (`QuarkusTestProfileAwareClassOrderer` is registered as a
   global `ClassOrderer` by default; `quarkus.test.class-orderer` sets its secondary order), so the number of boots is the
   number of distinct profiles. **Don't add a profile for one test;** a test whose config is additive belongs in an existing one.
-  There are four (five with the gated-off drift tests):
+  **A change in a class's test resources is a boot too.** Quarkus compares each class's set of `@QuarkusTestResource`s
+  (`TestResourceManager.testResourcesRequireReload`), and `@ConnectWireMock` and `@WithPlaywright` are both test resources.
+  So `@ConnectWireMock` sits on the profile classes, never on a test class: Quarkus reads test-resource annotations on the profile
+  too, so every class on a profile gets the same set, and `WireMock` fields are still injected. A test class on one of these
+  profiles adds no test-resource annotation of its own. **The Playwright classes still boot once each:** `@WithPlaywright` has
+  array attributes, which Quarkus 3.40 compares by identity, so two identical annotations never match. quarkusio/quarkus#56443
+  (4.0.0.Beta1) fixes it; once a Quarkus we're on has it, the UI classes share one boot.
+  There are four profiles (five with the gated-off drift tests), so seven boots in a full `verify`:
   - **none** (the `%test` defaults): the tests that need real models, a real key and boot-time Easy RAG ingestion.
   - **`org.parasol.testing.StubbedModelsTestProfile`**: every test whose models are stubbed or never called. That's the intake
     tests, the tests of what the intake stores, `DriftDetectionOutputGuardrailTests`, `LangfuseDatasetSampleLoaderTests` and
