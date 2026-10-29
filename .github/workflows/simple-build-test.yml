@@ -82,12 +82,8 @@ jobs:
           COHERE_API_KEY: change-me
           GEMINI_API_KEY: change-me
         run: |
-          # TEMPORARY (#270): only the StubbedModelsTestProfile classes (one boot), to diagnose
-          # ClaimIntakeReviewTests.aFaultInTheDecisionStep... quickly. Revert before merging
           ./mvnw -B clean verify \
             -P${{ matrix.ai-provider }} \
             -Dquarkus.http.host=0.0.0.0 \
             -Dmaven.compiler.release=${{ matrix.java }} \
-            -Dquarkus.langchain4j.ollama.devservices.enabled=false \
-            -Dsurefire.failIfNoSpecifiedTests=false \
-            -Dtest='AgentMonitorConfigurerTests,ClaimExtractionValueRoundTripTests,ClaimExtractionWorkflowTests,ClaimIntakeDispatcherTests,ClaimIntakeMoveFailureMetricsTests,ClaimIntakeNewClaimTests,ClaimIntakePendingClaimTests,ClaimIntakePolicyTests,ClaimIntakeReplyFailureMetricsTests,ClaimIntakeResolveClaimTests,ClaimIntakeReviewTests,ClaimMatcherTests,ClaimResolverTests,ClaimRetrievalHasNoIntakeBookkeepingTests,ClaimReviewResourceTests,ClaimsInboxWatcherTests,ClaimsMailboxAgentTests,ClaimsMailboxTests,DriftDetectionChatRouteExceptionHandlerTests,DriftDetectionOutputGuardrailTests,FailedAgenticSystemTests,IntakeCompleteToolInputGuardrailTests,IntakeExtensionsTests,IntakeFailureHandlerTests,IntakeFlowTestBase,IntakeMetricsTests,IntakeOutcomeRoundTripTests,IntakeReplySenderTests,IntakeSpanPropagationTests,IntakeTemplatesTests,IntakeTracingTests,LangfuseDatasetSampleLoaderTests,MailClientSpanFailureTests'
+            -Dquarkus.langchain4j.ollama.devservices.enabled=false
