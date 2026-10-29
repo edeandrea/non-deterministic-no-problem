@@ -37,10 +37,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.parasol.intake.config.IntakeConfig;
-import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.IntakeScenario;
 import org.parasol.intake.IntakeScenario.Mail;
 import org.parasol.intake.mailbox.ClaimsInboxWatcher.Settings;
+import org.parasol.testing.StubbedModelsTestProfile;
 import org.parasol.testing.mail.InjectToxiproxy;
 import org.parasol.testing.mail.Toxiproxy;
 
@@ -56,7 +56,7 @@ import io.quarkus.test.junit.virtual.VirtualThreadUnit;
 // mocked bean (quarkusio/quarkus#11122), so a mocked ClaimIntakeDispatcher would never see an event.
 // Network faults come from Toxiproxy, which the watcher's IDLE connection (and only that) goes through.
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
+@TestProfile(StubbedModelsTestProfile.class)
 // Pinning is only asserted by the tests that log no stack trace: formatting one loads classes under a JDK monitor, which pins
 // for microseconds and is no concern of the watcher's, but it makes the tests that log a lost connection flaky
 @VirtualThreadUnit

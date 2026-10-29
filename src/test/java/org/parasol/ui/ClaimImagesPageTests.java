@@ -17,12 +17,11 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.assertions.PlaywrightAssertions;
 import com.microsoft.playwright.options.AriaRole;
-import io.quarkiverse.quinoa.testing.QuinoaTestProfiles;
 
 // The claim without images is created for the test and deleted afterwards (ClaimsListPageTests expects exactly the 6
 // seeded claims). The seeded claim's images come from ClaimImageSeeder.
 @QuarkusTest
-@TestProfile(QuinoaTestProfiles.EnableAndRunTests.class)
+@TestProfile(UiTestProfile.class)
 public class ClaimImagesPageTests extends PlaywrightTests {
 	private static final long SEEDED_CLAIM_ID = 1L;
 	private static final long UNKNOWN_CLAIM_ID = 999_999L;

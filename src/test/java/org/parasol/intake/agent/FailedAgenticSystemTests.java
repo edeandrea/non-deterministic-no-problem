@@ -16,18 +16,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.ChatStubs;
 import org.parasol.intake.IntakeScenario;
-import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.agent.triage.ClaimStatusTools;
 import org.parasol.intake.model.EmailType;
 import org.parasol.intake.model.IncidentDetails;
 import org.parasol.intake.model.MatchedClaim;
+import org.parasol.testing.StubbedModelsTestProfile;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import dev.langchain4j.guardrails.JsonExtractorOutputGuardrail;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
-import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 
 /**
  * A failed root invocation leaves none of the Flow runs quarkus-flow generated for it, and no worker thread blocked in
@@ -37,8 +36,7 @@ import io.quarkiverse.wiremock.devservice.ConnectWireMock;
  * unchanged as the regression guard for that fix.
  */
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
-@ConnectWireMock
+@TestProfile(StubbedModelsTestProfile.class)
 class FailedAgenticSystemTests {
 	// Where a generated workflow's task waits for its agent call: FlowPlanner.executeAgent(i).join()
 	private static final String AGENT_CALL_CLASS = "io.quarkiverse.flow.langchain4j.workflow.flow.AgenticFlow";

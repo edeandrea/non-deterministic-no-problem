@@ -56,7 +56,7 @@ These are the scripts actually defined in [`package.json`](./package.json):
 Jest tests live next to the code (`*.test.ts` / `*.test.tsx`).
 - **What they cover:** `src/app/app.test.tsx` renders the whole app against a snapshot in
   `src/app/__snapshots__/`. `src/app/utils/formatIncident.test.ts` covers the incident date/time formatting.
-- **Run by Maven:** the Playwright `@QuarkusTest`s use Quinoa's `EnableAndRunTests` profile, so Quinoa runs
+- **Run by Maven:** the Playwright `@QuarkusTest`s use `UiTestProfile`, which carries Quinoa's `EnableAndRunTests` overrides, so Quinoa runs
   `npm test` during their build, and a failing Jest test fails the Maven test run.
 - **Config:** [`jest.config.js`](./jest.config.js) maps CSS and asset imports to the stubs in
   [`__mocks__/`](./__mocks__). It also maps deep `@patternfly/react-icons/dist/esm/...` imports to the CommonJS

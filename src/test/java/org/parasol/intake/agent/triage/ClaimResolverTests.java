@@ -11,22 +11,20 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.ChatStubs;
-import org.parasol.intake.IntakeTestProfile;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.model.ClaimResolution;
 import org.parasol.intake.model.ClaimResolution.Kind;
 import org.parasol.intake.model.PendingClaim;
+import org.parasol.testing.StubbedModelsTestProfile;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import dev.langchain4j.model.output.structured.Description;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
-import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 
 @QuarkusTest
-@TestProfile(IntakeTestProfile.class)
-@ConnectWireMock
+@TestProfile(StubbedModelsTestProfile.class)
 class ClaimResolverTests {
 	private static final String RESOLVE = "Decide which of the customer's pending claims the following email is about";
 	private static final List<PendingClaim> PENDING = List.of(

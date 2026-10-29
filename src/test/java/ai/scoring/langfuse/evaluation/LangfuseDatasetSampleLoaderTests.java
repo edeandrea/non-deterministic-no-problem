@@ -2,7 +2,6 @@ package ai.scoring.langfuse.evaluation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
@@ -13,12 +12,11 @@ import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 
-import ai.scoring.langfuse.evaluation.LangfuseDatasetSampleLoaderTests.KeysTestProfile;
 import com.langfuse.api.datasetItems.DatasetItemsApi.APIDatasetItemsCreateRequest;
 import com.langfuse.api.model.CreateDatasetItemRequest;
 import com.langfuse.api.model.CreateDatasetRequest;
@@ -26,7 +24,7 @@ import io.quarkiverse.langfuse.api.LangfuseOperations;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
 
 @QuarkusTest
-@TestProfile(KeysTestProfile.class)
+@TestProfile(StubbedModelsTestProfile.class)
 @TestMethodOrder(OrderAnnotation.class)
 class LangfuseDatasetSampleLoaderTests {
 	@Inject
@@ -137,20 +135,5 @@ class LangfuseDatasetSampleLoaderTests {
 		assertThat(this.langfuseDatasetSampleLoader.load("dataset3", String.class))
 			.isNotNull()
 			.hasSize(items);
-	}
-
-	public static class KeysTestProfile implements QuarkusTestProfile {
-		@Override
-		public Map<String, String> getConfigOverrides() {
-			return Map.of(
-				"quarkus.langchain4j.openai.api-key", "changeme",
-				"quarkus.langchain4j.openai.session-sentiment.api-key", "changeme",
-				"quarkus.langchain4j.openai.judge.api-key", "changeme",
-				// Boot-time Easy RAG ingestion would call the embedding model with the stub key above (401 from OpenAI, or
-				// localhost:11434 under -Pollama-openai) unless a cached easy-rag-embeddings.json happens to exist. This test
-				// doesn't use RAG, and OFF also skips reading/writing that file.
-				"quarkus.langchain4j.easy-rag.ingestion-strategy", "OFF"
-			);
-		}
 	}
 }

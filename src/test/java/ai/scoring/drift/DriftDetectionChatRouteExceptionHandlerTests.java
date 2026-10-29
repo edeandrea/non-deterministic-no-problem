@@ -19,18 +19,16 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.parasol.chat.model.ClaimBotQuery;
+import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 
-import ai.scoring.drift.DriftDetectionChatRouteExceptionHandlerTests.DriftHandlerTestProfile;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import dev.langchain4j.guardrail.OutputGuardrail;
 import dev.langchain4j.guardrail.OutputGuardrailRequest;
 import io.quarkiverse.langchain4j.chatscopes.LocalChatRoutes;
-import io.quarkiverse.wiremock.devservice.ConnectWireMock;
 
 /**
  * End-to-end: a drift failure raised by the guardrail on {@code ClaimService.chat} must reach the websocket client
@@ -41,8 +39,7 @@ import io.quarkiverse.wiremock.devservice.ConnectWireMock;
  * evaluation strategy - those are covered by {@link DriftDetectionOutputGuardrailTests}.
  */
 @QuarkusTest
-@TestProfile(DriftHandlerTestProfile.class)
-@ConnectWireMock
+@TestProfile(StubbedModelsTestProfile.class)
 class DriftDetectionChatRouteExceptionHandlerTests {
 	private static final DriftDetectionException DRIFT = DriftDetectionException.builder()
 		.sampleSetName("langchain4j.aiservices.ClaimService.chat")
@@ -139,34 +136,5 @@ class DriftDetectionChatRouteExceptionHandlerTests {
 			.isEmpty();
 
 		verify(this.driftGuardrail).validate(any(OutputGuardrailRequest.class));
-	}
-
-	public static class DriftHandlerTestProfile implements QuarkusTestProfile {
-		private static final String WIREMOCK_URL = "http://localhost:${quarkus.wiremock.devservices.port}/v1";
-
-		@Override
-		public Map<String, String> getConfigOverrides() {
-			return Map.ofEntries(
-				// Pin the provider: %ollama switches these two to `ollama`, which would route the chat path around the
-				// WireMock stubs below and into a real model. Don't remove these as redundant - without them this test
-				// only mocks the LLM under the default and %ollama-openai profiles.
-				Map.entry("quarkus.langchain4j.parasol-chat.chat-model.provider", "openai"),
-				Map.entry("quarkus.langchain4j.embedding-model.provider", "openai"),
-				// Point every model the chat path touches at WireMock
-				Map.entry("quarkus.langchain4j.openai.api-key", "changeme"),
-				Map.entry("quarkus.langchain4j.openai.base-url", WIREMOCK_URL),
-				Map.entry("quarkus.langchain4j.openai.parasol-chat.api-key", "changeme"),
-				Map.entry("quarkus.langchain4j.openai.parasol-chat.base-url", WIREMOCK_URL),
-				Map.entry("quarkus.langchain4j.openai.session-sentiment.api-key", "changeme"),
-				Map.entry("quarkus.langchain4j.openai.judge.api-key", "changeme"),
-				// Boot-time Easy RAG ingestion would call /v1/embeddings before the @BeforeEach WireMock stubs exist, and the
-				// test must not depend on a cached easy-rag-embeddings.json. OFF also skips reading/writing that file.
-				Map.entry("quarkus.langchain4j.easy-rag.ingestion-strategy", "OFF"),
-				// Keep the rest of the scoring machinery out of the way; we're only interested in the chat route
-				Map.entry("quarkus.aiscoring.langfuse.evaluation.initialize-on-startup", "false"),
-				Map.entry("quarkus.aiscoring.langfuse.evaluation.session.score-session", "false"),
-				Map.entry("quarkus.aiscoring.langfuse.evaluation.session.create-dataset-on-session-close", "false")
-			);
-		}
 	}
 }
