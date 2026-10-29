@@ -55,18 +55,24 @@ These are the scripts actually defined in [`package.json`](./package.json):
 
 Jest tests live next to the code (`*.test.ts` / `*.test.tsx`).
 - **What they cover:** `src/app/app.test.tsx` renders the whole app against a snapshot in
-  `src/app/__snapshots__/`. `src/app/utils/formatIncident.test.ts` covers the incident date/time formatting.
+  `src/app/__snapshots__/`. `src/app/utils/formatIncident.test.ts` covers the incident date/time formatting,
+  `claimImages.test.ts` which images the detail page shows and their URLs, and `httpErrors.test.ts` the 404 check.
 - **Run by Maven:** the Playwright `@QuarkusTest`s use `UiTestProfile`, which carries Quinoa's `EnableAndRunTests` overrides, so Quinoa runs
   `npm test` during their build, and a failing Jest test fails the Maven test run.
 - **Config:** [`jest.config.js`](./jest.config.js) maps CSS and asset imports to the stubs in
   [`__mocks__/`](./__mocks__). It also maps deep `@patternfly/react-icons/dist/esm/...` imports to the CommonJS
   `dist/js/...` build, because Jest doesn't transform `node_modules`.
 - **Updating the snapshot:** after an intentional layout change, run `npx jest -u` and commit the updated snapshot.
-- **No backend under Jest:** `app.test.tsx` renders the app under jsdom with no backend, so the axios
-  `GET …/api/db/claims` errors in the `npm test` and Maven/Quinoa output are expected on a green run. The snapshot
-  is taken synchronously right after `render(<App />)`, before the claims request settles, so it always shows an
-  empty claims table: it checks the page structure (shell, filters, table headers), not claim rendering. Claim
-  rendering is covered by the Playwright tests in `src/test/java/org/parasol/ui/`.
+- **No backend under Jest:** `app.test.tsx` renders the app under jsdom with no backend, so it stubs `axios.get`
+  with a request that never settles. Nothing goes over the network, and no state update lands after the render
+  (outside `act`). The snapshot always shows an empty claims table: it checks the page structure (shell, filters,
+  table headers), not claim rendering. Claim rendering is covered by the Playwright tests in
+  `src/test/java/org/parasol/ui/`.
+- **A test that logs fails:** [`jest.setup.ts`](./jest.setup.ts) (`setupFilesAfterEnv`) records every
+  `console.error` / `console.warn` call, still printing it, and fails the test in `afterEach` if there was one. React's
+  `act(...)` warnings and jsdom's errors (a failed XHR) arrive there, so a green run prints no console output. A log that
+  arrives asynchronously, after its test has finished, is charged to whichever test is running then, and is missed if
+  none is. Fix the cause (wrap the update in `act`, stub the request) rather than muting the console.
 
 ## Talking to the backend
 

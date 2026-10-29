@@ -30,6 +30,9 @@ module.exports = {
   // A preset that is used as a base for Jest's configuration
   preset: "ts-jest/presets/js-with-ts",
 
+  // Runs in each test file after the framework is installed: fails any test that logs to console.error or console.warn
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+
   // The test environment that will be used for testing.
   testEnvironment: "jsdom",
 };
