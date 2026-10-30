@@ -67,12 +67,24 @@ class IntakeJsonRoundTripTests {
 
 	@Test
 	void aFullIntakeStateRoundTrips() throws Exception {
-		var details = new IncidentDetails("Hit a post", "2026-10-07", "14:30", "Elm Street", ClaimCategory.SINGLE_VEHICLE, "AC-123456789", Set.of(MissingItem.LOCATION));
+		var details = new IncidentDetails(true, "2026-10-07", "14:30", "Elm Street", ClaimCategory.SINGLE_VEHICLE, "AC-123456789", Set.of(MissingItem.LOCATION));
 		var state = new IntakeState("<id@example.com>", "jane@example.com", 7L, Disposition.WHICH_CLAIM, true, List.of("CLM01000000", "CLM01001009"),
 			new IntakeOutcome.NewClaim(new ClaimExtraction("A summary", "Calm", details)), "AC-123456789", true,
 			Set.of(MissingItem.LOCATION, MissingItem.CATEGORY), true, false, "2026-10-29T10:15:30Z");
 
 		assertRoundTrips(state);
+	}
+
+	@Test
+	void anIncidentDetailsPersistedBeforeTheFlagStillReads() throws Exception {
+		// A run waiting in Pending Review keeps the old shape, with "description" and no "incidentDescribed"
+		var old = this.objectMapper.readValue("""
+			{"description":"Car hit a post.","incidentDate":"2026-10-07","incidentTime":null,"location":"Elm Street","category":"SINGLE_VEHICLE","policyNumber":null,"answeredItems":[]}""",
+			IncidentDetails.class);
+
+		assertThat(old)
+			.returns(null, IncidentDetails::incidentDescribed)
+			.returns("Elm Street", IncidentDetails::location);
 	}
 
 	@Test

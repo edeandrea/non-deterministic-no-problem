@@ -11,7 +11,8 @@ import org.parasol.intake.MissingItem;
  * Date and time are stored as ISO-8601 strings ({@code "yyyy-MM-dd"} and {@code "HH:mm"}) to stay safe under
  * agentic-scope Jackson serialization (spike Q13).
  *
- * @param description What happened
+ * @param incidentDescribed Whether the correspondence says what happened in the incident itself (not the text: the claim's
+ * summary holds that), or null if unjudged; anything but {@code true} counts as the description missing
  * @param incidentDate The incident date as an ISO string ({@code "yyyy-MM-dd"}), or null if unstated
  * @param incidentTime The incident time as an ISO string ({@code "HH:mm"}), if stated
  * @param location Where the incident took place, or null if unstated
@@ -20,7 +21,7 @@ import org.parasol.intake.MissingItem;
  * @param answeredItems The subset of requested items that this email supplies
  */
 public record IncidentDetails(
-	String description,
+	Boolean incidentDescribed,
 	String incidentDate,
 	String incidentTime,
 	String location,

@@ -13,7 +13,7 @@ import org.parasol.intake.model.IncidentDetails;
 class ClaimExtractionWorkflowOutputTests {
 	@Test
 	void outputCombinesTheThreeAgentResults() {
-		var details = new IncidentDetails("car hit a tree", "2026-10-07", null, "Elm Street", ClaimCategory.SINGLE_VEHICLE, null, Set.of(MissingItem.LOCATION));
+		var details = new IncidentDetails(true, "2026-10-07", null, "Elm Street", ClaimCategory.SINGLE_VEHICLE, null, Set.of(MissingItem.LOCATION));
 
 		assertThat(ClaimExtractionWorkflow.combineAgentOutputs("summary", "sentiment", details))
 			.isEqualTo(new ClaimExtraction("summary", "sentiment", details));

@@ -54,7 +54,7 @@ public interface IncidentDetailsAgent {
 		such as "yesterday" or "last night" against it.
 
 		Details extracted from earlier emails (keep them unless the correspondence corrects them):
-		- description: {extractedSoFar.description ?: 'unknown'}
+		- incidentDescribed: {extractedSoFar.incidentDescribed ?: 'unknown'}
 		- incidentDate: {extractedSoFar.incidentDate ?: 'unknown'}
 		- incidentTime: {extractedSoFar.incidentTime ?: 'unknown'}
 		- location: {extractedSoFar.location ?: 'unknown'}
@@ -64,7 +64,7 @@ public interface IncidentDetailsAgent {
 		Items we asked the customer for: {#if requestedItems.isEmpty()}none{#else}{#for item in requestedItems.stream.sorted.toList}{item.name}{#if item_hasNext}, {/if}{/for}{/if}
 
 		Return JSON with these fields:
-		- description: what happened
+		- incidentDescribed: true if the correspondence says what happened in the incident, false if it only says that something happened or that a claim is being made
 		- incidentDate: ISO date (yyyy-MM-dd), or null if unstated
 		- incidentTime: ISO time (HH:mm), or null if unstated
 		- location: where it happened, or null if unstated

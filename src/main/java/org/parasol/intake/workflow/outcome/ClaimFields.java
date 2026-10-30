@@ -1,10 +1,14 @@
 package org.parasol.intake.workflow.outcome;
 
+import static java.util.function.Predicate.not;
+
+import java.util.Collection;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
 import org.parasol.claim.model.Claim;
+import org.parasol.intake.MissingItem;
 import org.parasol.intake.agent.extraction.IsoValues;
 import org.parasol.intake.model.ClaimExtraction;
 import org.parasol.intake.model.IncidentDetails;
@@ -17,12 +21,27 @@ public final class ClaimFields {
 	}
 
 	/**
-	 * The fields a claim already has, as what the agents extracted so far. A claim stores no description, so its summary
-	 * stands in for it.
+	 * The fields a claim already has, as what the agents extracted so far.
+	 * <p>
+	 * A claim stores no incident-described flag, so it's derived. The summary can't tell, because the summary agent
+	 * always writes one, even for "something happened, help". The requested items can: the customer was asked for the
+	 * incident description exactly when it was missing (or a reviewer wanted more of it).
+	 *
+	 * @param claim the persisted claim
+	 * @param requestedItems what the customer was last asked for; empty if nothing
+	 * @return the details, with {@code incidentDescribed} {@code false} when the description was requested, otherwise
+	 * {@code true} when the claim has a summary and {@code null} when it has none
 	 */
-	public static IncidentDetails extractedSoFar(Claim claim) {
+	public static IncidentDetails extractedSoFar(Claim claim, Collection<MissingItem> requestedItems) {
+		var described = requestedItems.contains(MissingItem.INCIDENT_DESCRIPTION) ?
+		                Boolean.FALSE :
+		                Optional.ofNullable(claim.summary)
+			                .filter(not(String::isBlank))
+			                .map(_ -> Boolean.TRUE)
+			                .orElse(null);
+
 		return new IncidentDetails(
-			claim.summary,
+			described,
 			Optional.ofNullable(claim.incidentDate).map(Object::toString).orElse(null),
 			Optional.ofNullable(claim.incidentTime).map(Object::toString).orElse(null),
 			claim.location,

@@ -26,8 +26,9 @@ public final class ClaimExtractionRules {
 	 * <p>
 	 * A claim is missing an item if:
 	 * <ul>
-	 * <li>any core field (description, incident date, location, category) has no value; {@code OTHER} counts as a
-	 * category, and an incident date that isn't a valid ISO date counts as no value</li>
+	 * <li>any core field (incident description, incident date, location, category) has no value; the incident description
+	 * counts as present only when the details agent says the correspondence describes what happened, {@code OTHER}
+	 * counts as a category, and an incident date that isn't a valid ISO date counts as no value</li>
 	 * <li>a reviewer checked the item, and the customer's newest reply did not answer it</li>
 	 * <li>a reviewer checked the item, and the newest reply is blank (it answers nothing, whatever the model says)</li>
 	 * </ul>
@@ -76,7 +77,7 @@ public final class ClaimExtractionRules {
 	// Exhaustive on purpose: a new MissingItem won't compile until it says how its field counts as absent
 	private static boolean isAbsent(MissingItem item, IncidentDetails details) {
 		return switch (item) {
-			case INCIDENT_DESCRIPTION -> isBlank(details.description());
+			case INCIDENT_DESCRIPTION -> !Boolean.TRUE.equals(details.incidentDescribed());
 			case INCIDENT_DATE -> IsoValues.parseDate(details.incidentDate()).isEmpty();
 			case LOCATION -> isBlank(details.location());
 			case CATEGORY -> (details.category() == null);

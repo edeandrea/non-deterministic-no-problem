@@ -43,7 +43,7 @@ public abstract class IntakeFlowTestBase {
 	protected static final String STATUS_ANSWER = "Hello, your claim is being worked on. Sincerely, the claims department";
 	protected static final byte[] JPEG = { (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 1, 2, 3 };
 
-	protected static final String COMPLETE_DETAILS = details("Car hit a post.", "2026-10-07", "Elm Street", "SINGLE_VEHICLE", null, List.of());
+	protected static final String COMPLETE_DETAILS = details(true, "2026-10-07", "Elm Street", "SINGLE_VEHICLE", null, List.of());
 
 	@Inject
 	protected IntakeScenario scenario;
@@ -184,10 +184,10 @@ public abstract class IntakeFlowTestBase {
 		}
 	}
 
-	protected static String details(String description, String date, String location, String category, String policyNumber, List<String> answered) {
+	protected static String details(Boolean described, String date, String location, String category, String policyNumber, List<String> answered) {
 		return """
-			{"description":%s,"incidentDate":%s,"incidentTime":null,"location":%s,"category":%s,"policyNumber":%s,"answeredItems":%s}"""
-			.formatted(quote(description), quote(date), quote(location), quote(category), quote(policyNumber),
+			{"incidentDescribed":%s,"incidentDate":%s,"incidentTime":null,"location":%s,"category":%s,"policyNumber":%s,"answeredItems":%s}"""
+			.formatted(described, quote(date), quote(location), quote(category), quote(policyNumber),
 				answered.stream().map(IntakeFlowTestBase::quote).toList());
 	}
 

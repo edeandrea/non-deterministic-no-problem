@@ -50,7 +50,7 @@ package "Parasol app" {
         package "ClaimExtractionWorkflow (parallel)\n→ claim extraction" as EX {
           component "ClaimSummaryAgent\n→ summary" as SUM <<LLM>>
           component "ClaimSentimentAgent\n→ sentiment" as SEN <<LLM>>
-          component "IncidentDetailsAgent\n→ description, date, time,\nlocation, category, policy number" as DET <<LLM>>
+          component "IncidentDetailsAgent\n→ incidentDescribed, date, time,\nlocation, category, policy number" as DET <<LLM>>
         }
         component "ClaimFollowUpAgent\nstatus answer;\nread-only status tool" as FU <<LLM>>
         component "UnmatchedEmailAgent\nnot a claim /\nno matching claim" as NAC <<no LLM>>

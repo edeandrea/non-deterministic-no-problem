@@ -166,6 +166,30 @@ class ClaimExtractionWorkflowTests {
 	}
 
 	@Test
+	void aNewClaimsPromptAsksForTheDescribedFlagAndNeverForADescription() {
+		stub(DETAILS_PROMPT, detailsJson("2026-10-07", null, "Elm Street", "SINGLE_VEHICLE", "[]"));
+
+		this.workflow.extractClaim(NEW_CLAIM, NOTHING_YET, Set.of(), SENT_DATE);
+
+		assertThat(userMessage(requestFor(DETAILS_PROMPT)))
+			.contains("- incidentDescribed: unknown")
+			.contains("- incidentDescribed: true if the correspondence says what happened")
+			.doesNotContain("- description:");
+	}
+
+	@Test
+	void aFalseDescribedFlagRendersAsFalseNotUnknown() {
+		var soFar = new IncidentDetails(false, null, null, null, null, null, Set.of());
+		stub(DETAILS_PROMPT, detailsJson("2026-10-07", null, "Elm Street", "SINGLE_VEHICLE", "[]"));
+
+		this.workflow.extractClaim(NEW_CLAIM, soFar, Set.of(MissingItem.INCIDENT_DESCRIPTION), SENT_DATE);
+
+		// Qute's ?: only replaces null, so false must survive
+		assertThat(userMessage(requestFor(DETAILS_PROMPT)))
+			.contains("- incidentDescribed: false");
+	}
+
+	@Test
 	void theDetailsPromptListsEveryClaimCategoryFromTheEnum() {
 		stub(DETAILS_PROMPT, detailsJson("2026-10-07", null, "Elm Street", "SINGLE_VEHICLE", "[]"));
 
@@ -286,12 +310,12 @@ class ClaimExtractionWorkflowTests {
 	}
 
 	private static IncidentDetails details(String date, String time, String location, ClaimCategory category, Set<MissingItem> answered) {
-		return new IncidentDetails("Car hit another vehicle.", date, time, location, category, null, answered);
+		return new IncidentDetails(true, date, time, location, category, null, answered);
 	}
 
 	private static String detailsJson(String date, String time, String location, String category, String answered) {
 		return """
-			{"description":"Car hit another vehicle.","incidentDate":%s,"incidentTime":%s,"location":%s,"category":%s,"policyNumber":null,"answeredItems":%s}"""
+			{"incidentDescribed":true,"incidentDate":%s,"incidentTime":%s,"location":%s,"category":%s,"policyNumber":null,"answeredItems":%s}"""
 			.formatted(jsonString(date), jsonString(time), jsonString(location), jsonString(category), answered);
 	}
 

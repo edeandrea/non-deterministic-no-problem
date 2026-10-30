@@ -46,7 +46,7 @@ import io.quarkus.test.junit.mockito.InjectSpy;
 @QuarkusTest
 @TestProfile(StubbedModelsTestProfile.class)
 class IntakeTracingTests extends IntakeFlowTestBase {
-	private static final String NO_LOCATION = details("Car hit a post.", "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());
+	private static final String NO_LOCATION = details(true, "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());
 	private static final AttributeKey<String> MESSAGING_SYSTEM = AttributeKey.stringKey("messaging.system");
 	private static final AttributeKey<String> SERVER_ADDRESS = AttributeKey.stringKey("server.address");
 	private static final AttributeKey<Long> SERVER_PORT = AttributeKey.longKey("server.port");

@@ -259,7 +259,7 @@ class RoundcubeClaimIntakeE2ETests extends PlaywrightTests {
 
 	private static String details(String date, String location, String category, List<String> answered) {
 		return """
-			{"description":"The car hit a lamp post.","incidentDate":%s,"incidentTime":null,"location":%s,"category":%s,"policyNumber":null,"answeredItems":%s}"""
+			{"incidentDescribed":true,"incidentDate":%s,"incidentTime":null,"location":%s,"category":%s,"policyNumber":null,"answeredItems":%s}"""
 			.formatted(quote(date), quote(location), quote(category), answered.stream().map(RoundcubeClaimIntakeE2ETests::quote).toList());
 	}
 

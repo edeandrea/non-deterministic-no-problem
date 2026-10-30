@@ -22,9 +22,9 @@ import io.quarkiverse.langchain4j.guardrails.NoopChatExecutor;
 class IncidentDetailsOutputGuardrailTests {
 	private static final String SENT_DATE = "2026-10-08";
 	private static final String VALID_JSON = """
-		{"description":"car hit a tree","incidentDate":"2026-10-07","incidentTime":"14:30","location":"Elm Street","category":"SINGLE_VEHICLE","policyNumber":null,"answeredItems":["LOCATION"]}""";
+		{"incidentDescribed":true,"incidentDate":"2026-10-07","incidentTime":"14:30","location":"Elm Street","category":"SINGLE_VEHICLE","policyNumber":null,"answeredItems":["LOCATION"]}""";
 	private static final IncidentDetails VALID = new IncidentDetails(
-		"car hit a tree",
+		true,
 		"2026-10-07",
 		"14:30",
 		"Elm Street",
@@ -42,6 +42,18 @@ class IncidentDetailsOutputGuardrailTests {
 		assertThat(result)
 			.returns(true, OutputGuardrailResult::isSuccess)
 			.returns(VALID, OutputGuardrailResult::successfulResult);
+	}
+
+	@Test
+	void aMissingIncidentDescribedKeyParsesAsNull() {
+		var withoutFlag = VALID_JSON.replace("\"incidentDescribed\":true,", "");
+
+		var result = this.guardrail.validate(requestFor(withoutFlag, SENT_DATE));
+
+		assertThat(result)
+			.returns(true, OutputGuardrailResult::isSuccess)
+			.extracting(r -> ((IncidentDetails) r.successfulResult()).incidentDescribed())
+			.isNull();
 	}
 
 	@Test
@@ -169,7 +181,7 @@ class IncidentDetailsOutputGuardrailTests {
 
 	private static IncidentDetails withDateAndTime(String incidentDate, String incidentTime) {
 		return new IncidentDetails(
-			VALID.description(),
+			VALID.incidentDescribed(),
 			incidentDate,
 			incidentTime,
 			VALID.location(),

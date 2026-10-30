@@ -17,7 +17,7 @@ import org.parasol.intake.model.IncidentDetails;
 
 class ClaimExtractionRulesTests {
 	private static final IncidentDetails COMPLETE = new IncidentDetails(
-		"car hit a tree",
+		true,
 		"2026-10-07",
 		"14:30",
 		"Elm Street",
@@ -42,8 +42,8 @@ class ClaimExtractionRulesTests {
 
 	static Stream<Arguments> absentCoreFields() {
 		return Stream.of(
-			Arguments.of("null description", withDescription(null), MissingItem.INCIDENT_DESCRIPTION),
-			Arguments.of("blank description", withDescription("  "), MissingItem.INCIDENT_DESCRIPTION),
+			Arguments.of("unjudged description", withDescribed(null), MissingItem.INCIDENT_DESCRIPTION),
+			Arguments.of("undescribed incident", withDescribed(false), MissingItem.INCIDENT_DESCRIPTION),
 			Arguments.of("null date", withDate(null), MissingItem.INCIDENT_DATE),
 			Arguments.of("invalid ISO date", withDate("2026-13-40"), MissingItem.INCIDENT_DATE),
 			Arguments.of("null location", withLocation(null), MissingItem.LOCATION),
@@ -68,7 +68,7 @@ class ClaimExtractionRulesTests {
 	@Test
 	void incidentTimeIsNeverMissing() {
 		var noTime = new IncidentDetails(
-			COMPLETE.description(),
+			COMPLETE.incidentDescribed(),
 			COMPLETE.incidentDate(),
 			null,
 			COMPLETE.location(),
@@ -141,25 +141,25 @@ class ClaimExtractionRulesTests {
 		return new ClaimExtraction("summary", "sentiment", details);
 	}
 
-	private static IncidentDetails withDescription(String description) {
-		return new IncidentDetails(description, COMPLETE.incidentDate(), COMPLETE.incidentTime(), COMPLETE.location(), COMPLETE.category(), COMPLETE.policyNumber(), Set.of());
+	private static IncidentDetails withDescribed(Boolean described) {
+		return new IncidentDetails(described, COMPLETE.incidentDate(), COMPLETE.incidentTime(), COMPLETE.location(), COMPLETE.category(), COMPLETE.policyNumber(), Set.of());
 	}
 
 	private static IncidentDetails withDate(String incidentDate) {
-		return new IncidentDetails(COMPLETE.description(), incidentDate, COMPLETE.incidentTime(), COMPLETE.location(), COMPLETE.category(), COMPLETE.policyNumber(), Set.of());
+		return new IncidentDetails(COMPLETE.incidentDescribed(), incidentDate, COMPLETE.incidentTime(), COMPLETE.location(), COMPLETE.category(), COMPLETE.policyNumber(), Set.of());
 	}
 
 	private static IncidentDetails withLocation(String location) {
-		return new IncidentDetails(COMPLETE.description(), COMPLETE.incidentDate(), COMPLETE.incidentTime(), location, COMPLETE.category(), COMPLETE.policyNumber(), Set.of());
+		return new IncidentDetails(COMPLETE.incidentDescribed(), COMPLETE.incidentDate(), COMPLETE.incidentTime(), location, COMPLETE.category(), COMPLETE.policyNumber(), Set.of());
 	}
 
 	private static IncidentDetails withCategory(ClaimCategory category) {
-		return new IncidentDetails(COMPLETE.description(), COMPLETE.incidentDate(), COMPLETE.incidentTime(), COMPLETE.location(), category, COMPLETE.policyNumber(), Set.of());
+		return new IncidentDetails(COMPLETE.incidentDescribed(), COMPLETE.incidentDate(), COMPLETE.incidentTime(), COMPLETE.location(), category, COMPLETE.policyNumber(), Set.of());
 	}
 
 	private static IncidentDetails withAnswered(Set<MissingItem> answeredItems) {
 		return new IncidentDetails(
-			COMPLETE.description(),
+			COMPLETE.incidentDescribed(),
 			COMPLETE.incidentDate(),
 			COMPLETE.incidentTime(),
 			COMPLETE.location(),

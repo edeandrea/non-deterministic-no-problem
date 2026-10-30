@@ -30,7 +30,7 @@ import io.quarkus.test.junit.mockito.InjectSpy;
 @QuarkusTest
 @TestProfile(StubbedModelsTestProfile.class)
 class ClaimIntakeReplyFailureMetricsTests extends IntakeFlowTestBase {
-	private static final String NO_LOCATION = details("Car hit a post.", "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());
+	private static final String NO_LOCATION = details(true, "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());
 
 	@InjectSpy
 	IntakeReplySender sender;

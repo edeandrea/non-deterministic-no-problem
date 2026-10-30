@@ -113,7 +113,7 @@ class ClaimIntakeNewClaimTests extends IntakeFlowTestBase {
 			.satisfies(reply -> assertThat(reply.body()).contains("incident description", "incident date", "location", "category"));
 
 		var other = marker();
-		stubNewClaim(other, details("Stuff broke.", "2026-10-07", "Home", "OTHER", null, List.of()));
+		stubNewClaim(other, details(true, "2026-10-07", "Home", "OTHER", null, List.of()));
 		this.scenario.awaitFiled(this.scenario.submit(Mail.from("other.person@example.com").body("Stuff broke. " + other)));
 
 		assertThat(this.scenario.claim(this.scenario.awaitClaimOf("other.person@example.com").id).status)
@@ -140,7 +140,7 @@ class ClaimIntakeNewClaimTests extends IntakeFlowTestBase {
 	@Test
 	void severalMissingItemsAreListedExactly() {
 		var marker = marker();
-		stubNewClaim(marker, details("A theft.", null, null, "THEFT", null, List.of()));
+		stubNewClaim(marker, details(true, null, null, "THEFT", null, List.of()));
 
 		this.scenario.awaitFiled(this.scenario.submit(Mail.from(SENDER).body("Stolen. " + marker)));
 
@@ -249,9 +249,9 @@ class ClaimIntakeNewClaimTests extends IntakeFlowTestBase {
 	private static String detailsWithout(MissingItem item) {
 		return switch (item) {
 			case INCIDENT_DESCRIPTION -> details(null, "2026-10-07", "Elm Street", "SINGLE_VEHICLE", null, List.of());
-			case INCIDENT_DATE -> details("Car hit a post.", null, "Elm Street", "SINGLE_VEHICLE", null, List.of());
-			case LOCATION -> details("Car hit a post.", "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());
-			case CATEGORY -> details("Car hit a post.", "2026-10-07", "Elm Street", null, null, List.of());
+			case INCIDENT_DATE -> details(true, null, "Elm Street", "SINGLE_VEHICLE", null, List.of());
+			case LOCATION -> details(true, "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());
+			case CATEGORY -> details(true, "2026-10-07", "Elm Street", null, null, List.of());
 		};
 	}
 }

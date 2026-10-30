@@ -67,10 +67,10 @@ class ClaimIntakeDispatcherTests extends IntakeFlowTestBase {
 		var firstMarker = marker();
 		classify(firstMarker, EmailType.NEW_CLAIM);
 		// Slow enough that, run in parallel, the second email would be matched before the first created its claim
-		this.stubs.answerWhenAll(List.of(DETAILS, firstMarker), details("Car hit a post.", "2026-10-07", null, "SINGLE_VEHICLE", null, List.of()), 1500);
+		this.stubs.answerWhenAll(List.of(DETAILS, firstMarker), details(true, "2026-10-07", null, "SINGLE_VEHICLE", null, List.of()), 1500);
 
 		var secondMarker = marker();
-		stubFollowUp(secondMarker, details("Car hit a post.", "2026-10-07", "Elm Street", "SINGLE_VEHICLE", null, List.of("LOCATION")));
+		stubFollowUp(secondMarker, details(true, "2026-10-07", "Elm Street", "SINGLE_VEHICLE", null, List.of("LOCATION")));
 
 		this.scenario.submit(Mail.from(SENDER).messageId(firstId).subject("Accident").body("I hit a post. " + firstMarker));
 		var secondId = this.scenario.submit(Mail.from(SENDER).inReplyTo(firstId).subject("Re: Accident").body("On Elm Street. " + secondMarker));

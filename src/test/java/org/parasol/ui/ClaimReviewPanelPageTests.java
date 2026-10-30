@@ -48,7 +48,7 @@ class ClaimReviewPanelPageTests extends PlaywrightTests {
 	private static final String DETAILS = "Extract the incident details from the following correspondence";
 	private static final String COMPLETE_DETAILS =
 		"""
-		{"description":"Car hit a post.","incidentDate":"2026-10-07","incidentTime":null,"location":"Elm Street","category":"SINGLE_VEHICLE","policyNumber":null,"answeredItems":[]}""";
+		{"incidentDescribed":true,"incidentDate":"2026-10-07","incidentTime":null,"location":"Elm Street","category":"SINGLE_VEHICLE","policyNumber":null,"answeredItems":[]}""";
 	private static final LocatorAssertions.IsVisibleOptions LONG_WAIT = new LocatorAssertions.IsVisibleOptions().setTimeout(20_000);
 
 	@Inject

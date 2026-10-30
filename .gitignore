@@ -49,3 +49,4 @@ easy-rag-embeddings.json
 /.explyt/
 /.claude/hooks/
 .junie
+/skills/
