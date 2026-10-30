@@ -1,7 +1,9 @@
 package org.parasol.claim.model;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 import jakarta.persistence.Column;
@@ -19,13 +21,21 @@ import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntity;
+import io.quarkus.panache.common.Sort;
 
 /**
- * An email the intake accepted, recorded by its {@code Message-ID}. The unique {@code Message-ID} is the duplicate check,
- * and later emails are matched to a claim through the {@code In-Reply-To} and {@code References} headers that name one.
+ * An email of a claim's correspondence, recorded by its {@code Message-ID}: one the intake accepted
+ * ({@link CorrespondenceDirection#INBOUND}) or a reply it sent about a claim ({@link CorrespondenceDirection#OUTBOUND}).
+ * The unique {@code Message-ID} is the duplicate check, and later emails are matched to a claim through the
+ * {@code In-Reply-To} and {@code References} headers that name one.
  * <p>
- *   The claim is empty until the email creates or matches one (a not-a-claim email never has one). Deleting a claim
+ *   The claim is empty until an inbound email creates or matches one (a not-a-claim email never has one). Deleting a claim
  *   deletes its rows.
+ * </p>
+ * <p>
+ *   For an outbound row, {@link #sentDate} and {@link #receivedAt} are both the moment the mail server accepted the reply, by
+ *   this app's clock, {@link #sender} is the claims address, {@link #subject} is the subject as sent (with its {@code [CLM...] Re:} prefix) and
+ *   {@link #strippedText} is the text sent.
  * </p>
  */
 @Entity
@@ -55,7 +65,70 @@ public class ClaimCorrespondence extends PanacheEntity {
 	public String sender;
 
 	@Column(length = Length.LONG32)
+	public String subject;
+
+	/**
+	 * Whether this email created its claim. It is {@code false} for every other email, including the replies to a claim that
+	 * someone else entered (e.g. an adjustor), whose original content then isn't in any email.
+	 */
+	@Column(nullable = false)
+	public boolean createdClaim;
+
+	@Column(length = Length.LONG32)
 	public String strippedText;
+
+	/**
+	 * Records a reply the intake sent about a claim. The row is persisted in the current transaction.
+	 *
+	 * @param claim the claim the reply is about
+	 * @param messageId the {@code Message-ID} the reply was sent with
+	 * @param sender the address the reply was sent from
+	 * @param subject the subject as sent
+	 * @param text the text sent
+	 * @return the persisted row
+	 */
+	public static ClaimCorrespondence recordReply(Claim claim, String messageId, String sender, String subject, String text) {
+		// The column keeps microseconds; truncating returns the row as stored (a Linux clock ticks in nanoseconds)
+		var sentAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
+		var correspondence = new ClaimCorrespondence();
+
+		correspondence.messageId = messageId;
+		correspondence.claim = claim;
+		correspondence.direction = CorrespondenceDirection.OUTBOUND;
+		correspondence.sentDate = sentAt;
+		correspondence.receivedAt = sentAt;
+		correspondence.sender = sender;
+		correspondence.subject = subject;
+		correspondence.strippedText = text;
+		correspondence.persist();
+
+		return correspondence;
+	}
+
+	/**
+	 * Lists a claim's emails in the order they happened, which is the order they were recorded: an inbound email is recorded as
+	 * the intake picks it up, a reply as soon as the mail server has accepted it. Their times can't give that order, because an
+	 * inbound row's {@link #receivedAt} comes from the mail server's clock and an outbound row's from this app's.
+	 *
+	 * @param claim the claim
+	 * @return the claim's rows, oldest first; empty if the claim has none
+	 */
+	public static List<ClaimCorrespondence> listForClaim(Claim claim) {
+		return ClaimCorrespondence.<ClaimCorrespondence>list("claim", Sort.by("id"), claim);
+	}
+
+	/**
+	 * Lists a claim's emails in the order they happened, like {@link #listForClaim(Claim)}.
+	 *
+	 * @param claimId the claim id
+	 * @return the claim's rows, oldest first; empty if the claim has none
+	 * @throws ClaimNotFoundException if there's no claim with that id
+	 */
+	public static List<ClaimCorrespondence> listForClaim(long claimId) {
+		return Claim.<Claim>findByIdOptional(claimId)
+			.map(claim -> listForClaim(claim))
+			.orElseThrow(() -> new ClaimNotFoundException(claimId));
+	}
 
 	/**
 	 * Finds the claim a reply belongs to from the {@code Message-ID}s in its {@code In-Reply-To} and {@code References}

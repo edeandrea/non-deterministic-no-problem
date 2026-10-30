@@ -6,7 +6,9 @@ import java.time.LocalDate;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.parasol.claim.model.CorrespondenceDirection;
 import org.parasol.intake.IntakeFlowTestBase;
+import org.parasol.intake.IntakeScenario;
 import org.parasol.intake.IntakeScenario.Mail;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.model.EmailType;
@@ -54,6 +56,27 @@ class ClaimIntakePendingClaimTests extends IntakeFlowTestBase {
 			.hasSize(2)
 			.last()
 			.satisfies(reply -> assertThat(reply.body()).contains("Pending Review"));
+	}
+
+	// The customer replies to our email and the subject lost its claim number, so only the Message-ID we generated for the reply
+	// ties it to the claim
+	@Test
+	void aCustomerReplyThatNamesOnlyOurMessageIdFindsTheClaim() {
+		var created = createClaim(SENDER, NO_LOCATION);
+		var ourReply = this.scenario.awaitReplies(SENDER, 1).getFirst();
+		var ourMessageId = ourReply.firstHeader("Message-ID").orElseThrow();
+		var marker = marker();
+
+		stubFollowUp(marker, LOCATION_ANSWERED);
+		this.scenario.awaitFiled(this.scenario.submit(Mail.from(SENDER).subject("My claim").inReplyTo(ourMessageId).body("It was on Elm Street. " + marker)));
+		this.scenario.awaitWaitingRun(created.claim().id);
+
+		assertThat(this.scenario.transcript(created.claim().id))
+			.extracting(IntakeScenario.TranscriptEntry::direction)
+			.containsExactly(CorrespondenceDirection.INBOUND, CorrespondenceDirection.OUTBOUND, CorrespondenceDirection.INBOUND, CorrespondenceDirection.OUTBOUND);
+		// Only the first email created the claim; the reply doesn't, so a claim an adjustor entered would show its own content first
+		assertThat(this.scenario.createdClaimFlags(created.claim().id))
+			.containsExactly(true, false, false, false);
 	}
 
 	@Test

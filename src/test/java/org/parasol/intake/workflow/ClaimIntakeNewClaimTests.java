@@ -14,8 +14,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.parasol.claim.model.ClaimCategory;
 import org.parasol.claim.model.ClaimImageKind;
+import org.parasol.claim.model.CorrespondenceDirection;
 import org.parasol.intake.IntakeFlowTestBase;
 import org.parasol.intake.IntakeScenario.Mail;
+import org.parasol.intake.IntakeScenario.TranscriptEntry;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.config.IntakeConfig;
 import org.parasol.intake.mailbox.MailFolder;
@@ -168,6 +170,26 @@ class ClaimIntakeNewClaimTests extends IntakeFlowTestBase {
 		assertThat(this.scenario.awaitReplies(SENDER, 1))
 			.singleElement()
 			.satisfies(reply -> assertThat(reply.body()).contains("report.pdf").doesNotContain("send us photos"));
+	}
+
+	@Test
+	void theTranscriptHoldsTheEmailWithItsPhotoThenTheReply() {
+		var marker = marker();
+		stubNewClaim(marker, COMPLETE_DETAILS);
+
+		this.scenario.awaitFiled(this.scenario.submit(Mail.from(SENDER).subject("With photos").body("Photos. " + marker).attachment("front.jpg", "image/jpeg", JPEG)));
+
+		var claim = this.scenario.awaitClaimOf(SENDER);
+		var reply = this.scenario.awaitReplies(SENDER, 1).getFirst();
+
+		assertThat(this.scenario.transcript(claim.id))
+			.containsExactly(
+				new TranscriptEntry(CorrespondenceDirection.INBOUND, "With photos", List.of("front.jpg")),
+				new TranscriptEntry(CorrespondenceDirection.OUTBOUND, reply.subject(), List.of()));
+		assertThat(reply.subject())
+			.isEqualTo("[%s] Re: With photos".formatted(claim.claimNumber));
+		assertThat(this.scenario.createdClaimFlags(claim.id))
+			.containsExactly(true, false);
 	}
 
 	@Test

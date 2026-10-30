@@ -45,6 +45,7 @@ class CorrespondenceRecorder {
 		correspondence.sentDate = email.sentDate();
 		correspondence.receivedAt = email.receivedDate();
 		correspondence.sender = email.fromAddress().orElse(null);
+		correspondence.subject = email.subject();
 		correspondence.strippedText = email.strippedBody();
 		correspondence.persistAndFlush();
 	}

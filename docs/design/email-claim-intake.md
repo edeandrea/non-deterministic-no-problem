@@ -65,7 +65,8 @@ workflow run**, and the steps below are that run's steps.
     decision makes no LLM call.
 
 Every submission gets a reply (fixed templates, except the AI-written status answer), apart from
-auto-replies, self-sent mail and duplicates. A reply and a decision arriving together are serialized by
+auto-replies, self-sent mail and duplicates. Replies about a claim carry an app-generated `Message-ID` and are recorded next to the
+customer's emails, so the claim page's Documents tab shows the two-sided transcript, with each photo under the email that carried it. A reply and a decision arriving together are serialized by
 optimistic locking on the claim's intake state (not on the claim itself): whichever commits first wins. A losing decision gets a 409; a losing
 reply's email goes back in line behind the claim's run and is handled again under the claim's new status.
 

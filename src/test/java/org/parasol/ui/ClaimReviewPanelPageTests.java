@@ -213,6 +213,45 @@ class ClaimReviewPanelPageTests extends PlaywrightTests {
 		assertNoReviewControls(page);
 	}
 
+	// Four real emails through the intake: the transcript shows both sides in order, and the photo only under the email that carried it
+	@Test
+	void theDocumentsTabShowsTheTwoSidedTranscriptWithThePhotoUnderItsMessage() {
+		var marker = marker();
+		var noLocation = COMPLETE_DETAILS.replace("\"location\":\"Elm Street\"", "\"location\":null");
+
+		this.stubs.answerWhenAll(List.of(CLASSIFY, marker), "NEW_CLAIM");
+		this.stubs.answerWhenAll(List.of(DETAILS, marker), noLocation);
+
+		var messageId = this.scenario.submit(Mail.from(SENDER).name(SENDER_NAME).subject("Car accident").body("First email. " + marker)
+			.attachment("front.jpg", "image/jpeg", new byte[] { (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 1, 2, 3 }));
+
+		this.scenario.awaitFiled(messageId);
+
+		var claim = this.scenario.awaitClaimOf(SENDER);
+		var replyMarker = marker();
+
+		this.scenario.awaitReplies(SENDER, 1);
+		this.stubs.answerWhenAll(List.of(CLASSIFY, replyMarker), "CLAIM_FOLLOW_UP");
+		this.stubs.answerWhenAll(List.of(DETAILS, replyMarker), COMPLETE_DETAILS.replace("\"answeredItems\":[]", "\"answeredItems\":[\"LOCATION\"]"));
+		this.scenario.awaitFiled(this.scenario.submit(Mail.from(SENDER).subject("Re: Car accident").inReplyTo(messageId).body("It was on Elm Street. " + replyMarker)));
+		this.scenario.awaitWaitingRun(claim.id);
+		this.scenario.awaitReplies(SENDER, 2);
+
+		var page = loadPage(claim, "theTranscript");
+
+		page.getByRole(AriaRole.TAB, new Page.GetByRoleOptions().setName("Documents")).click();
+
+		var messages = page.getByTestId("correspondence-message");
+
+		PlaywrightAssertions.assertThat(messages).hasCount(4, new LocatorAssertions.HasCountOptions().setTimeout(20_000));
+		assertThat(messages.evaluateAll("items => items.map(item => item.dataset.direction)"))
+			.isEqualTo(List.of("INBOUND", "OUTBOUND", "INBOUND", "OUTBOUND"));
+		PlaywrightAssertions.assertThat(messages.nth(0).locator("img.image-gallery-image")).hasCount(1);
+		PlaywrightAssertions.assertThat(messages.nth(1).locator("img.image-gallery-image")).hasCount(0);
+		PlaywrightAssertions.assertThat(messages.nth(2).locator("img.image-gallery-image")).hasCount(0);
+		PlaywrightAssertions.assertThat(messages.nth(3).locator("img.image-gallery-image")).hasCount(0);
+	}
+
 	private static Locator exact(Page page, String label) {
 		return page.getByLabel(label, new Page.GetByLabelOptions().setExact(true));
 	}

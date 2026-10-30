@@ -94,8 +94,7 @@ public class ApplyOutcomeStep {
 		intake.policyNumberGenerated = state.policyNumberGenerated();
 		setReviewState(intake, isComplete, missing, runId);
 
-		storeImages(claim, email);
-		linkCorrespondence(email, claim);
+		linkCorrespondenceAndStoreImages(email, claim, true);
 
 		this.activities.publish(new ClaimStatusChanged(statusFor(isComplete)));
 		this.activities.publish(new NewClaimExtracted(ClaimExtractionRules.completeness(missing), missing));
@@ -120,8 +119,7 @@ public class ApplyOutcomeStep {
 
 		claim.status = statusFor(isComplete).label();
 		setReviewState(intake, isComplete, missing, runId);
-		storeImages(claim, email);
-		linkCorrespondence(email, claim);
+		linkCorrespondenceAndStoreImages(email, claim, false);
 		Claim.flush();
 
 		this.activities.publish(new ClaimStatusChanged(statusFor(isComplete)));
@@ -147,14 +145,20 @@ public class ApplyOutcomeStep {
 		intake.requestedItems = isComplete ? new HashSet<>() : new HashSet<>(missing);
 	}
 
-	private static void storeImages(Claim claim, InboundEmail email) {
-		email.images()
-			.forEach(image -> ClaimImage.store(claim, ClaimImageKind.ORIGINAL, image.fileName(), image.contentType(), image.data()));
-	}
+	// The email's row is looked up once: it gets the claim, and the photos link to it so the transcript shows them with their
+	// message. A row is missing only for an email without a Message-ID, which the dispatcher filters out before this step, so
+	// the claim-only store is a fallback that keeps the photos on the claim
+	private static void linkCorrespondenceAndStoreImages(InboundEmail email, Claim claim, boolean createdClaim) {
+		var correspondence = email.messageId().flatMap(ClaimCorrespondence::findByMessageId);
 
-	private static void linkCorrespondence(InboundEmail email, Claim claim) {
-		email.messageId()
-			.flatMap(ClaimCorrespondence::findByMessageId)
-			.ifPresent(correspondence -> correspondence.claim = claim);
+		correspondence.ifPresent(row -> {
+			row.claim = claim;
+			row.createdClaim = createdClaim;
+		});
+
+		email.images()
+			.forEach(image -> correspondence
+				.map(row -> ClaimImage.store(row, ClaimImageKind.ORIGINAL, image.fileName(), image.contentType(), image.data()))
+				.orElseGet(() -> ClaimImage.store(claim, ClaimImageKind.ORIGINAL, image.fileName(), image.contentType(), image.data())));
 	}
 }
