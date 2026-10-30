@@ -66,6 +66,8 @@ class CustomerNameTests {
 			fromName,
 			"Subject",
 			Instant.EPOCH,
+			Instant.EPOCH,
+			4,
 			"Body",
 			"Body",
 			List.of(),

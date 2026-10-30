@@ -22,6 +22,7 @@ import io.opentelemetry.instrumentation.annotations.SpanAttribute;
 import io.opentelemetry.sdk.common.CompletableResultCode;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.opentelemetry.sdk.trace.data.SpanData;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
 
@@ -33,7 +34,8 @@ class MailClientSpanInterceptorTests {
 	private static final String MESSAGE_WITH_AN_ADDRESS = "Couldn't access the INBOX folder of claims@parasol.com";
 
 	private final List<SpanData> spans = new CopyOnWriteArrayList<>();
-	private final MailClientSpanInterceptor interceptor = interceptor(this.spans);
+	private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
+	private final MailClientSpanInterceptor interceptor = interceptor(this.spans, this.registry);
 
 	@Test
 	void aCheckedExceptionEndsTheSpanInError() {
@@ -70,6 +72,27 @@ class MailClientSpanInterceptorTests {
 			.satisfies(span -> assertThat(span.getEvents()).isEmpty());
 	}
 
+	@Test
+	void aSuccessfulCallIsTimedAsASuccess() throws Exception {
+		this.interceptor.span(failing(null));
+
+		assertThat(this.registry.find("claim.intake.mail.client.duration").tags("protocol", "imap", "operation", "list", "outcome", "success").timer())
+			.isNotNull()
+			.satisfies(timer -> assertThat(timer.count()).isEqualTo(1));
+		assertThat(this.registry.find("claim.intake.mail.client.duration").tag("outcome", "error").timer()).isNull();
+	}
+
+	@Test
+	void aFailedCallIsTimedAsAnError() {
+		assertThatThrownBy(() -> this.interceptor.span(failing(new IOException(MESSAGE_WITH_AN_ADDRESS))))
+			.isInstanceOf(IOException.class);
+
+		assertThat(this.registry.find("claim.intake.mail.client.duration").tags("protocol", "imap", "operation", "list", "outcome", "error").timer())
+			.isNotNull()
+			.satisfies(timer -> assertThat(timer.count()).isEqualTo(1));
+		assertThat(this.registry.find("claim.intake.mail.client.duration").tag("outcome", "success").timer()).isNull();
+	}
+
 	private static InvocationContext failing(Exception failure) throws Exception {
 		var context = mock(InvocationContext.class);
 
@@ -90,7 +113,7 @@ class MailClientSpanInterceptorTests {
 		return Mailbox.class.getDeclaredMethod("list", String.class);
 	}
 
-	private static MailClientSpanInterceptor interceptor(List<SpanData> spans) {
+	private static MailClientSpanInterceptor interceptor(List<SpanData> spans, SimpleMeterRegistry registry) {
 		var imap = mock(IntakeConfig.Imap.class);
 		var config = mock(IntakeConfig.class);
 
@@ -103,7 +126,7 @@ class MailClientSpanInterceptorTests {
 			.build()
 			.get("test");
 
-		return new MailClientSpanInterceptor(tracer, config, "localhost", Optional.of(3025));
+		return new MailClientSpanInterceptor(tracer, config, IntakeActivityEvents.into(registry), "localhost", Optional.of(3025));
 	}
 
 	private static final class Mailbox {

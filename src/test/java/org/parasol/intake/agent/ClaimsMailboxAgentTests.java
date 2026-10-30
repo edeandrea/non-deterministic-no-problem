@@ -15,6 +15,7 @@ import org.parasol.claim.model.ClaimCategory;
 import org.parasol.intake.ChatStubs;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.agent.triage.ClaimStatusTools;
+import org.parasol.intake.model.ClassifiedOutcome;
 import org.parasol.intake.model.EmailType;
 import org.parasol.intake.model.IncidentDetails;
 import org.parasol.intake.model.IntakeOutcome;
@@ -87,6 +88,16 @@ class ClaimsMailboxAgentTests {
 				.containsExactly("system", "user"))
 			.allSatisfy(request -> assertThat(this.stubs.body(request).path("model").asText()).isEqualTo(StubbedModelsTestProfile.MODEL_NAME));
 		assertThat(this.stubs.countRequestsFor(FOLLOW_UP)).isZero();
+	}
+
+	@Test
+	void theRootReturnsTheClassifiersLabelWithTheOutcome() {
+		this.stubs.answer(CLASSIFY, EmailType.CLAIM_FOLLOW_UP.name());
+
+		var classified = processClassified("It was on Elm Street.", PENDING_INFORMATION);
+
+		assertThat(classified.emailType()).isEqualTo(EmailType.CLAIM_FOLLOW_UP);
+		assertThat(classified.outcome()).isInstanceOf(IntakeOutcome.PendingClaimUpdate.class);
 	}
 
 	@Test
@@ -206,6 +217,10 @@ class ClaimsMailboxAgentTests {
 	}
 
 	private IntakeOutcome process(String correspondence, MatchedClaim matchedClaim) {
+		return processClassified(correspondence, matchedClaim).outcome();
+	}
+
+	private ClassifiedOutcome processClassified(String correspondence, MatchedClaim matchedClaim) {
 		return this.agent.process(correspondence, matchedClaim, NOTHING_YET, Set.of(), SENT_DATE, ClaimStatusTools.scopedTo(matchedClaim));
 	}
 

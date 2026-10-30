@@ -25,6 +25,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
  * @param missingItems What the claim still lacks after this email, in template order
  * @param wasPendingReview Whether the matched claim was in {@code Pending Review} when the email arrived
  * @param needsReview Whether the claim is now complete and waits for a reviewer
+ * @param receivedAt When the mailbox received the email, as an ISO-8601 instant, or {@code null} if unknown; {@code FileEmailStep} measures
+ *   the email's latency from it
  */
 public record IntakeState(
 	String messageId,
@@ -38,7 +40,8 @@ public record IntakeState(
 	boolean policyNumberGenerated,
 	Set<MissingItem> missingItems,
 	boolean wasPendingReview,
-	boolean needsReview) {
+	boolean needsReview,
+	String receivedAt) {
 
 	/**
 	 * Why a run is on, or left, the main path.
@@ -78,8 +81,8 @@ public record IntakeState(
 		missingItems = (missingItems == null) ? Set.of() : Set.copyOf(missingItems);
 	}
 
-	static IntakeState start(String messageId, String sender) {
-		return new IntakeState(messageId, sender, null, Disposition.CONTINUE, false, List.of(), null, null, false, Set.of(), false, false);
+	static IntakeState start(String messageId, String sender, String receivedAt) {
+		return new IntakeState(messageId, sender, null, Disposition.CONTINUE, false, List.of(), null, null, false, Set.of(), false, false, receivedAt);
 	}
 
 	/**
@@ -91,7 +94,7 @@ public record IntakeState(
 	 */
 	public IntakeState withClaim(Long newClaimId, boolean newWasPendingReview) {
 		return new IntakeState(this.messageId, this.sender, newClaimId, this.disposition, this.mayResolve, this.pendingClaimNumbers, this.outcome,
-			this.policyNumber, this.policyNumberGenerated, this.missingItems, newWasPendingReview, this.needsReview);
+			this.policyNumber, this.policyNumberGenerated, this.missingItems, newWasPendingReview, this.needsReview, this.receivedAt);
 	}
 
 	/**
@@ -102,7 +105,7 @@ public record IntakeState(
 	 */
 	public IntakeState withDisposition(Disposition newDisposition) {
 		return new IntakeState(this.messageId, this.sender, this.claimId, newDisposition, this.mayResolve, this.pendingClaimNumbers, this.outcome,
-			this.policyNumber, this.policyNumberGenerated, this.missingItems, this.wasPendingReview, this.needsReview);
+			this.policyNumber, this.policyNumberGenerated, this.missingItems, this.wasPendingReview, this.needsReview, this.receivedAt);
 	}
 
 	/**
@@ -114,7 +117,7 @@ public record IntakeState(
 	 */
 	public IntakeState withPendingClaims(boolean newMayResolve, List<String> numbers) {
 		return new IntakeState(this.messageId, this.sender, this.claimId, this.disposition, newMayResolve, numbers, this.outcome,
-			this.policyNumber, this.policyNumberGenerated, this.missingItems, this.wasPendingReview, this.needsReview);
+			this.policyNumber, this.policyNumberGenerated, this.missingItems, this.wasPendingReview, this.needsReview, this.receivedAt);
 	}
 
 	/**
@@ -125,7 +128,7 @@ public record IntakeState(
 	 */
 	public IntakeState withOutcome(IntakeOutcome newOutcome) {
 		return new IntakeState(this.messageId, this.sender, this.claimId, this.disposition, this.mayResolve, this.pendingClaimNumbers, newOutcome,
-			this.policyNumber, this.policyNumberGenerated, this.missingItems, this.wasPendingReview, this.needsReview);
+			this.policyNumber, this.policyNumberGenerated, this.missingItems, this.wasPendingReview, this.needsReview, this.receivedAt);
 	}
 
 	/**
@@ -137,7 +140,7 @@ public record IntakeState(
 	 */
 	public IntakeState withPolicy(String newPolicyNumber, boolean generated) {
 		return new IntakeState(this.messageId, this.sender, this.claimId, this.disposition, this.mayResolve, this.pendingClaimNumbers, this.outcome,
-			newPolicyNumber, generated, this.missingItems, this.wasPendingReview, this.needsReview);
+			newPolicyNumber, generated, this.missingItems, this.wasPendingReview, this.needsReview, this.receivedAt);
 	}
 
 	/**
@@ -150,7 +153,7 @@ public record IntakeState(
 	 */
 	public IntakeState withApplied(Long newClaimId, Set<MissingItem> missing, boolean newNeedsReview) {
 		return new IntakeState(this.messageId, this.sender, newClaimId, this.disposition, this.mayResolve, this.pendingClaimNumbers, this.outcome,
-			this.policyNumber, this.policyNumberGenerated, missing, this.wasPendingReview, newNeedsReview);
+			this.policyNumber, this.policyNumberGenerated, missing, this.wasPendingReview, newNeedsReview, this.receivedAt);
 	}
 
 	/**

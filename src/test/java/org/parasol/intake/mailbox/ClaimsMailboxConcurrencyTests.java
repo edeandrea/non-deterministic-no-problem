@@ -53,10 +53,12 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.parasol.intake.config.IntakeConfig;
+import org.parasol.intake.observability.IntakeActivityEvents;
 import org.opentest4j.TestAbortedException;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.smallrye.config.SmallRyeConfigBuilder;
 
 // Opt-in diagnostic: real mailbox methods and GreenMail, without booting unrelated Quarkus Dev Services.
@@ -134,7 +136,7 @@ class ClaimsMailboxConcurrencyTests {
 		var name = "%s-%s-%s-%d".formatted(strategy, workload, isPrecreated, round);
 		var address = "%s@stress.example.com".formatted(UUID.randomUUID());
 		var config = config(address);
-		var mailbox = new ClaimsMailbox(config);
+		var mailbox = new ClaimsMailbox(config, IntakeActivityEvents.into(new SimpleMeterRegistry()));
 		var gate = instrumentGate(mailbox, strategy);
 		var ids = seed(address, isPrecreated);
 		assertThat(config.imap().user()).isEqualTo(address);

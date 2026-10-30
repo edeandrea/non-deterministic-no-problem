@@ -7,6 +7,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
@@ -24,6 +25,9 @@ import jakarta.mail.StoreClosedException;
 import jakarta.mail.search.MessageIDTerm;
 
 import org.parasol.intake.config.IntakeConfig;
+import org.parasol.intake.observability.IntakeActivities;
+import org.parasol.intake.observability.IntakeActivity.MailboxLockAcquired;
+import org.parasol.intake.observability.MailboxLockMode;
 import org.parasol.intake.observability.MailClientSpan;
 import org.parasol.intake.observability.MailClientSpan.Protocol;
 
@@ -46,12 +50,14 @@ public class ClaimsMailbox {
 	private static final int FETCH_SIZE_BYTES = 1024 * 1024;
 
 	private final IntakeConfig config;
+	private final IntakeActivities activities;
 	private final Session session = Session.getInstance(sessionProperties());
 	private final MimeMessageParser parser;
 	private final ReadWriteLock folderLock = new ReentrantReadWriteLock(true);
 
-	ClaimsMailbox(IntakeConfig config) {
+	ClaimsMailbox(IntakeConfig config, IntakeActivities activities) {
 		this.config = config;
+		this.activities = activities;
 		this.parser = new MimeMessageParser(config.limits().maxImages(), config.limits().maxImageSize().asLongValue());
 	}
 
@@ -74,6 +80,29 @@ public class ClaimsMailbox {
 	public List<InboundEmail> list(@SpanAttribute(FOLDER) MailFolder folder) {
 		return withFolder(folder, Folder.READ_ONLY, imapFolder -> parseAll(imapFolder.getMessages()))
 			.orElseGet(List::of);
+	}
+
+	/**
+	 * Counts the emails waiting in the INBOX, with IMAP {@code STATUS}: the folder isn't opened and no email is read. Like every other
+	 * read it takes the shared lock. Not a {@link MailClientSpan} method, so measuring adds no spans.
+	 *
+	 * @return The number of emails in the INBOX, 0 if it doesn't exist yet
+	 */
+	public int inboxDepth() {
+		var lock = this.folderLock.readLock();
+		acquire(lock, MailboxLockMode.READ);
+
+		try (var store = connect()) {
+			var inbox = store.getFolder(folderName(MailFolder.INBOX));
+
+			return inbox.exists() ? inbox.getMessageCount() : 0;
+		}
+		catch (MessagingException e) {
+			throw new MailboxException("Couldn't count the %s folder of %s".formatted(folderName(MailFolder.INBOX), this.config.imap().user()), e);
+		}
+		finally {
+			lock.unlock();
+		}
 	}
 
 	/**
@@ -236,8 +265,9 @@ public class ClaimsMailbox {
 	// Concurrent runs hitting GreenMail together stall some of their moves, so a call that changes the mailbox has it to itself, while
 	// reads share it. The lock is fair, so a steady stream of reads can't starve a move
 	private <T> Optional<T> withFolder(MailFolder folder, int mode, FolderAction<T> action) {
-		var lock = (mode == Folder.READ_ONLY) ? this.folderLock.readLock() : this.folderLock.writeLock();
-		lock.lock();
+		var isRead = (mode == Folder.READ_ONLY);
+		var lock = isRead ? this.folderLock.readLock() : this.folderLock.writeLock();
+		acquire(lock, isRead ? MailboxLockMode.READ : MailboxLockMode.WRITE);
 
 		try (var store = connect()) {
 			var imapFolder = store.getFolder(folderName(folder));
@@ -252,6 +282,12 @@ public class ClaimsMailbox {
 		finally {
 			lock.unlock();
 		}
+	}
+
+	private void acquire(Lock lock, MailboxLockMode mode) {
+		var startedWaiting = System.nanoTime();
+		lock.lock();
+		this.activities.publish(new MailboxLockAcquired(mode, Duration.ofNanos(System.nanoTime() - startedWaiting)));
 	}
 
 	private static <T> T openAndRun(Folder folder, int mode, FolderAction<T> action) throws MessagingException, IOException {

@@ -54,6 +54,8 @@ class SameCustomerRuleTests {
 			Optional.ofNullable(fromName),
 			"Subject",
 			Instant.EPOCH,
+			Instant.EPOCH,
+			4,
 			"Body",
 			"Body",
 			List.of(),
@@ -63,6 +65,6 @@ class SameCustomerRuleTests {
 	}
 
 	private static InboundEmail emailWithoutSender() {
-		return new InboundEmail(Optional.of("<id@example.com>"), List.of(), Optional.empty(), Optional.empty(), "Subject", Instant.EPOCH, "Body", "Body", List.of(), List.of(), false);
+		return new InboundEmail(Optional.of("<id@example.com>"), List.of(), Optional.empty(), Optional.empty(), "Subject", Instant.EPOCH, Instant.EPOCH, 4, "Body", "Body", List.of(), List.of(), false);
 	}
 }

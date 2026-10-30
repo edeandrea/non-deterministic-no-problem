@@ -14,6 +14,9 @@ import java.util.Optional;
  * @param fromName The sender's display name, if the {@code From} header has one
  * @param subject The decoded subject, empty if there is none
  * @param sentDate The {@code Date} header, or the date the mailbox received the email if that's missing
+ * @param receivedDate When the mailbox received the email (IMAP INTERNALDATE), or {@code sentDate} if the server gave none. Unlike the {@code Date}
+ *   header, the sender can't set it
+ * @param sizeBytes The size of the message, from the server, or the body and attachments if it gave none
  * @param body The text body. An HTML-only body is converted to text
  * @param strippedBody The text body without quoted reply text (lines starting with {@code >} and their "On … wrote:" line)
  * @param images The image attachments that are kept, in the order they appear
@@ -27,6 +30,8 @@ public record InboundEmail(
 	Optional<String> fromName,
 	String subject,
 	Instant sentDate,
+	Instant receivedDate,
+	long sizeBytes,
 	String body,
 	String strippedBody,
 	List<ImageAttachment> images,
@@ -40,6 +45,7 @@ public record InboundEmail(
 		Objects.requireNonNull(fromName, "fromName");
 		Objects.requireNonNull(subject, "subject");
 		Objects.requireNonNull(sentDate, "sentDate");
+		Objects.requireNonNull(receivedDate, "receivedDate");
 		Objects.requireNonNull(body, "body");
 		Objects.requireNonNull(strippedBody, "strippedBody");
 		images = List.copyOf(images);

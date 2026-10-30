@@ -5,13 +5,15 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import java.util.Optional;
+
 import jakarta.enterprise.event.Event;
 
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.observability.IntakeActivity.EmailHandled;
 
 class IntakeActivitiesTests {
-	private static final EmailHandled ACTIVITY = new EmailHandled(EmailOutcome.NEW_CLAIM);
+	private static final EmailHandled ACTIVITY = new EmailHandled(EmailOutcome.NEW_CLAIM, Optional.empty());
 
 	@SuppressWarnings("unchecked")
 	private final Event<IntakeActivity> event = mock(Event.class);

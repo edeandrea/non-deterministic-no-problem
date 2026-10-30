@@ -64,6 +64,7 @@ final class MimeMessageParser {
 
 		var attachments = attachments(parts.attachments());
 		var sender = firstAddress(message);
+		var sentDate = sentDate(message);
 
 		return new InboundEmail(
 			messageId(message),
@@ -73,7 +74,9 @@ final class MimeMessageParser {
 				.filter(name -> !name.isBlank()),
 			Optional.ofNullable(message.getSubject())
 				.orElse(""),
-			sentDate(message),
+			sentDate,
+			receivedDate(message).map(Date::toInstant).orElse(sentDate),
+			sizeBytes(message, body, attachments),
 			body,
 			QuotedText.strip(body),
 			attachments.images(),
@@ -252,6 +255,13 @@ final class MimeMessageParser {
 		catch (MessagingException e) {
 			return Optional.empty();
 		}
+	}
+
+	// The server's figure when it gives one (getSize is -1 for an unknown size), otherwise what the parser kept
+	private static long sizeBytes(Message message, String body, Attachments attachments) throws MessagingException {
+		var size = message.getSize();
+
+		return (size > 0) ? size : (body.getBytes(StandardCharsets.UTF_8).length + attachments.images().stream().mapToLong(image -> image.data().length).sum());
 	}
 
 	private static Optional<InternetAddress> firstAddress(Message message) throws MessagingException {

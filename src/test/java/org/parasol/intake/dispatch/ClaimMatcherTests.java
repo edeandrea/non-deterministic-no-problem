@@ -87,6 +87,6 @@ class ClaimMatcherTests {
 	}
 
 	private static InboundEmail email(String from, String subject, List<String> references) {
-		return new InboundEmail(Optional.of("<new@example.com>"), references, Optional.of(from), Optional.empty(), subject, Instant.EPOCH, "Body", "Body", List.of(), List.of(), false);
+		return new InboundEmail(Optional.of("<new@example.com>"), references, Optional.of(from), Optional.empty(), subject, Instant.EPOCH, Instant.EPOCH, 4, "Body", "Body", List.of(), List.of(), false);
 	}
 }

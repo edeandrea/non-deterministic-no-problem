@@ -2,6 +2,7 @@ package org.parasol.intake.workflow;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -34,11 +35,34 @@ class IntakeJsonRoundTripTests {
 
 	@Test
 	void anIntakeRunRoundTrips() throws Exception {
-		var forEmail = IntakeRun.forEmail("<id@example.com>", "conversation", "jane@example.com", 7L, true);
+		var forEmail = IntakeRun.forEmail("<id@example.com>", "conversation", "jane@example.com", 7L, true, Instant.parse("2026-10-29T10:15:30Z"));
 
 		assertRoundTrips(forEmail);
-		assertRoundTrips(IntakeRun.forEmail("<id@example.com>", "conversation", "jane@example.com", null, false));
+		assertRoundTrips(IntakeRun.forEmail("<id@example.com>", "conversation", "jane@example.com", null, false, Instant.parse("2026-10-29T10:15:30Z")));
 		assertRoundTrips(IntakeRun.resumingReview(forEmail, "conversation", 7L));
+	}
+
+	@Test
+	void anIntakeRunWithoutAReceivedTimeRoundTrips() throws Exception {
+		// A run persisted before the received time was recorded has none
+		var legacy = new IntakeRun("<id@example.com>", "conversation", "jane@example.com", 7L, true, false, null);
+
+		assertRoundTrips(legacy);
+		assertThat(this.objectMapper.readValue("""
+			{"messageId":"<id@example.com>","conversationId":"conversation","sender":"jane@example.com","claimId":7,"senderMatches":true,"resumesReview":false}""",
+			IntakeRun.class))
+			.isEqualTo(legacy);
+		assertRoundTrips(IntakeRun.resumingReview(legacy, "conversation", 7L));
+	}
+
+	@Test
+	void theReceivedTimeSurvivesTheRoundTripOfARunAndItsState() throws Exception {
+		var run = IntakeRun.forEmail("<id@example.com>", "conversation", "jane@example.com", 7L, true, Instant.parse("2026-10-29T10:15:30Z"));
+
+		assertThat(this.objectMapper.readValue(this.objectMapper.writeValueAsString(run), IntakeRun.class).receivedAt()).isEqualTo("2026-10-29T10:15:30Z");
+		assertRoundTrips(IntakeState.start("<id@example.com>", "jane@example.com", null));
+		assertThat(this.objectMapper.readValue(this.objectMapper.writeValueAsString(IntakeState.start("<id@example.com>", "jane@example.com", run.receivedAt())),
+			IntakeState.class).receivedAt()).isEqualTo("2026-10-29T10:15:30Z");
 	}
 
 	@Test
@@ -46,20 +70,20 @@ class IntakeJsonRoundTripTests {
 		var details = new IncidentDetails("Hit a post", "2026-10-07", "14:30", "Elm Street", ClaimCategory.SINGLE_VEHICLE, "AC-123456789", Set.of(MissingItem.LOCATION));
 		var state = new IntakeState("<id@example.com>", "jane@example.com", 7L, Disposition.WHICH_CLAIM, true, List.of("CLM01000000", "CLM01001009"),
 			new IntakeOutcome.NewClaim(new ClaimExtraction("A summary", "Calm", details)), "AC-123456789", true,
-			Set.of(MissingItem.LOCATION, MissingItem.CATEGORY), true, false);
+			Set.of(MissingItem.LOCATION, MissingItem.CATEGORY), true, false, "2026-10-29T10:15:30Z");
 
 		assertRoundTrips(state);
 	}
 
 	@Test
 	void aMinimalIntakeStateRoundTrips() throws Exception {
-		assertRoundTrips(IntakeState.start("<id@example.com>", "jane@example.com"));
+		assertRoundTrips(IntakeState.start("<id@example.com>", "jane@example.com", "2026-10-29T10:15:30Z"));
 	}
 
 	@Test
 	void everyOutcomeVariantRoundTripsInsideTheState() throws Exception {
 		for (var outcome : List.of(new IntakeOutcome.StatusReply("Answer"), new IntakeOutcome.NotAClaim(), new IntakeOutcome.NoMatchingClaim())) {
-			assertRoundTrips(IntakeState.start("<id@example.com>", "jane@example.com").withOutcome(outcome));
+			assertRoundTrips(IntakeState.start("<id@example.com>", "jane@example.com", "2026-10-29T10:15:30Z").withOutcome(outcome));
 		}
 	}
 

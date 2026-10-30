@@ -17,6 +17,9 @@ import org.parasol.intake.mailbox.InboundEmail;
 import org.parasol.intake.model.ClaimIntakeState;
 import org.parasol.intake.model.IncidentDetails;
 import org.parasol.intake.model.MatchedClaim;
+import org.parasol.intake.observability.IntakeActivities;
+import org.parasol.intake.observability.IntakeActivity.EmailClassified;
+import org.parasol.intake.observability.MatchedClaimKind;
 import org.parasol.intake.workflow.mail.IntakeEmailReader;
 import org.parasol.intake.workflow.outcome.ClaimFields;
 
@@ -30,18 +33,20 @@ class AgentStep {
 	private final IntakeEmailReader emails;
 	private final ClaimsMailboxAgent agent;
 	private final IntakeConfig config;
+	private final IntakeActivities activities;
 
-	AgentStep(IntakeEmailReader emails, ClaimsMailboxAgent agent, IntakeConfig config) {
+	AgentStep(IntakeEmailReader emails, ClaimsMailboxAgent agent, IntakeConfig config, IntakeActivities activities) {
 		this.emails = emails;
 		this.agent = agent;
 		this.config = config;
+		this.activities = activities;
 	}
 
 	IntakeState run(IntakeState state) {
 		var email = this.emails.require(state.messageId());
 		var history = snapshot(state, email);
 		var matched = history.matchedClaim();
-		var outcome = this.agent.process(
+		var classified = this.agent.process(
 			CorrespondenceText.cap(history.correspondence(), this.config.limits().maxBodyCharacters()),
 			matched,
 			history.extractedSoFar(),
@@ -49,7 +54,9 @@ class AgentStep {
 			email.sentDate().atZone(ZoneOffset.UTC).toLocalDate().toString(),
 			ClaimStatusTools.scopedTo(matched));
 
-		return state.withOutcome(outcome);
+		this.activities.publish(new EmailClassified(classified.emailType(), MatchedClaimKind.of(matched)));
+
+		return state.withOutcome(classified.outcome());
 	}
 
 	// Its own transaction, committed before the agents run: no transaction is held across an LLM call

@@ -61,6 +61,18 @@ public final class ClaimExtractionRules {
 				Collections::unmodifiableSet));
 	}
 
+	/**
+	 * The share of the required fields an extraction filled.
+	 *
+	 * @param missing the items the claim lacks, from {@link #findMissingItems}
+	 * @return from 0 (none filled) to 1 (complete)
+	 */
+	public static double completeness(Collection<MissingItem> missing) {
+		var required = MissingItem.values().length;
+
+		return (double) (required - missing.size()) / required;
+	}
+
 	// Exhaustive on purpose: a new MissingItem won't compile until it says how its field counts as absent
 	private static boolean isAbsent(MissingItem item, IncidentDetails details) {
 		return switch (item) {
