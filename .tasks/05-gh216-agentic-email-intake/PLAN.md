@@ -42,10 +42,11 @@ changes tasks 12 and 13 (below).
 with the user the same day (six decisions, D1–D6) and then changed twice with the user while building it: the intake's
 bookkeeping lives in its own `ClaimIntakeState` entity, never on `Claim` (so claim retrieval neither returns nor loads
 it), and `IntakeReplySender` takes no `Optional` parameters.
-**Status (2026-10-29):** tasks 03–10b are done and merged into the feature branch (the last was
-[#268](https://github.com/edeandrea/non-deterministic-no-problem/pull/268), task 10b). **Task 11 is built** and its PR into
-`gh216-email-intake` is the next step; one item is open on it (a default-profile `IntakeSpanPropagationTests` failure on the
-user's machine whose cause isn't found, see the task file → Open). Tasks 12–14 are not started.
+**Status (2026-10-30):** tasks 03–11b are done and merged into the feature branch (the last was
+[#276](https://github.com/edeandrea/non-deterministic-no-problem/pull/276), task 11b, `465f7aa`). **Task 12 is built** on
+`gh216/12-roundcube-e2e` (all three scenarios pass locally under `-Pollama` and `-Pollama-openai`); its PR into
+`gh216-email-intake` is next. Then tasks 12b (#266) and 12c (#265), moved ahead of 13 and 14 in
+[#279](https://github.com/edeandrea/non-deterministic-no-problem/pull/279), then 13 and 14; none of them is started.
 
 **Plan File:** `.tasks/05-gh216-agentic-email-intake/PLAN.md`
 **Tasks Directory:** `.tasks/05-gh216-agentic-email-intake/`
@@ -162,6 +163,14 @@ Before starting any task, check each of these. **"Fixed" means released**, not m
    `IntakeSpanPropagationTests` and `IntakeLangfuseDeliveryTests` passed.
 
 **Findings log (most recent check first; drop an item once it's resolved):**
+- **2026-10-30, before task 12:** no change, every workaround stays. 2a — the newest platform `quarkus-flow-bom` is still 3.40.1
+  (Flow 1.1.3); [quarkus-platform#2281](https://github.com/quarkusio/quarkus-platform/pull/2281) is still open; Flow 1.3.0 is the
+  latest release. 2b — [#1111](https://github.com/quarkiverse/quarkus-flow/issues/1111) is closed (milestone 1.4.0, due 2026-11-20),
+  1.4.0 not released. 2c.1 — [#57879](https://github.com/quarkusio/quarkus/pull/57879) still open, no milestone; 3.40.1.1 is the latest
+  3.40.x. 2c.2 — 1.14.2 is still the latest stable quarkus-langchain4j; **1.15.0.CR2 (2026-10-30) is new**, not yet checked for
+  [#2951](https://github.com/quarkiverse/quarkus-langchain4j/pull/2951) (a pre-release either way). 2c.3 — 0.3.0 still latest. 2c.4 —
+  [#1122](https://github.com/quarkiverse/quarkus-flow/issues/1122) open, no milestone. 2c.6 — [#6886](https://github.com/langchain4j/langchain4j/pull/6886)
+  and [#6914](https://github.com/langchain4j/langchain4j/pull/6914) both still open (langchain4j 1.23.0 is out without them).
 - **2026-10-29, before the task 11 PR:** 2a — the newest platform release (3.40.1.1, 2026-10-19) still pins Flow 1.1.3; Flow 1.3.0
   (2026-10-23) is the latest release and the platform PR
   [quarkus-platform#2281](https://github.com/quarkusio/quarkus-platform/pull/2281) "Update Quarkus Flow to 1.3.0" is open; the
@@ -251,8 +260,8 @@ file's header link to it.**
 - [x] [task-10-review-api-and-ui.md](task-10-review-api-and-ui.md): Review API and UI — **done**, squash-merged into `gh216-email-intake` as `9647d24` ([#267](https://github.com/edeandrea/non-deterministic-no-problem/pull/267)) — issue [#258](https://github.com/edeandrea/non-deterministic-no-problem/issues/258); see Outcome
 - [x] [task-10b-conversation-core.md](task-10b-conversation-core.md): Generic conversation context core (`ai.scoring.conversation`; changes the chat's scoring trigger) — **done** on `gh216/10b-conversation-core` off the feature branch (not yet committed/PR'd; user decision 2026-10-27 dropped the straight-to-`main` exception) — issue [#259](https://github.com/edeandrea/non-deterministic-no-problem/issues/259); real-key suite left for the user: `ai.scoring.it.DriftDetectionTests`; see Outcome
 - [x] [task-11-observability.md](task-11-observability.md): Observability for the intake workflow — **done**, squash-merged into `gh216-email-intake` as `520501b` ([#270](https://github.com/edeandrea/non-deterministic-no-problem/pull/270)) — issue [#260](https://github.com/edeandrea/non-deterministic-no-problem/issues/260)
-- [ ] [task-11b-more-intake-metrics.md](task-11b-more-intake-metrics.md): More business and operational metrics for the intake (added 2026-10-29; building #1–#4, #6–#12, #15, #16 and a classifier-label counter in place of #5, in one PR; #13 dropped (Langfuse already sums tokens per claim), #14 and #17 already covered by existing meters; built, full `clean verify` under the Ollama profiles recorded in the task file; doesn't block #216's close-out) — issue [#271](https://github.com/edeandrea/non-deterministic-no-problem/issues/271)
-- [ ] [task-12-roundcube-e2e.md](task-12-roundcube-e2e.md): Roundcube end-to-end test — issue [#261](https://github.com/edeandrea/non-deterministic-no-problem/issues/261)
+- [x] [task-11b-more-intake-metrics.md](task-11b-more-intake-metrics.md): More business and operational metrics for the intake — **done**, squash-merged into `gh216-email-intake` as `465f7aa` ([#276](https://github.com/edeandrea/non-deterministic-no-problem/pull/276)) (added 2026-10-29; building #1–#4, #6–#12, #15, #16 and a classifier-label counter in place of #5, in one PR; #13 dropped (Langfuse already sums tokens per claim), #14 and #17 already covered by existing meters; built, full `clean verify` under the Ollama profiles recorded in the task file; doesn't block #216's close-out) — issue [#271](https://github.com/edeandrea/non-deterministic-no-problem/issues/271)
+- [ ] [task-12-roundcube-e2e.md](task-12-roundcube-e2e.md): Roundcube end-to-end test — **built** on `gh216/12-roundcube-e2e` (Roundcube from the Compose file through `UiTestProfile` on a random port, the watcher started by the test; see the task file → Outcome) — issue [#261](https://github.com/edeandrea/non-deterministic-no-problem/issues/261)
 - [ ] [task-12b-consolidate-description-into-summary.md](task-12b-consolidate-description-into-summary.md): Consolidate incident description into the claim summary (task 16 until 2026-10-30; spun off 2026-10-26; required before task 13, user decision 2026-10-30: it changes the extraction contract and every intake fixture that tasks 13 and 14 document and verify) — found while designing task 10's review UI: `IncidentDetailsAgent`'s `description` is extracted only to be thrown away, while a separate `ClaimSummaryAgent` output is what's actually persisted — issue [#266](https://github.com/edeandrea/non-deterministic-no-problem/issues/266)
 - [ ] [task-12c-claim-correspondence-transcript.md](task-12c-claim-correspondence-transcript.md): Show a claim's full email correspondence as a transcript on the Documents tab (task 15 until 2026-10-30; spun off 2026-10-26; required before task 13, user decision 2026-10-30: the demo guide shows the reviewer's view, so it documents the transcript; after 12b, so its tests use the final fixtures) — found while designing task 10's review UI: the Documents tab shows only the first email, and a reviewer deciding a `Pending Review` claim would benefit from the actual back-and-forth — issue [#265](https://github.com/edeandrea/non-deterministic-no-problem/issues/265)
 - [ ] [task-13-demo-and-docs.md](task-13-demo-and-docs.md): Demo guide and documentation — issue [#262](https://github.com/edeandrea/non-deterministic-no-problem/issues/262)
@@ -1113,6 +1122,14 @@ not only non-suspended ones (policy rejection and superseding evict a paused rev
   - a CDI `AgentListener` only for leaf metrics
   - handle the `MonitoredAgent` `ongoingExecutions` leak per the user's decision
 - **task-12 (Roundcube E2E):** stub or mock the LLM agents, with WireMock stubs matching on the last message.
+  - **Roundcube 1.7.5 selectors (elastic skin), recorded by task 12 (2026-10-30), used by `org.parasol.testing.mail.Roundcube`:**
+    login `#rcmloginuser`, `#rcmloginpwd`, `#rcmloginsubmit`; logout `#taskmenu a.logout`; compose at
+    `?_task=mail&_action=compose`: recipient `#compose_to input[type=text]` (the visible input of the recipient widget; the
+    hidden `#_to` textarea fills itself on send), subject `#compose-subject` (`_subject`), body `#composebody` (`_message`),
+    attachment `#uploadformInput` (`setInputFiles`; uploaded once `#attachment-list li` is no longer `.uploading`), send
+    `button.btn.send` (back to the mailbox URL when sent); message list `#messagelist tbody tr` (newest first); a clicked
+    message opens in the `#messagecontframe` iframe, body `#messagebody`; reply `#toolbar-menu a.reply` (the body starts
+    with the quote, `Re: ` subject, `In-Reply-To`/`References` set).
 - **task-13 (demo/docs):** document the opt-outs, single replica, store lifecycle and eviction.
 - **task-14 (verification):**
   - the restart test needs a DB that survives a Quarkus restart (the test Postgres dev service is recreated)

@@ -1,10 +1,15 @@
 # Mail stack for dev mode and tests, started by Quarkus Compose Dev Services.
 # - greenmail: SMTP (3025) + IMAP (3143) + REST API (8080), auth disabled, mailboxes auto-created, mail kept in memory.
 #   Started in dev mode and in every test run, on random host ports mapped into the app's config by the labels below.
-# - roundcube: browser webmail on http://localhost:8000, only in dev mode (the 'webmail' Compose profile, enabled at
-#   root level in application.yml so it applies under every AI profile). Never in tests: surefire/failsafe set
-#   quarkus.compose.devservices.profiles=none whatever the config profile, and %test blanks it for IDE/continuous-testing
-#   runs. Sends and reads mail through greenmail only. Host port 8000 is fixed, so it must be free when dev mode starts.
+# - roundcube: browser webmail, behind the 'webmail' Compose profile. Dev mode enables it at root level in application.yml
+#   (so it applies under every AI profile) on http://localhost:8000, a fixed host port that must be free when dev mode
+#   starts. Tests leave it off (surefire/failsafe set quarkus.compose.devservices.profiles=none, %test blanks it), except
+#   the Playwright tests' UiTestProfile, which turns it on with ROUNDCUBE_PORT=0, a random host port mapped into
+#   parasol.mail.roundcube-port for the Roundcube end-to-end test. The host port is a bare ${ROUNDCUBE_PORT} because
+#   Quarkus parses this file itself, and its port parser can't read ${VAR:-default}: application.yml supplies the value
+#   through quarkus.compose.devservices.env-variables. Sends and reads mail through greenmail only.
+#   On OpenShift, src/main/kubernetes/dependencies.yml runs the same image, environment and plugin files; the port
+#   mapping and labels here are Compose Dev Services only and have no counterpart there.
 #   The parasol_identities plugin (src/main/docker/roundcube/) gives the seeded claimants' identities their names; the
 #   address -> name map in config/parasol-identities.php must follow the claimants in import.sql.
 services:
@@ -27,7 +32,10 @@ services:
     depends_on:
       - greenmail
     ports:
-      - '8000:8000'
+      - '${ROUNDCUBE_PORT}:8000'
+    labels:
+      io.quarkus.devservices.compose.wait_for.logs: .*resuming normal operations.*
+      io.quarkus.devservices.compose.config_map.port.8000: parasol.mail.roundcube-port
     environment:
       ROUNDCUBEMAIL_DEFAULT_HOST: greenmail
       ROUNDCUBEMAIL_DEFAULT_PORT: "3143"

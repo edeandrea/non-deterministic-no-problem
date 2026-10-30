@@ -19,14 +19,27 @@ import io.quarkiverse.wiremock.devservice.ConnectWireMock;
  * Easy RAG ingestion at boot, because the claim detail page's chat test talks to the real chat bot. Share it rather than adding
  * another: every profile class is another full application boot. {@code @ConnectWireMock} is on the profile rather than the
  * review panel test for the reason {@link StubbedModelsTestProfile} gives.
+ * <p>
+ *   It also starts Roundcube, the {@code webmail} profile of compose-devservices.yml, for the Roundcube end-to-end test,
+ *   on a random host port ({@code ROUNDCUBE_PORT=0}) mapped into {@code parasol.mail.roundcube-port}, so it never clashes
+ *   with dev mode's 8000. This override wins over the {@code quarkus.compose.devservices.profiles=none} that surefire and
+ *   failsafe set for every other test. Every Playwright boot starts it, which costs a few seconds each.
+ * </p>
  */
 @ConnectWireMock
 public class UiTestProfile implements QuarkusTestProfile {
+	private static final Map<String, String> WEBMAIL = Map.of(
+		"quarkus.compose.devservices.profiles", "webmail",
+		"quarkus.compose.devservices.env-variables.ROUNDCUBE_PORT", "0"
+	);
+
 	@Override
 	public Map<String, String> getConfigOverrides() {
-		return Stream.concat(
-				new QuinoaTestProfiles.EnableAndRunTests().getConfigOverrides().entrySet().stream(),
-				StubbedModelsTestProfile.claimIntakeOnWireMock().entrySet().stream())
+		return Stream.of(
+				new QuinoaTestProfiles.EnableAndRunTests().getConfigOverrides(),
+				StubbedModelsTestProfile.claimIntakeOnWireMock(),
+				WEBMAIL)
+			.flatMap(overrides -> overrides.entrySet().stream())
 			.collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
 	}
 }

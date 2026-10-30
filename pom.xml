@@ -335,7 +335,8 @@
 						<java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
 						<maven.home>${maven.home}</maven.home>
 						<quarkus.class-loading.parent-first-artifacts>ai.djl:api,ai.djl.huggingface:tokenizers,net.java.dev.jna:jna</quarkus.class-loading.parent-first-artifacts>
-						<!-- Never start Roundcube (the 'webmail' Compose profile) in tests, whatever the Quarkus config profile -->
+						<!-- Don't start Roundcube (the 'webmail' Compose profile) in tests, whatever the Quarkus config profile.
+						     A @TestProfile override still wins: UiTestProfile turns it on for the Playwright tests -->
 						<quarkus.compose.devservices.profiles>none</quarkus.compose.devservices.profiles>
 					</systemPropertyVariables>
 					<environmentVariables>
@@ -361,7 +362,8 @@
 						<native.image.path>${project.build.directory}/${project.build.finalName}-runner</native.image.path>
 						<java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
 						<maven.home>${maven.home}</maven.home>
-						<!-- Never start Roundcube (the 'webmail' Compose profile) in tests, whatever the Quarkus config profile -->
+						<!-- Don't start Roundcube (the 'webmail' Compose profile) in tests, whatever the Quarkus config profile.
+						     A @TestProfile override still wins: UiTestProfile turns it on for the Playwright tests -->
 						<quarkus.compose.devservices.profiles>none</quarkus.compose.devservices.profiles>
 					</systemPropertyVariables>
 					<environmentVariables>

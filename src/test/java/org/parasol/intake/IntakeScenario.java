@@ -543,6 +543,17 @@ public class IntakeScenario {
 		return Claim.<Claim>find("lower(emailAddress) = ?1 order by id desc", address.toLowerCase()).firstResultOptional();
 	}
 
+	/**
+	 * The claim a customer's email created, for a customer who already has a seeded claim (one of the six seeded claimants),
+	 * which {@link #awaitClaimOf} would return at once.
+	 */
+	public Claim awaitNewClaimOf(String address) {
+		return await()
+			.atMost(WAIT)
+			.until(() -> newestClaimOf(address).filter(claim -> claim.id > SEEDED_CLAIMS), Optional::isPresent)
+			.orElseThrow();
+	}
+
 	@Transactional(TxType.REQUIRES_NEW)
 	public long instanceRows() {
 		return ((Number) this.entityManager
