@@ -188,7 +188,7 @@ class ClaimImageResourceTests {
 
 	private static long storeImage(long claimId, ClaimImageKind kind, String fileName, ClaimImageContentType contentType, byte[] data) {
 		return QuarkusTransaction.requiringNew().call(() ->
-			ClaimImage.store(Claim.findById(claimId), kind, fileName, contentType, data).id
+			ClaimImage.store(Claim.<Claim>findById(claimId), kind, fileName, contentType, data).id
 		);
 	}
 }

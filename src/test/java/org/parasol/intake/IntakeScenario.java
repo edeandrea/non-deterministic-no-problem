@@ -457,6 +457,44 @@ public class IntakeScenario {
 		return ClaimImage.listForClaim(claimId);
 	}
 
+	/**
+	 * A claim's correspondence in order, as the transcript shows it.
+	 */
+	@Transactional(TxType.REQUIRES_NEW)
+	public List<TranscriptEntry> transcript(long claimId) {
+		var images = ClaimImage.<ClaimImage>list("claim.id", claimId);
+
+		return ClaimCorrespondence.listForClaim(claimId).stream()
+			.map(row -> new TranscriptEntry(
+				row.direction,
+				row.subject,
+				images.stream()
+					.filter(image -> (image.correspondence != null) && (image.correspondence.id.equals(row.id)))
+					.map(image -> image.fileName)
+					.toList()))
+			.toList();
+	}
+
+	/**
+	 * Whether each of a claim's emails created it, in transcript order.
+	 */
+	@Transactional(TxType.REQUIRES_NEW)
+	public List<Boolean> createdClaimFlags(long claimId) {
+		return ClaimCorrespondence.listForClaim(claimId).stream()
+			.map(row -> row.createdClaim)
+			.toList();
+	}
+
+	/**
+	 * One email of a claim's transcript.
+	 *
+	 * @param direction which way the email went
+	 * @param subject the subject
+	 * @param imageFileNames the photos the email carried
+	 */
+	public record TranscriptEntry(CorrespondenceDirection direction, String subject, List<String> imageFileNames) {
+	}
+
 	public void decide(long claimId, ReviewOutcome outcome, java.util.Set<MissingItem> items) {
 		decide(claimId, outcome, items, ReviewedFields.none());
 	}

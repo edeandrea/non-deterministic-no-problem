@@ -50,7 +50,7 @@ class IntakeReplySenderThreadTests {
 
 		Thread.currentThread().setContextClassLoader(callersLoader);
 
-		new IntakeReplySender(config, mailer, Duration.ofSeconds(5), IntakeActivityEvents.into(new SimpleMeterRegistry()))
+		new IntakeReplySender(config, mailer, Duration.ofSeconds(5), IntakeActivityEvents.into(new SimpleMeterRegistry()), mock(ReplyRecorder.class))
 			.sendTextReply("jane.doe@example.com", "Car accident", "Thanks", "CLM01000000", ThreadingHeaders.none());
 
 		assertThat(sendingLoader).hasValue(callersLoader);

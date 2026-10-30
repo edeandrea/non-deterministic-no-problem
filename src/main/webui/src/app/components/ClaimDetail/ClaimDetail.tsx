@@ -2,7 +2,7 @@ import config from '@app/config';
 import { faCalendarDays, faCommentDots, faFaceSmile, faFileLines } from '@fortawesome/free-regular-svg-icons';
 import { faCaretDown, faLocationDot, faRectangleList, faShieldHalved, faTags, faUser } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { Accordion, AccordionContent, AccordionItem, AccordionToggle, Alert, Breadcrumb, BreadcrumbItem, Button, Card, CardBody, Divider, EmptyState, EmptyStateBody, EmptyStateFooter, EmptyStateHeader, EmptyStateIcon, Flex, FlexItem, Grid, GridItem, Page, PageSection, Tab, Tabs, TabTitleText, Text, TextContent, TextVariants, Title } from '@patternfly/react-core';
+import { Alert, Breadcrumb, BreadcrumbItem, Button, Card, CardBody, Divider, EmptyState, EmptyStateBody, EmptyStateFooter, EmptyStateHeader, EmptyStateIcon, Flex, FlexItem, Grid, GridItem, Page, PageSection, Tab, Tabs, TabTitleText, Text, TextContent, TextVariants, Title } from '@patternfly/react-core';
 import { ExclamationTriangleIcon } from '@patternfly/react-icons';
 import axios from 'axios';
 import * as React from 'react';
@@ -13,6 +13,7 @@ import { isNotFound } from '@app/utils/httpErrors';
 import { Chat } from '../Chat/Chat';
 import { ImageCarousel } from '../ImageCarousel/ImageCarousel';
 import { StatusLabel } from '../StatusLabel/StatusLabel';
+import { Correspondence } from './Correspondence';
 import { PendingInformation } from './PendingInformation';
 import { ReviewDecisionResult, ReviewPanel } from './ReviewPanel';
 
@@ -140,17 +141,6 @@ const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
     tabIndex: string | number
   ) => {
     setActiveTabKey(tabIndex);
-  };
-
-  // Accordion toggle
-  // The original claim content (with its attached images) starts expanded
-  const [expanded, setExpanded] = React.useState(['claim-toggle1']);
-
-  const toggle = (id) => {
-    const index = expanded.indexOf(id);
-    const newExpanded: string[] =
-      index >= 0 ? [...expanded.slice(0, index), ...expanded.slice(index + 1, expanded.length)] : [...expanded, id];
-    setExpanded(newExpanded);
   };
 
   // Chat panel
@@ -296,28 +286,7 @@ const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
                       <Tab eventKey={2} title={<TabTitleText>Damages</TabTitleText>} aria-label="Damages" isDisabled></Tab>
                       <Tab eventKey={3} title={<TabTitleText>Witnesses</TabTitleText>} aria-label="Witnesses" isDisabled></Tab>
                       <Tab eventKey={4} title={<TabTitleText>Documents</TabTitleText>} aria-label="Documents">
-                        <Accordion isBordered asDefinitionList={false} className='padding-top-25'>
-                          <AccordionItem>
-                            <AccordionToggle
-                              onClick={() => toggle('claim-toggle1')}
-                              isExpanded={expanded.includes('claim-toggle1')}
-                              id="claim-toggle1">
-                              Original claim content
-                            </AccordionToggle>
-<AccordionContent id="claim-content1" isHidden={!expanded.includes('claim-toggle1')}>
-                              <TextContent>
-                                <Text component={TextVariants.h3}>Subject:</Text>
-                                {claim.subject}
-                                <Text component={TextVariants.h3}>Body:</Text>
-                                <div className='display-linebreak'>{claim.body}</div>
-                                <Text component={TextVariants.h3}>Attached images:</Text>
-                                {(originalImages.length > 0)
-                                  ? <Grid><GridItem span={4}><ImageCarousel images={originalImages} /></GridItem></Grid>
-                                  : 'No images attached'}
-                              </TextContent>
-                            </AccordionContent>
-                          </AccordionItem>
-                        </Accordion>
+                        <Correspondence claimId={claim_id} claim={claim} originalImages={originalImages} />
                       </Tab>
                       <Tab eventKey={5} title={<TabTitleText>Comments</TabTitleText>} aria-label="Comments" isDisabled></Tab>
                     </Tabs>

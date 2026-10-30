@@ -21,8 +21,8 @@ The Java source is split into two top-level packages representing two distinct c
 
 | Package | Contents |
 |---|---|
-| `org.parasol.claim.model` | `Claim` (Panache entity, table `claims`), `ClaimImage` (table `claim_images`), `ClaimCorrespondence` (table `claim_correspondence`: every inbound email the intake accepted, by unique `Message-ID`), `ClaimImageKind`, `ClaimImageContentType`, `ClaimCategory`, `IntakeClaimStatus` (the intake's status labels; `isIntakeOpen` is true for `Pending Review` / `Pending Information`), claim-number generation, the domain exceptions (`ClaimNotFoundException`, `ClaimImageNotFoundException`, `UnknownClaimCategoryException`, `UnsupportedClaimImageContentTypeException`) |
-| `org.parasol.claim.rest` | `ClaimResource` (`/api/db/claims`), `ClaimImageResource` (`/api/db/claims/{id}/images`), the `ClaimDetails` / `ClaimImageMetadata` DTOs + `ClaimMapper` (MapStruct), `ClaimExceptionMappings` (Problem Details) |
+| `org.parasol.claim.model` | `Claim` (Panache entity, table `claims`), `ClaimImage` (table `claim_images`), `ClaimCorrespondence` (table `claim_correspondence`: every inbound email the intake accepted and every claim reply it sent, by unique `Message-ID`), `ClaimImageKind`, `ClaimImageContentType`, `ClaimCategory`, `IntakeClaimStatus` (the intake's status labels; `isIntakeOpen` is true for `Pending Review` / `Pending Information`), claim-number generation, the domain exceptions (`ClaimNotFoundException`, `ClaimImageNotFoundException`, `UnknownClaimCategoryException`, `UnsupportedClaimImageContentTypeException`) |
+| `org.parasol.claim.rest` | `ClaimResource` (`/api/db/claims`), `ClaimImageResource` (`/api/db/claims/{id}/images`), `ClaimCorrespondenceResource` (`/api/db/claims/{id}/correspondence`), the `ClaimDetails` / `ClaimImageMetadata` / `CorrespondenceMessage` DTOs + `ClaimMapper` (MapStruct), `ClaimExceptionMappings` (Problem Details) |
 | `org.parasol.claim.seed` | `ClaimImageSeeder` (attaches the sample images to the six seeded claims) |
 | `org.parasol.chat.ai` | `ClaimService` (the chat-bot AI service) |
 | `org.parasol.chat.model` | `ClaimBotQuery`, `ClaimBotQueryResponse` |
@@ -35,7 +35,7 @@ The Java source is split into two top-level packages representing two distinct c
 | `org.parasol.intake.mailbox` | `ClaimsMailbox` (the `claims@parasol.com` IMAP mailbox: list, find by `Message-ID`, move between `MailFolder`s, `moveOldest`), `ClaimsInboxWatcher` (the IMAP IDLE watcher, a Mutiny pipeline on a virtual thread (`@VirtualThreads` executor): scans the INBOX, moves each email to `processing`, fires `EmailReceived`; `ClaimIntakeDispatcher` observes it), `InboxIdle` (its own IMAP session for IDLE), `InboundEmail` (with `receivedDate`, the IMAP INTERNALDATE, and `sizeBytes`) and its attachment records, `MailLoopGuard` (auto-replies and mail from the claims address), `InboxDepthMonitor` (a `@Scheduled` job that measures the INBOX and fires `InboxDepthMeasured`; does nothing while the intake is off), the package-private MIME parser, HTML-to-text and quoted-text helpers |
 | `org.parasol.intake.dispatch` | What happens to an inbound email before its run: `ClaimIntakeDispatcher` (`submit(email)`: loop/duplicate/`Message-ID` checks, then a per-sender queue of immutable `SenderState`s; also the Flow status listener that drives the queue), `ClaimMatcher`, `CorrespondenceRecorder` and the package-private `ClaimReference` |
 | `org.parasol.intake.failure` | The failure path: `IntakeFailureHandler`, the `IntakeFailureListener` (`onWorkflowFailed`) and `ProcessingProblemReplySender` |
-| `org.parasol.intake.reply` | The intake's replies: `IntakeTemplates` (the fixed Qute mail templates, under `templates/IntakeTemplates/`), `IntakeReplySender` (blocking; subject prefix, `ThreadingHeaders` headers and `Auto-Submitted`; overloads with and without a claim number, no `Optional` parameters) and `CustomerName` (who a reply greets) |
+| `org.parasol.intake.reply` | The intake's replies: `IntakeTemplates` (the fixed Qute mail templates, under `templates/IntakeTemplates/`), `IntakeReplySender` (blocking; subject prefix, `ThreadingHeaders` headers and `Auto-Submitted`; overloads with and without a claim number, no `Optional` parameters) `ReplyRecorder` (records a claim reply as an `OUTBOUND` `ClaimCorrespondence` row after it's sent) and `CustomerName` (who a reply greets) |
 | `org.parasol.intake.model` | The intake's records that Flow persists and later steps read: `IncidentDetails`, `ClaimExtraction` (JSON-safe: ISO date/time strings, no `Optional`), the sealed `IntakeOutcome`, `MatchedClaim` (`none()` rather than `null`), `EmailType`, `ClassifiedOutcome` (the root agent's return: the outcome plus the classifier's label), `ClaimResolver`'s `PendingClaim` / `ClaimResolution`, and the `ClaimIntakeState` entity (the intake's bookkeeping about a claim, kept off `Claim`) |
 | `org.parasol.intake.workflow` | `ClaimIntakeFlow` (the whole intake as one quarkus-flow workflow, `claim-intake`; the only place with side effects), the JSON-safe `IntakeRun` (input: ids only) and `IntakeState` (threaded through every step), the `EmailRequeued` event, the `AgentStep` and `ClaimMatchingSteps` steps and `CorrespondenceText` |
 | `org.parasol.intake.workflow.policy` | `PolicyCheckStep` and its package-private `SameCustomerRule` (same customer) and `PolicyNumbers` (generated `AC-` numbers) |
@@ -251,6 +251,9 @@ and map to DTO records with `ClaimMapper`.
 - `ClaimImageResource`: `GET /api/db/claims/{id}/images` (`ClaimImageMetadata` list, oldest first) and
   `GET /api/db/claims/{id}/images/{imageId}` (the bytes, with the stored content type and
   `X-Content-Type-Options: nosniff`).
+- `ClaimCorrespondenceResource`: `GET /api/db/claims/{id}/correspondence` (`CorrespondenceMessage` list in the order the emails
+  happened: the customer's and the replies the intake sent, each with the photos it carried; `[]` for a claim with no recorded
+  emails, such as a seeded one; `404` Problem Details for an unknown claim). It feeds the Documents tab.
 - **The DTOs are the API contract.** `ClaimDetails` lists every field the UI reads, in snake_case
   (`@JsonNaming` on the record; `category` is the label via `ClaimCategory`'s `@JsonValue`; nulls are omitted by the
   global `serialization-inclusion: non-empty`). A new `Claim` column stays out of the API until it's added to
@@ -363,10 +366,15 @@ and no intake columns (not even a version), so no claim fetch can load it, and `
   `claim_requested_items`, stored as constant names) and the `@Version`.
 - **The lock is on this row.** A reply that supersedes a review and a reviewer's decision both write it, so the race is
   serialized there. Someone editing a claim's own details is a different concern and would need its own lock on `Claim`.
-- **`ClaimCorrespondence`** (`org.parasol.claim.model`) records every inbound email the intake accepts: unique `Message-ID`
-  (the duplicate check is insert-and-catch), a nullable claim set once the email creates or matches one, direction
-  (`INBOUND` only: the mailer generates the replies' ids), sent date, `receivedAt` (the mailbox's IMAP INTERNALDATE, which a sender can't set; non-null), sender and the stripped text. `countInboundForClaim` and `findFirstInboundReceivedAt` feed the claim metrics. Reply headers are
-  matched against it (`findClaimByMessageIds`).
+- **`ClaimCorrespondence`** (`org.parasol.claim.model`) records every inbound email the intake accepts, and every reply it sends
+  about a claim: unique `Message-ID` (the duplicate check is insert-and-catch), a nullable claim set once an inbound email creates or
+  matches one, direction (`INBOUND`, or `OUTBOUND` for a reply: `recordReply` persists one), sent date, `receivedAt` (the mailbox's IMAP
+  INTERNALDATE, which a sender can't set; non-null), sender, the nullable subject, `createdClaim` (true only for the email that created its claim; the UI shows the claim's own content first unless one does, so a claim entered by hand keeps it) and the stripped text. For an outbound row `sentDate`
+  and `receivedAt` are both when the mail server accepted the reply, the subject is as sent (with its `[CLM…] Re:` prefix) and the text
+  is what was sent. `listForClaim` (throws `ClaimNotFoundException`) orders by `receivedAt`, then id. `countInboundForClaim` and
+  `findFirstInboundReceivedAt` filter on `INBOUND`, so the claim metrics ignore replies. Reply headers are matched against it
+  (`findClaimByMessageIds`), so a customer reply that names only our reply's `Message-ID` still finds the claim. The chat bot's
+  `NotificationService` emails aren't recorded.
 
 **Claim images** (`ClaimImage`, table `claim_images`):
 - **Persistence is Active Record, like `Claim`:** `listForClaim(claimId)` (throws `ClaimNotFoundException`),
@@ -374,6 +382,9 @@ and no intake columns (not even a version), so no claim fetch can load it, and `
   image is empty; `ClaimImageResource` throws `ClaimImageNotFoundException` for the 404),
   `hasImage(claim, kind, fileName)` and `store(claim, kind, fileName, contentType, data)`. #216's intake stores
   attachments through `store`. Image ids are table-wide `PanacheEntity` ids.
+- **`correspondence`** is a nullable link to the `ClaimCorrespondence` row of the email that carried the image (`@OnDelete(SET_NULL)`,
+  so deleting the email keeps the image). The intake stores through `store(correspondence, …)`, which takes the claim from the row;
+  seeded images have none, and `ClaimMapper.toMessages` puts only linked images into a message.
 - **`kind`** is `ORIGINAL` (customer photo) or `PROCESSED` (annotated damage image). New claims never get processed
   images.
 - **`contentType` is an allow-list,** the `ClaimImageContentType` enum (JPEG, PNG, GIF, WebP; stored as the constant name,
@@ -516,8 +527,8 @@ events and never call an adapter.
   conversation id with no code in a step. What the intake adds:
   - `ai.scoring.conversation.flow.FlowSpanTypingProcessor` types the `workflow.execute` span of a workflow Flow generated for an agentic interface (named after the interface in kebab case, `flow.workflow.namespace`/`name`; the interface is looked up and must have a `@SequenceAgent`/`@ParallelAgent`/… method; the run's own `claim-intake` workflow isn't one; a stand-in for quarkiverse/quarkus-flow#1122, relying on Flow's naming) as the standard `gen_ai.operation.name=invoke_agent` plus `gen_ai.agent.name` (**a documented workaround, reflection on Flow's naming, no good for native; delete with #1122**); the Langfuse-specific part is `ai.scoring.langfuse.otel.LangfuseFlowSpanTypingProcessor`: `task.execute` (a step, usually plain Java) is a `chain` (`langfuse.observation.type` only; quarkus-langfuse 0.9.1 retains it under `AI_ONLY` without a synthetic GenAI operation name).
   - `@MailClientSpan` (an interceptor binding in `org.parasol.intake.observability`, handled by the package-private `MailClientSpanInterceptor`; a parameter marked
-    `@SpanAttribute` becomes a span attribute, as the folder does) wraps `ClaimsMailbox`'s IMAP operations (`imap list|find|move|moveOldest|moveWithoutMessageId`) and `IntakeReplySender`'s four
-    public send methods (`smtp send`) in `CLIENT` spans with `messaging.system`, `server.address`, `server.port` and the folder, plus, on a send, `claim.intake.reply.template` (a fixed set, set by `IntakeSpanAttributes` from `ReplySent`, so the sender has no tracing code), never an address or `Message-ID` (a failure
+    `@SpanAttribute` becomes a span attribute, as the folder does) wraps `ClaimsMailbox`'s IMAP operations (`imap list|find|move|moveOldest|moveWithoutMessageId`) and `IntakeReplySender`'s `deliver`
+    (`smtp send`, the one place the four public send methods hand their send to, so recording the reply isn't inside the span or `claim.intake.mail.client.duration`) in `CLIENT` spans with `messaging.system`, `server.address`, `server.port` and the folder, plus, on a send, `claim.intake.reply.template` (a fixed set, set by `IntakeSpanAttributes` from `ReplySent`, so the sender has no tracing code), never an address or `Message-ID` (a failure
     records only the exception type). `IntakeReplySender` wraps the OTel `Context` onto its virtual thread so the send stays in the run's trace. Only a call through the CDI proxy is
     intercepted (a private method isn't); `unprocessed()` → `list(...)` is, since Quarkus intercepts self-invocation of non-private methods. The metrics are CDI events, not
     calls: a step injects `IntakeActivities` and publishes a fact, which logs and swallows an observer's failure so telemetry never changes what the intake does (it fires the CDI `Event<IntakeActivity>` synchronously, since the status and decision observers are transactional and the reply observer needs the send's span current) (`EmailHandled`, `EmailAccepted`, `EmailMatched`, `EmailClassified`, `NewClaimExtracted`, `ClaimStatusChanged`, `ReplySent`, `ReviewDecisionApplied`, `ClaimCompleted`, `IntakeFailed`,
@@ -938,7 +949,8 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
 - **Intake reply tests** (`org.parasol.intake.reply`): `IntakeTemplatesTests` renders both variants of every template
   without sending (the HTML through jsoup's visible text, so both get the same assertions): greetings, missing items,
   attachment notes, HTML escaping, and the no-leak checks against every seeded claim. `IntakeReplySenderTests` sends
-  through GreenMail and checks the subject and headers. `CustomerNameTests` is a plain unit test.
+  through GreenMail and checks the subject and headers, the generated `Message-ID`, and that a claim reply is recorded (and one without a claim isn't).
+  `IntakeReplySenderFailureTests` also checks a failed send records nothing and a recording failure doesn't fail the send. `CustomerNameTests` is a plain unit test.
 - **Intake agent tests** (`org.parasol.intake.agent` and its sub-packages): plain unit tests for `findMissingItems`, the
   guardrails, the `@Output` method, the router's conditions (`EmailRouterTests`: exactly one is true for every matched
   status × email type), `UnmatchedEmailAgent`, `ClaimStatusTools` and `ClaimResolution.limitToOfferedClaims`.
@@ -999,8 +1011,8 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
     app-wide; `ClaimIntakeFlow`'s own `IntakeRun` input is unaffected either way. Filed upstream as
     [quarkiverse/quarkus-flow#1111](https://github.com/quarkiverse/quarkus-flow/issues/1111); re-enable once it's
     addressed there.
-- **Claim image tests:** `ClaimImageTests` (entity, `@TestTransaction`), `ClaimImageResourceTests` (REST and Problem
-  Details), `ClaimImageContentTypeTests` (allow-list, no Quarkus), `ClaimImageSeederTests` and the Playwright
+- **Claim image tests:** `ClaimImageTests` (entity, `@TestTransaction`; plus the email link), `ClaimImageResourceTests` (REST and Problem
+  Details), `ClaimCorrespondenceResourceTests` (the transcript endpoint), `ClaimMapperTests` (the mapper called directly on hand-built entities in a `@QuarkusTest`, nothing persisted), `ClaimImageContentTypeTests` (allow-list, no Quarkus), `ClaimImageSeederTests` and the Playwright
   `ClaimImagesPageTests`.
   - Fixtures that the endpoints must see are committed with `QuarkusTransaction.requiringNew()` and removed with
     `Claim.deleteById` (cascades to images). `@TestTransaction` doesn't work for these: REST Assured calls the endpoint
@@ -1205,5 +1217,9 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
     `@Transactional(TxType.REQUIRES_NEW)` and called from the step: Quarkus intercepts self-invocation of non-private methods
     (so the annotation applies), and a private method or a private record in its signature would break the generated
     subclass. `CorrespondenceRecorder`, `SupersedeStep` and `ReviewDecisionSteps` catch the exception from such a call.
+  - **Every intake reply carries a `Message-ID` that `IntakeReplySender` generates** (`<UUID@domain of parasol.intake.address>`; Vert.x's
+    mail encoder applies user headers last, so it replaces the mailer's). The two overloads with a claim number record the reply through
+    `ReplyRecorder` (`REQUIRES_NEW`) **after** the send succeeded; a failed recording only logs a WARN, since faulting the step would
+    answer the customer twice. A template reply's recorded text is its `text/plain` variant. `ReplySent` is published inside `deliver`'s span.
   - **Don't pass `Optional` to `IntakeReplySender`:** use `ThreadingHeaders` (`of(email)`, `replyingTo(id)`, `none()`) and the overload
     with or without a `String claimNumber`. The overload without one is for replies that mustn't disclose a claim.

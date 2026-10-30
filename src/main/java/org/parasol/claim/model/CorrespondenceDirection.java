@@ -5,8 +5,12 @@ package org.parasol.claim.model;
  */
 public enum CorrespondenceDirection {
 	/**
-	 * Received at the claims mailbox. The only direction recorded today: the mailer generates the {@code Message-ID} of
-	 * the replies, so they aren't known.
+	 * Received at the claims mailbox.
 	 */
-	INBOUND
+	INBOUND,
+
+	/**
+	 * A reply the intake sent about a claim. The intake generates its {@code Message-ID}, so it is known before the send.
+	 */
+	OUTBOUND
 }
