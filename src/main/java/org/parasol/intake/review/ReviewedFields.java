@@ -2,6 +2,7 @@ package org.parasol.intake.review;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.parasol.claim.model.Claim;
@@ -45,6 +46,24 @@ public record ReviewedFields(String description, LocalDate incidentDate, LocalTi
 			case LOCATION -> (this.location != null);
 			case CATEGORY -> (this.category != null);
 		};
+	}
+
+	/**
+	 * Whether {@link #applyTo} would change a claim: some field the reviewer gave a value for differs from the claim's. Text is compared
+	 * stripped, so a whitespace-only edit changes nothing, and the time only counts along with a date, as {@code applyTo} applies it.
+	 *
+	 * @param claim the claim being decided
+	 * @return {@code true} if the reviewer changed anything
+	 */
+	public boolean changes(Claim claim) {
+		return differs(this.description, claim.summary)
+			|| differs(this.location, claim.location)
+			|| ((this.category != null) && (this.category != claim.category))
+			|| ((this.incidentDate != null) && (!this.incidentDate.equals(claim.incidentDate) || !Objects.equals(this.incidentTime, claim.incidentTime)));
+	}
+
+	private static boolean differs(String reviewed, String current) {
+		return (reviewed != null) && !reviewed.strip().equals(Optional.ofNullable(current).map(String::strip).orElse(""));
 	}
 
 	/**

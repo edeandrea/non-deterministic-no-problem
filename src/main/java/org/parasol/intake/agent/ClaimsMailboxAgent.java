@@ -6,6 +6,8 @@ import org.parasol.intake.MissingItem;
 import org.parasol.intake.agent.extraction.ClaimExtractionWorkflow;
 import org.parasol.intake.agent.triage.ClaimStatusTools;
 import org.parasol.intake.agent.triage.EmailClassifierAgent;
+import org.parasol.intake.model.ClassifiedOutcome;
+import org.parasol.intake.model.EmailType;
 import org.parasol.intake.model.IncidentDetails;
 import org.parasol.intake.model.IntakeOutcome;
 import org.parasol.intake.model.MatchedClaim;
@@ -13,7 +15,9 @@ import org.parasol.intake.model.MatchedClaim;
 import dev.langchain4j.agentic.agent.ErrorContext;
 import dev.langchain4j.agentic.agent.ErrorRecoveryResult;
 import dev.langchain4j.agentic.declarative.ErrorHandler;
+import dev.langchain4j.agentic.declarative.Output;
 import dev.langchain4j.agentic.declarative.SequenceAgent;
+import dev.langchain4j.agentic.scope.AgenticScope;
 // Restore with `extends MonitoredAgent` below
 // import dev.langchain4j.agentic.observability.MonitoredAgent;
 import dev.langchain4j.invocation.InvocationParameters;
@@ -48,7 +52,7 @@ public interface ClaimsMailboxAgent /* extends MonitoredAgent */ {
 	 * @param invocationParameters always {@link ClaimStatusTools#scopedTo ClaimStatusTools.scopedTo(matchedClaim)}: scopes
 	 * the follow-up agent's status tool to the matched claim, so the model can't pick another claim. It goes into the
 	 * scope's execution context, never into a prompt
-	 * @return the outcome
+	 * @return the outcome, with the label the classifier gave the email
 	 */
 	// invocationParameters is a root argument only because quarkus-langchain4j 1.14.1's build-time check
 	// (AgenticProcessor#validateAgenticParameterTypes) skips AgenticScope and @MemoryId parameters but not
@@ -56,17 +60,29 @@ public interface ClaimsMailboxAgent /* extends MonitoredAgent */ {
 	// 'invocationParameters'") unless a caller-provided parameter has the same name. langchain4j-agentic itself fills it
 	// from the execution context at runtime (AgentUtil). quarkiverse/quarkus-langchain4j#2950: once fixed, a @BeforeCall
 	// can write the parameters into the scope instead, and this argument goes
-	@SequenceAgent(outputKey = "intakeOutcome", subAgents = {
+	@SequenceAgent(outputKey = "classifiedOutcome", subAgents = {
 		EmailClassifierAgent.class,
 		EmailRouter.class
 	})
-	IntakeOutcome process(
+	ClassifiedOutcome process(
 		String correspondence,
 		MatchedClaim matchedClaim,
 		IncidentDetails extractedSoFar,
 		Collection<MissingItem> requestedItems,
 		String sentDate,
 		InvocationParameters invocationParameters);
+
+	/**
+	 * Pairs the router's outcome with the classifier's label. It reads the scope, whose keys are the sub-agents' output keys: the
+	 * root's own output key can't be the router's, or one scope key would hold two types.
+	 *
+	 * @param agenticScope the root's scope
+	 * @return the outcome and the label
+	 */
+	@Output
+	static ClassifiedOutcome classify(AgenticScope agenticScope) {
+		return new ClassifiedOutcome((EmailType) agenticScope.readState("emailType"), (IntakeOutcome) agenticScope.readState("intakeOutcome"));
+	}
 
 	/**
 	 * Treats an incident date or time the model never corrected as missing, as {@link ClaimExtractionWorkflow} does on

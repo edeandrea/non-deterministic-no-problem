@@ -46,6 +46,12 @@ public class ClaimCorrespondence extends PanacheEntity {
 	@Column(nullable = false)
 	public Instant sentDate;
 
+	/**
+	 * When the mailbox received the email (IMAP INTERNALDATE). Unlike {@link #sentDate}, a sender's client can't set it.
+	 */
+	@Column(nullable = false)
+	public Instant receivedAt;
+
 	public String sender;
 
 	@Column(length = Length.LONG32)
@@ -64,6 +70,28 @@ public class ClaimCorrespondence extends PanacheEntity {
 			: ClaimCorrespondence.<ClaimCorrespondence>find("claim is not null and messageId in ?1 order by id desc", messageIds)
 				.firstResultOptional()
 				.map(correspondence -> correspondence.claim);
+	}
+
+	/**
+	 * Counts the inbound emails recorded against a claim: the first one and every one later linked to it.
+	 *
+	 * @param claim the claim
+	 * @return the number of rows
+	 */
+	public static long countInboundForClaim(Claim claim) {
+		return count("claim = ?1 and direction = ?2", claim, CorrespondenceDirection.INBOUND);
+	}
+
+	/**
+	 * Finds when the claim's first inbound email was received.
+	 *
+	 * @param claim the claim
+	 * @return the earliest {@link #receivedAt}, or empty if no email is recorded against the claim
+	 */
+	public static Optional<Instant> findFirstInboundReceivedAt(Claim claim) {
+		return ClaimCorrespondence.<ClaimCorrespondence>find("claim = ?1 and direction = ?2 order by receivedAt", claim, CorrespondenceDirection.INBOUND)
+			.firstResultOptional()
+			.map(correspondence -> correspondence.receivedAt);
 	}
 
 	/**

@@ -27,6 +27,14 @@ class ClaimExtractionRulesTests {
 	);
 
 	@Test
+	void completenessIsTheShareOfRequiredFieldsThatAreFilled() {
+		assertThat(ClaimExtractionRules.completeness(Set.of())).isEqualTo(1.0);
+		assertThat(ClaimExtractionRules.completeness(Set.of(MissingItem.LOCATION))).isEqualTo(0.75);
+		assertThat(ClaimExtractionRules.completeness(Set.of(MissingItem.LOCATION, MissingItem.CATEGORY))).isEqualTo(0.5);
+		assertThat(ClaimExtractionRules.completeness(Set.of(MissingItem.values()))).isZero();
+	}
+
+	@Test
 	void completeClaimMissesNothing() {
 		assertThat(ClaimExtractionRules.findMissingItems(extraction(COMPLETE), Set.of(), false))
 			.isEmpty();

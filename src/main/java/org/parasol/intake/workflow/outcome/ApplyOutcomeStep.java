@@ -31,6 +31,7 @@ import org.parasol.intake.model.IntakeOutcome.PendingClaimUpdate;
 import org.parasol.intake.model.IntakeOutcome.StatusReply;
 import org.parasol.intake.observability.IntakeActivities;
 import org.parasol.intake.observability.IntakeActivity.ClaimStatusChanged;
+import org.parasol.intake.observability.IntakeActivity.NewClaimExtracted;
 import org.parasol.intake.workflow.CorrespondenceText;
 import org.parasol.intake.workflow.IntakeState;
 import org.parasol.intake.workflow.mail.IntakeEmailReader;
@@ -54,16 +55,11 @@ public class ApplyOutcomeStep {
 	}
 
 	public IntakeState apply(IntakeState state, String runId, String conversationId) {
-		var applied = persist(state, this.emails.require(state.messageId()), runId, conversationId);
-
-		if ((applied.outcome() instanceof NewClaim) || applied.outcome() instanceof PendingClaimUpdate) {
-			this.activities.publish(new ClaimStatusChanged(statusFor(applied.needsReview())));
-		}
-
-		return applied;
+		return persist(state, this.emails.require(state.messageId()), runId, conversationId);
 	}
 
-	// One transaction for the claim, its images and its correspondence; the IMAP read above stays outside it
+	// One transaction for the claim, its images and its correspondence; the IMAP read above stays outside it. The activities are
+	// published inside it and observed after it commits, so a rolled-back claim counts nothing
 	@Transactional(TxType.REQUIRES_NEW)
 	IntakeState persist(IntakeState state, InboundEmail email, String runId, String conversationId) {
 		return switch (state.outcome()) {
@@ -101,6 +97,9 @@ public class ApplyOutcomeStep {
 		storeImages(claim, email);
 		linkCorrespondence(email, claim);
 
+		this.activities.publish(new ClaimStatusChanged(statusFor(isComplete)));
+		this.activities.publish(new NewClaimExtracted(ClaimExtractionRules.completeness(missing), missing));
+
 		return state.withApplied(claim.id, missing, isComplete);
 	}
 
@@ -124,6 +123,8 @@ public class ApplyOutcomeStep {
 		storeImages(claim, email);
 		linkCorrespondence(email, claim);
 		Claim.flush();
+
+		this.activities.publish(new ClaimStatusChanged(statusFor(isComplete)));
 
 		return state.withApplied(claim.id, missing, isComplete);
 	}

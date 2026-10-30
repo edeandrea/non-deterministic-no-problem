@@ -60,6 +60,13 @@ public interface IntakeConfig {
 	Watcher watcher();
 
 	/**
+	 * How the intake's metrics are measured, for those that can't be read from an event.
+	 *
+	 * @return the metrics settings
+	 */
+	Metrics metrics();
+
+	/**
 	 * The IMAP connection to the claims mailbox.
 	 */
 	interface Imap {
@@ -185,5 +192,19 @@ public interface IntakeConfig {
 		 */
 		@WithDefault("1m")
 		Duration maxReconnectDelay();
+	}
+
+	/**
+	 * Settings of the intake's metrics.
+	 */
+	interface Metrics {
+		/**
+		 * How often the INBOX's message count is measured for {@code claim.intake.inbox.depth}. A measurement logs in to the mailbox,
+		 * so it isn't a gauge read on every scrape.
+		 *
+		 * @return the measuring interval
+		 */
+		@WithDefault("30s")
+		Duration inboxDepthInterval();
 	}
 }

@@ -305,6 +305,55 @@ class ClaimsMailboxTests {
 			.isFalse();
 	}
 
+	@Test
+	void theReceivedDateIsWhenTheServerGotTheEmailNotTheDateTheSenderWrote() throws Exception {
+		var before = Instant.now().minusSeconds(5);
+		var message = newMessage("Written long ago");
+		message.setSentDate(Date.from(Instant.parse("2020-01-01T00:00:00Z")));
+		message.setText("A body of some length, so the size is more than nothing.", "UTF-8");
+
+		send(message);
+
+		assertThat(awaitInbox())
+			.singleElement()
+			.returns(Instant.parse("2020-01-01T00:00:00Z"), InboundEmail::sentDate)
+			.satisfies(email -> assertThat(email.receivedDate()).isBetween(before, Instant.now().plusSeconds(5)))
+			.satisfies(email -> assertThat(email.sizeBytes()).isGreaterThan(email.body().length()));
+	}
+
+	@Test
+	void theReceivedDateSurvivesTheMoveToTheProcessingFolder() throws Exception {
+		var message = newMessage("Moves");
+		message.setText("moves to processing");
+		var messageId = send(message);
+		var received = awaitInbox().getFirst().receivedDate();
+
+		assertThat(this.claimsMailbox.move(messageId, MailFolder.INBOX, MailFolder.PROCESSING)).isTrue();
+
+		assertThat(this.claimsMailbox.find(MailFolder.PROCESSING, messageId))
+			.get()
+			.returns(received, InboundEmail::receivedDate);
+	}
+
+	@Test
+	void theInboxDepthCountsTheEmailsWaitingWithoutReadingThem() throws Exception {
+		assertThat(this.claimsMailbox.inboxDepth()).isZero();
+
+		var first = newMessage("First");
+		first.setText("one");
+		var second = newMessage("Second");
+		second.setText("two");
+		send(first);
+		var secondId = send(second);
+		awaitInbox(2);
+
+		assertThat(this.claimsMailbox.inboxDepth()).isEqualTo(2);
+
+		this.claimsMailbox.move(secondId, MailFolder.INBOX, MailFolder.PROCESSING);
+
+		assertThat(this.claimsMailbox.inboxDepth()).isEqualTo(1);
+	}
+
 	private List<InboundEmail> awaitInbox() {
 		return awaitInbox(1);
 	}

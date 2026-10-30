@@ -1,5 +1,9 @@
 package org.parasol.intake.failure;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Optional;
+
 import jakarta.enterprise.context.ApplicationScoped;
 
 import org.parasol.intake.mailbox.ClaimsMailbox;
@@ -38,11 +42,15 @@ public class IntakeFailureHandler {
 	 */
 	public void handle(String messageId, Throwable cause) {
 		Log.errorf(cause, "Processing %s failed", messageId);
-		this.activities.publish(new EmailHandled(EmailOutcome.FAILED));
 		this.activities.publish(new IntakeFailed(FailureStage.of(cause), cause.getClass().getSimpleName(), FailureOutcome.FATAL));
+
+		// Only an email still in the processing folder has its latency counted here: one already filed was counted when it was filed, and
+		// the time since it was received would include its whole review wait
+		var latency = Optional.<Duration>empty();
 
 		try {
 			var inProcessing = this.mailbox.find(MailFolder.PROCESSING, messageId);
+			latency = inProcessing.map(IntakeFailureHandler::latencyOf);
 
 			// An email already filed (the run failed after its review wait) isn't moved, but its sender is still told
 			var email = inProcessing.or(() -> this.mailbox.find(MailFolder.PROCESSED, messageId));
@@ -52,6 +60,9 @@ public class IntakeFailureHandler {
 		catch (RuntimeException e) {
 			Log.errorf(e, "Couldn't finish the failure handling of %s", messageId);
 		}
+		finally {
+			this.activities.publish(new EmailHandled(EmailOutcome.FAILED, latency));
+		}
 	}
 
 	/**
@@ -60,7 +71,7 @@ public class IntakeFailureHandler {
 	 * @param email The email
 	 */
 	public void handleWithoutMessageId(InboundEmail email) {
-		this.activities.publish(new EmailHandled(EmailOutcome.FAILED));
+		this.activities.publish(new EmailHandled(EmailOutcome.FAILED, Optional.of(latencyOf(email))));
 		this.activities.publish(new IntakeFailed(FailureStage.FETCH, IllegalArgumentException.class.getSimpleName(), FailureOutcome.FATAL));
 		Log.warnf("An email from %s has no Message-ID, so it can't be processed: filing it as failed", email.fromAddress().orElse("an unknown sender"));
 
@@ -71,6 +82,10 @@ public class IntakeFailureHandler {
 		catch (RuntimeException e) {
 			Log.errorf(e, "Couldn't finish the failure handling of an email without a Message-ID");
 		}
+	}
+
+	private static Duration latencyOf(InboundEmail email) {
+		return Duration.between(email.receivedDate(), Instant.now());
 	}
 
 	/**

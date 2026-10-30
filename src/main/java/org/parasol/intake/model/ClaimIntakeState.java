@@ -56,7 +56,7 @@ public class ClaimIntakeState extends PanacheEntityBase {
 	public String reviewRunId;
 
 	/**
-	 * When the claim went into {@code Pending Review}; empty otherwise. Only the review-wait metric reads it.
+	 * When the claim went into {@code Pending Review}; empty otherwise. The review-wait timer and the oldest-pending-review gauge read it.
 	 */
 	public Instant reviewOpenedAt;
 
@@ -101,6 +101,17 @@ public class ClaimIntakeState extends PanacheEntityBase {
 		return IntakeClaimStatus.PENDING_REVIEW.label().equals(this.claim.status)
 			&& (this.reviewRunId != null)
 			&& (this.decidingRunId == null);
+	}
+
+	/**
+	 * When the claim that has waited longest in {@code Pending Review} went into it: the claims {@link Claim#countPendingReview} counts.
+	 *
+	 * @return the earliest {@link #reviewOpenedAt} of those claims, or empty if none is pending or none has one
+	 */
+	public static Optional<Instant> oldestPendingReviewOpenedAt() {
+		return ClaimIntakeState.<ClaimIntakeState>find("claim.status = ?1 and reviewOpenedAt is not null order by reviewOpenedAt", IntakeClaimStatus.PENDING_REVIEW.label())
+			.firstResultOptional()
+			.map(state -> state.reviewOpenedAt);
 	}
 
 	/**

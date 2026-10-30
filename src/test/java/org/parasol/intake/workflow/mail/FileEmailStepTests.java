@@ -31,6 +31,6 @@ class FileEmailStepTests {
 	}
 
 	private static IntakeState state(Disposition disposition, IntakeOutcome outcome) {
-		return new IntakeState("<id@example.com>", "jane.doe@example.com", null, disposition, false, List.of(), outcome, null, false, Set.of(), false, false);
+		return new IntakeState("<id@example.com>", "jane.doe@example.com", null, disposition, false, List.of(), outcome, null, false, Set.of(), false, false, null);
 	}
 }

@@ -1,5 +1,6 @@
 package org.parasol.intake.workflow;
 
+import java.time.Instant;
 import java.util.Objects;
 
 /**
@@ -13,8 +14,10 @@ import java.util.Objects;
  * @param senderMatches Whether the sender is the matched claim's address. Meaningless without a claim
  * @param resumesReview Whether this run only takes over a claim's review from a run that faulted: it goes straight to the
  *   review wait, and its {@code messageId} is the email the faulted run worked on
+ * @param receivedAt When the mailbox received the email, as an ISO-8601 instant, or {@code null} if unknown (a run persisted before
+ *   this was recorded still reads). The email's latency is measured from it
  */
-public record IntakeRun(String messageId, String conversationId, String sender, Long claimId, boolean senderMatches, boolean resumesReview) {
+public record IntakeRun(String messageId, String conversationId, String sender, Long claimId, boolean senderMatches, boolean resumesReview, String receivedAt) {
 	public IntakeRun {
 		Objects.requireNonNull(messageId, "messageId");
 		Objects.requireNonNull(conversationId, "conversationId");
@@ -29,10 +32,11 @@ public record IntakeRun(String messageId, String conversationId, String sender, 
 	 * @param sender The sender's address
 	 * @param claimId The matched claim, or {@code null}
 	 * @param senderMatches Whether the sender is the matched claim's address
+	 * @param receivedAt When the mailbox received the email
 	 * @return The run's input
 	 */
-	public static IntakeRun forEmail(String messageId, String conversationId, String sender, Long claimId, boolean senderMatches) {
-		return new IntakeRun(messageId, conversationId, sender, claimId, senderMatches, false);
+	public static IntakeRun forEmail(String messageId, String conversationId, String sender, Long claimId, boolean senderMatches, Instant receivedAt) {
+		return new IntakeRun(messageId, conversationId, sender, claimId, senderMatches, false, receivedAt.toString());
 	}
 
 	/**
@@ -44,6 +48,6 @@ public record IntakeRun(String messageId, String conversationId, String sender, 
 	 * @return The run's input
 	 */
 	public static IntakeRun resumingReview(IntakeRun faulted, String conversationId, long claimId) {
-		return new IntakeRun(faulted.messageId(), conversationId, faulted.sender(), claimId, true, true);
+		return new IntakeRun(faulted.messageId(), conversationId, faulted.sender(), claimId, true, true, faulted.receivedAt());
 	}
 }

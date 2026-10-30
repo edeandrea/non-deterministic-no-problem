@@ -145,7 +145,8 @@ and visibility, not propagation:
 - Flow's `workflow.execute` spans of generated agentic workflows are typed `invoke_agent` and its `task.execute` spans
   `chain` for Langfuse (a stand-in until [quarkus-flow#1122](https://github.com/quarkiverse/quarkus-flow/issues/1122)),
   IMAP and SMTP calls get `CLIENT` spans without addresses, and `claim.intake.*` meters count emails, replies, review
-  decisions and failures.
+  decisions and failures, time what the claimant waits for, and show the backlog, the routing mix, how complete the agents' extractions are and how
+  often a reviewer overrides them.
 - Two parts are temporary workarounds: a guard for a Quarkus context-propagation bug
   ([quarkus#54354](https://github.com/quarkusio/quarkus/issues/54354)), which otherwise leaks one run's id onto another
   run's spans, and the `invoke_agent` typing above.

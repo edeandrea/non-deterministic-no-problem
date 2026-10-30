@@ -43,6 +43,7 @@ class CorrespondenceRecorder {
 		correspondence.messageId = messageId;
 		correspondence.direction = CorrespondenceDirection.INBOUND;
 		correspondence.sentDate = email.sentDate();
+		correspondence.receivedAt = email.receivedDate();
 		correspondence.sender = email.fromAddress().orElse(null);
 		correspondence.strippedText = email.strippedBody();
 		correspondence.persistAndFlush();

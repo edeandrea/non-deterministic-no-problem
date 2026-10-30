@@ -1,5 +1,9 @@
 package org.parasol.intake.workflow.mail;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Optional;
+
 import jakarta.enterprise.context.ApplicationScoped;
 
 import org.parasol.intake.mailbox.ClaimsMailbox;
@@ -33,7 +37,7 @@ public class FileEmailStep {
 			Log.warnf("%s wasn't in the processing folder to file", state.messageId());
 		}
 
-		this.activities.publish(new EmailHandled(outcomeOf(state)));
+		this.activities.publish(new EmailHandled(outcomeOf(state), Optional.ofNullable(state.receivedAt()).map(received -> Duration.between(Instant.parse(received), Instant.now()))));
 
 		return state;
 	}

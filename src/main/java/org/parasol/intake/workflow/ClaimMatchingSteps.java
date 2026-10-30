@@ -15,6 +15,9 @@ import org.parasol.intake.agent.triage.ClaimResolver;
 import org.parasol.intake.config.IntakeConfig;
 import org.parasol.intake.model.ClaimIntakeState;
 import org.parasol.intake.model.PendingClaim;
+import org.parasol.intake.observability.IntakeActivities;
+import org.parasol.intake.observability.IntakeActivity.EmailMatched;
+import org.parasol.intake.observability.MatcherResult;
 import org.parasol.intake.workflow.IntakeState.Disposition;
 import org.parasol.intake.workflow.mail.IntakeEmailReader;
 
@@ -32,11 +35,13 @@ class ClaimMatchingSteps {
 	private final IntakeEmailReader emails;
 	private final ClaimResolver claimResolver;
 	private final IntakeConfig config;
+	private final IntakeActivities activities;
 
-	ClaimMatchingSteps(IntakeEmailReader emails, ClaimResolver claimResolver, IntakeConfig config) {
+	ClaimMatchingSteps(IntakeEmailReader emails, ClaimResolver claimResolver, IntakeConfig config, IntakeActivities activities) {
 		this.emails = emails;
 		this.claimResolver = claimResolver;
 		this.config = config;
+		this.activities = activities;
 	}
 
 	@Transactional(TxType.REQUIRES_NEW)
@@ -46,13 +51,13 @@ class ClaimMatchingSteps {
 
 	// A run that takes over a review: it only waits for the reviewer's decision, so the routing sends it straight there
 	private static IntakeState resumeReview(IntakeRun run) {
-		return IntakeState.start(run.messageId(), run.sender())
+		return IntakeState.start(run.messageId(), run.sender(), run.receivedAt())
 			.withClaim(run.claimId(), true)
 			.withApplied(run.claimId(), Set.of(), true);
 	}
 
-	private static IntakeState initializeForEmail(IntakeRun run) {
-		var state = IntakeState.start(run.messageId(), run.sender());
+	private IntakeState initializeForEmail(IntakeRun run) {
+		var state = IntakeState.start(run.messageId(), run.sender(), run.receivedAt());
 		var claim = Stream.ofNullable(run.claimId())
 			.map(id -> Claim.<Claim>findById(id))
 			.findFirst();
@@ -61,6 +66,14 @@ class ClaimMatchingSteps {
 		var numbers = pending.stream()
 			.map(pendingClaim -> pendingClaim.claimNumber)
 			.toList();
+
+		// With no claim and pending ones to choose from, resolveClaim says what became of the email
+		if (claim.isPresent()) {
+			this.activities.publish(new EmailMatched(isWrongSender ? MatcherResult.WRONG_SENDER : MatcherResult.MATCHED));
+		}
+		else if (pending.isEmpty()) {
+			this.activities.publish(new EmailMatched(MatcherResult.NO_MATCH));
+		}
 
 		return state
 			.withClaim(claim.map(matched -> matched.id).orElse(null), claim.filter(ClaimMatchingSteps::isPendingReview).isPresent())
@@ -77,6 +90,12 @@ class ClaimMatchingSteps {
 		var text = CorrespondenceText.cap(CorrespondenceText.firstEmail(email.subject(), email.strippedBody()), this.config.limits().maxBodyCharacters());
 		var resolution = this.claimResolver.resolveClaim(text, offered.stream().map(Offered::pending).toList())
 			.limitToOfferedClaims(numbers);
+
+		this.activities.publish(new EmailMatched(switch (resolution.kind()) {
+			case EXISTING -> MatcherResult.RESOLVED_EXISTING;
+			case NEW_INCIDENT -> MatcherResult.RESOLVED_NEW_INCIDENT;
+			case UNSURE -> MatcherResult.UNSURE;
+		}));
 
 		return switch (resolution.kind()) {
 			case EXISTING -> offered.stream()

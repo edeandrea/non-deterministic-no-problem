@@ -1,6 +1,7 @@
 package org.parasol.intake.dispatch;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.EnumSet;
 import java.util.Locale;
 import java.util.Map;
@@ -21,8 +22,10 @@ import org.parasol.intake.mailbox.EmailReceived;
 import org.parasol.intake.mailbox.InboundEmail;
 import org.parasol.intake.mailbox.MailLoopGuard;
 import org.parasol.intake.mailbox.MailFolder;
+import org.parasol.intake.mailbox.SkippedAttachment;
 import org.parasol.intake.observability.IntakeActivities;
 import org.parasol.intake.observability.EmailOutcome;
+import org.parasol.intake.observability.IntakeActivity.EmailAccepted;
 import org.parasol.intake.observability.IntakeActivity.EmailHandled;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
 import org.parasol.intake.workflow.EmailRequeued;
@@ -118,7 +121,7 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 	 */
 	public void submit(InboundEmail email) {
 		if (MailLoopGuard.shouldIgnore(email, this.config.address())) {
-			this.activities.publish(new EmailHandled(EmailOutcome.SKIPPED_AUTO_REPLY));
+			this.activities.publish(new EmailHandled(EmailOutcome.SKIPPED_AUTO_REPLY, Optional.of(latencyOf(email))));
 			this.failureHandler.fileWithoutRun(email);
 		}
 		else {
@@ -131,11 +134,15 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 		email.fromAddress()
 		     .ifPresentOrElse(address -> {
 					 if (this.recorder.recordIfNew(email, messageId)) {
+						 this.activities.publish(new EmailAccepted(
+							 email.sizeBytes(),
+							 email.images().size(),
+							 email.skippedAttachments().stream().map(SkippedAttachment::reason).toList()));
 						 transition(sender(address), state -> state.enqueue(messageId));
 					 }
 					 else {
 						 Log.debugf("Ignoring %s: it was already accepted", messageId);
-						 this.activities.publish(new EmailHandled(EmailOutcome.DUPLICATE));
+						 this.activities.publish(new EmailHandled(EmailOutcome.DUPLICATE, Optional.of(latencyOf(email))));
 						 this.failureHandler.fileWithoutRun(email);
 					 }
 					 },
@@ -183,7 +190,7 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 			var email = this.mailbox.find(MailFolder.PROCESSING, messageId)
 				.orElseThrow(() -> new ProcessingEmailMissingException(messageId));
 			var match = this.matcher.match(email);
-			var run = IntakeRun.forEmail(messageId, match.conversationId(), email.fromAddress().orElse(sender), match.claimId(), match.senderMatches());
+			var run = IntakeRun.forEmail(messageId, match.conversationId(), email.fromAddress().orElse(sender), match.claimId(), match.senderMatches(), email.receivedDate());
 
 			this.conversationContext.runIn(match.conversationId(), () -> {
 				var instance = this.flow.get().instance(run);
@@ -247,6 +254,10 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 
 		Optional.ofNullable(sender)
 			.ifPresent(found -> transition(found, state -> state.release(instanceId)));
+	}
+
+	private static Duration latencyOf(InboundEmail email) {
+		return Duration.between(email.receivedDate(), Instant.now());
 	}
 
 	private static String sender(String address) {

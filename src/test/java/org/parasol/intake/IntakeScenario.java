@@ -458,9 +458,13 @@ public class IntakeScenario {
 	}
 
 	public void decide(long claimId, ReviewOutcome outcome, java.util.Set<MissingItem> items) {
+		decide(claimId, outcome, items, ReviewedFields.none());
+	}
+
+	public void decide(long claimId, ReviewOutcome outcome, java.util.Set<MissingItem> items, ReviewedFields fields) {
 		var run = awaitWaitingRun(claimId);
 		var runId = claimReview(claimId);
-		publishUntilWoken(run, new ReviewDecided(claimId, runId, new ReviewDecision(outcome, items, ReviewedFields.none())));
+		publishUntilWoken(run, new ReviewDecided(claimId, runId, new ReviewDecision(outcome, items, fields)));
 	}
 
 	@Transactional(TxType.REQUIRES_NEW)
@@ -520,6 +524,7 @@ public class IntakeScenario {
 		correspondence.claim = Claim.findById(claimId);
 		correspondence.direction = CorrespondenceDirection.INBOUND;
 		correspondence.sentDate = Instant.EPOCH;
+		correspondence.receivedAt = Instant.EPOCH;
 		correspondence.persist();
 	}
 

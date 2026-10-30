@@ -66,6 +66,40 @@ class ReviewedFieldsTests {
 			.satisfies(fields -> assertThat(fields.hasValueFor(MissingItem.CATEGORY)).isTrue());
 	}
 
+	@Test
+	void valuesEqualToTheClaimsChangeNothing() {
+		var claim = claim();
+
+		assertThat(ReviewedFields.none().changes(claim)).isFalse();
+		assertThat(new ReviewedFields("Car hit a post.", LocalDate.of(2026, 10, 7), LocalTime.of(15, 30), "Elm Street", ClaimCategory.SINGLE_VEHICLE).changes(claim)).isFalse();
+	}
+
+	@Test
+	void aWhitespaceOnlyEditChangesNothing() {
+		assertThat(new ReviewedFields("  Car hit a post.\n", null, null, " Elm Street ", null).changes(claim())).isFalse();
+	}
+
+	@Test
+	void eachDifferingFieldIsAChange() {
+		var claim = claim();
+
+		assertThat(new ReviewedFields("Car hit a tree.", null, null, null, null).changes(claim)).isTrue();
+		assertThat(new ReviewedFields(null, null, null, "Oak Avenue", null).changes(claim)).isTrue();
+		assertThat(new ReviewedFields(null, null, null, null, ClaimCategory.THEFT).changes(claim)).isTrue();
+		assertThat(new ReviewedFields(null, LocalDate.of(2026, 10, 8), LocalTime.of(15, 30), null, null).changes(claim)).isTrue();
+	}
+
+	@Test
+	void aDifferentTimeWithTheSameDateIsAChange() {
+		assertThat(new ReviewedFields(null, LocalDate.of(2026, 10, 7), LocalTime.NOON, null, null).changes(claim())).isTrue();
+		assertThat(new ReviewedFields(null, LocalDate.of(2026, 10, 7), null, null, null).changes(claim())).isTrue();
+	}
+
+	@Test
+	void aTimeWithoutADateIsNotAChange() {
+		assertThat(new ReviewedFields(null, null, LocalTime.NOON, null, null).changes(claim())).isFalse();
+	}
+
 	private static Claim claim() {
 		var claim = new Claim();
 		claim.summary = "Car hit a post.";

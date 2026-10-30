@@ -1,5 +1,6 @@
 package org.parasol.intake.observability;
 
+import java.time.Duration;
 import java.util.Optional;
 import java.util.stream.IntStream;
 
@@ -10,6 +11,7 @@ import jakarta.interceptor.InvocationContext;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.parasol.intake.config.IntakeConfig;
+import org.parasol.intake.observability.IntakeActivity.MailClientCompleted;
 
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
@@ -39,17 +41,20 @@ class MailClientSpanInterceptor {
 
 	private final Tracer tracer;
 	private final IntakeConfig config;
+	private final IntakeActivities activities;
 	private final String smtpHost;
 	private final int smtpPort;
 
 	MailClientSpanInterceptor(
 		Tracer tracer,
 		IntakeConfig config,
+		IntakeActivities activities,
 		@ConfigProperty(name = "quarkus.mailer.host") String smtpHost,
 		@ConfigProperty(name = "quarkus.mailer.port") Optional<Integer> smtpPort
 	) {
 		this.tracer = tracer;
 		this.config = config;
+		this.activities = activities;
 		this.smtpHost = smtpHost;
 		this.smtpPort = smtpPort.orElse(DEFAULT_SMTP_PORT);
 	}
@@ -76,11 +81,14 @@ class MailClientSpanInterceptor {
 				.ifPresent(attribute -> builder.setAttribute(attribute.value(), String.valueOf(context.getParameters()[i]))));
 
 		var span = builder.startSpan();
+		var startedAt = System.nanoTime();
+		var failed = false;
 
 		try (var _ = span.makeCurrent()) {
 			return context.proceed();
 		}
 		catch (Exception e) {
+			failed = true;
 			// Not recordException: a mailbox exception's message names the mailbox's address
 			span.addEvent("exception", Attributes.of(EXCEPTION_TYPE, e.getClass().getName()))
 			    .setStatus(StatusCode.ERROR, e.getClass().getSimpleName());
@@ -88,6 +96,7 @@ class MailClientSpanInterceptor {
 		}
 		finally {
 			span.end();
+			this.activities.publish(new MailClientCompleted(binding.protocol(), binding.operation(), failed, Duration.ofNanos(System.nanoTime() - startedAt)));
 		}
 	}
 }
