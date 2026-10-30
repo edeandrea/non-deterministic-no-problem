@@ -47,7 +47,7 @@ class ClaimsMailboxAgentTests {
 	private static final String DATE_REPROMPT = "incidentDate must be a valid yyyy-MM-dd date string, or null.";
 	private static final String STATUS_ANSWER = "Hello, claim CLM01001009 is In Process. Sincerely, the claims department";
 	private static final String DETAILS_JSON = """
-		{"description":"Car hit a post.","incidentDate":"2026-10-07","incidentTime":null,"location":"Elm Street","category":"SINGLE_VEHICLE","policyNumber":null,"answeredItems":[]}""";
+		{"incidentDescribed":true,"incidentDate":"2026-10-07","incidentTime":null,"location":"Elm Street","category":"SINGLE_VEHICLE","policyNumber":null,"answeredItems":[]}""";
 
 	@Inject
 	ClaimsMailboxAgent agent;
@@ -205,7 +205,7 @@ class ClaimsMailboxAgentTests {
 	@Test
 	void theRootPassesTheClaimHistoryToTheDetailsAgent() {
 		this.stubs.answer(CLASSIFY, EmailType.CLAIM_FOLLOW_UP.name());
-		var soFar = new IncidentDetails("Car hit a post.", "2026-10-07", null, null, ClaimCategory.SINGLE_VEHICLE, null, Set.of());
+		var soFar = new IncidentDetails(true, "2026-10-07", null, null, ClaimCategory.SINGLE_VEHICLE, null, Set.of());
 
 		this.agent.process("It was on Elm Street.", PENDING_INFORMATION, soFar, Set.of(MissingItem.LOCATION), "2026-10-09", ClaimStatusTools.scopedTo(PENDING_INFORMATION));
 

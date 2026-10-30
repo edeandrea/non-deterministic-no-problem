@@ -72,7 +72,7 @@ import io.quarkus.test.junit.mockito.InjectSpy;
 @QuarkusTest
 @TestProfile(StubbedModelsTestProfile.class)
 class IntakeMetricsTests extends IntakeFlowTestBase {
-	private static final String NO_LOCATION = details("Car hit a post.", "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());
+	private static final String NO_LOCATION = details(true, "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());
 
 	@Inject
 	SimpleMeterRegistry registry;
@@ -261,7 +261,7 @@ class IntakeMetricsTests extends IntakeFlowTestBase {
 		var before = count("claim.intake.emails", "outcome", "policy_rejected");
 		var newClaims = count("claim.intake.emails", "outcome", "new_claim");
 		var marker = marker();
-		stubNewClaim(marker, details("Car hit a post.", "2026-10-07", "Elm Street", "SINGLE_VEHICLE", "AC-987654321", List.of()));
+		stubNewClaim(marker, details(true, "2026-10-07", "Elm Street", "SINGLE_VEHICLE", "AC-987654321", List.of()));
 
 		this.scenario.submit(Mail.from(SENDER).name(SENDER_NAME).subject("My accident").body("Policy AC-987654321. " + marker));
 

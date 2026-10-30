@@ -90,7 +90,7 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> this.scenario.claim(created.claim().id).status.equals("Pending Information"));
 
 		var marker = marker();
-		stubFollowUp(marker, details("Car hit a post.", "2026-10-07", "Elm Street, by the school", "SINGLE_VEHICLE", null, List.of("LOCATION")));
+		stubFollowUp(marker, details(true, "2026-10-07", "Elm Street, by the school", "SINGLE_VEHICLE", null, List.of("LOCATION")));
 		this.scenario.awaitFiled(this.scenario.submit(Mail.from(SENDER).inReplyTo(created.messageId()).body("It was by the school on Elm Street. " + marker)));
 
 		var run = this.scenario.awaitWaitingRun(created.claim().id);
@@ -198,7 +198,7 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 		var oldRun = this.scenario.awaitWaitingRun(created.claim().id);
 
 		var marker = marker();
-		stubFollowUp(marker, details("Car hit a post.", "2026-10-07", null, "SINGLE_VEHICLE", null, List.of()));
+		stubFollowUp(marker, details(true, "2026-10-07", null, "SINGLE_VEHICLE", null, List.of()));
 		this.scenario.awaitFiled(this.scenario.submit(Mail.from(SENDER).inReplyTo(created.messageId()).body("Never mind the location. " + marker)));
 
 		assertThat(this.scenario.claim(created.claim().id).status).isEqualTo("Pending Information");

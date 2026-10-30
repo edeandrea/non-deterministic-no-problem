@@ -21,9 +21,9 @@ import io.quarkus.test.junit.TestProfile;
 @QuarkusTest
 @TestProfile(StubbedModelsTestProfile.class)
 class ClaimIntakePendingClaimTests extends IntakeFlowTestBase {
-	private static final String NO_LOCATION = details("Car hit a post.", "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());
+	private static final String NO_LOCATION = details(true, "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());
 	// A reply has to say which of the requested items it answers, as the agent does from its prompt
-	private static final String LOCATION_ANSWERED = details("Car hit a post.", "2026-10-07", "Elm Street", "SINGLE_VEHICLE", null, List.of("LOCATION"));
+	private static final String LOCATION_ANSWERED = details(true, "2026-10-07", "Elm Street", "SINGLE_VEHICLE", null, List.of("LOCATION"));
 
 	@Test
 	void aReplyThatCompletesAPendingClaimMovesItToReviewAndKeepsTheConversation() {
@@ -58,20 +58,20 @@ class ClaimIntakePendingClaimTests extends IntakeFlowTestBase {
 
 	@Test
 	void aClaimIsCompletedOnlyByTheSecondReply() {
-		var created = createClaim(SENDER, details("Car hit a post.", null, null, "SINGLE_VEHICLE", null, List.of()));
+		var created = createClaim(SENDER, details(true, null, null, "SINGLE_VEHICLE", null, List.of()));
 
 		assertThat(this.scenario.intake(created.claim().id).orElseThrow().requestedItems)
 			.containsExactlyInAnyOrder(MissingItem.INCIDENT_DATE, MissingItem.LOCATION);
 
 		var first = marker();
-		stubFollowUp(first, details("Car hit a post.", "2026-10-07", null, "SINGLE_VEHICLE", null, List.of("INCIDENT_DATE")));
+		stubFollowUp(first, details(true, "2026-10-07", null, "SINGLE_VEHICLE", null, List.of("INCIDENT_DATE")));
 		this.scenario.awaitFiled(this.scenario.submit(Mail.from(SENDER).inReplyTo(created.messageId()).body("It was on the 7th. " + first)));
 
 		assertThat(this.scenario.claim(created.claim().id).status).isEqualTo("Pending Information");
 		assertThat(this.scenario.intake(created.claim().id).orElseThrow().requestedItems).containsExactly(MissingItem.LOCATION);
 
 		var second = marker();
-		stubFollowUp(second, details("Car hit a post.", "2026-10-07", "Elm Street", "SINGLE_VEHICLE", null, List.of("LOCATION")));
+		stubFollowUp(second, details(true, "2026-10-07", "Elm Street", "SINGLE_VEHICLE", null, List.of("LOCATION")));
 		this.scenario.awaitFiled(this.scenario.submit(Mail.from(SENDER).inReplyTo(created.messageId()).body("On Elm Street. " + second)));
 
 		var run = this.scenario.awaitWaitingRun(created.claim().id);
@@ -89,10 +89,10 @@ class ClaimIntakePendingClaimTests extends IntakeFlowTestBase {
 
 	@Test
 	void aReplyThatStillLacksSomethingGetsTheStillMissingEmail() {
-		var created = createClaim(SENDER, details(null, "2026-10-07", null, "SINGLE_VEHICLE", null, List.of()));
+		var created = createClaim(SENDER, details(false, "2026-10-07", null, "SINGLE_VEHICLE", null, List.of()));
 
 		var marker = marker();
-		stubFollowUp(marker, details("Car hit a post.", "2026-10-07", null, "SINGLE_VEHICLE", null, List.of("INCIDENT_DESCRIPTION")));
+		stubFollowUp(marker, details(true, "2026-10-07", null, "SINGLE_VEHICLE", null, List.of("INCIDENT_DESCRIPTION")));
 		this.scenario.awaitFiled(this.scenario.submit(Mail.from(SENDER).inReplyTo(created.messageId()).body("It hit a post. " + marker)));
 
 		assertThat(this.scenario.claim(created.claim().id).status).isEqualTo("Pending Information");
@@ -100,6 +100,22 @@ class ClaimIntakePendingClaimTests extends IntakeFlowTestBase {
 		assertThat(this.scenario.awaitReplies(SENDER, 2))
 			.last()
 			.satisfies(reply -> assertThat(reply.body()).contains("location").doesNotContain("incident description"));
+	}
+
+	@Test
+	void aReplyThatDoesNotExplainWhatHappenedIsAskedForAgain() {
+		var created = createClaim(SENDER, details(false, "2026-10-07", "Elm Street", "SINGLE_VEHICLE", null, List.of()));
+
+		assertThat(this.scenario.intake(created.claim().id).orElseThrow().requestedItems).containsExactly(MissingItem.INCIDENT_DESCRIPTION);
+
+		var marker = marker();
+		stubFollowUp(marker, details(false, "2026-10-07", "Elm Street", "SINGLE_VEHICLE", null, List.of()));
+		this.scenario.awaitFiled(this.scenario.submit(Mail.from(SENDER).inReplyTo(created.messageId()).body("Please hurry. " + marker)));
+
+		assertThat(this.scenario.intake(created.claim().id).orElseThrow().requestedItems).containsExactly(MissingItem.INCIDENT_DESCRIPTION);
+		assertThat(this.scenario.awaitReplies(SENDER, 2))
+			.last()
+			.satisfies(reply -> assertThat(reply.body()).contains("incident description"));
 	}
 
 	@Test

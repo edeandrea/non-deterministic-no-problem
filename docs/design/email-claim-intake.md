@@ -44,7 +44,8 @@ workflow run**, and the steps below are that run's steps.
    an unmatched "follow-up" gets the "no matching claim" reply, and nothing is created or changed.
 5. A matched claim in any other status (e.g. `New`, `In Process`, `Processed`, `Denied`) gets a status
    answer. For a matched pending claim, or an unmatched new claim, the details are extracted over the
-   whole correspondence: what happened, incident date, location and category (`Other` counts).
+   whole correspondence: the summary (the only incident text, and what is stored), whether the correspondence says
+   what happened, incident date, location and category (`Other` counts).
 6. When the agents finish, the workflow applies the policy-number rule in code, before any claim is
    created or changed. If a new claim states a number that belongs to another customer, it sends a vague
    "policy inconsistency" reply and ends; no claim is created. Otherwise, if the claim was waiting for
@@ -112,8 +113,9 @@ email, the matched claim (or none) and the claim's history:
 - [`EmailClassifierAgent`](../../src/main/java/org/parasol/intake/agent/triage/EmailClassifierAgent.java) (LLM) returns the email type.
 - [`EmailRouter`](../../src/main/java/org/parasol/intake/agent/EmailRouter.java) (no LLM) routes on the matched claim first, then on the type:
   - matched pending claims, and unmatched new claims, go to [`ClaimExtractionWorkflow`](../../src/main/java/org/parasol/intake/agent/extraction/ClaimExtractionWorkflow.java): three LLM agents
-    in parallel, [`ClaimSummaryAgent`](../../src/main/java/org/parasol/intake/agent/extraction/ClaimSummaryAgent.java), [`ClaimSentimentAgent`](../../src/main/java/org/parasol/intake/agent/extraction/ClaimSentimentAgent.java) and [`IncidentDetailsAgent`](../../src/main/java/org/parasol/intake/agent/extraction/IncidentDetailsAgent.java) (description,
-    date, optional time, location, category, stated policy number).
+    in parallel, [`ClaimSummaryAgent`](../../src/main/java/org/parasol/intake/agent/extraction/ClaimSummaryAgent.java), [`ClaimSentimentAgent`](../../src/main/java/org/parasol/intake/agent/extraction/ClaimSentimentAgent.java) and [`IncidentDetailsAgent`](../../src/main/java/org/parasol/intake/agent/extraction/IncidentDetailsAgent.java) (a flag for whether the
+    correspondence says what happened, date, optional time, location, category, stated policy number; the text of what
+    happened is the summary agent's job).
   - matched claims in any other status go to [`ClaimFollowUpAgent`](../../src/main/java/org/parasol/intake/agent/triage/ClaimFollowUpAgent.java) (LLM), which writes the status
     answer using a read-only status tool.
   - unmatched "not a claim" and "follow-up" emails go to [`UnmatchedEmailAgent`](../../src/main/java/org/parasol/intake/agent/triage/UnmatchedEmailAgent.java) (no LLM) for those two outcomes.

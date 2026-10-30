@@ -43,10 +43,11 @@ with the user the same day (six decisions, D1–D6) and then changed twice with 
 bookkeeping lives in its own `ClaimIntakeState` entity, never on `Claim` (so claim retrieval neither returns nor loads
 it), and `IntakeReplySender` takes no `Optional` parameters.
 **Status (2026-10-30):** tasks 03–11b are done and merged into the feature branch (the last was
-[#276](https://github.com/edeandrea/non-deterministic-no-problem/pull/276), task 11b, `465f7aa`). **Task 12 is built** on
-`gh216/12-roundcube-e2e` (all three scenarios pass locally under `-Pollama` and `-Pollama-openai`); its PR into
-`gh216-email-intake` is next. Then tasks 12b (#266) and 12c (#265), moved ahead of 13 and 14 in
-[#279](https://github.com/edeandrea/non-deterministic-no-problem/pull/279), then 13 and 14; none of them is started.
+[#276](https://github.com/edeandrea/non-deterministic-no-problem/pull/276), task 11b, `465f7aa`). Task 12 is done
+([#278](https://github.com/edeandrea/non-deterministic-no-problem/pull/278), `59e3b28`). **Task 12b is built** on
+`gh216/12b-description-into-summary` and in review as a PR into `gh216-email-intake` (`-Pollama-openai` and the full
+`clean verify` are left to CI; see the task file → Outcome). Then 12c (#265), moved ahead of 13 and 14 in
+[#279](https://github.com/edeandrea/non-deterministic-no-problem/pull/279), then 13 and 14; 12c, 13 and 14 aren't started.
 
 **Plan File:** `.tasks/05-gh216-agentic-email-intake/PLAN.md`
 **Tasks Directory:** `.tasks/05-gh216-agentic-email-intake/`
@@ -261,8 +262,8 @@ file's header link to it.**
 - [x] [task-10b-conversation-core.md](task-10b-conversation-core.md): Generic conversation context core (`ai.scoring.conversation`; changes the chat's scoring trigger) — **done** on `gh216/10b-conversation-core` off the feature branch (not yet committed/PR'd; user decision 2026-10-27 dropped the straight-to-`main` exception) — issue [#259](https://github.com/edeandrea/non-deterministic-no-problem/issues/259); real-key suite left for the user: `ai.scoring.it.DriftDetectionTests`; see Outcome
 - [x] [task-11-observability.md](task-11-observability.md): Observability for the intake workflow — **done**, squash-merged into `gh216-email-intake` as `520501b` ([#270](https://github.com/edeandrea/non-deterministic-no-problem/pull/270)) — issue [#260](https://github.com/edeandrea/non-deterministic-no-problem/issues/260)
 - [x] [task-11b-more-intake-metrics.md](task-11b-more-intake-metrics.md): More business and operational metrics for the intake — **done**, squash-merged into `gh216-email-intake` as `465f7aa` ([#276](https://github.com/edeandrea/non-deterministic-no-problem/pull/276)) (added 2026-10-29; building #1–#4, #6–#12, #15, #16 and a classifier-label counter in place of #5, in one PR; #13 dropped (Langfuse already sums tokens per claim), #14 and #17 already covered by existing meters; built, full `clean verify` under the Ollama profiles recorded in the task file; doesn't block #216's close-out) — issue [#271](https://github.com/edeandrea/non-deterministic-no-problem/issues/271)
-- [ ] [task-12-roundcube-e2e.md](task-12-roundcube-e2e.md): Roundcube end-to-end test — **built** on `gh216/12-roundcube-e2e` (Roundcube from the Compose file through `UiTestProfile` on a random port, the watcher started by the test; see the task file → Outcome) — issue [#261](https://github.com/edeandrea/non-deterministic-no-problem/issues/261)
-- [ ] [task-12b-consolidate-description-into-summary.md](task-12b-consolidate-description-into-summary.md): Consolidate incident description into the claim summary (task 16 until 2026-10-30; spun off 2026-10-26; required before task 13, user decision 2026-10-30: it changes the extraction contract and every intake fixture that tasks 13 and 14 document and verify) — found while designing task 10's review UI: `IncidentDetailsAgent`'s `description` is extracted only to be thrown away, while a separate `ClaimSummaryAgent` output is what's actually persisted — issue [#266](https://github.com/edeandrea/non-deterministic-no-problem/issues/266)
+- [x] [task-12-roundcube-e2e.md](task-12-roundcube-e2e.md): Roundcube end-to-end test — **done**, squash-merged into `gh216-email-intake` as `59e3b28` ([#278](https://github.com/edeandrea/non-deterministic-no-problem/pull/278)); built on `gh216/12-roundcube-e2e` (Roundcube from the Compose file through `UiTestProfile` on a random port, the watcher started by the test; see the task file → Outcome) — issue [#261](https://github.com/edeandrea/non-deterministic-no-problem/issues/261)
+- [ ] [task-12b-consolidate-description-into-summary.md](task-12b-consolidate-description-into-summary.md): Consolidate incident description into the claim summary (**built, in PR** on `gh216/12b-description-into-summary`; task 16 until 2026-10-30; spun off 2026-10-26; required before task 13, user decision 2026-10-30: it changes the extraction contract and every intake fixture that tasks 13 and 14 document and verify) — found while designing task 10's review UI: `IncidentDetailsAgent`'s `description` is extracted only to be thrown away, while a separate `ClaimSummaryAgent` output is what's actually persisted — issue [#266](https://github.com/edeandrea/non-deterministic-no-problem/issues/266)
 - [ ] [task-12c-claim-correspondence-transcript.md](task-12c-claim-correspondence-transcript.md): Show a claim's full email correspondence as a transcript on the Documents tab (task 15 until 2026-10-30; spun off 2026-10-26; required before task 13, user decision 2026-10-30: the demo guide shows the reviewer's view, so it documents the transcript; after 12b, so its tests use the final fixtures) — found while designing task 10's review UI: the Documents tab shows only the first email, and a reviewer deciding a `Pending Review` claim would benefit from the actual back-and-forth — issue [#265](https://github.com/edeandrea/non-deterministic-no-problem/issues/265)
 - [ ] [task-13-demo-and-docs.md](task-13-demo-and-docs.md): Demo guide and documentation — issue [#262](https://github.com/edeandrea/non-deterministic-no-problem/issues/262)
 - [ ] [task-14-verification.md](task-14-verification.md): Verification — issue [#263](https://github.com/edeandrea/non-deterministic-no-problem/issues/263)
@@ -365,6 +366,8 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
   templates on purpose, to show both patterns.
 
 ### Key Decisions
+
+- **Task 12b (built, in review):** the incident description's completeness is a nullable `IncidentDetails.incidentDescribed` flag from the details agent, not a blank-summary check, because the summary agent never answers blank; `ClaimSummaryAgent` stays the only writer of incident text, and `MissingItem.INCIDENT_DESCRIPTION` keeps its name and label.
 - **Task 11 mailbox concurrency — current implementation and evidence, not a new user-approved policy decision:**
   `ClaimsMailbox.withFolder` currently uses a fair `ReentrantReadWriteLock`: reads may overlap; mutations exclude reads
   and other mutations. Both exclusive and read/write policies passed the repeated investigation; moves-only exclusion,

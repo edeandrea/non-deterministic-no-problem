@@ -55,7 +55,7 @@ import io.serverlessworkflow.impl.WorkflowStatus;
 class IntakeSpanPropagationTests extends IntakeFlowTestBase {
 	private static final int CONCURRENT_RUNS = 8;
 	// No location, so each run asks for it and ends instead of waiting for review, and all its spans are exported
-	private static final String INCOMPLETE_DETAILS = details("Car hit a post.", "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());
+	private static final String INCOMPLETE_DETAILS = details(true, "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());
 	// Keeps every run's model calls in flight long enough for the batch's runs to overlap
 	private static final int MODEL_DELAY_MS = 400;
 	private static final String OTHER_SENDER = "john.roe@example.com";

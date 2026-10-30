@@ -32,7 +32,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @TestProfile(StubbedModelsTestProfile.class)
 class IntakeOutcomeRoundTripTests {
 	private static final ClaimExtraction EXTRACTION = new ClaimExtraction("summary", "sentiment", new IncidentDetails(
-		"car hit a tree", "2026-10-08", "14:30", "Elm Street", ClaimCategory.SINGLE_VEHICLE, "AC-1234567", Set.of(MissingItem.LOCATION)));
+		true, "2026-10-08", "14:30", "Elm Street", ClaimCategory.SINGLE_VEHICLE, "AC-1234567", Set.of(MissingItem.LOCATION)));
 
 	@Inject
 	ObjectMapper objectMapper;

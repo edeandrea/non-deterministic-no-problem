@@ -20,8 +20,8 @@ import io.quarkus.test.junit.TestProfile;
 @QuarkusTest
 @TestProfile(StubbedModelsTestProfile.class)
 class ClaimIntakeResolveClaimTests extends IntakeFlowTestBase {
-	private static final String NO_LOCATION = details("Car hit a post.", "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());
-	private static final String LOCATION_ANSWERED = details("Car hit a post.", "2026-10-07", "Elm Street", "SINGLE_VEHICLE", null, List.of("LOCATION"));
+	private static final String NO_LOCATION = details(true, "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());
+	private static final String LOCATION_ANSWERED = details(true, "2026-10-07", "Elm Street", "SINGLE_VEHICLE", null, List.of("LOCATION"));
 
 	@Test
 	void aFreshEmailAboutTheOnlyPendingClaimIsMergedIntoIt() {
@@ -43,7 +43,7 @@ class ClaimIntakeResolveClaimTests extends IntakeFlowTestBase {
 
 		var secondMarker = marker();
 		resolve(secondMarker, "NEW_INCIDENT", null);
-		stubNewClaim(secondMarker, details("Hail damage.", "2026-10-08", null, "OTHER", null, List.of()));
+		stubNewClaim(secondMarker, details(true, "2026-10-08", null, "OTHER", null, List.of()));
 		this.scenario.awaitFiled(this.scenario.submit(Mail.from(SENDER).subject("Hail").body("Hail damaged my roof. " + secondMarker)));
 
 		var second = this.scenario.awaitClaimOf(SENDER);
@@ -54,7 +54,7 @@ class ClaimIntakeResolveClaimTests extends IntakeFlowTestBase {
 		var thirdMarker = marker();
 		resolve(thirdMarker, "EXISTING", second.claimNumber);
 		classify(thirdMarker, EmailType.CLAIM_FOLLOW_UP);
-		extract(thirdMarker, details("Hail damage.", "2026-10-08", "Home", "OTHER", null, List.of("LOCATION")));
+		extract(thirdMarker, details(true, "2026-10-08", "Home", "OTHER", null, List.of("LOCATION")));
 		this.scenario.awaitFiled(this.scenario.submit(Mail.from(SENDER).subject("Where").body("At home. " + thirdMarker)));
 
 		assertThat(this.scenario.claim(second.id).status).isEqualTo("Pending Review");
@@ -66,7 +66,7 @@ class ClaimIntakeResolveClaimTests extends IntakeFlowTestBase {
 		var first = createClaim(SENDER, NO_LOCATION);
 		var secondMarker = marker();
 		resolve(secondMarker, "NEW_INCIDENT", null);
-		stubNewClaim(secondMarker, details("Hail damage.", "2026-10-08", null, "OTHER", null, List.of()));
+		stubNewClaim(secondMarker, details(true, "2026-10-08", null, "OTHER", null, List.of()));
 		this.scenario.awaitFiled(this.scenario.submit(Mail.from(SENDER).subject("Hail").body("Hail. " + secondMarker)));
 		var second = this.scenario.awaitClaimOf(SENDER);
 		var other = createClaim("someone.else@example.com", NO_LOCATION);

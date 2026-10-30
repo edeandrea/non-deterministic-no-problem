@@ -74,10 +74,10 @@ class ClaimIntakePolicyTests extends IntakeFlowTestBase {
 
 	@Test
 	void aGeneratedPolicyIsReplacedByTheOneAReplyStates() {
-		var created = createClaim(SENDER, details("Car hit a post.", "2026-10-07", null, "SINGLE_VEHICLE", null, List.of()));
+		var created = createClaim(SENDER, details(true, "2026-10-07", null, "SINGLE_VEHICLE", null, List.of()));
 
 		var marker = marker();
-		stubFollowUp(marker, details("Car hit a post.", "2026-10-07", "Elm Street", "SINGLE_VEHICLE", "AC-555666777", List.of("LOCATION")));
+		stubFollowUp(marker, details(true, "2026-10-07", "Elm Street", "SINGLE_VEHICLE", "AC-555666777", List.of("LOCATION")));
 		this.scenario.awaitFiled(this.scenario.submit(Mail.from(SENDER).inReplyTo(created.messageId()).body("Elm Street, policy AC-555666777. " + marker)));
 
 		assertThat(this.scenario.claim(created.claim().id).policyNumber).isEqualTo("AC-555666777");
@@ -119,6 +119,6 @@ class ClaimIntakePolicyTests extends IntakeFlowTestBase {
 	}
 
 	private static String withPolicy(String policyNumber) {
-		return details("Car hit a post.", "2026-10-07", "Elm Street", "SINGLE_VEHICLE", policyNumber, List.of());
+		return details(true, "2026-10-07", "Elm Street", "SINGLE_VEHICLE", policyNumber, List.of());
 	}
 }

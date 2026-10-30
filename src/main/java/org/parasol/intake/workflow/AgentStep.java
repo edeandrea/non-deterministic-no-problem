@@ -64,16 +64,24 @@ class AgentStep {
 	History snapshot(IntakeState state, InboundEmail email) {
 		return Optional.ofNullable(state.claimId())
 			.map(id -> Claim.<Claim>findById(id))
-			.map(claim -> new History(
-				MatchedClaim.of(claim.claimNumber, claim.status),
-				CorrespondenceText.appendReply(claim.body, email.sentDate().atZone(ZoneOffset.UTC).toLocalDate(), email.strippedBody()),
-				ClaimFields.extractedSoFar(claim),
-				ClaimIntakeState.findForClaim(claim.id).map(intake -> Set.copyOf(intake.requestedItems)).orElse(Set.of())))
+			.map(claim -> history(claim, email))
 			.orElseGet(() -> new History(
 				MatchedClaim.none(),
 				CorrespondenceText.firstEmail(email.subject(), email.strippedBody()),
 				IncidentDetails.empty(),
 				Set.of()));
+	}
+
+	private static History history(Claim claim, InboundEmail email) {
+		var requestedItems = ClaimIntakeState.findForClaim(claim.id)
+			.map(intake -> Set.copyOf(intake.requestedItems))
+			.orElse(Set.of());
+
+		return new History(
+			MatchedClaim.of(claim.claimNumber, claim.status),
+			CorrespondenceText.appendReply(claim.body, email.sentDate().atZone(ZoneOffset.UTC).toLocalDate(), email.strippedBody()),
+			ClaimFields.extractedSoFar(claim, requestedItems),
+			requestedItems);
 	}
 
 	record History(MatchedClaim matchedClaim, String correspondence, IncidentDetails extractedSoFar, Set<MissingItem> requestedItems) {

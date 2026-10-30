@@ -28,7 +28,7 @@ class ClaimExtractionValueRoundTripTests {
 	@Test
 	void incidentDetailsAndClaimExtractionRoundTrip() throws Exception {
 		var details = new IncidentDetails(
-			"car hit a tree",
+			true,
 			"2026-10-08",
 			"14:30",
 			"Elm Street",

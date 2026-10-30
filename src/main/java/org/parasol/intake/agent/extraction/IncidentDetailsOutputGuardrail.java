@@ -80,7 +80,7 @@ class IncidentDetailsOutputGuardrail extends JsonExtractorOutputGuardrail<Incide
 		var clearTime = problems.contains(DateProblem.INVALID_TIME);
 
 		return new IncidentDetails(
-			details.description(),
+			details.incidentDescribed(),
 			clearDate ? null : details.incidentDate(),
 			clearTime ? null : details.incidentTime(),
 			details.location(),
