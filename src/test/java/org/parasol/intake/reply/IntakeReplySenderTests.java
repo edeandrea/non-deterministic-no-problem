@@ -131,6 +131,8 @@ class IntakeReplySenderTests {
 			.satisfies(row -> assertThat(row.strippedText)
 				.contains("Dear Jane Doe,", "Your claim %s has been processed".formatted(claimNumber))
 				.doesNotContain("<"))
+			// The text part as the customer got it, not a second rendering. The transport drops the final line break
+			.satisfies(row -> assertThat(row.strippedText.strip()).isEqualToNormalizingNewlines(received.body().strip()))
 			.satisfies(row -> assertThat(row.receivedAt).isEqualTo(row.sentDate));
 		assertThat(received.firstHeader("Message-ID").orElseThrow())
 			.matches("<[0-9a-f-]{36}@parasol\\.com>");

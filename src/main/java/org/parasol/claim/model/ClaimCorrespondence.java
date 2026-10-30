@@ -1,7 +1,6 @@
 package org.parasol.claim.model;
 
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -33,9 +32,8 @@ import io.quarkus.panache.common.Sort;
  *   deletes its rows.
  * </p>
  * <p>
- *   For an outbound row, {@link #sentDate} and {@link #receivedAt} are both the moment the mail server accepted the reply (in whole seconds, like an
- *   inbound row's {@code INTERNALDATE}, so the two sides sort consistently),
- *   {@link #sender} is the claims address, {@link #subject} is the subject as sent (with its {@code [CLM...] Re:} prefix) and
+ *   For an outbound row, {@link #sentDate} and {@link #receivedAt} are both the moment the mail server accepted the reply, by
+ *   this app's clock, {@link #sender} is the claims address, {@link #subject} is the subject as sent (with its {@code [CLM...] Re:} prefix) and
  *   {@link #strippedText} is the text sent.
  * </p>
  */
@@ -89,10 +87,7 @@ public class ClaimCorrespondence extends PanacheEntity {
 	 * @return the persisted row
 	 */
 	public static ClaimCorrespondence recordReply(Claim claim, String messageId, String sender, String subject, String text) {
-		// Whole seconds, like the IMAP INTERNALDATE of the inbound rows. With the sub-second Instant.now() a customer reply that
-		// arrives in the same second as our earlier reply (INTERNALDATE truncates it) would sort before that reply. Equal seconds
-		// then fall back to the id, and an inbound row is recorded before the reply to it
-		var sentAt = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+		var sentAt = Instant.now();
 		var correspondence = new ClaimCorrespondence();
 
 		correspondence.messageId = messageId;
@@ -109,15 +104,27 @@ public class ClaimCorrespondence extends PanacheEntity {
 	}
 
 	/**
-	 * Lists a claim's emails in the order they happened.
+	 * Lists a claim's emails in the order they happened, which is the order they were recorded: an inbound email is recorded as
+	 * the intake picks it up, a reply as soon as the mail server has accepted it. Their times can't give that order, because an
+	 * inbound row's {@link #receivedAt} comes from the mail server's clock and an outbound row's from this app's.
+	 *
+	 * @param claim the claim
+	 * @return the claim's rows, oldest first; empty if the claim has none
+	 */
+	public static List<ClaimCorrespondence> listForClaim(Claim claim) {
+		return ClaimCorrespondence.<ClaimCorrespondence>list("claim", Sort.by("id"), claim);
+	}
+
+	/**
+	 * Lists a claim's emails in the order they happened, like {@link #listForClaim(Claim)}.
 	 *
 	 * @param claimId the claim id
-	 * @return the claim's rows, oldest {@link #receivedAt} first and by id within the same second; empty if the claim has none
+	 * @return the claim's rows, oldest first; empty if the claim has none
 	 * @throws ClaimNotFoundException if there's no claim with that id
 	 */
 	public static List<ClaimCorrespondence> listForClaim(long claimId) {
 		return Claim.<Claim>findByIdOptional(claimId)
-			.map(claim -> ClaimCorrespondence.<ClaimCorrespondence>list("claim", Sort.by("receivedAt").and("id"), claim))
+			.map(claim -> listForClaim(claim))
 			.orElseThrow(() -> new ClaimNotFoundException(claimId));
 	}
 

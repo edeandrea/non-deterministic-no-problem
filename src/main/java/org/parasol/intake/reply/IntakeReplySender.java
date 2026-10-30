@@ -4,10 +4,8 @@ import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.function.Supplier;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
@@ -23,8 +21,6 @@ import io.quarkus.logging.Log;
 import io.quarkus.mailer.Mail;
 import io.quarkus.mailer.MailTemplate.MailTemplateInstance;
 import io.quarkus.mailer.reactive.ReactiveMailer;
-import io.quarkus.qute.TemplateInstance;
-import io.quarkus.qute.Variant;
 import io.smallrye.mutiny.Uni;
 
 /**
@@ -57,10 +53,17 @@ public class IntakeReplySender {
 
 	// Every reply gives up at quarkus.mailer.timeout, the blocking Mailer's own timeout. It's a single Quarkus-owned key, so
 	// a @ConfigProperty rather than a mapping of our own
-	IntakeReplySender(IntakeConfig config, ReactiveMailer mailer, @ConfigProperty(name = "quarkus.mailer.timeout") Duration sendTimeout, IntakeActivities activities, ReplyRecorder recorder) {
+	IntakeReplySender(
+		IntakeConfig config,
+		ReactiveMailer mailer,
+		@ConfigProperty(name = "quarkus.mailer.timeout") Duration sendTimeout,
+		IntakeActivities activities,
+		ReplyRecorder recorder) {
+
 		this.activities = activities;
 		this.recorder = recorder;
-		// The config can't change while the app runs, so the domain is worked out once. A Message-ID's right-hand side is a domain
+		// The config can't change while the app runs, so the domain is worked out once. A Message-ID's right-hand side is a domain.
+		// IntakeConfig validates the address as a bare one, so everything after its '@' is the domain
 		this.messageIdDomain = config.address().substring(config.address().indexOf('@') + 1);
 		this.config = config;
 		this.mailer = mailer;
@@ -82,7 +85,7 @@ public class IntakeReplySender {
 		var fullSubject = subjectPrefix(Optional.of(claimNumber)) + normalizeSubject(subject);
 
 		sendText(recipient, fullSubject, body, messageId, threadingHeaders);
-		record(claimNumber, () -> new SentReply(messageId, fullSubject, body));
+		record(claimNumber, new SentReply(messageId, fullSubject, body));
 	}
 
 	/**
@@ -112,8 +115,12 @@ public class IntakeReplySender {
 		var messageId = newMessageId();
 		var fullSubject = subjectPrefix(Optional.of(claimNumber)) + normalizeSubject(subject);
 
-		sendTemplate(template, recipient, fullSubject, messageId, threadingHeaders);
-		record(claimNumber, () -> new SentReply(messageId, fullSubject, textOf(template)));
+		// The template renders its variants into this mail as it sends it, so afterwards the mail holds the text/plain part exactly
+		// as it went out (none if the template has no text variant)
+		var mail = baseMail(messageId, threadingHeaders);
+
+		sendTemplate(template, mail, recipient, fullSubject);
+		record(claimNumber, new SentReply(messageId, fullSubject, mail.getText()));
 	}
 
 	/**
@@ -127,7 +134,7 @@ public class IntakeReplySender {
 	 * @param threadingHeaders The headers that thread the reply under the email it answers
 	 */
 	public void sendTemplateReply(MailTemplateInstance template, String recipient, String subject, ThreadingHeaders threadingHeaders) {
-		sendTemplate(template, recipient, subjectPrefix(Optional.empty()) + normalizeSubject(subject), newMessageId(), threadingHeaders);
+		sendTemplate(template, baseMail(newMessageId(), threadingHeaders), recipient, subjectPrefix(Optional.empty()) + normalizeSubject(subject));
 	}
 
 	// The template's id is IntakeTemplates/<method>, optionally with a variant suffix
@@ -150,9 +157,9 @@ public class IntakeReplySender {
 		deliver(this.mailer.send(mail), STATUS_ANSWER);
 	}
 
-	private void sendTemplate(MailTemplateInstance template, String recipient, String subject, String messageId, ThreadingHeaders threadingHeaders) {
+	private void sendTemplate(MailTemplateInstance template, Mail mail, String recipient, String subject) {
 		deliver(template
-			.mail(baseMail(messageId, threadingHeaders))
+			.mail(mail)
 			.to(recipient)
 			.from(this.config.address())
 			.subject(subject)
@@ -167,28 +174,17 @@ public class IntakeReplySender {
 		this.activities.publish(new ReplySent(template));
 	}
 
-	// The reply has gone out: failing the step now would answer the customer twice, so a failure to record it only logs. The text
-	// is rendered inside the try, so a rendering problem only logs too
-	private void record(String claimNumber, Supplier<SentReply> reply) {
+	// The reply has gone out: failing the step now would answer the customer twice, so a failure to record it only logs. The
+	// customer's answer still finds the claim: ClaimMatcher reads the [CLM...] subject prefix before the Message-IDs, and the
+	// References chain names the customer's own recorded email. Only the transcript misses the reply. A same-sender answer can't
+	// beat the recording either: the dispatcher doesn't match a sender's next email until the run sending this one has ended
+	private void record(String claimNumber, SentReply reply) {
 		try {
-			this.recorder.record(claimNumber, reply.get());
+			this.recorder.record(claimNumber, reply);
 		}
 		catch (RuntimeException e) {
 			Log.warnf(e, "Sent a reply about claim %s but couldn't record it", claimNumber);
 		}
-	}
-
-	// The text/plain variant, which is what the mailer sends as the text part of the template
-	private static String textOf(MailTemplateInstance template) {
-		var instance = template.templateInstance();
-		var variant = ((List<?>) instance.getAttribute(TemplateInstance.VARIANTS)).stream()
-			.map(Variant.class::cast)
-			.filter(candidate -> candidate.getContentType().equals(Variant.TEXT_PLAIN))
-			.findFirst()
-			.orElseThrow();
-
-		return instance.setAttribute(TemplateInstance.SELECTED_VARIANT, variant)
-			.render();
 	}
 
 	private String newMessageId() {

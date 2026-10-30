@@ -41,3 +41,13 @@ export const initiallyExpanded = (messages: CorrespondenceMessage[]): string[] =
  */
 export const showsOriginalContent = (messages: CorrespondenceMessage[]): boolean =>
     !messages.some(message => message.created_claim);
+
+/**
+ * Where the customer photos that no message carries go. With the claim's own content shown, they are its photos, in that item;
+ * otherwise they get an item of their own. Either way a photo a message carried appears only under that message.
+ */
+export const unlinkedImages = (originalImages: ClaimImage[], messages: CorrespondenceMessage[]): { original: ClaimImage[]; other: ClaimImage[] } => {
+    const unlinked = imagesWithoutMessage(originalImages, messages);
+
+    return showsOriginalContent(messages) ? { original: unlinked, other: [] } : { original: [], other: unlinked };
+};

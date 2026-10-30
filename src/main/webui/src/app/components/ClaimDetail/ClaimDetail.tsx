@@ -286,7 +286,9 @@ const ClaimDetail: React.FunctionComponent<ClaimProps> = () => {
                       <Tab eventKey={2} title={<TabTitleText>Damages</TabTitleText>} aria-label="Damages" isDisabled></Tab>
                       <Tab eventKey={3} title={<TabTitleText>Witnesses</TabTitleText>} aria-label="Witnesses" isDisabled></Tab>
                       <Tab eventKey={4} title={<TabTitleText>Documents</TabTitleText>} aria-label="Documents">
-                        <Correspondence claimId={claim_id} claim={claim} originalImages={originalImages} />
+                        {/* Mounted only while the tab is open, so every visit reads the emails again (the reply to a review
+                            decision, the customer's next email), and keyed so another claim never starts from this one's */}
+                        {(activeTabKey === 4) && <Correspondence key={claim_id} claimId={claim_id} claim={claim} originalImages={originalImages} />}
                       </Tab>
                       <Tab eventKey={5} title={<TabTitleText>Comments</TabTitleText>} aria-label="Comments" isDisabled></Tab>
                     </Tabs>

@@ -8,8 +8,10 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 
+import org.parasol.claim.model.Claim;
 import org.parasol.claim.model.ClaimCorrespondence;
 import org.parasol.claim.model.ClaimImage;
+import org.parasol.claim.model.ClaimNotFoundException;
 
 /**
  * A claim's email correspondence. A missing claim surfaces as a domain exception that {@link ClaimExceptionMappings} turns
@@ -33,6 +35,9 @@ class ClaimCorrespondenceResource {
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
 	public List<CorrespondenceMessage> listCorrespondence(@PathParam("id") long claimId) {
-		return this.mapper.toMessages(ClaimCorrespondence.listForClaim(claimId), ClaimImage.listForClaim(claimId), claimId);
+		// Looked up once here, so the two lists don't each check the claim exists
+		return Claim.<Claim>findByIdOptional(claimId)
+			.map(claim -> this.mapper.toMessages(ClaimCorrespondence.listForClaim(claim), ClaimImage.listForClaim(claim), claimId))
+			.orElseThrow(() -> new ClaimNotFoundException(claimId));
 	}
 }

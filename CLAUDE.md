@@ -370,8 +370,10 @@ and no intake columns (not even a version), so no claim fetch can load it, and `
   about a claim: unique `Message-ID` (the duplicate check is insert-and-catch), a nullable claim set once an inbound email creates or
   matches one, direction (`INBOUND`, or `OUTBOUND` for a reply: `recordReply` persists one), sent date, `receivedAt` (the mailbox's IMAP
   INTERNALDATE, which a sender can't set; non-null), sender, the nullable subject, `createdClaim` (true only for the email that created its claim; the UI shows the claim's own content first unless one does, so a claim entered by hand keeps it) and the stripped text. For an outbound row `sentDate`
-  and `receivedAt` are both when the mail server accepted the reply, the subject is as sent (with its `[CLM…] Re:` prefix) and the text
-  is what was sent. `listForClaim` (throws `ClaimNotFoundException`) orders by `receivedAt`, then id. `countInboundForClaim` and
+  and `receivedAt` are both when the mail server accepted the reply (by the app's clock), the subject is as sent (with its `[CLM…] Re:` prefix) and the text
+  is what was sent. `listForClaim(Claim)` (and `listForClaim(long)`, which throws `ClaimNotFoundException`) orders by id, the order the rows were
+  recorded: an inbound row's `receivedAt` is the mail server's clock and an outbound one's the app's (separate pods on OpenShift), so the times can't order
+  the two sides. `ClaimCorrespondenceResource` looks the claim up once and lists both the emails and the images by it. `countInboundForClaim` and
   `findFirstInboundReceivedAt` filter on `INBOUND`, so the claim metrics ignore replies. Reply headers are matched against it
   (`findClaimByMessageIds`), so a customer reply that names only our reply's `Message-ID` still finds the claim. The chat bot's
   `NotificationService` emails aren't recorded.
@@ -1220,6 +1222,10 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
   - **Every intake reply carries a `Message-ID` that `IntakeReplySender` generates** (`<UUID@domain of parasol.intake.address>`; Vert.x's
     mail encoder applies user headers last, so it replaces the mailer's). The two overloads with a claim number record the reply through
     `ReplyRecorder` (`REQUIRES_NEW`) **after** the send succeeded; a failed recording only logs a WARN, since faulting the step would
-    answer the customer twice. A template reply's recorded text is its `text/plain` variant. `ReplySent` is published inside `deliver`'s span.
+    answer the customer twice. Matching doesn't depend on it: `ClaimMatcher` reads the `[CLM…]` subject prefix first, the `References`
+    chain names the customer's own recorded email, and a sender's next email isn't matched until the run that sent the reply has ended.
+    A template reply's recorded text is the `text/plain` part the template rendered into the `Mail` it sent (`Mail.getText()` after the send;
+    `MailTemplateInstance.mail(Mail)` fills that instance), not a second rendering. `parasol.intake.address` is validated as a bare address
+    (`@NotBlank @Email`), since the `Message-ID` domain is everything after its `@`. `ReplySent` is published inside `deliver`'s span.
   - **Don't pass `Optional` to `IntakeReplySender`:** use `ThreadingHeaders` (`of(email)`, `replyingTo(id)`, `none()`) and the overload
     with or without a `String claimNumber`. The overload without one is for replies that mustn't disclose a claim.

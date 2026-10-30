@@ -80,6 +80,19 @@ class ClaimCorrespondenceResourceTests {
 				new CorrespondenceMessage(outbound.id(), CorrespondenceDirection.OUTBOUND, "claims@parasol.com", "[CLM] Re: Car accident", outbound.date(), "We got your claim.", false, List.of()));
 	}
 
+	// The mail server's clock dates the customer's email, ours dates the reply, and the two can disagree (separate pods on
+	// OpenShift). An answer the mail server dated before the reply it answers is still listed after it
+	@Test
+	void listsTheEmailsInTheOrderTheyWereRecordedWhateverTheirDates() {
+		var reply = storeReply(this.claimId, "<out-order@parasol.com>", "[CLM] Re: Car accident", "Where did it happen?");
+		var answerId = QuarkusTransaction.requiringNew().call(() ->
+			inbound(Claim.<Claim>findById(this.claimId), "<in-order@example.com>", "Re: [CLM] Re: Car accident", "In the car park.", "2026-01-01T10:00:00Z").id);
+
+		assertThat(listCorrespondence(this.claimId))
+			.extracting(CorrespondenceMessage::id)
+			.containsExactly(reply.id(), answerId);
+	}
+
 	@Test
 	void doesNotIncludeAnotherClaimsEmails() {
 		storeReply(this.otherClaimId, "<out-other@parasol.com>", "Other", "Other claim");
@@ -160,7 +173,7 @@ class ClaimCorrespondenceResourceTests {
 		return row;
 	}
 
-	// A reply is recorded "now", so it sorts after the inbound row's fixed 2026-01-01 date
+	// Recorded after any inbound row the test stored first, so it's listed after it
 	private static Reply storeReply(long claimId, String messageId, String subject, String text) {
 		return QuarkusTransaction.requiringNew().call(() -> {
 			var row = ClaimCorrespondence.recordReply(Claim.<Claim>findById(claimId), messageId, "claims@parasol.com", subject, text);

@@ -84,13 +84,23 @@ public class ClaimImage extends PanacheEntity {
 	/**
 	 * Lists a claim's images, oldest first. The image bytes aren't loaded.
 	 *
+	 * @param claim the claim
+	 * @return the claim's images; empty if the claim has none
+	 */
+	public static List<ClaimImage> listForClaim(Claim claim) {
+		return ClaimImage.<ClaimImage>list("claim", Sort.by("createdAt").and("id"), claim);
+	}
+
+	/**
+	 * Lists a claim's images, oldest first. The image bytes aren't loaded.
+	 *
 	 * @param claimId the claim id
 	 * @return the claim's images; empty if the claim has none
 	 * @throws ClaimNotFoundException if there's no claim with that id
 	 */
 	public static List<ClaimImage> listForClaim(long claimId) {
 		return Claim.<Claim>findByIdOptional(claimId)
-			.map(claim -> ClaimImage.<ClaimImage>list("claim", Sort.by("createdAt").and("id"), claim))
+			.map(claim -> listForClaim(claim))
 			.orElseThrow(() -> new ClaimNotFoundException(claimId));
 	}
 

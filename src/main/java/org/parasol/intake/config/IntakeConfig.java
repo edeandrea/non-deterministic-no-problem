@@ -3,6 +3,8 @@ package org.parasol.intake.config;
 import java.time.Duration;
 import java.util.Optional;
 
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 
 import io.quarkus.runtime.configuration.MemorySize;
@@ -24,11 +26,14 @@ public interface IntakeConfig {
 	boolean enabled();
 
 	/**
-	 * The address customers send claims to. Replies are sent from it, and mail from it is never processed.
+	 * The address customers send claims to. Replies are sent from it, and mail from it is never processed. A bare address, with no
+	 * display name: replies' {@code Message-ID}s take their domain from it.
 	 *
 	 * @return the claims inbox address
 	 */
 	@WithDefault("claims@parasol.com")
+	@NotBlank
+	@Email
 	String address();
 
 	/**

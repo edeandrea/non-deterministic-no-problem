@@ -1,6 +1,6 @@
 import config from '@app/config';
 import { ClaimImage } from '@app/utils/claimImages';
-import { CorrespondenceMessage, imagesWithoutMessage, initiallyExpanded, showsOriginalContent } from '@app/utils/correspondence';
+import { CorrespondenceMessage, initiallyExpanded, showsOriginalContent, unlinkedImages } from '@app/utils/correspondence';
 import { Accordion, AccordionContent, AccordionItem, AccordionToggle, Grid, GridItem, Text, TextContent, TextVariants } from '@patternfly/react-core';
 import axios from 'axios';
 import * as React from 'react';
@@ -16,7 +16,8 @@ const CLAIM_TOGGLE = 'claim-toggle1';
 const OTHER_IMAGES_TOGGLE = 'other-images-toggle';
 
 // The claim's emails in order: the customer's and the replies the intake sent, each with the photos it carried. A claim with
-// no recorded emails (a seeded one) shows its original content as a single item, as before the intake existed.
+// no recorded emails (a seeded one) shows its original content as a single item, as before the intake existed. It reads the
+// emails once, when it mounts: ClaimDetail mounts it each time the Documents tab opens, keyed by the claim.
 const Correspondence: React.FunctionComponent<CorrespondenceProps> = ({ claimId, claim, originalImages }) => {
   const [messages, setMessages] = React.useState<CorrespondenceMessage[]>([]);
   const [expanded, setExpanded] = React.useState<string[]>([CLAIM_TOGGLE]);
@@ -41,8 +42,7 @@ const Correspondence: React.FunctionComponent<CorrespondenceProps> = ({ claimId,
   const toggle = (id: string) => setExpanded(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
 
   const showsOriginal = showsOriginalContent(messages);
-  // With the original content shown, its carousel already has every original photo
-  const imagesWithoutEmail = showsOriginal ? [] : imagesWithoutMessage(originalImages, messages);
+  const images = unlinkedImages(originalImages, messages);
 
   return (
     <Accordion isBordered asDefinitionList={false} className='padding-top-25'>
@@ -58,8 +58,8 @@ const Correspondence: React.FunctionComponent<CorrespondenceProps> = ({ claimId,
               <Text component={TextVariants.h3}>Body:</Text>
               <div className='display-linebreak'>{claim.body}</div>
               <Text component={TextVariants.h3}>Attached images:</Text>
-              {(originalImages.length > 0)
-                ? <Grid><GridItem span={4}><ImageCarousel images={originalImages} /></GridItem></Grid>
+              {(images.original.length > 0)
+                ? <Grid><GridItem span={4}><ImageCarousel images={images.original} /></GridItem></Grid>
                 : 'No images attached'}
             </TextContent>
           </AccordionContent>
@@ -94,13 +94,13 @@ const Correspondence: React.FunctionComponent<CorrespondenceProps> = ({ claimId,
           </div>
         );
       })}
-      {(imagesWithoutEmail.length > 0) && (
+      {(images.other.length > 0) && (
         <AccordionItem>
           <AccordionToggle onClick={() => toggle(OTHER_IMAGES_TOGGLE)} isExpanded={expanded.includes(OTHER_IMAGES_TOGGLE)} id={OTHER_IMAGES_TOGGLE}>
             Other attached images
           </AccordionToggle>
           <AccordionContent id="other-images-content" isHidden={!expanded.includes(OTHER_IMAGES_TOGGLE)}>
-            <Grid><GridItem span={4}><ImageCarousel images={imagesWithoutEmail} /></GridItem></Grid>
+            <Grid><GridItem span={4}><ImageCarousel images={images.other} /></GridItem></Grid>
           </AccordionContent>
         </AccordionItem>
       )}
