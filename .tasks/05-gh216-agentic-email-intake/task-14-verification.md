@@ -18,6 +18,9 @@ Steps → 2a).
 
 ## What to Do
 
+Tasks 12b (#266) and 12c (#265) land before this one (user decision, 2026-10-30), so the full verify and the fresh
+review cover them too.
+
 - Run `./mvnw -B clean test-compile -Pollama` and `./mvnw -B clean test-compile`.
 - Run `OPENAI_API_KEY=change-me ./mvnw -B clean verify -Pollama`. Every intake test and the Roundcube E2E must pass.
   Report pre-existing secret-dependent failures separately.

@@ -458,7 +458,7 @@ validates every action. `ClaimReviewPanelPageTests` now has 5 tests (status labe
 
 Also surfaced in the same conversation and spun off as their own sub-issues, not part of this task:
 - the Documents tab shows only the first email, with no transcript of the back-and-forth — [task
-  15](task-15-claim-correspondence-transcript.md), issue [#265](https://github.com/edeandrea/non-deterministic-no-problem/issues/265)
+  12c](task-12c-claim-correspondence-transcript.md), issue [#265](https://github.com/edeandrea/non-deterministic-no-problem/issues/265)
 - `IncidentDetailsAgent`'s `description` is extracted only to be discarded, while a separate `ClaimSummaryAgent`
   output is what's actually persisted as `claim.summary` — [task
-  16](task-16-consolidate-description-into-summary.md), issue [#266](https://github.com/edeandrea/non-deterministic-no-problem/issues/266)
+  12b](task-12b-consolidate-description-into-summary.md), issue [#266](https://github.com/edeandrea/non-deterministic-no-problem/issues/266)

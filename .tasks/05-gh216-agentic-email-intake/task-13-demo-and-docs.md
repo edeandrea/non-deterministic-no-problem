@@ -18,15 +18,20 @@ fixes [quarkiverse/quarkus-flow#1096](https://github.com/quarkiverse/quarkus-flo
 (`AgenticWorkflowRuns`, `FailedAgenticSystemListener`, `ClaimsMailboxAgent.endFlowRunsOnFailure()`). Document what
 1.3.0 fixed, not the workaround it replaced.
 
+**Tasks 12b and 12c run first** (user decision, 2026-10-30): document the extraction contract as 12b leaves it (the claim
+summary stands in for the incident description; no separately extracted `description`) and the Documents tab's
+correspondence transcript as 12c builds it. The review panel's buttons are **Submit claim for processing** and, once an
+item is asked, **Request more information** (task 12 found this file still said "Ready for processing").
+
 ## What to Do
 
 - Write a demo guide (e.g. `docs/email-claim-intake-demo.md`) with sample emails to paste into Roundcube. Say to log in as a
   seeded claimant (`marty.mcfly@email.com`, …), not an arbitrary address: those identities carry the claimant's name (#237), so
   the email goes out as `Marty McFly <marty.mcfly@email.com>` and the replies greet "Marty McFly". Any other address sends as
   a bare address and is greeted "Customer":
-  - a complete new claim (`Pending Review`, then the claims processor clicks **Ready for processing** →
+  - a complete new claim (`Pending Review`, then the claims processor clicks **Submit claim for processing** →
     `In Process`; also show **Request more information** → `Pending Information` → reply → `Pending Review`)
-  - a claim missing its location (reply → `Pending Review` → Ready → `In Process`)
+  - a claim missing its location (reply → `Pending Review` → Submit claim for processing → `In Process`)
   - a follow-up on Marty's claim (status question)
   - a policy-number conflict
   - a not-a-claim email (newsletter)
