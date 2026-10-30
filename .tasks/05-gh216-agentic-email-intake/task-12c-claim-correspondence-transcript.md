@@ -1,4 +1,4 @@
-# Task 15: Claim Correspondence Transcript
+# Task 12c: Claim Correspondence Transcript
 
 **Type:** Code Modification
 
@@ -13,7 +13,9 @@ whatever the agents merged into the claim's current field values.
 
 Found while designing task 10's review UI (#258): a claims processor deciding a `Pending Review` claim would
 benefit from seeing the actual back-and-forth that led to the current extracted fields, not just the first email.
-**For the future — not required for #216 to land**; sequenced after task 14 so it doesn't block the intake's close-out.
+**Required before task 13** (user decision, 2026-10-30; it was task 15, "for the future", until then): the demo guide
+shows a reviewer deciding a claim, so it should document the transcript, and task 14 verifies it. It runs after task 12b,
+so its tests use the final extraction fixtures.
 
 ## What to Do
 
