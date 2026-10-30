@@ -198,7 +198,8 @@ Same reasoning as task 11b's nullable `IntakeRun.receivedAt`.
 - [x] `ClaimFields.extractedSoFar` derives the flag from the requested items and no longer copies the summary
 - [x] An old-shape `IncidentDetails` (with `description`) still reads from persisted run state
 - [ ] Every affected test fixture across `org.parasol.intake.**` and the two Playwright tests is updated and the suite
-  passes under `-Pollama` and `-Pollama-openai`
+  passes under `-Pollama` and `-Pollama-openai` (passes: default-profile full verify and the intake classes under
+  `-Pollama`; open: `-Pollama-openai`, left to CI)
 - [ ] The real-model dev-mode check behaves as described in section 7
 - [ ] The design doc (and diagram), `CLAUDE.md`, `PLAN.md` and issue #266's body are updated
 
@@ -224,11 +225,13 @@ Built on `gh216/12b-description-into-summary` as planned (decisions 1 and 2 abov
 | Check | Result |
 |---|---|
 | 13 intake classes (121 tests) under `-Pollama` | 0 failures, 0 skipped |
-| `ClaimReviewPanelPageTests` + `RoundcubeClaimIntakeE2ETests` under `-Pollama` | 9 run, 3 failures, 6 errors (Playwright timeouts); the same 9 fail on clean `HEAD` (`59e3b28`) in a baseline worktree, so they aren't caused by this change |
+| `ClaimReviewPanelPageTests` + `RoundcubeClaimIntakeE2ETests` under `-Pollama`, run by the agent | 9 run, 3 failures, 6 errors (Playwright timeouts); the same 9 fail on clean `HEAD` (`59e3b28`) in a baseline worktree, so this change didn't cause them. The user's default-profile verify passed all 9, so the failures were specific to that shell or machine |
 | `-Pollama-openai` | **Not run locally** (user decision 2026-10-30: left to CI) |
-| Full `clean verify` | **Not run locally**; CI is the check |
+| Full `clean verify`, default profile (run by the user locally) | 602 tests in 100 classes, 0 failures, 0 errors, 2 skipped (`DriftDetectionTests`, `ClaimsMailboxConcurrencyTests`); includes `ClaimFieldsTests` and both Playwright classes (6 of 6 and 3 of 3 passed) |
 | Real-model dev-mode check | **Not run** |
 | IntelliJ lint of 8 changed files | nothing on changed lines (known `@Inject` false positive and pre-existing warnings only) |
 
 Two earlier `-Pollama-openai` attempts hit Testcontainers start failures (`localhost:2375 failed to respond`) and
 skipped 61 and 54 of 121 tests, 0 failures among those that ran; they prove nothing for that profile.
+
+PR: [#280](https://github.com/edeandrea/non-deterministic-no-problem/pull/280).
