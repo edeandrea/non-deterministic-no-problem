@@ -1,4 +1,4 @@
-# Task 16: Consolidate Incident Description Into the Claim Summary
+# Task 12b: Consolidate Incident Description Into the Claim Summary
 
 **Type:** Code Modification
 
@@ -20,8 +20,9 @@ persisted:
 
 Found while designing task 10's reworked review UI: the mock-up's "Description" field reads/writes `claim.summary`
 (there's no `description` column on `Claim` at all), which is what surfaced that two agents are independently
-guessing at the same thing today, with one answer thrown away. **For the future — not required for #216 to land**;
-sequenced after task 14, like task 15.
+guessing at the same thing today, with one answer thrown away. **Required before task 13** (user decision, 2026-10-30;
+it was task 16, "for the future", until then): it changes the extraction contract and every intake test fixture, which
+task 13 documents and task 14 verifies. It runs before task 12c, so 12c's new tests are written against the final fixtures.
 
 ## What to Do
 
@@ -34,7 +35,8 @@ sequenced after task 14, like task 15.
   `IncidentDetails`.
 - Every test's mocked LLM JSON across the intake suite needs the `description` key dropped from the incident-details
   stub, and the separate summary stub made the one that matters for completeness (`COMPLETE_DETAILS` and the
-  `details(...)` helper in `IntakeFlowTestBase`, and anything built on them, including `ClaimReviewPanelPageTests`).
+  `details(...)` helper in `IntakeFlowTestBase`, and anything built on them, including the Playwright
+  `ClaimReviewPanelPageTests` and `RoundcubeClaimIntakeE2ETests` (task 12), which carry their own copies).
 - Update the design doc and `CLAUDE.md` wherever they describe the four required details as "description, incident
   date, location, category" with `description` as its own extracted field.
 - Decide whether `MissingItem.INCIDENT_DESCRIPTION`'s name/label should change too, now that what it actually checks
