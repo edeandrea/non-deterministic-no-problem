@@ -111,7 +111,8 @@ Then:
 Dev Services bring up PostgreSQL, Langfuse and LGTM for you automatically, and Compose Dev Services
 start GreenMail (SMTP + IMAP) and Roundcube from `compose-devservices.yml`, under every AI profile.
 GreenMail keeps mail in memory, so restarting dev mode empties every inbox. Tests start GreenMail
-only, never Roundcube. The application does not
+only, except the Playwright UI tests, which also start Roundcube on a random port (never 8000, so they can run
+while dev mode does) for the end-to-end test that sends a claim from Roundcube. The application does not
 override `quarkus.http.port` anywhere, so it uses the Quarkus default of `8080` in dev mode. Tests
 run against port `8081` — the root `pom.xml` sets `BACKEND_API_URL=http://localhost:8081/api` for
 both surefire and failsafe.

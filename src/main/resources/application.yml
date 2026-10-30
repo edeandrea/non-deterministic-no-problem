@@ -215,10 +215,14 @@ quarkus:
     host: localhost
 
   # Also start Roundcube (http://localhost:8000) from compose-devservices.yml in dev mode, whatever the
-  # config profile (Dev Services follow the launch mode, so this has no effect in prod). Turned off in %test
+  # config profile (Dev Services follow the launch mode, so this has no effect in prod). Turned off in %test.
+  # ROUNDCUBE_PORT is its host port: compose-devservices.yml can't default it itself (Quarkus parses the file and can't
+  # read ${VAR:-default}). The Playwright tests' UiTestProfile sets it to 0, a random port
   compose:
     devservices:
       profiles: webmail
+      env-variables:
+        ROUNDCUBE_PORT: 8000
 
   # HTTP
   http:
@@ -397,7 +401,8 @@ parasol:
 '%test':
   quarkus:
     # GreenMail only in tests, no Roundcube. Covers IDE runs and continuous testing; Maven builds also force
-    # quarkus.compose.devservices.profiles=none from surefire/failsafe, which covers config profiles without 'test'
+    # quarkus.compose.devservices.profiles=none from surefire/failsafe, which covers config profiles without 'test'.
+    # The Playwright tests' UiTestProfile overrides both and starts Roundcube on a random port
     compose:
       devservices:
         profiles: ""

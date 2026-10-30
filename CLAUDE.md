@@ -119,7 +119,17 @@ webmail` (which enables Roundcube) and `quarkus.mailer.mock: false` / `host: loc
 in `application.yml` rather than in `%dev`. Tests get GreenMail only: `%test` blanks the Compose profile, and
 surefire/failsafe also set `quarkus.compose.devservices.profiles=none`, because a test whose config profile doesn't
 include `test` (`DriftTestProfile` returns `drift`, `-Dquarkus.test.profile=drift`) would otherwise start Roundcube on
-port 8000.
+port 8000. **The one exception is the Playwright tests' `UiTestProfile`**, which starts Roundcube for
+`RoundcubeClaimIntakeE2ETests`: a `@TestProfile` override wins over the surefire/failsafe system property (verified).
+- **Roundcube's host port is `${ROUNDCUBE_PORT}`**, with no default in the file, because Quarkus parses
+  `compose-devservices.yml` itself (for its wait strategies) and its port parser splits on `:` and reads any `-` as a port
+  range, so `${VAR:-8000}` fails the build (`Error parsing PortBinding`). The value comes from
+  `quarkus.compose.devservices.env-variables.ROUNDCUBE_PORT`, which Quarkus passes to the compose CLI: `8000` at root level
+  in `application.yml`, `0` (random) in `UiTestProfile`. The `config_map.port.8000` label maps the host port into
+  `parasol.mail.roundcube-port`, and a `wait_for.logs` label holds the boot until Apache is up.
+- None of this has a counterpart in `src/main/kubernetes/dependencies.yml` (a Service and Route, no host port; its own
+  readiness probe), so a port or label change here needs nothing there. Image, environment and plugin files still change
+  together.
 GreenMail keeps mail in memory, so restarting dev mode (or a test run) empties every mailbox.
 
 ### Diagrams
@@ -607,7 +617,7 @@ The two Ollama profiles are **not** equivalent:
 | Profile | Purpose |
 |---|---|
 | `dev` | Only `datasource.dev-ui.allow-sql`. The LGTM, PostgreSQL and Langfuse dev services do run in dev mode, but they come from the extensions' own Dev Services defaults, not from this profile block. The GreenMail/Roundcube mail stack and `mailer.mock: false` are root-level config (see Commands) |
-| `test` | Observability + Langfuse init/session scoring disabled; `compose.devservices.profiles` blanked so Roundcube doesn't start |
+| `test` | Observability + Langfuse init/session scoring disabled; `compose.devservices.profiles` blanked so Roundcube doesn't start (`UiTestProfile` turns it back on) |
 | `ollama` | Local Ollama via the Ollama extension; OpenAI/Cohere keys stubbed to `changeme`; Langfuse session scoring + startup init disabled |
 | `ollama-openai` | Local Ollama via the OpenAI client (`base-url: http://localhost:11434/v1`); no key stubs, no `quarkus.aiscoring` overrides |
 | `drift` | Parent `langfuse-ocp`; sets `quarkus.aiscoring.interaction-mode: drift-detection` |
@@ -750,6 +760,24 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
     uses the current version. All
     through the real endpoints, not stubs. The status labels/filters are covered against two directly-persisted fixture
     claims, no Flow run needed for that one.
+  - **`RoundcubeClaimIntakeE2ETests`** (task 12, #261) runs the whole demo through the real Roundcube: Marty McFly (a seeded
+    claimant, so the `parasol_identities` plugin gives his mail a named `From`) sends a claim, with a photo, from Roundcube;
+    the real IMAP IDLE watcher picks it up; he reads the replies in Roundcube and replies there; a reviewer decides in the
+    review panel. Three scenarios: a complete claim, a claim missing its location that his reply completes, and a reviewer
+    who asks for the category. Only `claim-intake` is stubbed (`ChatStubs`, matching on the last message: a marker in the
+    body Playwright types). It reuses `UiTestProfile`, with no profile of its own:
+    - Roundcube is the Compose service itself (see Commands), on `parasol.mail.roundcube-port`. `org.parasol.testing.mail.Roundcube`
+      drives it (log in, compose with an attachment, wait for a message, open the newest, reply above the quote). Its
+      selectors are Roundcube 1.7's elastic skin; Roundcube shows a reply's HTML part, so a listed item is an `li`. The browser
+      context outlives a test, so logging in first logs out of an earlier test's session.
+    - **The watcher is started by the test**, not by config: `%test` keeps `parasol.intake.enabled=false`, and the test-only
+      `org.parasol.intake.mailbox.InboxWatcherControl` (same package, so it can call `ClaimsInboxWatcher`'s package-private
+      `start()`/`stop()`) turns it on in `@BeforeEach`, after `IntakeScenario.reset()` deletes the claims user, and off in
+      `@AfterEach`. The other UI classes never see a live watcher, which would race their `IntakeScenario.submit`.
+    - Marty already has seeded claim 1, so `IntakeScenario.awaitClaimOf` would return it at once; the test uses
+      `awaitNewClaimOf` (newest claim beyond the six seeded ones).
+    - It must pass under both CI legs with only stub keys; locally, `-Pollama-openai` needs `OPENAI_API_KEY`, `COHERE_API_KEY`
+      and `GEMINI_API_KEY` set to anything, as CI sets them.
 - `ai.scoring.it.DriftDetectionTests` is annotated with the custom meta-annotation
   `ai.scoring.it.DriftDetectionTest`, which combines `@QuarkusTest` with **four** independent
   enablement conditions, each carrying its own `disabledReason`:
@@ -798,14 +826,14 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   profiles adds no test-resource annotation of its own. **The Playwright classes still boot once each:** `@WithPlaywright` has
   array attributes, which Quarkus 3.40 compares by identity, so two identical annotations never match. quarkusio/quarkus#56443
   (4.0.0.Beta1) fixes it; once a Quarkus we're on has it, the UI classes share one boot.
-  There are four profiles (five with the gated-off drift tests), so seven boots in a full `verify`:
+  There are four profiles (five with the gated-off drift tests), so eight boots in a full `verify` (five of them the five Playwright classes):
   - **none** (the `%test` defaults): the tests that need real models, a real key and boot-time Easy RAG ingestion.
   - **`org.parasol.testing.StubbedModelsTestProfile`**: every test whose models are stubbed or never called. That's the intake
     tests, the tests of what the intake stores, `DriftDetectionOutputGuardrailTests`, `LangfuseDatasetSampleLoaderTests` and
     `DriftDetectionChatRouteExceptionHandlerTests`. It sets stub keys and Easy RAG ingestion off, and points `claim-intake`,
     `parasol-chat`, the default OpenAI model and embeddings at WireMock with their providers pinned. It also turns Hibernate
     statistics on, exports spans every 100 ms and starts Toxiproxy.
-  - **`org.parasol.ui.UiTestProfile`**: every Playwright test (see above).
+  - **`org.parasol.ui.UiTestProfile`**: every Playwright test (see above). It also starts Roundcube.
   - **`org.parasol.testing.LangfuseExportTestProfile`** (extends the stubbed one): the build-time Langfuse exporter
     (`AI_ONLY`), session scoring, dataset creation and startup initialization, for `LangfuseSessionScoringServiceTests` and
     `IntakeLangfuseDeliveryTests`. The intake never ends a chat scope, so its runs aren't scored.
