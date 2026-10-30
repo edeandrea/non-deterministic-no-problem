@@ -1,6 +1,7 @@
 package org.parasol.claim.model;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -87,7 +88,8 @@ public class ClaimCorrespondence extends PanacheEntity {
 	 * @return the persisted row
 	 */
 	public static ClaimCorrespondence recordReply(Claim claim, String messageId, String sender, String subject, String text) {
-		var sentAt = Instant.now();
+		// The column keeps microseconds; truncating returns the row as stored (a Linux clock ticks in nanoseconds)
+		var sentAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
 		var correspondence = new ClaimCorrespondence();
 
 		correspondence.messageId = messageId;
