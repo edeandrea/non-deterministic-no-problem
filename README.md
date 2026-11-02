@@ -20,8 +20,9 @@ deliberately small; the interesting part is the three-tier AI evaluation strateg
   second AI service (`generate-email`) to compose a notification email that is actually sent.
 - **Output guardrails, including one that calls another LLM** — the generated email passes through
   four output guardrails; the last of them (`PolitenessOutputGuardrail`) delegates to
-  `PolitenessService`, an AI service of its own. There are seven guardrail classes in total, all on
-  the output side — this app has no input guardrails.
+  `PolitenessService`, an AI service of its own. There are nine output guardrail classes in total (the email four, two
+  for drift detection and session scoring, one for the evaluator and two more in the email intake). The app has no LLM
+  input guardrails; it does have one *tool* input guardrail, which stops the chat bot acting on a claim still in intake.
 - **Three tiers of continuous AI evaluation** — per-trace judging inside Langfuse, session-level
   scoring written in application code, and drift detection wired into a guardrail.
 - **An agentic email intake, built as one [quarkus-flow](https://docs.quarkiverse.io/quarkus-flow/dev/)
@@ -254,8 +255,8 @@ this constraint.
 ### Observability
 
 One claim is one Langfuse **session** — every span of a claim's intake runs carries the same
-`gen_ai.conversation.id`, even though one run is still several traces
-([quarkus-flow#1056](https://github.com/quarkiverse/quarkus-flow/issues/1056)). The intake never ends a
+`gen_ai.conversation.id`, even though one run is still several traces (Flow's persistence emits roughly 58 root traces
+per run, all kept and unsampled). The intake never ends a
 chat-scope "conversation", so it gets tier-1 per-trace scores only, never a tier-2 session score. `claim.intake.*`
 Micrometer meters cover emails, replies, review decisions, failures, latency, the inbox backlog and how often a
 reviewer overrides the extracted fields. The Quarkus Dev UI's **Workflows** card (from `quarkus-flow`) draws

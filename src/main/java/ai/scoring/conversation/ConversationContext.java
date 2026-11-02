@@ -73,7 +73,7 @@ public class ConversationContext {
 	 * @param runnable what to run
 	 */
 	public void runIn(String conversationId, Runnable runnable) {
-		try (var ignored = enter(conversationId)) {
+		try (var _ = enter(conversationId)) {
 			runnable.run();
 		}
 	}

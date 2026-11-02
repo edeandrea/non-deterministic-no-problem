@@ -1,6 +1,7 @@
 package org.parasol.intake;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 import java.util.List;
 import java.util.Set;
@@ -8,7 +9,6 @@ import java.util.concurrent.TimeUnit;
 
 import jakarta.inject.Inject;
 
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.parasol.intake.IntakeScenario.Mail;
@@ -94,7 +94,7 @@ public abstract class IntakeFlowTestBase {
 	 * @param ended Whether the intake workflow itself must have ended
 	 */
 	protected void awaitRunSpans(String runId, Set<String> generatedNames, Set<String> mailOperations, boolean ended) {
-		Awaitility.await()
+		await()
 			.atMost(IntakeScenario.WAIT)
 			.untilAsserted(() -> {
 				flushSpans();
@@ -155,7 +155,7 @@ public abstract class IntakeFlowTestBase {
 	}
 
 	protected void awaitCounted(double expected, String name, String... tags) {
-		Awaitility.await()
+		await()
 			.atMost(IntakeScenario.WAIT)
 			.untilAsserted(() -> assertThat(counted(name, tags)).as("%s %s".formatted(name, List.of(tags))).isEqualTo(expected));
 	}
@@ -178,10 +178,24 @@ public abstract class IntakeFlowTestBase {
 		try {
 			this.scenario.cleanUp();
 			flushSpans();
+			assertNoFlowRowsLeft();
 		}
 		finally {
 			this.spans.stopCapture();
 		}
+	}
+
+	/**
+	 * Every one of Flow's three tables is empty once the test's runs are gone: the intake's own runs, the ones quarkus-flow
+	 * generated for the agent topology, their tasks, and the events a waiting run listened for. A generated run can still be
+	 * ending when the test's own assertions have passed, so this waits rather than reading once.
+	 */
+	private void assertNoFlowRowsLeft() {
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.untilAsserted(() -> assertThat(List.of(this.scenario.allInstanceRows(), this.scenario.taskRows(), this.scenario.cloudEventRows()))
+				.as("Flow's workflow_instance_entity, task_info_entity and cloud_event_entity rows left behind")
+				.containsExactly(0L, 0L, 0L));
 	}
 
 	protected static String details(Boolean described, String date, String location, String category, String policyNumber, List<String> answered) {

@@ -60,6 +60,7 @@ public class ApplyOutcomeStep {
 
 	// One transaction for the claim, its images and its correspondence; the IMAP read above stays outside it. The activities are
 	// published inside it and observed after it commits, so a rolled-back claim counts nothing
+	// Non-private and non-final, so the transaction interceptor applies to the call from this class
 	@Transactional(TxType.REQUIRES_NEW)
 	IntakeState persist(IntakeState state, InboundEmail email, String runId, String conversationId) {
 		return switch (state.outcome()) {

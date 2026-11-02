@@ -37,6 +37,7 @@ class CorrespondenceRecorder {
 		}
 	}
 
+	// Non-private and non-final, so the transaction interceptor applies to the call from this class
 	@Transactional(TxType.REQUIRES_NEW)
 	void insert(InboundEmail email, String messageId) {
 		var correspondence = new ClaimCorrespondence();
@@ -50,6 +51,7 @@ class CorrespondenceRecorder {
 		correspondence.persistAndFlush();
 	}
 
+	// Non-private and non-final, so the transaction interceptor applies to the call from this class
 	@Transactional(TxType.REQUIRES_NEW)
 	boolean isRecorded(String messageId) {
 		return ClaimCorrespondence.findByMessageId(messageId).isPresent();

@@ -36,32 +36,57 @@ public class IntakeFailureHandler {
 
 	/**
 	 * Handles an email whose run failed, before or after the review wait.
+	 * <p>
+	 *   <b>Where the email is decides what its sender hears.</b> The flow files an email only after it has replied about
+	 *   it — every branch is {@code reply → file} — so an email that has left the processing folder has already been
+	 *   answered, and telling its sender now that we couldn't process it would contradict the reply they already have. It
+	 *   was also counted as handled when it was filed. Such a run's fault is recorded for an operator (see {@code outcome})
+	 *   and the customer hears nothing.
+	 * </p>
 	 *
 	 * @param messageId The {@code Message-ID} of the email
 	 * @param cause What failed
+	 * @param outcome Whether anything picked the claim up: {@link FailureOutcome#RECOVERED} when another run took its
+	 * review over, otherwise {@link FailureOutcome#FATAL}
 	 */
-	public void handle(String messageId, Throwable cause) {
+	public void handle(String messageId, Throwable cause, FailureOutcome outcome) {
 		Log.errorf(cause, "Processing %s failed", messageId);
-		this.activities.publish(new IntakeFailed(FailureStage.of(cause), cause.getClass().getSimpleName(), FailureOutcome.FATAL));
+		this.activities.publish(new IntakeFailed(FailureStage.of(cause), cause.getClass().getSimpleName(), outcome));
 
-		// Only an email still in the processing folder has its latency counted here: one already filed was counted when it was filed, and
-		// the time since it was received would include its whole review wait
-		var latency = Optional.<Duration>empty();
+		unansweredEmail(messageId).ifPresent(email -> fileAsFailed(messageId, email));
+	}
+
+	// Nothing on the failure path may throw: a mailbox that can't be read is logged and the email left alone. Each case logs
+	// only what it actually knows — an unreadable mailbox is not evidence that the email was already answered
+	private Optional<InboundEmail> unansweredEmail(String messageId) {
+		var found = Optional.<InboundEmail>empty();
 
 		try {
-			var inProcessing = this.mailbox.find(MailFolder.PROCESSING, messageId);
-			latency = inProcessing.map(IntakeFailureHandler::latencyOf);
+			found = this.mailbox.find(MailFolder.PROCESSING, messageId);
 
-			// An email already filed (the run failed after its review wait) isn't moved, but its sender is still told
-			var email = inProcessing.or(() -> this.mailbox.find(MailFolder.PROCESSED, messageId));
-			inProcessing.ifPresent(_ -> this.mailbox.move(messageId, MailFolder.PROCESSING, MailFolder.FAILED));
-			email.ifPresent(this.processingProblem::send);
+			if (found.isEmpty()) {
+				Log.warnf("The run for %s faulted after its email was filed and answered, so its sender is told nothing", messageId);
+			}
+		}
+		catch (RuntimeException e) {
+			Log.errorf(e, "Couldn't look for %s in the processing folder, so its sender is told nothing", messageId);
+		}
+
+		return found;
+	}
+
+	// Counted even when the move or the reply fails: the email is finished either way, and its latency is real, because it
+	// never left the processing folder
+	private void fileAsFailed(String messageId, InboundEmail email) {
+		try {
+			this.mailbox.move(messageId, MailFolder.PROCESSING, MailFolder.FAILED);
+			this.processingProblem.send(email);
 		}
 		catch (RuntimeException e) {
 			Log.errorf(e, "Couldn't finish the failure handling of %s", messageId);
 		}
 		finally {
-			this.activities.publish(new EmailHandled(EmailOutcome.FAILED, latency));
+			this.activities.publish(new EmailHandled(EmailOutcome.FAILED, Optional.of(latencyOf(email))));
 		}
 	}
 

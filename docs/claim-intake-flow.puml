@@ -40,7 +40,6 @@ rectangle "Mail: GreenMail\n<i>claims@parasol.com</i>" as Mail <<Mail>> {
 rectangle "quarkus-flow: ClaimIntakeFlow\n<i>single replica</i>" as WorkflowBox <<Workflow>> {
 	component "<$inbox>\nClaimsInboxWatcher\n<i>IMAP IDLE</i>" as Watcher
 	component "ClaimIntakeDispatcher\n<i>per-sender queue ·</i>\n<i>loop/duplicate/match checks</i>" as Dispatcher
-	component "SupersedeStep" as Supersede
 	component "AgentStep\n<i>one workflow step</i>" as AgentStep
 
 	rectangle "<$robot>\nClaimsMailboxAgent" as Agents <<Agents>> {
@@ -54,6 +53,7 @@ rectangle "quarkus-flow: ClaimIntakeFlow\n<i>single replica</i>" as WorkflowBox 
 	component "<$brain>\nclaim-intake model" as Model #FFFFFF
 
 	component "PolicyCheckStep" as Policy
+	component "SupersedeStep\n<i>cancels a waiting review run</i>" as Supersede
 	component "ApplyOutcomeStep\n<i>persist claim + photos</i>" as Persist
 	component "ReplySteps\n<i>IntakeReplySender ·</i>\n<i>Qute templates</i>" as Reply
 	component "FileEmailStep" as File
@@ -77,8 +77,7 @@ Customer -down-> Roundcube : writes to\nclaims@parasol.com
 Roundcube -down-> GreenMail : SMTP
 GreenMail -down-> Watcher : IMAP IDLE
 Watcher -down-> Dispatcher : starts a run\n<i>per-sender order</i>
-Dispatcher -down-> Supersede
-Supersede -down-> AgentStep
+Dispatcher -down-> AgentStep
 AgentStep -down-> Classifier
 
 Classifier -down-> Router
@@ -91,7 +90,8 @@ Unmatched -down-> Policy
 
 Agents -right-> Model : <<sync HTTP>>\n<i>classifier, extraction,</i>\n<i>follow-up agent</i>
 
-Policy -down-> Persist
+Policy -down-> Supersede
+Supersede -down-> Persist
 Persist -down-> Reply
 Reply -down-> File
 File -down-> WaitReview

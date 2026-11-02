@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -25,6 +26,7 @@ import org.parasol.intake.mailbox.MailFolder;
 import org.parasol.intake.mailbox.SkippedAttachment;
 import org.parasol.intake.observability.IntakeActivities;
 import org.parasol.intake.observability.EmailOutcome;
+import org.parasol.intake.observability.FailureOutcome;
 import org.parasol.intake.observability.IntakeActivity.EmailAccepted;
 import org.parasol.intake.observability.IntakeActivity.EmailHandled;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
@@ -146,7 +148,7 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 						 this.failureHandler.fileWithoutRun(email);
 					 }
 					 },
-			     () -> this.failureHandler.handle(messageId, new IllegalArgumentException("The email has no sender")));
+			     () -> this.failureHandler.handle(messageId, new IllegalArgumentException("The email has no sender"), FailureOutcome.FATAL));
 	}
 
 	/**
@@ -171,7 +173,7 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 
 		if (attempts > MAX_REQUEUES) {
 			this.requeues.remove(messageId);
-			this.executor.execute(() -> this.failureHandler.handle(messageId, new IllegalStateException("The claim stayed under a reviewer's decision")));
+			this.executor.execute(() -> this.failureHandler.handle(messageId, new IllegalStateException("The claim stayed under a reviewer's decision"), FailureOutcome.FATAL));
 			transition(sender, state -> state.release(SenderState.STARTING));
 		}
 		else if (attempts == 0) {
@@ -186,6 +188,10 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 	}
 
 	private void startRun(String sender, String messageId) {
+		// What holds the sender's slot right now: STARTING until the run exists, then the run's id. A failure has to release
+		// the holder the state actually has, or SenderState.release no-ops and the sender's queue never moves again
+		var holder = new AtomicReference<>(SenderState.STARTING);
+
 		try {
 			var email = this.mailbox.find(MailFolder.PROCESSING, messageId)
 				.orElseThrow(() -> new ProcessingEmailMissingException(messageId));
@@ -198,12 +204,18 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 				// Registered as working before it starts, so the status listener always finds it
 				this.senderByInstance.put(instance.id(), sender);
 				transition(sender, state -> state.working(instance.id()));
+				holder.set(instance.id());
 				instance.start();
 			});
 		}
 		catch (RuntimeException e) {
-			transition(sender, state -> state.release(SenderState.STARTING));
-			this.failureHandler.handle(messageId, e);
+			// A run that threw on the way up never reaches a WorkflowStatus, so the status listener will never release it.
+			// If it threw from start(), the instance also stays in Flow's in-memory activeInstances map — cancel() is a
+			// no-op on a PENDING instance and removeInstance isn't public (open-workflow-specification/sdk-java#1816).
+			// Harmless, since its id was never persisted and nothing looks it up, but it is a leaked map entry.
+			this.senderByInstance.remove(holder.get());
+			transition(sender, state -> state.release(holder.get()));
+			this.failureHandler.handle(messageId, e, FailureOutcome.FATAL);
 		}
 	}
 

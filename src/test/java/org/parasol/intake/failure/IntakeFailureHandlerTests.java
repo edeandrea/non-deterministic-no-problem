@@ -1,11 +1,11 @@
 package org.parasol.intake.failure;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 import java.time.Duration;
 import java.util.List;
 
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.IntakeScenario.Mail;
 
@@ -27,7 +27,9 @@ class IntakeFailureHandlerTests extends IntakeFlowTestBase {
 	void anEmailWithoutAMessageIdIsFailedWithAProblemReplyAndNoRun() {
 		this.scenario.submit(Mail.from(SENDER).subject("No id").withoutMessageId().body("Hello"));
 
-		Awaitility.await().atMost(Duration.ofSeconds(30)).until(() -> this.scenario.inFolder(MailFolder.FAILED).size() == 1);
+		await()
+			.atMost(Duration.ofSeconds(30))
+			.until(() -> this.scenario.inFolder(MailFolder.FAILED).size() == 1);
 
 		assertThat(this.scenario.awaitReplies(SENDER, 1))
 			.singleElement()

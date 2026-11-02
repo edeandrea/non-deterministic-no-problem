@@ -56,8 +56,9 @@ McFly"). Any other address sends as a bare address and every reply greets "Custo
 
 ### Sample photos to attach
 
-`src/main/resources/seed/claim-images/` already has six car-damage JPEGs, one per seeded claim — the
-`ORIGINAL`-kind photo `ClaimImageSeeder` attaches to each claim by id (`SEED_IMAGES`). Click one below to
+`src/main/resources/seed/claim-images/` already has a car-damage JPEG for each of the six seeded claims — the
+`ORIGINAL`-kind photo `ClaimImageSeeder` attaches to each claim by id (`SEED_IMAGES`), alongside the six `PROCESSED`
+ones it also seeds (twelve files in all). Click one below to
 view or save it, then attach it in Roundcube's compose window (`#uploadformInput`) when sending a new
 claim email:
 
@@ -224,9 +225,9 @@ these files are 15–150 KB.
 1. Open Langfuse (dev mode's LGTM/Langfuse Dev Service prints its URL in the Quarkus dev console, or use
    the Dev UI's Langfuse card). Find the **session** for the claim you just created — search by its
    claim number, or browse Sessions by recency.
-2. **A claim's session has several traces, not one** — one per workflow/sub-workflow run
-   ([quarkus-flow#1056](https://github.com/quarkiverse/quarkus-flow/issues/1056): a Flow run itself emits
-   several root traces). `gen_ai.conversation.id` is the shared id that ties them into one session; it's
+2. **A claim's session has several traces, not one** — one per workflow/sub-workflow run, plus the roughly 58 root
+   traces Flow's own persistence emits per run (all kept and unsampled).
+   `gen_ai.conversation.id` is the shared id that ties them into one session; it's
    entered once when the run starts and carried through the chat, Flow and the agents by the app's own
    `ai.scoring.conversation` package (see CLAUDE.md → *Conversation core*).
 3. Open one of the traces and show the `workflow.execute` / `task.execute` spans Flow generates, typed

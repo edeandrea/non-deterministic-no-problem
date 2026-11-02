@@ -1,6 +1,7 @@
 package org.parasol.intake.observability;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 
@@ -14,7 +15,6 @@ import java.util.stream.IntStream;
 
 import jakarta.inject.Inject;
 
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.IntakeFlowTestBase;
@@ -107,14 +107,16 @@ class IntakeSpanPropagationTests extends IntakeFlowTestBase {
 		var marker = marker();
 		stubFollowUp(marker, COMPLETE_DETAILS.replace("Elm Street", "Oak Avenue"));
 		this.scenario.awaitFiled(this.scenario.submit(Mail.from(SENDER).inReplyTo(created.messageId()).body("Actually Oak Avenue. " + marker)));
-		var reviewRunId = Awaitility.await().atMost(IntakeScenario.WAIT)
+		var reviewRunId = await().atMost(IntakeScenario.WAIT)
 			.until(() -> this.scenario.waitingRun(claimId).filter(run -> !run.id().equals(firstRunId)), Optional::isPresent)
 			.orElseThrow()
 			.id();
 
 		var wokenAt = Instant.now();
 		this.scenario.decide(claimId, ReviewOutcome.READY, Set.of());
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> this.scenario.claim(claimId).status.equals("In Process"));
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.scenario.claim(claimId).status.equals("In Process"));
 
 		var other = createClaim(OTHER_SENDER, COMPLETE_DETAILS);
 		var otherConversationId = this.scenario.intake(other.claim().id).orElseThrow().intakeConversationId;
@@ -175,9 +177,11 @@ class IntakeSpanPropagationTests extends IntakeFlowTestBase {
 
 		this.scenario.decide(claimId, ReviewOutcome.READY, Set.of());
 
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> run.status() == WorkflowStatus.FAULTED);
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> run.status() == WorkflowStatus.FAULTED);
 
-		var faultedSpan = Awaitility.await()
+		var faultedSpan = await()
 			.atMost(IntakeScenario.WAIT)
 			.until(() -> this.spans.ofRun(run.id()), Optional::isPresent)
 			.orElseThrow();
@@ -199,7 +203,7 @@ class IntakeSpanPropagationTests extends IntakeFlowTestBase {
 		var messageId = this.scenario.submit(Mail.from(SENDER).subject("Car accident").body("My claim. " + marker));
 		this.scenario.awaitFailed(messageId);
 
-		Awaitility.await()
+		await()
 			.atMost(IntakeScenario.WAIT)
 			.untilAsserted(() -> {
 				assertThat(this.startedRuns.of(SENDER)).hasSize(1);
@@ -282,7 +286,7 @@ class IntakeSpanPropagationTests extends IntakeFlowTestBase {
 		emails.forEach(this.scenario::submit);
 		emails.forEach(email -> this.scenario.awaitFiled(email.messageId().orElseThrow()));
 
-		var runs = Awaitility.await()
+		var runs = await()
 			.atMost(IntakeScenario.WAIT)
 			.until(() -> this.startedRuns.all(), all -> all.size() == (before + CONCURRENT_RUNS))
 			.subList(before, before + CONCURRENT_RUNS);

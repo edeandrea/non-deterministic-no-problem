@@ -78,7 +78,9 @@ record the answers before the design (task 02) is written and before any feature
 
 ## Done When
 
-- [ ] `spike-results.md` answers all nineteen questions with evidence, and `PLAN.md` Spike Results summarises them.
-- [ ] `PLAN.md` records a feasibility verdict for suspend/resume through Quarkus. If it isn't feasible, stop and ask the user (task 07's decision gate).
-- [ ] The worktree is removed; the local spike branch is kept and was never pushed.
-- [ ] The user's working tree and `main` are unchanged.
+*Never ticked when the task ran; verified and closed by task 14 on 2026-11-02, with the evidence in brackets.*
+
+- [x] `spike-results.md` answers all nineteen questions with evidence, and `PLAN.md` Spike Results summarises them. [19 `### Q…` sections in `spike-results.md`; `PLAN.md` → *Spike Results*]
+- [x] `PLAN.md` records a feasibility verdict for suspend/resume through Quarkus. If it isn't feasible, stop and ask the user (task 07's decision gate). [`PLAN.md`: "Decision gate: **passed** (spike verdict: feasible with workarounds). No status-only fallback."]
+- [x] The worktree is removed; the local spike branch is kept and was never pushed. [`git worktree list` shows only the main checkout; `spike/agentic-hitl` exists locally and `git branch -r` has no `origin/spike/*`]
+- [x] The user's working tree and `main` are unchanged. [no spike branch was ever pushed; `main` carries none of the spike commits]

@@ -17,7 +17,10 @@ Evidence for every design choice here: `spike-results-flow.md` → *Follow-up sp
 
 **quarkus-flow 1.2.0 (2026-10-09):** adopted in task 06b. The core doesn't change. #1065 is in it, so task 11 expects
 to drop its Flow task proxy and agentic adapter: once task 11 has proven that, check which core hooks it still needs
-(`ConversationContext.callIn` from the starter, at least). Check `PLAN.md` → Execution Steps → 2a first.
+(`ConversationContext.runIn` from the starter, at least). Check `PLAN.md` → Execution Steps → 2a first.
+As built, the intake enters a conversation in two places, both per run start: `ClaimIntakeDispatcher.startRun` for a
+new email (`runIn`) and `ReviewRecoverer.handOver` for a run taking over a faulted run's review (`callIn`, since it
+reports back what became of the review).
 
 **Task 08 adds a minimal `ConversationContext`** (user decision, 2026-10-11, D1): baggage only (`currentId`, `enter`,
 `callIn`, `runIn`; `@ApplicationScoped`, with a public `CONVERSATION_ID_KEY`), with no span processor, leak guard, events

@@ -22,7 +22,6 @@ import jakarta.mail.internet.MimeBodyPart;
 import jakarta.mail.internet.MimeMessage;
 import jakarta.mail.internet.MimeMultipart;
 import jakarta.mail.util.ByteArrayDataSource;
-import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import jakarta.transaction.Transactional.TxType;
 
@@ -66,7 +65,7 @@ public class IntakeScenario {
 	private final ClaimIntakeFlow flow;
 	private final ReviewDecisionPublisher publisher;
 	private final IntakeConfig config;
-	private final EntityManager entityManager;
+	private final FlowRows flowRows;
 	private final String smtpHost;
 	private final int smtpPort;
 
@@ -77,7 +76,7 @@ public class IntakeScenario {
 		ClaimIntakeFlow flow,
 		ReviewDecisionPublisher publisher,
 		IntakeConfig config,
-		EntityManager entityManager,
+		FlowRows flowRows,
 		@ConfigProperty(name = "quarkus.mailer.host") String smtpHost,
 		@ConfigProperty(name = "quarkus.mailer.port") int smtpPort) {
 
@@ -87,7 +86,7 @@ public class IntakeScenario {
 		this.flow = flow;
 		this.publisher = publisher;
 		this.config = config;
-		this.entityManager = entityManager;
+		this.flowRows = flowRows;
 		this.smtpHost = smtpHost;
 		this.smtpPort = smtpPort;
 	}
@@ -178,13 +177,8 @@ public class IntakeScenario {
 		deleteCreatedData();
 	}
 
-	@SuppressWarnings("unchecked")
-	@Transactional(TxType.REQUIRES_NEW)
 	List<String> runIds() {
-		return this.entityManager
-			.createNativeQuery("select instance_id from workflow_instance_entity where workflow_name = ?1")
-			.setParameter(1, ClaimIntakeFlow.NAME)
-			.getResultList();
+		return this.flowRows.intakeRunIds();
 	}
 
 	@Transactional(TxType.REQUIRES_NEW)
@@ -311,7 +305,10 @@ public class IntakeScenario {
 			.atMost(WAIT)
 			.until(() -> this.greenMail.messages(address), messages -> messages.size() >= count);
 
-		await().pollDelay(Duration.ofMillis(500)).atMost(Duration.ofSeconds(3)).until(() -> true);
+		await()
+			.pollDelay(Duration.ofMillis(500))
+			.atMost(Duration.ofSeconds(3))
+			.until(() -> true);
 
 		return this.greenMail.messages(address);
 	}
@@ -395,42 +392,42 @@ public class IntakeScenario {
 	/**
 	 * How many Flow task rows a run has left.
 	 */
-	@Transactional(TxType.REQUIRES_NEW)
 	public long taskRows(String runId) {
-		return ((Number) this.entityManager
-			.createNativeQuery("select count(*) from task_info_entity where workflow_instance_id = ?1")
-			.setParameter(1, runId)
-			.getSingleResult()).longValue();
+		return this.flowRows.tasks(runId);
 	}
 
 	/**
 	 * How many Flow instance rows a run has left.
 	 */
-	@Transactional(TxType.REQUIRES_NEW)
 	public long instanceRows(String runId) {
-		return ((Number) this.entityManager
-			.createNativeQuery("select count(*) from workflow_instance_entity where instance_id = ?1")
-			.setParameter(1, runId)
-			.getSingleResult()).longValue();
+		return this.flowRows.instances(runId);
 	}
 
-	@Transactional(TxType.REQUIRES_NEW)
 	public long taskRows() {
-		return ((Number) this.entityManager
-			.createNativeQuery("select count(*) from task_info_entity")
-			.getSingleResult()).longValue();
+		return this.flowRows.allTasks();
+	}
+
+	/**
+	 * How many Flow instance rows there are, of <em>every</em> workflow: the intake's own runs and the ones quarkus-flow
+	 * generated for an agentic system alike. {@link #instanceRows()} counts only the intake's, so it can't see a leaked
+	 * generated run.
+	 */
+	long allInstanceRows() {
+		return this.flowRows.allInstances();
+	}
+
+	/**
+	 * How many rows there are in Flow's third table, the one that holds the events a waiting run listens for.
+	 */
+	long cloudEventRows() {
+		return this.flowRows.cloudEvents();
 	}
 
 	/**
 	 * The ids of every persisted Flow run that quarkus-flow generated for an agentic system: every workflow but the intake's own.
 	 */
-	@SuppressWarnings("unchecked")
-	@Transactional(TxType.REQUIRES_NEW)
 	public Set<String> agenticRunIds() {
-		return Set.copyOf(this.entityManager
-			.createNativeQuery("select instance_id from workflow_instance_entity where workflow_name <> ?1")
-			.setParameter(1, ClaimIntakeFlow.NAME)
-			.getResultList());
+		return this.flowRows.generatedRunIds();
 	}
 
 	/**
@@ -592,12 +589,8 @@ public class IntakeScenario {
 			.orElseThrow();
 	}
 
-	@Transactional(TxType.REQUIRES_NEW)
 	public long instanceRows() {
-		return ((Number) this.entityManager
-			.createNativeQuery("select count(*) from workflow_instance_entity where workflow_name = ?1")
-			.setParameter(1, ClaimIntakeFlow.NAME)
-			.getSingleResult()).longValue();
+		return this.flowRows.intakeInstances();
 	}
 
 	private MimeMessage toMessage(Mail mail) throws MessagingException, java.io.UnsupportedEncodingException {

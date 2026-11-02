@@ -1,6 +1,7 @@
 package org.parasol.intake.observability;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 
@@ -13,7 +14,6 @@ import java.util.logging.LogRecord;
 
 import jakarta.inject.Inject;
 
-import org.awaitility.Awaitility;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logmanager.ExtLogRecord;
 import org.jboss.logmanager.formatters.PatternFormatter;
@@ -90,7 +90,10 @@ class IntakeTracingTests extends IntakeFlowTestBase {
 		this.scenario.awaitFiled(messageId);
 		this.scenario.awaitReplies(SENDER, 1);
 
-		var run = Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> this.startedRuns.of(SENDER), runs -> !runs.isEmpty()).getFirst();
+		var run = await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.startedRuns.of(SENDER), runs -> !runs.isEmpty())
+			.getFirst();
 		awaitRunSpans(run.runId(), Set.of("claims-mailbox-agent", "email-router", "claim-extraction-workflow"),
 			Set.of("imap find", "imap move", "smtp send"));
 
@@ -158,7 +161,7 @@ class IntakeTracingTests extends IntakeFlowTestBase {
 		this.scenario.decide(claimId, ReviewOutcome.READY, Set.of());
 		// Handlers may receive either the format plus parameters or an already-formatted record.
 		var formatter = new PatternFormatter("%s");
-		var record = Awaitility.await()
+		var record = await()
 			.atMost(IntakeScenario.WAIT)
 			.until(() -> this.logs.records().stream()
 				.filter(log -> formatter.formatMessage(log).equals(
@@ -173,7 +176,7 @@ class IntakeTracingTests extends IntakeFlowTestBase {
 
 		// The log is synchronous, but its task span reaches the exporter only after the task ends and the batch exports.
 		// The workflow remains waiting, so correlate with the ended recovery task, not its still-open workflow span.
-		Awaitility.await()
+		await()
 			.atMost(IntakeScenario.WAIT)
 			.untilAsserted(() -> assertThat(this.spans.all())
 				.filteredOn(span -> span.getSpanId().equals(spanId) && span.getTraceId().equals(traceId))

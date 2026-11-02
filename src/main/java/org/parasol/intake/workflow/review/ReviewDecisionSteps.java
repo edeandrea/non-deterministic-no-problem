@@ -44,6 +44,13 @@ import io.serverlessworkflow.impl.WorkflowException;
  *   commit only logs a problem (the claim has moved on; a retry would mean a second email). A fault before the commit puts
  *   the claim back for the reviewer to retry, with none of the reviewed values set: {@link #restoreReview}.
  * </p>
+ * <p>
+ *   <b>This is the one hole in the intake's "every submission gets a reply" rule, and it is deliberate.</b> When the send
+ *   fails here the decision stands and <em>the customer is told nothing at all</em> — the failure is only an ERROR log and a
+ *   {@code claim.intake.failures{stage=reply,outcome=recovered}} count. Retrying would answer a customer twice, since every
+ *   send mints a fresh {@code Message-ID} and nothing deduplicates them. Watch that counter rather than assuming the reply
+ *   went out.
+ * </p>
  */
 @ApplicationScoped
 public class ReviewDecisionSteps {
@@ -81,6 +88,7 @@ public class ReviewDecisionSteps {
 		return AfterDecision.END;
 	}
 
+	// Non-private and non-final, so the transaction interceptor applies to the call from this class
 	@Transactional(TxType.REQUIRES_NEW)
 	public Snapshot applyReady(ReviewDecided decided, String runId) {
 		var intake = stateBeingDecided(decided, runId);
@@ -97,6 +105,7 @@ public class ReviewDecisionSteps {
 		return snapshot(intake);
 	}
 
+	// Non-private and non-final, so the transaction interceptor applies to the call from this class
 	@Transactional(TxType.REQUIRES_NEW)
 	public Snapshot applyNeedsInformation(ReviewDecided decided, String runId) {
 		var intake = stateBeingDecided(decided, runId);
@@ -155,6 +164,7 @@ public class ReviewDecisionSteps {
 	}
 
 	// Committed before restoreReview logs that the claim is back in review
+	// Non-private and non-final, so the transaction interceptor applies to the call from this class
 	@Transactional(TxType.REQUIRES_NEW)
 	Optional<String> putBackInReview(String runId) {
 		return ClaimIntakeState.<ClaimIntakeState>find("decidingRunId", runId)

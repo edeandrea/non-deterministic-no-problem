@@ -60,6 +60,7 @@ class AgentStep {
 	}
 
 	// Its own transaction, committed before the agents run: no transaction is held across an LLM call
+	// Non-private and non-final, so the transaction interceptor applies to the call from this class
 	@Transactional(TxType.REQUIRES_NEW)
 	History snapshot(IntakeState state, InboundEmail email) {
 		return Optional.ofNullable(state.claimId())
