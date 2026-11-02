@@ -1,6 +1,6 @@
 # Design: email claim intake
 
-Status: proposed, for review before implementation ([#216](https://github.com/edeandrea/non-deterministic-no-problem/issues/216)).
+Status: accepted and implemented ([#216](https://github.com/edeandrea/non-deterministic-no-problem/issues/216)).
 Revised after the quarkus-flow spike: the intake is now one [quarkus-flow](https://docs.quarkiverse.io/quarkus-flow/dev/)
 workflow, and the agents are one of its steps. This replaces the agentic human-in-the-loop design merged in
 [#220](https://github.com/edeandrea/non-deterministic-no-problem/pull/220).
@@ -13,10 +13,12 @@ arrive. A **claims processor** then does one last completeness look-over (not an
 The existing chat ([`ClaimService`](../../src/main/java/org/parasol/chat/ai/ClaimService.java)), [`NotificationService`](../../src/main/java/org/parasol/notification/service/NotificationService.java) and [`GenerateEmailService`](../../src/main/java/org/parasol/notification/ai/GenerateEmailService.java) behave as today.
 They share the email sign-off with the new templates, and the chat's conversation handling moves onto the
 new conversation package described under Observability, with no behavior change. Out of scope: non-English email, several
-incidents in one email, the reviewer editing extracted fields, and drift detection for the new agents.
+incidents in one email, and drift detection for the new agents.
 
-The prerequisites are [#212](https://github.com/edeandrea/non-deterministic-no-problem/issues/212) (dependency upgrades), [#213](https://github.com/edeandrea/non-deterministic-no-problem/issues/213) (claim data model), [#214](https://github.com/edeandrea/non-deterministic-no-problem/issues/214) (claim images) and [#215](https://github.com/edeandrea/non-deterministic-no-problem/issues/215)
-(GreenMail and Roundcube), all merged. Progress is tracked in [#217](https://github.com/edeandrea/non-deterministic-no-problem/issues/217).
+The prerequisites were [#212](https://github.com/edeandrea/non-deterministic-no-problem/issues/212) (dependency upgrades), [#213](https://github.com/edeandrea/non-deterministic-no-problem/issues/213) (claim data model), [#214](https://github.com/edeandrea/non-deterministic-no-problem/issues/214) (claim images) and [#215](https://github.com/edeandrea/non-deterministic-no-problem/issues/215)
+(GreenMail and Roundcube), all merged before implementation started. Implementation progress was tracked task by task in
+[`.tasks/05-gh216-agentic-email-intake/PLAN.md`](../../.tasks/05-gh216-agentic-email-intake/PLAN.md); see its Task Plan for every
+task's merged PR.
 
 ## Workflow
 
@@ -116,7 +118,9 @@ email, the matched claim (or none) and the claim's history:
   - matched pending claims, and unmatched new claims, go to [`ClaimExtractionWorkflow`](../../src/main/java/org/parasol/intake/agent/extraction/ClaimExtractionWorkflow.java): three LLM agents
     in parallel, [`ClaimSummaryAgent`](../../src/main/java/org/parasol/intake/agent/extraction/ClaimSummaryAgent.java), [`ClaimSentimentAgent`](../../src/main/java/org/parasol/intake/agent/extraction/ClaimSentimentAgent.java) and [`IncidentDetailsAgent`](../../src/main/java/org/parasol/intake/agent/extraction/IncidentDetailsAgent.java) (a flag for whether the
     correspondence says what happened, date, optional time, location, category, stated policy number; the text of what
-    happened is the summary agent's job).
+    happened is the summary agent's job). The incident time is never required and never one of the items a customer is
+    asked for — only the date, location, category and whether the incident was described (`IncidentDetails.incidentDescribed`)
+    can be missing.
   - matched claims in any other status go to [`ClaimFollowUpAgent`](../../src/main/java/org/parasol/intake/agent/triage/ClaimFollowUpAgent.java) (LLM), which writes the status
     answer using a read-only status tool.
   - unmatched "not a claim" and "follow-up" emails go to [`UnmatchedEmailAgent`](../../src/main/java/org/parasol/intake/agent/triage/UnmatchedEmailAgent.java) (no LLM) for those two outcomes.

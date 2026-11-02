@@ -59,16 +59,27 @@ Supporting docs:
 - `langfuse-evaluation.md` — **the** design document: the three-tier evaluation strategy, Langfuse
   platform/language gaps, and the workarounds implemented here. Read this before touching anything
   under `ai.scoring.langfuse`.
-- `docs/*.puml` — three PlantUML diagrams: `application-flow.puml` (the business flow —
-  chat → tool → email), `continuous-scoring-architecture.puml` (single-container component view of
-  the evaluation layer) and `continuous-scoring-sequence.puml` (the tier-2 session-scoring
-  sequence).
-- `docs/design/email-claim-intake.md` — the **proposed** design for the email claim intake ([#216](https://github.com/edeandrea/non-deterministic-no-problem/issues/216)):
-  workflow, claim states and agent topology, with three diagrams (`docs/design/claim-intake-*.puml`).
-  None of it is implemented yet; don't describe it as existing code.
+- `docs/*.puml` — four PlantUML diagrams: `claim-chat-flow.puml` (renamed from `application-flow.puml`
+  once the email intake made that name ambiguous; the business flow — chat → tool → email),
+  `continuous-scoring-architecture.puml` (single-container component view of
+  the evaluation layer), `continuous-scoring-sequence.puml` (the tier-2 session-scoring
+  sequence) and `claim-intake-flow.puml` (the email intake: mail → watcher → dispatcher →
+  `ClaimIntakeFlow`'s steps, with the `ClaimsMailboxAgent` topology nested inside, through to the
+  review decision waking a waiting run).
+- `docs/design/email-claim-intake.md` — the **accepted and implemented** design for the email claim
+  intake ([#216](https://github.com/edeandrea/non-deterministic-no-problem/issues/216)): workflow,
+  claim states and agent topology, with three diagrams (`docs/design/claim-intake-*.puml`). It is
+  kept in sync with the implementation rather than retired, since it's the shortest accurate
+  description of the workflow and the agent topology.
+- `docs/email-claim-intake-demo.md` — the demo guide for the email intake: five scenarios (a
+  complete claim, a claim missing a field, a follow-up, a policy-number conflict, a not-a-claim
+  email), what to show for each (Roundcube, the `claims@` folders, the claims list and review
+  panel, Langfuse), and the caveats that bite in a live demo (GreenMail's in-memory mail, the
+  agentic Dev UI not showing the intake, `IncompatibleClassChangeError` on a live-reloaded `Flow`
+  bean).
 - `images/arch.png` — the hand-drawn overview of the business flow, framed as "Code I write" vs
   "Is this code?", embedded at the top of README.md's Architecture section with
-  `docs/application-flow.png` below it as the detailed complement. It is a **source-less raster**
+  `docs/claim-chat-flow.png` below it as the detailed complement. It is a **source-less raster**
   (no `.excalidraw`/`.drawio` original) that has already been pixel-edited — a white rectangle
   painted over a now-removed "Input Guardrails" box describing a component that does not exist (all
   seven guardrails here are output-side). Changing it means pixel editing or a full redraw, not
@@ -637,6 +648,21 @@ The two Ollama profiles are **not** equivalent:
 | `langfuse-ocp` | Points at a deployed Langfuse instance; disables OTLP export and LGTM |
 | `instana` | Exports OTLP to Instana instead of LGTM |
 | `prod`, `openshift` | Schema drop-and-create + `import.sql`; OpenShift deployment config |
+
+**`parasol.intake.*` configuration** (`IntakeConfig`, `org.parasol.intake.config`):
+
+| Key | Default | Notes |
+|---|---|---|
+| `enabled` | `true` | **Off only in `%test`** (`parasol.intake.enabled: false`); the Playwright and workflow tests that need it turn it on themselves (`InboxWatcherControl`, or they drive the workflow directly without the watcher) |
+| `address` | `claims@parasol.com` | Bare address only (`@Email`); the `Message-ID` domain of every reply comes from it |
+| `imap.host` / `.port` / `.user` / `.password` | GreenMail's host/port, the intake address, none | GreenMail runs with IMAP auth disabled |
+| `folders.processing` / `.processed` / `.failed` | `Processing` / `Processed` / `Failed` | Created on first use |
+| `limits.max-body-characters` | `20000` | Sent to the LLM; the stored body is never truncated |
+| `limits.max-image-size` | `10M` | Larger attachments are skipped and mentioned in the reply |
+| `limits.max-images` | `10` | Attachments beyond it are skipped and mentioned in the reply |
+| `watcher.idle-refresh` | `1m` | **`10s` in `%dev`** only, for quick pickup of mail sent from Roundcube |
+| `watcher.reconnect-delay` / `.max-reconnect-delay` | `1s` / `1m` | Doubles on every reconnect failure |
+| `metrics.inbox-depth-interval` | `30s` | How often `claim.intake.inbox.depth` is measured (a gauge read would log in to IMAP on every scrape) |
 
 ### OpenShift deployment
 
@@ -1229,3 +1255,50 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
     (`@NotBlank @Email`), since the `Message-ID` domain is everything after its `@`. `ReplySent` is published inside `deliver`'s span.
   - **Don't pass `Optional` to `IntakeReplySender`:** use `ThreadingHeaders` (`of(email)`, `replyingTo(id)`, `none()`) and the overload
     with or without a `String claimNumber`. The overload without one is for replies that mustn't disclose a claim.
+- **The six intake agents' statelessness opt-outs are load-bearing, not decorative.**
+  `EmailClassifierAgent`, `ClaimFollowUpAgent`, `ClaimResolver`, `ClaimSummaryAgent`,
+  `ClaimSentimentAgent` and `IncidentDetailsAgent` all carry `@RegisterAiService(retrievalAugmentor =
+  NoRetrievalAugmentorSupplier.class, chatMemoryProviderSupplier = NoChatMemoryProviderSupplier.class)`.
+  This is deliberate (`docs/design/email-claim-intake.md` → Architecture: "They're stateless"): the
+  workflow passes the claim's whole history in on every run, so an agent carrying its own memory or
+  retrieval would see stale or duplicated context. **A seventh intake agent that omits either
+  annotation gets the default behavior silently** — the shared `"default"` chat memory (so it leaks
+  context across unrelated claims and senders) and/or the policy-PDF Easy RAG retriever (irrelevant to
+  claim email) — with no build error and no failing test to catch it. Copy both annotations onto any
+  new intake `@RegisterAiService`.
+- **Two more quarkus-flow gotchas, beyond the ones already covered above:**
+  - **Every terminal `switch` branch needs an explicit `.then(FlowDirectiveEnum.END)`** — Flow doesn't
+    infer "this branch ends the workflow" on its own. `ClaimIntakeFlow`'s three `switchWhenOrElse` calls
+    all pass it as the else-branch directive.
+  - **Pass ids through workflow/task data, not payloads.** `IntakeRun` and `IntakeState` carry claim,
+    email and run ids, never photo bytes or the raw email — Flow persists every step's data to
+    PostgreSQL, so a payload-carrying step bloats the run's row on every transition. `IntakeEmailReader`
+    re-reads the email from the processing folder by id instead.
+  - **`quarkus.application.name` is part of Flow's table primary keys.** Renaming the application (the
+    `application.yml` comment at `quarkus.application.name` says this too) orphans every waiting intake
+    run — the renamed app can no longer find its own in-flight `Pending Review` claims in Flow's tables.
+- **No durable state across restarts (user decision).** The intake has no persistence story beyond
+  "while the app and GreenMail are both up": a restart drops the database and GreenMail both (schema
+  is drop-and-create, GreenMail is in-memory), so a waiting review does not survive it, and neither does
+  any email sitting in `Processing`. This is intentional for a demo app, not a gap to file.
+- **The intake only works correctly with one replica**, though nothing enforces it beyond the OpenShift
+  extension's own default (`quarkus.openshift.replicas: 1`, pinned and commented in `%openshift` in
+  `application.yml`). Four mechanisms assume a single instance:
+  - `ReviewDecisionPublisher.publish` → Flow's in-memory `eventPublishers()`: a decision `POST`ed to the
+    replica that isn't hosting the waiting run passes every check (`PersistenceInstanceReader` reads the
+    shared database, so it says `WAITING` either way), publishes locally, and returns `202` — **silently
+    never applied**.
+  - `SupersedeStep`'s `…definition().activeInstance(oldRunId)` is an in-JVM lookup, so a reply on
+    replica B can't cancel a run waiting on replica A; `cancel` returns `false` and the step only logs at
+    debug.
+  - `ClaimIntakeDispatcher`'s three `ConcurrentHashMap`s (the per-sender queues) and its
+    `WorkflowExecutionListener` registration are both per-JVM, so each replica orders only the emails it
+    sees — the documented per-sender ordering breaks across replicas.
+  - `ClaimsInboxWatcher` + `ClaimsMailbox`'s process-local `ReentrantReadWriteLock`: two replicas both
+    IDLE the same INBOX and race to move the same message.
+
+  Already safe across replicas: the `ClaimCorrespondence.messageId` database unique constraint, optimistic
+  locking on `ClaimIntakeState`, and Flow's own DB-backed run persistence (`quarkus-flow-jpa`). See
+  [#284](https://github.com/edeandrea/non-deterministic-no-problem/issues/284) for the follow-up to lift
+  the single-replica requirement, and `docs/email-claim-intake-demo.md` / README → *Single replica* for
+  the demo-facing version of this list.

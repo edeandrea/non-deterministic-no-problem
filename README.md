@@ -24,6 +24,14 @@ deliberately small; the interesting part is the three-tier AI evaluation strateg
   the output side — this app has no input guardrails.
 - **Three tiers of continuous AI evaluation** — per-trace judging inside Langfuse, session-level
   scoring written in application code, and drift detection wired into a guardrail.
+- **An agentic email intake, built as one [quarkus-flow](https://docs.quarkiverse.io/quarkus-flow/dev/)
+  workflow** — a customer emails `claims@parasol.com`; an IMAP IDLE watcher picks it up and starts one
+  workflow run per email. Inside that run, a `quarkus-langchain4j-agentic` composition (one workflow
+  step) classifies and extracts the claim, then the workflow's own steps apply business rules, persist
+  the claim, reply, and file the email. See [Email claim intake](#email-claim-intake), below.
+- **A human-in-the-loop review, without holding a thread** — before a claim moves to `In Process`, the
+  workflow *waits* (a Flow `listen` step, persisted in PostgreSQL) for a claims processor's decision on
+  the claim detail page, and applies it once it arrives.
 
 ## Architecture
 
@@ -32,7 +40,7 @@ deliberately small; the interesting part is the three-tier AI evaluation strateg
 The hand-drawn overview of the business flow, framed around the question this demo keeps asking of
 every box: is it "code I write" or is it "is this code?".
 
-![Application flow](docs/application-flow.png)
+![Claim chat flow](docs/claim-chat-flow.png)
 
 The same flow rendered in detail, adding the `ai.scoring` evaluation layer the overview omits: the
 browser opens a chat WebSocket, `ClaimService` answers using RAG plus the chat model, and — when the
@@ -40,7 +48,14 @@ conversation warrants it — issues a tool call to `NotificationService`, which 
 hands off to `GenerateEmailService`. The generated email runs the gauntlet of the four output
 guardrails before `ReactiveMailer` sends it.
 
-Two further diagrams cover the evaluation layer:
+![Email claim intake flow](docs/claim-intake-flow.png)
+
+The email claim intake, below `claim-chat-flow.png` as a co-equal part of the architecture: Roundcube
+→ GreenMail → the IMAP IDLE watcher → the per-sender dispatcher → `ClaimIntakeFlow`'s own steps, with
+the `ClaimsMailboxAgent` topology as one of those steps, PostgreSQL holding the claim data and Flow's
+own run state, and the claims processor's review decision waking a waiting run.
+
+Further diagrams cover the evaluation layer and the intake's design:
 
 - [`docs/continuous-scoring-architecture.png`](docs/continuous-scoring-architecture.png) — component
   view of the single Quarkus container, showing the `org.parasol` business layer, the `ai.scoring`
@@ -48,11 +63,16 @@ Two further diagrams cover the evaluation layer:
 - [`docs/continuous-scoring-sequence.png`](docs/continuous-scoring-sequence.png) — sequence diagram
   of tier-2 session scoring, from `ChatScopeEnded` through the OpenTelemetry flush wait and
   observation polling to the score written back to Langfuse.
+- [`docs/design/claim-intake-workflow.png`](docs/design/claim-intake-workflow.png),
+  [`claim-intake-states.png`](docs/design/claim-intake-states.png) and
+  [`claim-intake-agents.png`](docs/design/claim-intake-agents.png) — the intake's own design diagrams
+  (workflow steps, claim states, agent topology); see
+  [docs/design/email-claim-intake.md](docs/design/email-claim-intake.md).
 
-The three PlantUML diagrams are generated with [PlantUML](https://plantuml.com) from the `.puml` sources
-committed next to them in `docs/`. Re-render them with
-[`docs/render-diagrams.sh`](docs/render-diagrams.sh) (needs Java and Graphviz; it downloads the
-pinned PlantUML release into a temp directory on first use).
+There are **seven** PlantUML diagrams in total (four in `docs/`, three in `docs/design/`), all generated
+with [PlantUML](https://plantuml.com) from the `.puml` sources committed next to them. Re-render all of
+them with [`docs/render-diagrams.sh`](docs/render-diagrams.sh) (needs Java and Graphviz; it downloads the
+pinned PlantUML release into a temp directory on first use, and already globs both directories).
 
 ## The three evaluation tiers
 
@@ -159,11 +179,89 @@ PostgreSQL and served by `GET /api/db/claims/{id}/images` (metadata, with a rela
 entities, and a missing claim or image is an RFC 9457 Problem Details `404` (`application/problem+json`). Chat goes
 through the chat WebSocket.
 
+The email intake adds four more endpoints: `GET /api/db/claims/{id}/correspondence` (the claim's two-sided email
+transcript, oldest first, each message with the photos it carried; `404` for an unknown claim), `GET
+/api/db/claims/{id}/review` (the claim's review state — whether a review is open, its requested items, and the full
+missing-item checklist), `POST /api/db/claims/{id}/review-decision` (the claims processor's decision; it's
+**asynchronous** — it returns `202 Accepted` once the decision is published, not once the workflow has applied it;
+`400` for an invalid request body, `404` for an unknown claim or a vanished run, `409` for a claim not open for
+review or a stale version, `422` if the reviewed values don't fit the claim) and `POST
+/api/db/claims/{id}/sentiment` (re-runs the sentiment agent for a claim under review, `200 { "sentiment": … }`).
+None of them require authentication — this is a demo app.
+
 Each claim has a numeric `id` and a separate claim number (`CLM` + 8 digits, e.g. `CLM01000000`). PostgreSQL
 generates the number from its own sequence on insert. Claims also have a category (`Single vehicle`,
 `Multiple vehicle`, `Theft` or `Other`) and a typed incident date with an optional time.
 `src/main/resources/import.sql` seeds six sample claims. See [CLAUDE.md](CLAUDE.md) for how the claim number
 is generated and the rules around it.
+
+## Email claim intake
+
+A customer emails `claims@parasol.com`; an IMAP IDLE watcher (`ClaimsInboxWatcher`) picks the email up and starts
+one [quarkus-flow](https://docs.quarkiverse.io/quarkus-flow/dev/) workflow run (`ClaimIntakeFlow`) for it. Inside
+that run, one workflow step runs a `quarkus-langchain4j-agentic` composition (`ClaimsMailboxAgent`) that classifies
+the email and, for a new or still-incomplete claim, extracts the incident details in parallel. The workflow's own
+steps then apply the policy-number rule, persist the claim and any photos, reply with a fixed Qute template, and
+file the email.
+
+A claim the intake creates or updates moves through three statuses — it never sets `New`:
+
+- **`Pending Information`** — something required is missing; the customer was asked for exactly those items.
+- **`Pending Review`** — every required item is present; the workflow is **waiting**, with no thread held, for a
+  claims processor's decision.
+- **`In Process`** — the claims processor marked the claim ready.
+
+On the claim detail page, a `Pending Review` claim shows a **review panel**: the claims processor can correct any
+extracted field, or check **Ask customer** next to any field that's still missing, then click **Submit claim for
+processing** (→ `In Process`) or, once something is checked, **Request more information** (→ `Pending Information`).
+**Regenerate** re-runs the sentiment agent over the claim's correspondence. The Documents tab shows the claim's full,
+two-sided email transcript — every inbound email and every reply the intake sent, each with the photos it carried.
+
+See [docs/email-claim-intake-demo.md](docs/email-claim-intake-demo.md) for a full walkthrough with five scenarios,
+and [docs/design/email-claim-intake.md](docs/design/email-claim-intake.md) for the accepted design.
+
+### Configuration
+
+The intake is configured under `parasol.intake.*` (`IntakeConfig`,
+`src/main/java/org/parasol/intake/config/IntakeConfig.java`):
+
+| Key | Default | Purpose |
+|---|---|---|
+| `enabled` | `true` | Whether the claims inbox is watched. **Off only in `%test`** |
+| `address` | `claims@parasol.com` | The claims inbox address; replies come from it |
+| `imap.host` | `${quarkus.mailer.host}` | The IMAP host (GreenMail by default) |
+| `imap.port` | `${parasol.mail.imap-port:3143}` | The IMAP port |
+| `imap.user` | `${parasol.intake.address}` | The IMAP login |
+| `imap.password` | *(none)* | The IMAP password (GreenMail runs with auth disabled) |
+| `folders.processing` / `.processed` / `.failed` | `Processing` / `Processed` / `Failed` | The folders an email moves through |
+| `limits.max-body-characters` | `20000` | Most characters of correspondence sent to the LLM (the stored body is never truncated) |
+| `limits.max-image-size` | `10M` | Largest image attachment kept |
+| `limits.max-images` | `10` | Most image attachments kept per email |
+| `watcher.idle-refresh` | `1m` (`10s` in `%dev`) | How often the IMAP IDLE is renewed |
+| `watcher.reconnect-delay` / `.max-reconnect-delay` | `1s` / `1m` | Reconnect backoff |
+| `metrics.inbox-depth-interval` | `30s` | How often `claim.intake.inbox.depth` is measured |
+
+### Single replica
+
+The intake only works correctly with **one** replica, though nothing enforces that beyond the OpenShift
+extension's own default (`quarkus.openshift.replicas: 1`, pinned in `%openshift`). Four in-process mechanisms
+assume a single instance: `ReviewDecisionPublisher`'s in-memory event publisher (a decision POSTed to the "wrong"
+replica silently succeeds and is never applied), `SupersedeStep`'s in-JVM lookup of the run to cancel, the
+per-sender queues `ClaimIntakeDispatcher` keeps in memory, and `ClaimsInboxWatcher`'s process-local lock on the
+mailbox. See [#284](https://github.com/edeandrea/non-deterministic-no-problem/issues/284) for the follow-up to lift
+this constraint.
+
+### Observability
+
+One claim is one Langfuse **session** — every span of a claim's intake runs carries the same
+`gen_ai.conversation.id`, even though one run is still several traces
+([quarkus-flow#1056](https://github.com/quarkiverse/quarkus-flow/issues/1056)). The intake never ends a
+chat-scope "conversation", so it gets tier-1 per-trace scores only, never a tier-2 session score. `claim.intake.*`
+Micrometer meters cover emails, replies, review decisions, failures, latency, the inbox backlog and how often a
+reviewer overrides the extracted fields. The Quarkus Dev UI's **Workflows** card (from `quarkus-flow`) draws
+`claim-intake` as a typed, branching diagram, including the review wait — the agentic Dev UI does **not** show the
+intake's agents (`ClaimsMailboxAgent`'s `MonitoredAgent` support is commented out pending upstream fixes; see
+CLAUDE.md).
 
 # Langfuse integration
 
@@ -240,13 +338,16 @@ Both Ollama profiles redirect only the business chat models — `parasol-chat`,
 `granite4:micro` is a 3B Apache-2.0 model with tool calling and no reasoning mode, picked because
 the chat bot invokes a tool and the email guardrails parse structured JSON.
 
-Under `-Pollama`, `generate-email` is the exception: it uses `qwen3:4b` with reasoning turned off.
-`EmailEndsAppropriatelyOutputGuardrail` requires the email to end with the standard closing block
-**verbatim**, and `granite4:micro` reflows it — as do `llama3.2`, `ministral-3:3b` and
+Under `-Pollama`, `generate-email` **and `claim-intake`** are the exception: both use `qwen3:4b` with
+reasoning turned off. `EmailEndsAppropriatelyOutputGuardrail` requires the email to end with the standard
+closing block **verbatim**, and `granite4:micro` reflows it — as do `llama3.2`, `ministral-3:3b` and
 `qwen2.5:3b` — so the guardrail reprompts until it gives up. `qwen3:4b` reproduces it. Reasoning is
 disabled because qwen3 otherwise spends roughly 6,000 thinking tokens per email instead of ~140.
-`-Pollama-openai` keeps `granite4:micro` throughout: it reaches Ollama over the OpenAI-compatible
-endpoint, which has no equivalent switch for reasoning.
+`-Pollama-openai` **can't follow this split**: all four of its chat models interpolate their `model-name`
+from `parasol-chat`'s Ollama `model-id`, not from their own, so changing `generate-email`'s (or
+`claim-intake`'s) id there would only move the Ollama-native leg. It keeps `granite4:micro` throughout
+instead — it reaches Ollama over the OpenAI-compatible endpoint, which has no equivalent switch for
+reasoning, so a thinking `qwen3:4b` would be far too slow there anyway.
 
 Pull all three before your first Ollama run:
 
@@ -284,5 +385,7 @@ to the Ollama extension's default `base-url` because CI passes
   profiles and the gotchas that bite.
 - [langfuse-evaluation.md](langfuse-evaluation.md) — the three-tier evaluation design, the Langfuse
   platform gaps behind it and the workarounds chosen.
-- [docs/design/email-claim-intake.md](docs/design/email-claim-intake.md) — the proposed design for
-  the upcoming email claim intake (workflow, claim states, agent architecture). Not implemented yet.
+- [docs/design/email-claim-intake.md](docs/design/email-claim-intake.md) — the accepted, implemented
+  design for the email claim intake (workflow, claim states, agent architecture).
+- [docs/email-claim-intake-demo.md](docs/email-claim-intake-demo.md) — a five-scenario walkthrough of
+  the email claim intake, for dev mode and the cluster.
