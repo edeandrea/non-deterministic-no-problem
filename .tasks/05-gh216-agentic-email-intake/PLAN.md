@@ -42,12 +42,27 @@ changes tasks 12 and 13 (below).
 with the user the same day (six decisions, D1–D6) and then changed twice with the user while building it: the intake's
 bookkeeping lives in its own `ClaimIntakeState` entity, never on `Claim` (so claim retrieval neither returns nor loads
 it), and `IntakeReplySender` takes no `Optional` parameters.
-**Status (2026-10-30):** tasks 03–11b are done and merged into the feature branch (the last was
+**Status (2026-11-02):** tasks 03–11b are done and merged into the feature branch (the last was
 [#276](https://github.com/edeandrea/non-deterministic-no-problem/pull/276), task 11b, `465f7aa`). Task 12 is done
 ([#278](https://github.com/edeandrea/non-deterministic-no-problem/pull/278), `59e3b28`). Task 12b is done
-([#280](https://github.com/edeandrea/non-deterministic-no-problem/pull/280), `995eea1`). **Task 12c (#265) is built** on
-`gh216/12c-correspondence-transcript` (2026-10-30; full `clean verify -Pollama` passes, `-Pollama-openai` is left to CI; see its task file → Outcome), not yet in a PR. It was moved ahead of 13 and 14 in
-[#279](https://github.com/edeandrea/non-deterministic-no-problem/pull/279). 13 and 14 aren't started.
+([#280](https://github.com/edeandrea/non-deterministic-no-problem/pull/280), `995eea1`). **Task 12c (#265) is done**,
+squash-merged into `gh216-email-intake` as `5d05a4b` ([#282](https://github.com/edeandrea/non-deterministic-no-problem/pull/282),
+2026-10-30). It was moved ahead of 13 and 14 in
+[#279](https://github.com/edeandrea/non-deterministic-no-problem/pull/279). **Task 13 is built** on
+`gh216/13-demo-and-docs` (off `gh216-email-intake` @ `5d05a4b`); task 14 isn't started.
+
+**Findings log entry, 2026-11-02 (before task 13):** no change, every workaround stays. 2a — the newest platform
+`quarkus-flow-bom` is still `3.40.1` (Flow 1.1.3); Flow `1.3.0` is still the latest release; the `pom.xml` override
+stays. 2b — [quarkus-flow#1111](https://github.com/quarkiverse/quarkus-flow/issues/1111) is closed for milestone
+1.4.0 (due 2026-11-20), not released; `quarkus.flow.validation.input.enabled=false` stays. 2c.1 —
+[quarkus#57879](https://github.com/quarkusio/quarkus/pull/57879) still open, no milestone; `OtelContextLeakGuard`
+stays. 2c.2 — [quarkus-langchain4j#2951](https://github.com/quarkiverse/quarkus-langchain4j/pull/2951) merged but in
+no release; 1.14.2 is still the latest stable (2.0.0.Beta2 is a pre-release); the `InvocationParameters` workaround
+stays. 2c.3 — quarkus-network-faults `0.3.0` still the latest; the Toxiproxy swap stays a separate decision. 2c.4 —
+[quarkus-flow#1122](https://github.com/quarkiverse/quarkus-flow/issues/1122) open; `FlowSpanTypingProcessor` stays.
+**2c.6 — changed:** [langchain4j#6914](https://github.com/langchain4j/langchain4j/pull/6914) was **merged
+2026-11-02**; [#6886](https://github.com/langchain4j/langchain4j/pull/6886) is still open. Neither is in a release,
+so by the step's own bar ("fixed means released") `MonitoredAgent` stays commented out.
 
 **Plan File:** `.tasks/05-gh216-agentic-email-intake/PLAN.md`
 **Tasks Directory:** `.tasks/05-gh216-agentic-email-intake/`
@@ -271,8 +286,8 @@ file's header link to it.**
 - [x] [task-11b-more-intake-metrics.md](task-11b-more-intake-metrics.md): More business and operational metrics for the intake — **done**, squash-merged into `gh216-email-intake` as `465f7aa` ([#276](https://github.com/edeandrea/non-deterministic-no-problem/pull/276)) (added 2026-10-29; building #1–#4, #6–#12, #15, #16 and a classifier-label counter in place of #5, in one PR; #13 dropped (Langfuse already sums tokens per claim), #14 and #17 already covered by existing meters; built, full `clean verify` under the Ollama profiles recorded in the task file; doesn't block #216's close-out) — issue [#271](https://github.com/edeandrea/non-deterministic-no-problem/issues/271)
 - [x] [task-12-roundcube-e2e.md](task-12-roundcube-e2e.md): Roundcube end-to-end test — **done**, squash-merged into `gh216-email-intake` as `59e3b28` ([#278](https://github.com/edeandrea/non-deterministic-no-problem/pull/278)); built on `gh216/12-roundcube-e2e` (Roundcube from the Compose file through `UiTestProfile` on a random port, the watcher started by the test; see the task file → Outcome) — issue [#261](https://github.com/edeandrea/non-deterministic-no-problem/issues/261)
 - [x] [task-12b-consolidate-description-into-summary.md](task-12b-consolidate-description-into-summary.md): Consolidate incident description into the claim summary (**done**, squash-merged into `gh216-email-intake` as `995eea1` ([#280](https://github.com/edeandrea/non-deterministic-no-problem/pull/280)); task 16 until 2026-10-30; spun off 2026-10-26; required before task 13, user decision 2026-10-30: it changes the extraction contract and every intake fixture that tasks 13 and 14 document and verify) — found while designing task 10's review UI: `IncidentDetailsAgent`'s `description` is extracted only to be thrown away, while a separate `ClaimSummaryAgent` output is what's actually persisted — issue [#266](https://github.com/edeandrea/non-deterministic-no-problem/issues/266)
-- [ ] [task-12c-claim-correspondence-transcript.md](task-12c-claim-correspondence-transcript.md): Show a claim's full email correspondence as a transcript on the Documents tab (**built 2026-10-30, not yet in a PR**: two-sided, intake replies only, photos per message, plus a `createdClaim` flag so hand-entered claims keep their original content; see the task file's Decisions and Outcome; task 15 until 2026-10-30; spun off 2026-10-26; required before task 13, user decision 2026-10-30: the demo guide shows the reviewer's view, so it documents the transcript; after 12b, so its tests use the final fixtures) — found while designing task 10's review UI: the Documents tab shows only the first email, and a reviewer deciding a `Pending Review` claim would benefit from the actual back-and-forth — issue [#265](https://github.com/edeandrea/non-deterministic-no-problem/issues/265)
-- [ ] [task-13-demo-and-docs.md](task-13-demo-and-docs.md): Demo guide and documentation — issue [#262](https://github.com/edeandrea/non-deterministic-no-problem/issues/262)
+- [x] [task-12c-claim-correspondence-transcript.md](task-12c-claim-correspondence-transcript.md): Show a claim's full email correspondence as a transcript on the Documents tab (**done**, squash-merged into `gh216-email-intake` as `5d05a4b` ([#282](https://github.com/edeandrea/non-deterministic-no-problem/pull/282)); two-sided, intake replies only, photos per message, plus a `createdClaim` flag so hand-entered claims keep their original content; see the task file's Decisions and Outcome; task 15 until 2026-10-30; spun off 2026-10-26; required before task 13, user decision 2026-10-30: the demo guide shows the reviewer's view, so it documents the transcript; after 12b, so its tests use the final fixtures) — found while designing task 10's review UI: the Documents tab shows only the first email, and a reviewer deciding a `Pending Review` claim would benefit from the actual back-and-forth — issue [#265](https://github.com/edeandrea/non-deterministic-no-problem/issues/265)
+- [x] [task-13-demo-and-docs.md](task-13-demo-and-docs.md): Demo guide and documentation — **done**, built on `gh216/13-demo-and-docs`; the demo guide (`docs/email-claim-intake-demo.md`), the `claim-intake-flow.puml`/`.png` diagram, the accepted/implemented design doc status, the #216 issue body reword, README's new Email claim intake section, CLAUDE.md's gap fill, the pinned `quarkus.openshift.replicas: 1` and the HA follow-up [#284](https://github.com/edeandrea/non-deterministic-no-problem/issues/284); see the task file → Outcome — issue [#262](https://github.com/edeandrea/non-deterministic-no-problem/issues/262)
 - [ ] [task-14-verification.md](task-14-verification.md): Verification — issue [#263](https://github.com/edeandrea/non-deterministic-no-problem/issues/263)
 
 > **Ordering:** the task files describe the b1 design (rewritten 2026-10-07). The design gate re-run has passed
@@ -606,6 +621,18 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies, N
   reviewer nothing to actually judge. The user decided a reviewer should see and correct the claim's own extracted
   fields directly (a human's correction becomes the claim's truth with no customer round-trip), with a per-field
   toggle for "I don't know this, ask the customer" instead. See task 10's *Resume Here* for the full design.
+- **Single replica: pin it, document it, file a follow-up (user decision, 2026-11-02, task 13).** The intake only
+  works correctly with one replica (four emergent mechanisms: `ReviewDecisionPublisher`'s in-memory event publisher,
+  `SupersedeStep`'s in-JVM `activeInstance` lookup, `ClaimIntakeDispatcher`'s in-JVM per-sender queues,
+  `ClaimsInboxWatcher`'s process-local lock). Rather than build HA support now, `quarkus.openshift.replicas: 1` is
+  pinned (with a comment) in `%openshift`, the constraint is documented in README/CLAUDE.md/the demo guide, and the
+  HA work (leader election, a durable cross-replica transport for the review-decision event, making the silent
+  failure loud) is filed as a follow-up outside #216:
+  [#284](https://github.com/edeandrea/non-deterministic-no-problem/issues/284).
+- **`images/arch.png` is a known, accepted gap (task 13).** It shows only the chat flow, so the email intake makes it
+  incomplete (not wrong). It's a source-less raster (no `.excalidraw`/`.drawio` original) already hand-patched once,
+  and this machine has no Pillow, numpy or ImageMagick, so task 13 reports this rather than pixel-editing it. Left
+  for a future task with better image tooling.
 
 ### Caveats & Problems
 - Never hold a transaction open across an LLM call. Persist in a `@Transactional(REQUIRES_NEW)` method of its own (task 08 review: prefer `@Transactional` to `QuarkusTransaction`).

@@ -26,6 +26,10 @@ Langfuse evaluation rules trigger automatically on ingested traces or observatio
 
 > **Langfuse support: Partial — storage and visualization only.**
 
+A "session" here means a chat conversation (`ChatScopeEnded` closes it). The email claim intake
+([#216](https://github.com/edeandrea/non-deterministic-no-problem/issues/216)) never ends a conversation,
+so its LLM calls only ever get tier-1 per-trace scores — a claim's intake run gets no tier-2 session score.
+
 ### Gaps
 
 - **Sessions are not a supported evaluation target** *(Platform gap)*
@@ -72,7 +76,7 @@ Step 2 is not instantaneous. Spans reach Langfuse asynchronously twice over — 
 
 Re-run the application against previously recorded inputs from Langfuse datasets. Compare the new outputs against the stored historical outputs to detect drift — whether caused by model updates, infrastructure changes, or unintended side effects.
 
-This is an integration-style test: the full application is exercised end-to-end via its external interfaces (REST, WebSocket, etc.), driven by dataset items instead of a human.
+This is an integration-style test: the full application is exercised end-to-end via its external interfaces (REST, WebSocket, email/IMAP, etc.), driven by dataset items instead of a human.
 
 #### 3b. Change Validation (new/modified inputs, compare against historical baselines)
 

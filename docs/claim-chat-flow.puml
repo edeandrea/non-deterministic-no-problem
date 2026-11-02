@@ -30,7 +30,7 @@ sprite $otel [16x16/16] {
 0000000000000000
 }
 
-title Application Flow: Parasol Claim Assistant
+title Claim Chat Flow: the chat bot, its tool call, and the generated email
 
 skinparam linetype polyline
 skinparam nodesep 50

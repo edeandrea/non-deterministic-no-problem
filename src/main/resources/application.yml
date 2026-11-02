@@ -460,6 +460,12 @@ parasol:
       builder: openshift
       registry: image-registry.openshift-image-registry.svc:5000
     openshift:
+      # The email intake only works correctly with one replica: ReviewDecisionPublisher's in-memory event
+      # publisher, SupersedeStep's in-JVM activeInstance() lookup, ClaimIntakeDispatcher's per-sender queues
+      # and ClaimsInboxWatcher's process-local lock all assume a single instance. This is the extension's
+      # own default, pinned here so it's documented rather than incidental. See
+      # https://github.com/edeandrea/non-deterministic-no-problem/issues/284 for the HA follow-up.
+      replicas: 1
       part-of: parasol-insurance
       base-jvm-image: registry.access.redhat.com/ubi10/openjdk-25:1.24
       labels:
