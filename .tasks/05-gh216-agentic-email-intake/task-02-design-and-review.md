@@ -72,8 +72,10 @@ tasks (03 onwards) don't start until the user confirms the reviewer has signed o
 
 ## Done When
 
-- [ ] `docs/design/email-claim-intake.md` has the four sections above, with three embedded diagrams, and reads in a few minutes.
-- [ ] The fresh review found no unresolved contradictions.
-- [ ] The pull request is open, and its URL is recorded in `PLAN.md`.
-- [ ] The user has confirmed the design review is complete.
-- [ ] Agreed review changes, and the spike-driven task changes, are applied to the doc, `PLAN.md`, the task files and the #216 issue body.
+*Never ticked when the task ran; verified and closed by task 14 on 2026-11-02, with the evidence in brackets.*
+
+- [x] `docs/design/email-claim-intake.md` has the four sections above, with three embedded diagrams, and reads in a few minutes. [sections Goal / Workflow / Claim states / Architecture; `claim-intake-workflow.png`, `claim-intake-states.png`, `claim-intake-agents.png`, each with a `.puml` source]
+- [x] The fresh review found no unresolved contradictions. [PR #231 was merged]
+- [x] The pull request is open, and its URL is recorded in `PLAN.md`. [#231, named five times in `PLAN.md`]
+- [x] The user has confirmed the design review is complete. [the design gate is recorded as passed and #231 merged; every later task built on it]
+- [x] Agreed review changes, and the spike-driven task changes, are applied to the doc, `PLAN.md`, the task files and the #216 issue body. [`PLAN.md` → *Rework required by the Flow verdict (task 01b = ADOPT) — APPLIED to the task files (2026-10-07)*; the #216 body was reworded again in task 13]

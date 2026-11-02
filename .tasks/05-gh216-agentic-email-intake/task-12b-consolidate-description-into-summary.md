@@ -197,11 +197,19 @@ Same reasoning as task 11b's nullable `IntakeRun.receivedAt`.
 - [x] `ClaimExtractionRules` treats anything but `incidentDescribed == TRUE` as `INCIDENT_DESCRIPTION` missing
 - [x] `ClaimFields.extractedSoFar` derives the flag from the requested items and no longer copies the summary
 - [x] An old-shape `IncidentDetails` (with `description`) still reads from persisted run state
-- [ ] Every affected test fixture across `org.parasol.intake.**` and the two Playwright tests is updated and the suite
-  passes under `-Pollama` and `-Pollama-openai` (passes: default-profile full verify and the intake classes under
-  `-Pollama`; open: `-Pollama-openai`, left to CI)
-- [ ] The real-model dev-mode check behaves as described in section 7
-- [ ] The design doc (and diagram), `CLAUDE.md`, `PLAN.md` and issue #266's body are updated
+- [x] Every affected test fixture across `org.parasol.intake.**` and the two Playwright tests is updated and the suite
+  passes under `-Pollama` and `-Pollama-openai`. **Closed by task 14 (2026-11-02):** the `-Pollama-openai` leg that was
+  left to CI passed on this task's own PR
+  ([#280](https://github.com/edeandrea/non-deterministic-no-problem/pull/280), `jvm-build-test-25-ollama-openai`,
+  29m25s), as did `-Pollama` (35m15s)
+- [ ] The real-model dev-mode check behaves as described in section 7 — **still not run** (the Outcome's verification
+  table records it as "Not run"). The stubbed suite can't test the prompt's meaning, so this needs a human in dev mode.
+  Task 14 moved it into `PLAN.md` → *Remaining manual checks for the user* so it stays visible after #216 closes; it is
+  the only Done When item in the whole task set that is open on merit rather than on bookkeeping.
+- [x] The design doc (and diagram), `CLAUDE.md`, `PLAN.md` and issue #266's body are updated (verified by task 14:
+  the Outcome records the doc, diagram and `CLAUDE.md`; `PLAN.md`'s task row carries the merge sha and PR; and
+  [#266](https://github.com/edeandrea/non-deterministic-no-problem/issues/266)'s body describes the final
+  `incidentDescribed` design and is closed)
 
 ## Outcome
 

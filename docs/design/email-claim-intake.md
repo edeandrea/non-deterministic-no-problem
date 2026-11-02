@@ -67,7 +67,10 @@ workflow run**, and the steps below are that run's steps.
     decision makes no LLM call.
 
 Every submission gets a reply (fixed templates, except the AI-written status answer), apart from
-auto-replies, self-sent mail and duplicates. Replies about a claim carry an app-generated `Message-ID` and are recorded next to the
+auto-replies, self-sent mail and duplicates — and apart from one case: a reviewer's decision that commits but whose
+notification email can't then be sent. That isn't retried (the send has no idempotency key, so a retry would answer twice);
+it's logged at ERROR and counted as `claim.intake.failures{stage=reply,outcome=recovered}`, and the customer gets nothing.
+The same holds when a decision faults before its commit and the claim goes back into review. Replies about a claim carry an app-generated `Message-ID` and are recorded next to the
 customer's emails, so the claim page's Documents tab shows the two-sided transcript, with each photo under the email that carried it. A reply and a decision arriving together are serialized by
 optimistic locking on the claim's intake state (not on the claim itself): whichever commits first wins. A losing decision gets a 409; a losing
 reply's email goes back in line behind the claim's run and is handled again under the claim's new status.
@@ -141,7 +144,7 @@ reviewer saw and the values fit the claim (400/409/422). The run sets them along
 
 **Observability.** The goal is that every span of a claim's runs carries the same
 `gen_ai.conversation.id`, so Langfuse groups each claim into one session. One run is still several
-traces ([quarkus-flow#1056](https://github.com/quarkiverse/quarkus-flow/issues/1056)); the shared id is what
+traces — Flow's persistence alone emits roughly 58 root traces per run — and the shared id is what
 ties them together. The id is OTel baggage, entered once when a run starts. The code that carries it across
 the chat, Flow and the agents is our own framework-neutral package, `ai.scoring.conversation`, kept
 separate so it can later become its own library. It has a small core (the conversation context, a span

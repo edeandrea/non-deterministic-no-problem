@@ -100,7 +100,9 @@ class ClaimReviewResourceTests extends IntakeFlowTestBase {
 			.then()
 			.statusCode(Status.ACCEPTED.getStatusCode());
 
-		await().atMost(IntakeScenario.WAIT).until(() -> this.scenario.claim(created.claim().id).status.equals("Pending Information"));
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.scenario.claim(created.claim().id).status.equals("Pending Information"));
 		// The fields the reviewer filled in are set; the ones asked of the customer keep their values until the customer answers
 		assertThat(this.scenario.claim(created.claim().id))
 			.extracting(c -> c.summary, c -> c.incidentDate, c -> c.location, c -> c.category)
@@ -110,7 +112,9 @@ class ClaimReviewResourceTests extends IntakeFlowTestBase {
 		assertThat(this.scenario.awaitReplies(SENDER, 2))
 			.last()
 			.satisfies(reply -> assertThat(reply.body()).contains("- location", "- category").doesNotContain("incident description", "incident date"));
-		await().atMost(IntakeScenario.WAIT).until(() -> this.scenario.instanceRows() == 0);
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.scenario.instanceRows() == 0);
 	}
 
 	@Test
@@ -140,7 +144,9 @@ class ClaimReviewResourceTests extends IntakeFlowTestBase {
 		var review = getReview(created.claim().id);
 
 		cancelRun(run.id());
-		await().atMost(IntakeScenario.WAIT).until(() -> run.status() == WorkflowStatus.CANCELLED);
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> run.status() == WorkflowStatus.CANCELLED);
 
 		var problem = getProblem(
 			postDecision(created.claim().id, ready(review.version())),
@@ -205,7 +211,9 @@ class ClaimReviewResourceTests extends IntakeFlowTestBase {
 
 		assertThat(problem.detail()).contains("no review open");
 
-		await().atMost(IntakeScenario.WAIT).until(() -> this.scenario.claim(created.claim().id).status.equals("In Process"));
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.scenario.claim(created.claim().id).status.equals("In Process"));
 	}
 
 	@Test
@@ -305,7 +313,9 @@ class ClaimReviewResourceTests extends IntakeFlowTestBase {
 		postDecision(created.claim().id, ready(review.version()))
 			.then()
 			.statusCode(Status.ACCEPTED.getStatusCode());
-		await().atMost(IntakeScenario.WAIT).until(() -> this.scenario.claim(created.claim().id).status.equals("In Process"));
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.scenario.claim(created.claim().id).status.equals("In Process"));
 	}
 
 	@Test
@@ -386,7 +396,9 @@ class ClaimReviewResourceTests extends IntakeFlowTestBase {
 			.statusCode(Status.ACCEPTED.getStatusCode());
 
 		assertThat(getProblem(assessment.get(30, TimeUnit.SECONDS), Status.CONFLICT).detail()).isNotBlank();
-		await().atMost(IntakeScenario.WAIT).until(() -> this.scenario.claim(created.claim().id).status.equals("In Process"));
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.scenario.claim(created.claim().id).status.equals("In Process"));
 		assertThat(this.scenario.claim(created.claim().id).sentiment).isEqualTo("Calm.");
 	}
 

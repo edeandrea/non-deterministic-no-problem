@@ -2,6 +2,7 @@ package org.parasol.intake.observability;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -24,7 +25,6 @@ import java.util.stream.Stream;
 import jakarta.inject.Inject;
 import jakarta.persistence.PersistenceException;
 
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.parasol.claim.model.Claim;
@@ -116,7 +116,9 @@ class IntakeMetricsTests extends IntakeFlowTestBase {
 		var decidingAt = Instant.now();
 		this.scenario.decide(claim.id, ReviewOutcome.READY, Set.of());
 		this.scenario.awaitReplies(SENDER, 1);
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> count("claim.intake.replies", "template", "claimInProcess") == replies + 1);
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> count("claim.intake.replies", "template", "claimInProcess") == replies + 1);
 
 		assertThat(count("claim.intake.review.decisions", "decision", "ready")).isEqualTo(decisions + 1);
 		assertThat(count("claim.intake.claim.status.transitions", "status", "In Process")).isEqualTo(inProcess + 1);
@@ -209,7 +211,9 @@ class IntakeMetricsTests extends IntakeFlowTestBase {
 
 		createClaim(SENDER, NO_LOCATION);
 		this.scenario.awaitReplies(SENDER, 1);
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> count("claim.intake.replies", "template", "missingInformation") == replies + 1);
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> count("claim.intake.replies", "template", "missingInformation") == replies + 1);
 
 		assertThat(count("claim.intake.claim.status.transitions", "status", "Pending Information")).isEqualTo(pendingInformation + 1);
 	}
@@ -226,7 +230,9 @@ class IntakeMetricsTests extends IntakeFlowTestBase {
 		this.scenario.awaitFiled(first);
 		this.scenario.submit(Mail.from(SENDER).messageId(first).subject("Car accident").body("My claim. " + marker));
 
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> count("claim.intake.emails", "outcome", "duplicate") == duplicates + 1);
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> count("claim.intake.emails", "outcome", "duplicate") == duplicates + 1);
 
 		assertThat(count("claim.intake.emails", "outcome", "skipped_auto_reply")).isEqualTo(skipped + 1);
 	}
@@ -281,7 +287,9 @@ class IntakeMetricsTests extends IntakeFlowTestBase {
 
 		this.scenario.submit(Mail.from(SENDER).inReplyTo(created.messageId()).body("One more thing. " + marker));
 		// The reply's first attempt ran the agents and found the claim being decided, so it was handed back
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> this.stubs.countRequestsFor(marker) > 0);
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.stubs.countRequestsFor(marker) > 0);
 		this.scenario.publishUntilWoken(run, new ReviewDecided(created.claim().id, runId, new ReviewDecision(ReviewOutcome.READY, Set.of(), ReviewedFields.none())));
 
 		awaitOutcome("status_question", statusQuestions + 1);
@@ -370,16 +378,18 @@ class IntakeMetricsTests extends IntakeFlowTestBase {
 			.attachment("report.pdf", "application/pdf", new byte[] { '%', 'P', 'D', 'F' }));
 		this.scenario.awaitFiled(id);
 
-		Awaitility.await().atMost(IntakeScenario.WAIT).untilAsserted(() -> {
-			assertThat(timerCount("claim.intake.email.latency", "outcome", "new_claim")).isEqualTo(latency + 1);
-			assertThat(summaryCount("claim.intake.email.size")).isEqualTo(sizes + 1);
-			assertThat(counted("claim.intake.attachments", "result", "kept", "reason", "none")).isEqualTo(kept + 1);
-			assertThat(counted("claim.intake.attachments", "result", "skipped", "reason", "not_an_image")).isEqualTo(notImages + 1);
-			assertThat(counted("claim.intake.classifications", "email_type", "new_claim", "matched_claim", "none")).isEqualTo(classified + 1);
-			assertThat(counted("claim.intake.matcher.result", "result", "no_match")).isEqualTo(noMatch + 1);
-			assertThat(summaryCount("claim.intake.extraction.completeness")).isEqualTo(completeness + 1);
-			assertThat(summaryTotal("claim.intake.extraction.completeness")).isEqualTo(completenessTotal + 1.0);
-		});
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.untilAsserted(() -> {
+				assertThat(timerCount("claim.intake.email.latency", "outcome", "new_claim")).isEqualTo(latency + 1);
+				assertThat(summaryCount("claim.intake.email.size")).isEqualTo(sizes + 1);
+				assertThat(counted("claim.intake.attachments", "result", "kept", "reason", "none")).isEqualTo(kept + 1);
+				assertThat(counted("claim.intake.attachments", "result", "skipped", "reason", "not_an_image")).isEqualTo(notImages + 1);
+				assertThat(counted("claim.intake.classifications", "email_type", "new_claim", "matched_claim", "none")).isEqualTo(classified + 1);
+				assertThat(counted("claim.intake.matcher.result", "result", "no_match")).isEqualTo(noMatch + 1);
+				assertThat(summaryCount("claim.intake.extraction.completeness")).isEqualTo(completeness + 1);
+				assertThat(summaryTotal("claim.intake.extraction.completeness")).isEqualTo(completenessTotal + 1.0);
+			});
 		assertThat(counted("claim.intake.missing.items")).isEqualTo(missing);
 		assertThat(totalTime("claim.intake.email.latency", "outcome", "new_claim")).isPositive();
 		assertThat(summaryTotal("claim.intake.email.size")).isPositive();
@@ -394,11 +404,13 @@ class IntakeMetricsTests extends IntakeFlowTestBase {
 
 		createClaim(SENDER, NO_LOCATION);
 
-		Awaitility.await().atMost(IntakeScenario.WAIT).untilAsserted(() -> {
-			assertThat(summaryCount("claim.intake.extraction.completeness")).isEqualTo(completeness + 1);
-			assertThat(summaryTotal("claim.intake.extraction.completeness")).isEqualTo(completenessTotal + 0.75);
-			assertThat(counted("claim.intake.missing.items", "item", "location")).isEqualTo(locations + 1);
-		});
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.untilAsserted(() -> {
+				assertThat(summaryCount("claim.intake.extraction.completeness")).isEqualTo(completeness + 1);
+				assertThat(summaryTotal("claim.intake.extraction.completeness")).isEqualTo(completenessTotal + 0.75);
+				assertThat(counted("claim.intake.missing.items", "item", "location")).isEqualTo(locations + 1);
+			});
 		assertThat(counted("claim.intake.missing.items") - counted("claim.intake.missing.items", "item", "location")).isEqualTo(others);
 	}
 
@@ -415,11 +427,13 @@ class IntakeMetricsTests extends IntakeFlowTestBase {
 
 		this.scenario.submit(Mail.from(SENDER).inReplyTo(created.messageId()).body("It was on Elm Street. " + marker));
 
-		Awaitility.await().atMost(IntakeScenario.WAIT).untilAsserted(() -> {
-			assertThat(counted("claim.intake.matcher.result", "result", "matched")).isEqualTo(matched + 1);
-			assertThat(counted("claim.intake.classifications", "email_type", "claim_follow_up", "matched_claim", "pending")).isEqualTo(classified + 1);
-			assertThat(timerCount("claim.intake.email.latency", "outcome", "claim_update")).isEqualTo(latency + 1);
-		});
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.untilAsserted(() -> {
+				assertThat(counted("claim.intake.matcher.result", "result", "matched")).isEqualTo(matched + 1);
+				assertThat(counted("claim.intake.classifications", "email_type", "claim_follow_up", "matched_claim", "pending")).isEqualTo(classified + 1);
+				assertThat(timerCount("claim.intake.email.latency", "outcome", "claim_update")).isEqualTo(latency + 1);
+			});
 		assertThat(summaryCount("claim.intake.extraction.completeness")).isEqualTo(extractions);
 	}
 
@@ -473,7 +487,9 @@ class IntakeMetricsTests extends IntakeFlowTestBase {
 		stubFollowUp(marker, COMPLETE_DETAILS);
 
 		this.scenario.submit(Mail.from(SENDER).inReplyTo(created.messageId()).body("One more thing. " + marker));
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> this.stubs.countRequestsFor(marker) > 0);
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.stubs.countRequestsFor(marker) > 0);
 		this.scenario.publishUntilWoken(run, new ReviewDecided(created.claim().id, runId, new ReviewDecision(ReviewOutcome.READY, Set.of(), ReviewedFields.none())));
 
 		awaitCounted(statusQuestions + 1, "claim.intake.emails", "outcome", "status_question");
@@ -494,12 +510,14 @@ class IntakeMetricsTests extends IntakeFlowTestBase {
 
 		this.scenario.decide(claim.id, ReviewOutcome.READY, Set.of());
 
-		Awaitility.await().atMost(IntakeScenario.WAIT).untilAsserted(() -> {
-			assertThat(counted("claim.intake.review.overrides", "agreement", "agreed")).isEqualTo(agreed + 1);
-			assertThat(summaryCount("claim.intake.claim.emails")).isEqualTo(emails + 1);
-			assertThat(summaryTotal("claim.intake.claim.emails")).isEqualTo(emailsTotal + 1);
-			assertThat(this.registry.timer("claim.intake.claim.time.to.complete").count()).isEqualTo(completions + 1);
-		});
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.untilAsserted(() -> {
+				assertThat(counted("claim.intake.review.overrides", "agreement", "agreed")).isEqualTo(agreed + 1);
+				assertThat(summaryCount("claim.intake.claim.emails")).isEqualTo(emails + 1);
+				assertThat(summaryTotal("claim.intake.claim.emails")).isEqualTo(emailsTotal + 1);
+				assertThat(this.registry.timer("claim.intake.claim.time.to.complete").count()).isEqualTo(completions + 1);
+			});
 		assertThat(counted("claim.intake.review.overrides", "agreement", "overridden")).isEqualTo(overridden);
 	}
 
@@ -536,20 +554,37 @@ class IntakeMetricsTests extends IntakeFlowTestBase {
 		var id = this.scenario.submit(Mail.from(SENDER).subject("Car accident").body("Nothing is stubbed for " + marker()));
 		this.scenario.awaitFailed(id);
 
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> timerCount("claim.intake.email.latency", "outcome", "failed") == latency + 1);
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> timerCount("claim.intake.email.latency", "outcome", "failed") == latency + 1);
 	}
 
 	@Test
-	void anEmailThatWasAlreadyFiledCountsNoLatencyWhenItsRunFails() {
+	void anEmailThatWasAlreadyFiledIsNeitherCountedNorAnsweredAgainWhenItsRunFails() {
 		var created = createClaim(SENDER, COMPLETE_DETAILS);
+		var replies = this.scenario.awaitReplies(SENDER, 1).size();
 		var latency = timerCount("claim.intake.email.latency", "outcome", "failed");
 		var failedEmails = counted("claim.intake.emails", "outcome", "failed");
+		var failures = counted("claim.intake.failures", "stage", "unknown", "exception", "IllegalStateException", "outcome", "fatal");
 
-		// The email is in the processed folder, as it is when a run fails after its review wait
-		this.failureHandler.handle(created.messageId(), new IllegalStateException("The run faulted after its review wait"));
+		// The email is in the processed folder, as it is when a run fails after its review wait. It was answered and counted
+		// when it was filed, so the fault is recorded for an operator and the customer hears nothing more
+		this.failureHandler.handle(created.messageId(), new IllegalStateException("The run faulted after its review wait"), FailureOutcome.FATAL);
 
-		awaitCounted(failedEmails + 1, "claim.intake.emails", "outcome", "failed");
+		awaitCounted(failures + 1, "claim.intake.failures", "stage", "unknown", "exception", "IllegalStateException", "outcome", "fatal");
+		assertThat(counted("claim.intake.emails", "outcome", "failed")).isEqualTo(failedEmails);
 		assertThat(timerCount("claim.intake.email.latency", "outcome", "failed")).isEqualTo(latency);
+		assertThat(this.scenario.replies(SENDER)).hasSize(replies);
+	}
+
+	@Test
+	void aRecoveredReviewCountsTheFaultAsRecoveredRatherThanFatal() {
+		var created = createClaim(SENDER, COMPLETE_DETAILS);
+		var recovered = counted("claim.intake.failures", "stage", "unknown", "exception", "IllegalStateException", "outcome", "recovered");
+
+		this.failureHandler.handle(created.messageId(), new IllegalStateException("Another run took the review over"), FailureOutcome.RECOVERED);
+
+		awaitCounted(recovered + 1, "claim.intake.failures", "stage", "unknown", "exception", "IllegalStateException", "outcome", "recovered");
 	}
 
 	@Test
@@ -575,7 +610,9 @@ class IntakeMetricsTests extends IntakeFlowTestBase {
 		createClaim(SENDER, NO_LOCATION);
 		this.scenario.awaitReplies(SENDER, 1);
 
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> timerCount("claim.intake.mail.client.duration", "protocol", "smtp", "outcome", "success") > sends);
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> timerCount("claim.intake.mail.client.duration", "protocol", "smtp", "outcome", "success") > sends);
 	}
 
 	@Test
@@ -599,7 +636,9 @@ class IntakeMetricsTests extends IntakeFlowTestBase {
 			.isBetween(0.0, Duration.between(openedAt, Instant.now()).toMillis() / 1000.0 + 1);
 
 		this.scenario.decide(claim.id, ReviewOutcome.READY, Set.of());
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> this.registry.get("claim.intake.review.oldest.pending").gauge().value() == 0);
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.registry.get("claim.intake.review.oldest.pending").gauge().value() == 0);
 	}
 
 	@Test
@@ -753,13 +792,13 @@ class IntakeMetricsTests extends IntakeFlowTestBase {
 	}
 
 	private void assertFatalFailureIncrement(String messageId, String stage, Map<String, Double> before) {
-		Awaitility.await()
+		await()
 			.atMost(IntakeScenario.WAIT)
 			.untilAsserted(() -> {
 				// Flow may wrap the collaborator's exception. Assert the exact class delivered to the failure boundary,
 				// not a guessed leaf type; snapshot every exception series before the run to retain a real delta.
 				var cause = ArgumentCaptor.forClass(Throwable.class);
-				verify(this.failureHandler).handle(eq(messageId), cause.capture());
+				verify(this.failureHandler).handle(eq(messageId), cause.capture(), any(FailureOutcome.class));
 				var exception = cause.getValue().getClass().getSimpleName();
 				assertThat(this.registry.find("claim.intake.failures")
 					.tags("stage", stage, "exception", exception, "outcome", "fatal")
@@ -770,7 +809,7 @@ class IntakeMetricsTests extends IntakeFlowTestBase {
 	}
 
 	private void awaitOutcome(String outcome, double expected) {
-		Awaitility.await()
+		await()
 			.atMost(IntakeScenario.WAIT)
 			.until(() -> count("claim.intake.emails", "outcome", outcome) == expected);
 	}

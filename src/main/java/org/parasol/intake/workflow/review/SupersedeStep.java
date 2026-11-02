@@ -78,6 +78,7 @@ public class SupersedeStep {
 
 	// Its own transaction: losing the claim's lock to a reviewer's decision fails it (OptimisticLockException at the flush),
 	// which tryClearReview turns into a requeue
+	// Non-private and non-final, so the transaction interceptor applies to the call from this class
 	@Transactional(TxType.REQUIRES_NEW)
 	Result clearReviewUnlessDecided(long claimId) {
 		var claim = Claim.<Claim>findById(claimId);

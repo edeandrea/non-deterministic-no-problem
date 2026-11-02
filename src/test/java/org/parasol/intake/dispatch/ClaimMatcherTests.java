@@ -18,13 +18,16 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 
 /**
- * Matching an email to a claim, and which conversation id the run starts in. Uses the first seeded claim.
+ * Matching an email to a claim, and which conversation id the run starts in: the matched claim's, otherwise a fresh
+ * {@link java.util.UUID} that names nobody. Uses the first seeded claim.
  */
 @QuarkusTest
 @TestProfile(StubbedModelsTestProfile.class)
 class ClaimMatcherTests {
 	private static final long CLAIM_ID = 1L;
 	private static final String OWNER = "marty.mcfly@email.com";
+	private static final String MESSAGE_ID = "<new@example.com>";
+	private static final String UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
 	@Inject
 	ClaimMatcher matcher;
@@ -49,11 +52,15 @@ class ClaimMatcherTests {
 	}
 
 	@Test
-	void aSeededClaimWithNoStoredConversationGetsANewOne() {
-		var match = this.matcher.match(email(OWNER, "About " + claimNumber(), List.of()));
+	void aSeededClaimWithNoStoredConversationGetsANewRandomUuid() {
+		var number = claimNumber();
+
+		var match = this.matcher.match(email(OWNER, "About " + number, List.of()));
 
 		assertThat(match.senderMatches()).isTrue();
-		assertThat(match.conversationId()).isNotBlank();
+		// A random UUID: the shape alone rules out the sender's address, the claim number and the Message-ID, none of which
+		// could survive it, so nothing the intake sends to Langfuse under this id identifies the customer.
+		assertThat(match.conversationId()).matches(UUID);
 	}
 
 	@Test
@@ -87,6 +94,7 @@ class ClaimMatcherTests {
 	}
 
 	private static InboundEmail email(String from, String subject, List<String> references) {
-		return new InboundEmail(Optional.of("<new@example.com>"), references, Optional.of(from), Optional.empty(), subject, Instant.EPOCH, Instant.EPOCH, 4, "Body", "Body", List.of(), List.of(), false);
+		return new InboundEmail(
+			Optional.of(MESSAGE_ID), references, Optional.of(from), Optional.empty(), subject, Instant.EPOCH, Instant.EPOCH, 4, "Body", "Body", List.of(), List.of(), false);
 	}
 }

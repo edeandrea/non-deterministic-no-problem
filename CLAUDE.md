@@ -30,18 +30,18 @@ The Java source is split into two top-level packages representing two distinct c
 | `org.parasol.notification.ai` | `GenerateEmailService` |
 | `org.parasol.notification.model` | `Email`, `ClaimInfo` |
 | `org.parasol.notification.guardrail` | The four email output guardrails, their `GenerateEmailOutputGuardrail` base, `PolitenessService`, `StringUtils` |
-| `org.parasol.intake` | The email claim intake ([#216](https://github.com/edeandrea/non-deterministic-no-problem/issues/216), being built). Only what every sub-package shares: `MissingItem` |
+| `org.parasol.intake` | The email claim intake ([#216](https://github.com/edeandrea/non-deterministic-no-problem/issues/216)). Only what every sub-package shares: `MissingItem` |
 | `org.parasol.intake.config` | `IntakeConfig` (`parasol.intake.*`) |
 | `org.parasol.intake.mailbox` | `ClaimsMailbox` (the `claims@parasol.com` IMAP mailbox: list, find by `Message-ID`, move between `MailFolder`s, `moveOldest`), `ClaimsInboxWatcher` (the IMAP IDLE watcher, a Mutiny pipeline on a virtual thread (`@VirtualThreads` executor): scans the INBOX, moves each email to `processing`, fires `EmailReceived`; `ClaimIntakeDispatcher` observes it), `InboxIdle` (its own IMAP session for IDLE), `InboundEmail` (with `receivedDate`, the IMAP INTERNALDATE, and `sizeBytes`) and its attachment records, `MailLoopGuard` (auto-replies and mail from the claims address), `InboxDepthMonitor` (a `@Scheduled` job that measures the INBOX and fires `InboxDepthMeasured`; does nothing while the intake is off), the package-private MIME parser, HTML-to-text and quoted-text helpers |
 | `org.parasol.intake.dispatch` | What happens to an inbound email before its run: `ClaimIntakeDispatcher` (`submit(email)`: loop/duplicate/`Message-ID` checks, then a per-sender queue of immutable `SenderState`s; also the Flow status listener that drives the queue), `ClaimMatcher`, `CorrespondenceRecorder` and the package-private `ClaimReference` |
-| `org.parasol.intake.failure` | The failure path: `IntakeFailureHandler`, the `IntakeFailureListener` (`onWorkflowFailed`) and `ProcessingProblemReplySender` |
+| `org.parasol.intake.failure` | The failure path: `IntakeFailureHandler` (**where the email is decides what its sender hears** — see Gotchas), the `IntakeFailureListener` (`onWorkflowFailed`) and `ProcessingProblemReplySender` |
 | `org.parasol.intake.reply` | The intake's replies: `IntakeTemplates` (the fixed Qute mail templates, under `templates/IntakeTemplates/`), `IntakeReplySender` (blocking; subject prefix, `ThreadingHeaders` headers and `Auto-Submitted`; overloads with and without a claim number, no `Optional` parameters) `ReplyRecorder` (records a claim reply as an `OUTBOUND` `ClaimCorrespondence` row after it's sent) and `CustomerName` (who a reply greets) |
 | `org.parasol.intake.model` | The intake's records that Flow persists and later steps read: `IncidentDetails`, `ClaimExtraction` (JSON-safe: ISO date/time strings, no `Optional`), the sealed `IntakeOutcome`, `MatchedClaim` (`none()` rather than `null`), `EmailType`, `ClassifiedOutcome` (the root agent's return: the outcome plus the classifier's label), `ClaimResolver`'s `PendingClaim` / `ClaimResolution`, and the `ClaimIntakeState` entity (the intake's bookkeeping about a claim, kept off `Claim`) |
 | `org.parasol.intake.workflow` | `ClaimIntakeFlow` (the whole intake as one quarkus-flow workflow, `claim-intake`; the only place with side effects), the JSON-safe `IntakeRun` (input: ids only) and `IntakeState` (threaded through every step), the `EmailRequeued` event, the `AgentStep` and `ClaimMatchingSteps` steps and `CorrespondenceText` |
 | `org.parasol.intake.workflow.policy` | `PolicyCheckStep` and its package-private `SameCustomerRule` (same customer) and `PolicyNumbers` (generated `AC-` numbers) |
 | `org.parasol.intake.workflow.outcome` | `ApplyOutcomeStep` (persists a new claim or a merged reply) and its helpers `ClaimFields` and the package-private `InceptionDates` |
 | `org.parasol.intake.workflow.review` | `SupersedeStep`, `ReviewDecisionSteps` (the review wait's decision steps and its match check), `AfterDecision` (what the run does next: `END` or `WAIT_AGAIN`), and `ReviewRecoverer` (hands a faulted run's review to a new run) |
-| `org.parasol.intake.observability` | `IntakeActivity` (the sealed CDI events the intake fires) and `IntakeMetrics` (observes them into the `claim.intake.*` meters; tags are small fixed sets, never a claim number, `Message-ID`, address or conversation id), and the tag enums `EmailOutcome`, `MatcherResult`, `ReviewAgreement`, `MailboxLockMode` and `MatchedClaimKind` |
+| `org.parasol.intake.observability` | `IntakeActivity` (the sealed CDI events the intake fires) and `IntakeMetrics` (observes them into the `claim.intake.*` meters; tags are small fixed sets, never a claim number, `Message-ID`, address or conversation id), and the tag enums `EmailOutcome`, `MatcherResult`, `ReviewAgreement`, `MailboxLockMode`, `MatchedClaimKind`, `FailureStage` and `FailureOutcome` |
 | `org.parasol.intake.workflow.mail` | `IntakeEmailReader` (re-reads a run's email from the processing folder), `ReplySteps`, `FileEmailStep` |
 | `org.parasol.intake.dev` | `DevClaimEmailSeeder`: the bean exists only with the build property `parasol.dev-seed.enabled=true` (`%dev`, and the two Ollama Maven profiles' `quarkus-maven-plugin` `systemProperties`, since they run dev as `prod`, so `@IfBuildProfile("dev")` wouldn't match), and it acts in `LaunchMode.DEVELOPMENT` only, mails two sample claims to the claims address at startup (one complete, one with no date or place) so the real intake produces a `Pending Review` and a `Pending Information` claim to look at. Needs the same model as any intake email; GreenMail is in memory, so it re-sends on every start |
 | `org.parasol.intake.review` | The reviewer's side of the wait: `ReviewOutcome`, `ReviewDecision`, the `ReviewDecided` event data, `ReviewedFields` (the values the reviewer confirmed or corrected, carried in the decision and set by the decision step), `ReviewDecisionPublisher` (publishes the CloudEvent the waiting run listens for), `ClaimReviewService` (checks the review is open at the reviewer's version and the reviewed values fit the claim, claims it under the claim's optimistic lock, confirms the run is waiting, then publishes), `ClaimSentimentReassessor` (assesses the claimant's sentiment again for a reviewer) and the package-private `ReviewGuard` (the open-review check both start with), plus its domain exceptions (`ReviewNotOpenException`, `ReviewLockLostException`, `ReviewRunNotFoundException`, `ReviewRunNotWaitingException`, `ReviewedFieldsRejectedException`, `SentimentAssessmentFailedException`) |
@@ -82,7 +82,7 @@ Supporting docs:
   `docs/claim-chat-flow.png` below it as the detailed complement. It is a **source-less raster**
   (no `.excalidraw`/`.drawio` original) that has already been pixel-edited — a white rectangle
   painted over a now-removed "Input Guardrails" box describing a component that does not exist (all
-  seven guardrails here are output-side). Changing it means pixel editing or a full redraw, not
+  guardrails here are output-side, bar the one tool input guardrail). Changing it means pixel editing or a full redraw, not
   editing a source file, and this machine has no Pillow, numpy or ImageMagick — the last edit
   needed a hand-rolled Python PNG codec.
 
@@ -235,9 +235,11 @@ the AI service return path (`PojoOutputParser` → `JsonParsingUtils.extractAndP
 buys here is its deliberately strict plain `ObjectMapper` and a reprompt — rather than an escaping
 `OutputParsingException` — when the output can't be parsed.
 
-The project has **seven guardrail classes in total and they are all output guardrails** — the four
-email ones above plus `DriftDetectionOutputGuardrail`, `SessionSentimentGuardrail` and
-`EvaluatorResultOutputGuardrail`. There are **zero (LLM) input guardrails**; the one *tool* input guardrail is below.
+The project has **nine output guardrail classes** — the four email ones above, plus `DriftDetectionOutputGuardrail`,
+`SessionSentimentGuardrail` and `EvaluatorResultOutputGuardrail`, plus the intake's own two
+(`IncidentDetailsOutputGuardrail` and `MaxLengthOutputGuardrail`, in `org.parasol.intake.agent.extraction`), over the
+`GenerateEmailOutputGuardrail` base the email four share. There are **zero (LLM) input guardrails**; the one *tool* input
+guardrail is below.
 
 **The chat bot can't act on a claim still in intake,** enforced twice. `IntakeCompleteToolInputGuardrail`
 (`@ToolInputGuardrails` on `updateClaimStatus`, quarkus-langchain4j's tool input guardrail) reads `claimId` from the tool call's
@@ -519,7 +521,8 @@ change it on the others or drift detection silently finds no samples** (it retur
 ### Conversation core — `ai.scoring.conversation`
 
 Which work belongs to which conversation, and what happens when one ends. Generic and framework-neutral, ready to
-be extracted: the core depends only on the OTel API/SDK, CDI and MicroProfile Context Propagation (no Quarkus,
+be extracted: the core depends only on the OTel API/SDK, CDI and JBoss Logging (MicroProfile Context Propagation is the
+`quarkus` sub-package's own dependency; no Quarkus,
 LangChain4j, chat-scope or Flow types). Frameworks feed it through adapters in sub-packages; consumers observe its
 events and never call an adapter.
 
@@ -559,10 +562,11 @@ events and never call an adapter.
     some boots only). Restore all three together once the fixes are released: `.tasks/05-gh216-agentic-email-intake/PLAN.md`, 2c item 6.
   - `%test` sets `quarkus.langfuse.otel.enabled: false` (build time; only the span processor goes), re-enabled in `org.parasol.testing.LangfuseExportTestProfile`.
   - Metrics: `claim.intake.emails{outcome}`, `.claim.status.transitions{status}`, `.replies{template}`, `.review.decisions{decision}`, the `.review.wait` timer,
-    `.failures{stage,exception,outcome}` (`outcome` is `fatal` for a run that faulted, `recovered` for a decision that couldn't be applied (the claim goes back in review) or whose email couldn't be sent (`ReviewDecisionSteps` fires these, since neither reaches `IntakeFailureHandler`); `stage` is `fetch`, `move`, `agent`, `persist`, `reply` or `unknown`: the mailbox throws `MailboxMoveException` for a change and the reply sender wraps every send failure or timeout in `ReplyFailedException`, so the stage names the operation, not the library underneath), gauges `.reviews.pending` (a DB count) and `.watcher.connected`, counter `.watcher.reconnects`.
-    `.emails` counts what finally became of an email, once: `FileEmailStep` fires `EmailHandled` as the email is filed (every reply path ends there; a run that
+    `.failures{stage,exception,outcome}` (`outcome` is `fatal` for a run that faulted with nothing picking its claim up, `recovered` when something did: a decision that couldn't be applied (the claim goes back in review) or whose email couldn't be sent (`ReviewDecisionSteps` fires these, since neither reaches `IntakeFailureHandler`), or a faulted run whose review `ReviewRecoverer` handed to a new run (`IntakeFailureListener` passes that outcome to `IntakeFailureHandler.handle`). So a rising `fatal` means claims are faulting with nothing left handling them; `stage` is `fetch`, `move`, `agent`, `persist`, `reply` or `unknown`: the mailbox throws `MailboxMoveException` for a change and the reply sender wraps every send failure or timeout in `ReplyFailedException`, so the stage names the operation, not the library underneath), gauges `.reviews.pending` (a DB count) and `.watcher.connected`, counter `.watcher.reconnects`.
+    `.emails` counts what finally became of an email, exactly once: `FileEmailStep` fires `EmailHandled` as the email is filed (every reply path ends there; a run that
     hands the email back to the queue for a decision doesn't, so its rerun counts it), the dispatcher counts `skipped_auto_reply` and `duplicate`, and the failure handler `failed`
-    (also for a run that fails after its email was filed, which then counts twice).
+    — but **only for an email still in the processing folder**. One that has left it was counted, and answered, when it was filed, so a run that faults after that counts no
+    second email (and sends no second reply): see *Where the email is decides what its sender hears* below.
     In tests the composite registry's first child is the OTel bridge, which records nothing, so tests inject `SimpleMeterRegistry` (`TestMeterRegistry`).
   - **More metrics (task 11b, [#271](https://github.com/edeandrea/non-deterministic-no-problem/issues/271)):** `claim.intake.email.latency{outcome}` (timer; from the IMAP received date, carried on `IntakeRun.receivedAt` → `IntakeState.receivedAt` to `FileEmailStep`;
     the dispatcher's skips and duplicates and the failure handler record it too, but the failure handler only for an email still in the processing folder, since one already filed was counted when it was
@@ -589,7 +593,7 @@ Model names are configured in `src/main/resources/application.yml` and resolve p
 | `politeness` | `PolitenessService` | `gpt-5-mini` |
 | `session-sentiment` | `SessionSentimentService` | Cohere `command-r7b-12-2024` via its OpenAI-compatible endpoint |
 | `judge` | `EvaluatorAgent` (drift detection) | Cohere `command-r7b-12-2024` via its OpenAI-compatible endpoint |
-| `claim-intake` | The email intake agents (#216, being built): `ClaimSummaryAgent`, `ClaimSentimentAgent`, `IncidentDetailsAgent` | `gpt-5-mini` |
+| `claim-intake` | The email intake agents (#216): `ClaimSummaryAgent`, `ClaimSentimentAgent`, `IncidentDetailsAgent` | `gpt-5-mini` |
 
 Note the Cohere models are reached through the **OpenAI** extension pointed at
 `https://api.cohere.ai/compatibility/v1` with `COHERE_API_KEY` — there is no Cohere-specific
@@ -640,7 +644,7 @@ The two Ollama profiles are **not** equivalent:
 
 | Profile | Purpose |
 |---|---|
-| `dev` | Only `datasource.dev-ui.allow-sql`. The LGTM, PostgreSQL and Langfuse dev services do run in dev mode, but they come from the extensions' own Dev Services defaults, not from this profile block. The GreenMail/Roundcube mail stack and `mailer.mock: false` are root-level config (see Commands) |
+| `dev` | `datasource.dev-ui.allow-sql`, `parasol.dev-seed.enabled` and the intake watcher's `idle-refresh: 10s`. The LGTM, PostgreSQL and Langfuse dev services do run in dev mode, but they come from the extensions' own Dev Services defaults, not from this profile block. The GreenMail/Roundcube mail stack and `mailer.mock: false` are root-level config (see Commands) |
 | `test` | Observability + Langfuse init/session scoring disabled; `compose.devservices.profiles` blanked so Roundcube doesn't start (`UiTestProfile` turns it back on) |
 | `ollama` | Local Ollama via the Ollama extension; OpenAI/Cohere keys stubbed to `changeme`; Langfuse session scoring + startup init disabled |
 | `ollama-openai` | Local Ollama via the OpenAI client (`base-url: http://localhost:11434/v1`); no key stubs, no `quarkus.aiscoring` overrides |
@@ -871,7 +875,11 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
     tests, the tests of what the intake stores, `DriftDetectionOutputGuardrailTests`, `LangfuseDatasetSampleLoaderTests` and
     `DriftDetectionChatRouteExceptionHandlerTests`. It sets stub keys and Easy RAG ingestion off, and points `claim-intake`,
     `parasol-chat`, the default OpenAI model and embeddings at WireMock with their providers pinned. It also turns Hibernate
-    statistics on, exports spans every 100 ms and starts Toxiproxy.
+    statistics on, exports spans every 100 ms and starts Toxiproxy. **No test on it may `@InjectMock` an intake agent:**
+    quarkus-langchain4j resolves and unwraps a sub-agent once, when the root agent is built, so a mock installed while the
+    root is built can stay baked into it for the rest of the application's life — and this profile is one boot shared by
+    every intake test class. Today none do; every agent runs as a real bean against WireMock, which is what keeps the whole
+    topology on the tested path. A test that must mock one needs its own profile, and another boot.
   - **`org.parasol.ui.UiTestProfile`**: every Playwright test (see above). It also starts Roundcube.
   - **`org.parasol.testing.LangfuseExportTestProfile`** (extends the stubbed one): the build-time Langfuse exporter
     (`AI_ONLY`), session scoring, dataset creation and startup initialization, for `LangfuseSessionScoringServiceTests` and
@@ -1037,8 +1045,9 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
     `InvocationParameters` (which `langchain4j-agentic` deliberately keeps out of `AgenticScope.state()`, so it's
     never actually present to validate against). There is no per-workflow scoping for the flag, so turning it off is
     app-wide; `ClaimIntakeFlow`'s own `IntakeRun` input is unaffected either way. Filed upstream as
-    [quarkiverse/quarkus-flow#1111](https://github.com/quarkiverse/quarkus-flow/issues/1111); re-enable once it's
-    addressed there.
+    [quarkiverse/quarkus-flow#1111](https://github.com/quarkiverse/quarkus-flow/issues/1111), which is closed for
+    milestone 1.4.0. 1.4.0 is not released, and the project's bar is "fixed means released", so the flag stays off until
+    a Flow we can move to carries the fix.
 - **Claim image tests:** `ClaimImageTests` (entity, `@TestTransaction`; plus the email link), `ClaimImageResourceTests` (REST and Problem
   Details), `ClaimCorrespondenceResourceTests` (the transcript endpoint), `ClaimMapperTests` (the mapper called directly on hand-built entities in a `@QuarkusTest`, nothing persisted), `ClaimImageContentTypeTests` (allow-list, no Quarkus), `ClaimImageSeederTests` and the Playwright
   `ClaimImagesPageTests`.
@@ -1211,6 +1220,13 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
   confidence. The guardrail divides by `100.0` to reconcile them. Consequently the per-sample
   `EvaluatorResult.score()` returned by `EvaluatorAgent` never reaches the threshold comparison
   directly; only its boolean `verdict` (via `EvaluationResult.passed()`) moves the needle.
+- **Where the email is decides what its sender hears** (`IntakeFailureHandler.handle`, task 14). The flow files an email only
+  after it has replied about it — every branch is `reply → file` — so an email that has left the `Processing` folder has
+  already been answered. A run that faults after that point (a faulted review wait, a failed decision) therefore moves no
+  email, sends no `processingProblem` reply and fires no second `EmailHandled`: it only records `claim.intake.failures`.
+  Replying would contradict the reply the customer already has. The `outcome` tag is the separate question of whether
+  anything picked the claim up: `IntakeFailureListener` passes `recovered` when `ReviewRecoverer` handed the review to a new
+  run (a `ReviewHandover` enum, not a boolean), `fatal` otherwise. Two questions, two inputs — don't collapse them.
 - **The email intake workflow** (`ClaimIntakeFlow`, task 08 of #216):
   - **Flow's `tryCatch` only catches a `WorkflowException`**, never a plain Java exception from a function step, which just
     faults the run. `ReviewDecisionSteps` wraps a fault *before* its commit in a `WorkflowException` of type `DECISION_FAILED`, and

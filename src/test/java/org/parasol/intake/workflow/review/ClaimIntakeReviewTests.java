@@ -1,6 +1,7 @@
 package org.parasol.intake.workflow.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -10,7 +11,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.IntakeFlowTestBase;
 import org.parasol.intake.IntakeScenario;
@@ -48,7 +48,9 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 
 		this.scenario.decide(created.claim().id, ReviewOutcome.READY, Set.of());
 
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> this.scenario.claim(created.claim().id).status.equals("In Process"));
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.scenario.claim(created.claim().id).status.equals("In Process"));
 		var state = this.scenario.intake(created.claim().id).orElseThrow();
 
 		assertThat(state.reviewRunId).isNull();
@@ -58,7 +60,9 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 			.last()
 			.satisfies(reply -> assertThat(reply.body()).contains(created.claim().claimNumber, "In Process"));
 		assertThat(this.stubs.requests()).hasSize(requestsBefore);
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> this.scenario.instanceRows() == 0);
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.scenario.instanceRows() == 0);
 		assertThat(run.status()).isEqualTo(WorkflowStatus.COMPLETED);
 	}
 
@@ -67,7 +71,9 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 		var created = createClaim(SENDER, COMPLETE_DETAILS);
 		var conversationId = this.scenario.intake(created.claim().id).orElseThrow().intakeConversationId;
 		this.scenario.decide(created.claim().id, ReviewOutcome.READY, Set.of());
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> this.scenario.claim(created.claim().id).status.equals("In Process"));
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.scenario.claim(created.claim().id).status.equals("In Process"));
 		var body = this.scenario.claim(created.claim().id).body;
 
 		var marker = marker();
@@ -87,7 +93,9 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 	void aReplyAnsweringTheTickedItemsGoesBackToReview() {
 		var created = createClaim(SENDER, COMPLETE_DETAILS);
 		this.scenario.decide(created.claim().id, ReviewOutcome.NEEDS_INFORMATION, Set.of(MissingItem.LOCATION));
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> this.scenario.claim(created.claim().id).status.equals("Pending Information"));
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.scenario.claim(created.claim().id).status.equals("Pending Information"));
 
 		var marker = marker();
 		stubFollowUp(marker, details(true, "2026-10-07", "Elm Street, by the school", "SINGLE_VEHICLE", null, List.of("LOCATION")));
@@ -112,7 +120,9 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 
 		this.scenario.decide(created.claim().id, ReviewOutcome.NEEDS_INFORMATION, Set.of(MissingItem.LOCATION, MissingItem.CATEGORY));
 
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> this.scenario.claim(created.claim().id).status.equals("Pending Information"));
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.scenario.claim(created.claim().id).status.equals("Pending Information"));
 		var state = this.scenario.intake(created.claim().id).orElseThrow();
 
 		assertThat(state.requestedItems).containsExactlyInAnyOrder(MissingItem.LOCATION, MissingItem.CATEGORY);
@@ -127,7 +137,9 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 	void anEmptyReplyAfterNeedsInformationStaysPendingInformation() {
 		var created = createClaim(SENDER, COMPLETE_DETAILS);
 		this.scenario.decide(created.claim().id, ReviewOutcome.NEEDS_INFORMATION, Set.of(MissingItem.LOCATION));
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> this.scenario.claim(created.claim().id).status.equals("Pending Information"));
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.scenario.claim(created.claim().id).status.equals("Pending Information"));
 
 		// A blank reply answers nothing. The stubs from the first email still apply: they're keyed on its text, which the
 		// claim's correspondence carries
@@ -148,7 +160,10 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 			this.scenario.publish(new ReviewDecided(created.claim().id, "some-other-run", new ReviewDecision(ReviewOutcome.READY, Set.of(), ReviewedFields.none())));
 		}
 
-		Awaitility.await().pollDelay(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(5)).until(() -> true);
+		await()
+			.pollDelay(Duration.ofSeconds(2))
+			.atMost(Duration.ofSeconds(5))
+			.until(() -> true);
 
 		assertThat(run.status()).isEqualTo(WorkflowStatus.WAITING);
 		assertThat(this.scenario.claim(created.claim().id).status).isEqualTo("Pending Review");
@@ -165,7 +180,7 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 		stubFollowUp(marker, COMPLETE_DETAILS.replace("Elm Street", "Oak Avenue"));
 		this.scenario.awaitFiled(this.scenario.submit(Mail.from(SENDER).inReplyTo(created.messageId()).body("Actually Oak Avenue. " + marker)));
 
-		var newRun = Awaitility.await()
+		var newRun = await()
 			.atMost(IntakeScenario.WAIT)
 			.until(() -> this.scenario.waitingRun(created.claim().id).filter(run -> !run.id().equals(oldRunId)), Optional::isPresent)
 			.orElseThrow();
@@ -182,14 +197,22 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 			.satisfies(reply -> assertThat(reply.body()).containsIgnoringCase("latest information"));
 
 		// The canceled run leaves no Flow rows, and its workflow.execute span is still exported (quarkus-flow#1058, fixed in 1.2.0)
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> (this.scenario.instanceRows(oldRunId) == 0) && (this.scenario.taskRows(oldRunId) == 0));
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> this.spans.ofRun(oldRunId), Optional::isPresent);
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> (this.scenario.instanceRows(oldRunId) == 0) && (this.scenario.taskRows(oldRunId) == 0));
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.spans.ofRun(oldRunId), Optional::isPresent);
 
 		// A later decision reaches only the new run
 		this.scenario.decide(created.claim().id, ReviewOutcome.READY, Set.of());
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> this.scenario.claim(created.claim().id).status.equals("In Process"));
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.scenario.claim(created.claim().id).status.equals("In Process"));
 		assertThat(this.scenario.awaitReplies(SENDER, 3)).hasSize(3);
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> this.scenario.instanceRows() == 0);
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.scenario.instanceRows() == 0);
 	}
 
 	@Test
@@ -223,7 +246,10 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 		var id = this.scenario.submit(Mail.from(SENDER).inReplyTo(created.messageId()).body("One more thing. " + marker));
 
 		// It goes back in the queue: still in the processing folder, not filed, and no reply yet
-		Awaitility.await().pollDelay(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(5)).until(() -> true);
+		await()
+			.pollDelay(Duration.ofSeconds(1))
+			.atMost(Duration.ofSeconds(5))
+			.until(() -> true);
 		assertThat(this.scenario.inFolder(MailFolder.PROCESSING)).hasSize(1);
 		assertThat(this.scenario.replies(SENDER)).hasSize(1);
 
@@ -252,7 +278,9 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 
 		this.scenario.decide(created.claim().id, ReviewOutcome.READY, Set.of());
 
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> this.scenario.claim(created.claim().id).status.equals("In Process"));
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.scenario.claim(created.claim().id).status.equals("In Process"));
 	}
 
 	@Test
@@ -262,7 +290,10 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 		var runId = this.scenario.claimReview(created.claim().id);
 		// Hold the decision step before it changes anything, so the run is visibly working for a while
 		doAnswer(invocation -> {
-			Awaitility.await().pollDelay(DECISION_DELAY).atMost(DECISION_DELAY.plusSeconds(5)).until(() -> true);
+			await()
+				.pollDelay(DECISION_DELAY)
+				.atMost(DECISION_DELAY.plusSeconds(5))
+				.until(() -> true);
 			return invocation.callRealMethod();
 		}).when(this.decisionSteps).applyReady(any(), any());
 
@@ -273,7 +304,10 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 		var id = this.scenario.submit(Mail.from(SENDER).inReplyTo(created.messageId()).body("One more thing. " + marker));
 
 		// The woken run holds the sender, so the reply hasn't started: no model call mentions it yet
-		Awaitility.await().pollDelay(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(3)).until(() -> true);
+		await()
+			.pollDelay(Duration.ofSeconds(1))
+			.atMost(Duration.ofSeconds(3))
+			.until(() -> true);
 		assertThat(run.status()).isEqualTo(WorkflowStatus.RUNNING);
 		assertThat(this.stubs.countRequestsFor(marker)).isZero();
 
@@ -298,8 +332,10 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 
 		this.scenario.decide(created.claim().id, ReviewOutcome.READY, Set.of());
 
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> run.status() == WorkflowStatus.FAULTED);
-		var replacement = Awaitility.await()
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> run.status() == WorkflowStatus.FAULTED);
+		var replacement = await()
 			.atMost(IntakeScenario.WAIT)
 			.until(() -> this.scenario.waitingRun(created.claim().id).filter(waiting -> !waiting.id().equals(run.id())), Optional::isPresent)
 			.orElseThrow();
@@ -308,10 +344,12 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 		assertThat(this.scenario.intake(created.claim().id).orElseThrow())
 			.returns(replacement.id(), state -> state.reviewRunId)
 			.returns(null, state -> state.decidingRunId);
-		assertThat(this.scenario.awaitReplies(SENDER, 2))
-			.hasSize(2)
-			.last()
-			.satisfies(reply -> assertThat(reply.body()).contains("problem"));
+		// The claim is still being handled, by the replacement run, so the customer is told nothing: only the acknowledgment
+		// their first email got. A "we couldn't process your email" reply here would be wrong, and the decision the reviewer
+		// is about to take would contradict it
+		assertThat(this.scenario.replies(SENDER))
+			.singleElement()
+			.satisfies(reply -> assertThat(reply.body()).doesNotContain("problem"));
 		// The email was filed when the run began to wait, so there's nothing to move to the failed folder
 		assertThat(this.scenario.inFolder(MailFolder.FAILED)).isEmpty();
 
@@ -319,9 +357,11 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 		var requestsBefore = this.stubs.requests().size();
 		this.scenario.decide(created.claim().id, ReviewOutcome.READY, Set.of());
 
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> this.scenario.claim(created.claim().id).status.equals("In Process"));
-		assertThat(this.scenario.awaitReplies(SENDER, 3))
-			.hasSize(3)
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.scenario.claim(created.claim().id).status.equals("In Process"));
+		assertThat(this.scenario.awaitReplies(SENDER, 2))
+			.hasSize(2)
 			.last()
 			.satisfies(reply -> assertThat(reply.body()).contains(created.claim().claimNumber, "In Process"));
 		assertThat(this.stubs.requests()).hasSize(requestsBefore);
@@ -353,7 +393,10 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 
 		this.scenario.decide(created.claim().id, ReviewOutcome.READY, Set.of());
 
-		var restored = Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> this.scenario.waitingRun(created.claim().id), Optional::isPresent).orElseThrow();
+		var restored = await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.scenario.waitingRun(created.claim().id), Optional::isPresent)
+			.orElseThrow();
 
 		assertThat(restored.id()).isEqualTo(run.id());
 		assertThat(this.scenario.claim(created.claim().id).status).isEqualTo("Pending Review");
@@ -362,7 +405,9 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 
 		this.scenario.decide(created.claim().id, ReviewOutcome.READY, Set.of());
 
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> this.scenario.claim(created.claim().id).status.equals("In Process"));
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.scenario.claim(created.claim().id).status.equals("In Process"));
 		assertThat(this.scenario.awaitReplies(SENDER, 2)).hasSize(2);
 	}
 
@@ -372,7 +417,9 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 		var runId = this.scenario.awaitWaitingRun(created.claim().id).id();
 		this.scenario.decide(created.claim().id, ReviewOutcome.READY, Set.of());
 
-		Awaitility.await().atMost(IntakeScenario.WAIT).until(() -> this.scenario.instanceRows() == 0);
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.scenario.instanceRows() == 0);
 		assertThat(this.scenario.taskRows(runId)).isZero();
 	}
 }

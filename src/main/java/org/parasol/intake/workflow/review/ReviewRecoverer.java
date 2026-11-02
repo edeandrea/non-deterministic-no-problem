@@ -40,12 +40,15 @@ public class ReviewRecoverer {
 	 *
 	 * @param faultedRunId The id of the run that faulted
 	 * @param faultedRun The faulted run's input
+	 * @return What became of the review, which tells the caller whether the claim is still being handled
 	 */
-	public void recover(String faultedRunId, IntakeRun faultedRun) {
-		reviewOwnedBy(faultedRunId)
-			.ifPresent(review -> handOver(review, faultedRunId, faultedRun));
+	public ReviewHandover recover(String faultedRunId, IntakeRun faultedRun) {
+		return reviewOwnedBy(faultedRunId)
+			.map(review -> handOver(review, faultedRunId, faultedRun))
+			.orElse(ReviewHandover.NOT_NEEDED);
 	}
 
+	// Non-private and non-final, so the transaction interceptor applies to the call from this class
 	@Transactional(TxType.REQUIRES_NEW)
 	Optional<OwnedReview> reviewOwnedBy(String runId) {
 		return ClaimIntakeState.<ClaimIntakeState>find("reviewRunId = ?1 or decidingRunId = ?1", runId)
@@ -56,20 +59,32 @@ public class ReviewRecoverer {
 
 	// The new run is registered as the claim's review run before it starts, so a decision published as soon as it waits
 	// matches it
-	private void handOver(OwnedReview review, String faultedRunId, IntakeRun faultedRun) {
+	private ReviewHandover handOver(OwnedReview review, String faultedRunId, IntakeRun faultedRun) {
 		var conversationId = Optional.ofNullable(review.conversationId()).orElse(faultedRun.conversationId());
 
-		this.conversationContext.runIn(conversationId, () -> {
+		return this.conversationContext.callIn(conversationId, () -> {
 			var instance = this.flow.get().instance(IntakeRun.resumingReview(faultedRun, conversationId, review.claimId()));
 
+			// The instance has to exist before the claim can be taken over, because its id is what's written as the new
+			// reviewRunId. If the take-over then loses, the instance is never started and stays in Flow's in-memory
+			// activeInstances map: cancel() is a no-op on a PENDING instance and removeInstance isn't public
+			// (open-workflow-specification/sdk-java#1816). Harmless — the id was never persisted, so nothing looks it up —
+			// but it is a leaked map entry. Discard the instance here once that issue is resolved.
 			if (takeOver(review.claimId(), faultedRunId, instance.id())) {
 				instance.start();
 				Log.warnf("Run %s faulted while it owned the review of claim %d: run %s now waits for the decision", faultedRunId, review.claimId(), instance.id());
+
+				return ReviewHandover.DONE;
 			}
+
+			Log.warnf("Run %s faulted while it owned the review of claim %d, but another run already holds it", faultedRunId, review.claimId());
+
+			return ReviewHandover.ALREADY_ELSEWHERE;
 		});
 	}
 
 	// Under the intake state's optimistic lock: only if the faulted run still owns the review
+	// Non-private and non-final, so the transaction interceptor applies to the call from this class
 	@Transactional(TxType.REQUIRES_NEW)
 	boolean takeOver(long claimId, String faultedRunId, String newRunId) {
 		return ClaimIntakeState.findForClaim(claimId)

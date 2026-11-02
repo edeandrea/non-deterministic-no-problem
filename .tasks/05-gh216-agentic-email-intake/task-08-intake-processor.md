@@ -387,7 +387,7 @@ Outcomes (agent gotchas).
 - **Match the claim when the run starts, not at submit.** At `submit`: loop protection, record/duplicate check,
   missing Message-ID, then the queue. When the email actually starts (immediately, or at dequeue): re-read it with
   `find(PROCESSING, id)`, match the claim (regex, then headers via `ClaimCorrespondence`), sender check, conversation id,
-  then `callIn(conversationId, () -> flow.instance(new IntakeRun(...)).start())`. A queued email then sees the claim its
+  then `runIn(conversationId, () -> flow.instance(new IntakeRun(...)).start())`. A queued email then sees the claim its
   predecessor created or changed.
 - **Never start a dequeued run on Flow's listener thread.** `onWorkflowStatusChanged` runs inside Flow's lifecycle
   stages (spike 5: on varying pool threads); dispatch the start to a `ManagedExecutor` (IMAP reads and DB lookups

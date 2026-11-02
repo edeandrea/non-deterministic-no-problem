@@ -272,7 +272,9 @@ class ClaimsInboxWatcherTests {
 		var during = deliver("While silent");
 
 		// Long enough for the read timeout to fire and the watcher to reconnect while nothing gets through
-		await().pollDelay(Duration.ofSeconds(4)).until(() -> true);
+		await()
+			.pollDelay(Duration.ofSeconds(4))
+			.until(() -> true);
 
 		this.toxiproxy.speak();
 
@@ -319,7 +321,9 @@ class ClaimsInboxWatcherTests {
 		var startedAt = Instant.now();
 
 		// Let it fail once, so it's sleeping off its delay
-		await().pollDelay(Duration.ofSeconds(1)).until(watcher::isRunning);
+		await()
+			.pollDelay(Duration.ofSeconds(1))
+			.until(watcher::isRunning);
 		watcher.stop();
 
 		assertThat(watcher.isRunning()).isFalse();

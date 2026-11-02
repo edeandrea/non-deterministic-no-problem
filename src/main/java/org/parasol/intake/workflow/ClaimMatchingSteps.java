@@ -109,6 +109,7 @@ class ClaimMatchingSteps {
 	}
 
 	// Its own transaction, committed before the resolver's LLM call
+	// Non-private and non-final, so the transaction interceptor applies to the call from this class
 	@Transactional(TxType.REQUIRES_NEW)
 	List<Offered> pendingClaimsOf(String sender) {
 		return Claim.findByEmailAddressAndStatus(sender, PENDING_STATUSES)

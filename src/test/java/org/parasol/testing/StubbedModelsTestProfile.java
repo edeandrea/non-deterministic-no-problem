@@ -38,6 +38,12 @@ import io.quarkiverse.wiremock.devservice.ConnectWireMock;
  *   application whenever two classes' test resources differ, so a class with it and one without would each boot. Quarkus reads
  *   test resource annotations on the profile class too, which gives every class on the profile (and its subclasses) the same
  *   set. A {@code WireMock} field in a test class is still injected.</li>
+ *   <li><b>No test here may {@code @InjectMock} an intake agent.</b> Every one of them runs as a real bean against the
+ *   WireMock stubs, which is what keeps the whole agent topology on the tested path. quarkus-langchain4j resolves a
+ *   sub-agent once, when the root agent is built, and unwraps the client proxy, so a mock installed while the root is built
+ *   can stay baked into it for the rest of the application's life — and this profile is one boot shared by every intake test
+ *   class. A test that genuinely needs to mock an agent needs a {@code @TestProfile} of its own (at the cost of another full
+ *   boot), not this one.</li>
  * </ul>
  */
 @ConnectWireMock

@@ -92,6 +92,7 @@ public class ClaimReviewService {
 	// Its own transaction: losing the claim's lock to a reply or another decision fails it at the flush, which is
 	// turned into a ReviewLockLostException here. The reviewed values are only checked against the claim here; the
 	// decision step sets them, in the transaction that changes the status
+	// Non-private and non-final, so the transaction interceptor applies to the call from this class
 	@Transactional(TxType.REQUIRES_NEW)
 	String claimReview(long claimId, long expectedVersion, ReviewedFields fields) {
 		var state = ReviewGuard.openReview(claimId, expectedVersion, LockModeType.NONE);
@@ -145,6 +146,7 @@ public class ClaimReviewService {
 	}
 
 	// Compensating transaction: a failed step-2 check would otherwise leave the claim stuck "being decided"
+	// Non-private and non-final, so the transaction interceptor applies to the call from this class
 	@Transactional(TxType.REQUIRES_NEW)
 	void restoreReview(long claimId, String runId) {
 		ClaimIntakeState.findForClaim(claimId)

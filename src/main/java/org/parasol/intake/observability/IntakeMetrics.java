@@ -43,8 +43,13 @@ import io.micrometer.core.instrument.Timer;
 
 /**
  * The email intake's metrics: what came in and what became of it. It observes the {@link IntakeActivity} the intake fires, so
- * the intake's code never touches a meter. Every tag has a small, fixed set of values, so no claim number, {@code Message-ID},
- * address or conversation id ever becomes a tag.
+ * the intake's code never touches a meter.
+ * <p>
+ *   Every tag value is bounded and comes from the code itself — an enum constant, a reply template's name, a mail operation
+ *   or an exception's class name — so no claim number, {@code Message-ID}, address or conversation id ever becomes a tag.
+ *   All of them but one are a small fixed set; {@code exception} is bounded only by the classpath, which is the point of it,
+ *   so group a dashboard by the enumerated {@code stage} rather than by {@code exception}.
+ * </p>
  */
 @Startup
 @ApplicationScoped

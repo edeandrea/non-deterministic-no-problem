@@ -80,17 +80,20 @@ public class PolicyCheckStep {
 			: state.withPolicy(statedNumber, false);
 	}
 
+	// Non-private and non-final, so the transaction interceptor applies to the call from this class
 	@Transactional(TxType.REQUIRES_NEW)
 	String unusedPolicyNumber() {
 		return PolicyNumbers.generateUnused();
 	}
 
+	// Non-private and non-final, so the transaction interceptor applies to the call from this class
 	@Transactional(TxType.REQUIRES_NEW)
 	Optional<Current> currentPolicy(long claimId) {
 		return Claim.<Claim>findByIdOptional(claimId)
 			.map(found -> new Current(found.policyNumber, ClaimIntakeState.findForClaim(found.id).map(intake -> intake.policyNumberGenerated).orElse(false)));
 	}
 
+	// Non-private and non-final, so the transaction interceptor applies to the call from this class
 	@Transactional(TxType.REQUIRES_NEW)
 	List<SameCustomerRule.Holder> holdersOf(String policyNumber) {
 		return Claim.<Claim>list("policyNumber", policyNumber)

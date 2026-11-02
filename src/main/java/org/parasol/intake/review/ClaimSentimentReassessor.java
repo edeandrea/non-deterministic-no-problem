@@ -53,6 +53,7 @@ public class ClaimSentimentReassessor {
 		return sentiment;
 	}
 
+	// Non-private and non-final, so the transaction interceptor applies to the call from this class
 	@Transactional(TxType.REQUIRES_NEW)
 	String correspondenceUnderReview(long claimId, long expectedVersion) {
 		var state = ReviewGuard.openReview(claimId, expectedVersion, LockModeType.NONE);
@@ -61,6 +62,7 @@ public class ClaimSentimentReassessor {
 	}
 
 	// Locked so a reply superseding the review, or a decision claiming it, can't commit between the check and the write
+	// Non-private and non-final, so the transaction interceptor applies to the call from this class
 	@Transactional(TxType.REQUIRES_NEW)
 	void store(long claimId, long expectedVersion, String sentiment) {
 		ReviewGuard.openReview(claimId, expectedVersion, LockModeType.PESSIMISTIC_WRITE).claim.sentiment = sentiment;

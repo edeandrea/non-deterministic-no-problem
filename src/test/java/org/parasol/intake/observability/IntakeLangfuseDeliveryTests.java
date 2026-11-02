@@ -1,6 +1,7 @@
 package org.parasol.intake.observability;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 import java.time.Duration;
 import java.util.List;
@@ -12,7 +13,6 @@ import java.util.stream.Stream;
 
 import jakarta.inject.Inject;
 
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.IntakeFlowTestBase;
@@ -67,7 +67,7 @@ class IntakeLangfuseDeliveryTests extends IntakeFlowTestBase {
 		stubFollowUp(marker, COMPLETE_DETAILS.replace("Elm Street", "Oak Avenue"));
 		var followUpId = this.scenario.submit(Mail.from(SENDER).inReplyTo(created.messageId()).body("Actually Oak Avenue. " + marker));
 		this.scenario.awaitFiled(followUpId);
-		var reviewRun = Awaitility.await()
+		var reviewRun = await()
 			.atMost(IntakeScenario.WAIT)
 			.until(() -> this.scenario.waitingRun(claimId).filter(run -> !run.id().equals(firstRunId)), Optional::isPresent)
 			.orElseThrow();
@@ -115,7 +115,8 @@ class IntakeLangfuseDeliveryTests extends IntakeFlowTestBase {
 			.sessionId(conversationId)
 			.fields("core,basic,metadata")
 			.build();
-		Awaitility.await()
+
+		await()
 			.atMost(Duration.ofSeconds(90))
 			.pollInterval(Duration.ofSeconds(1))
 			.untilAsserted(() -> {

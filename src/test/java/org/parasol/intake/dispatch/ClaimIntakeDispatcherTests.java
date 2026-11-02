@@ -1,6 +1,7 @@
 package org.parasol.intake.dispatch;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 import java.time.Duration;
 import java.util.List;
@@ -9,7 +10,6 @@ import java.util.UUID;
 import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
 
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.IntakeFlowTestBase;
 import org.parasol.intake.IntakeScenario.Mail;
@@ -94,7 +94,9 @@ class ClaimIntakeDispatcherTests extends IntakeFlowTestBase {
 		this.scenario.awaitFiled(this.scenario.submit(Mail.from(SENDER).messageId(messageId).body("Newsletter please. " + marker)));
 		this.scenario.submit(Mail.from(SENDER).messageId(messageId).body("Newsletter please. " + marker));
 
-		Awaitility.await().atMost(Duration.ofSeconds(30)).until(() -> this.scenario.inFolder(MailFolder.PROCESSING).isEmpty());
+		await()
+			.atMost(Duration.ofSeconds(30))
+			.until(() -> this.scenario.inFolder(MailFolder.PROCESSING).isEmpty());
 		assertThat(this.scenario.awaitReplies(SENDER, 1)).hasSize(1);
 	}
 
@@ -103,7 +105,9 @@ class ClaimIntakeDispatcherTests extends IntakeFlowTestBase {
 		this.scenario.submit(Mail.from(SENDER).header("Auto-Submitted", "auto-replied").body("Out of office"));
 		this.scenario.submit(Mail.from("claims@parasol.com").body("From ourselves"));
 
-		Awaitility.await().atMost(Duration.ofSeconds(30)).until(() -> this.scenario.inFolder(MailFolder.PROCESSED).size() == 2);
+		await()
+			.atMost(Duration.ofSeconds(30))
+			.until(() -> this.scenario.inFolder(MailFolder.PROCESSED).size() == 2);
 
 		assertThat(this.scenario.replies(SENDER)).isEmpty();
 		assertThat(this.scenario.replies("claims@parasol.com")).isEmpty();

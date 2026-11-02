@@ -87,6 +87,7 @@ public class ReplySteps {
 		return state;
 	}
 
+	// Non-private and non-final, so the transaction interceptor applies to the call from this class
 	@Transactional(TxType.REQUIRES_NEW)
 	Optional<ClaimView> claimView(long claimId) {
 		return Claim.<Claim>findByIdOptional(claimId)

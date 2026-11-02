@@ -3,9 +3,11 @@ package org.parasol.intake.failure;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import org.eclipse.microprofile.context.ManagedExecutor;
+import org.parasol.intake.observability.FailureOutcome;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
 import org.parasol.intake.workflow.IntakeRun;
 import org.parasol.intake.workflow.review.ReviewRecoverer;
+import org.parasol.intake.workflow.review.ReviewHandover;
 
 import io.quarkus.logging.Log;
 import io.serverlessworkflow.impl.lifecycle.WorkflowExecutionListener;
@@ -13,8 +15,10 @@ import io.serverlessworkflow.impl.lifecycle.WorkflowFailedEvent;
 
 /**
  * Handles every faulted intake run, before or after its review wait: a review the run owned is handed to a new run
- * ({@link ReviewRecoverer}), then {@link IntakeFailureHandler#handle}. The work (IMAP and SMTP)
- * runs off Flow's thread. No partial claim is left behind: each persistence step committed only its own transaction.
+ * ({@link ReviewRecoverer}), and then {@link IntakeFailureHandler#handle} files and answers the email if it still needs
+ * answering. Whether the hand-over happened only decides how the failure is counted, not what the customer hears. The
+ * work (IMAP and SMTP) runs off Flow's thread. No partial claim is left behind: each persistence step committed only its
+ * own transaction.
  */
 @ApplicationScoped
 public class IntakeFailureListener implements WorkflowExecutionListener {
@@ -42,14 +46,22 @@ public class IntakeFailureListener implements WorkflowExecutionListener {
 		}
 	}
 
+	// What the customer hears is the handler's call, from where the email is. What the recovery decides is only how the
+	// failure is counted: a claim another run picked up is self-healing, one nothing picked up needs an operator.
 	private void handle(String runId, IntakeRun run, Throwable cause) {
+		var outcome = recover(runId, run).isClaimStillHandled() ? FailureOutcome.RECOVERED : FailureOutcome.FATAL;
+
+		this.failureHandler.handle(run.messageId(), cause, outcome);
+	}
+
+	private ReviewHandover recover(String runId, IntakeRun run) {
 		try {
-			this.reviewRecoverer.recover(runId, run);
+			return this.reviewRecoverer.recover(runId, run);
 		}
 		catch (RuntimeException e) {
 			Log.errorf(e, "Couldn't hand over the review of run %s", runId);
-		}
 
-		this.failureHandler.handle(run.messageId(), cause);
+			return ReviewHandover.NOT_NEEDED;
+		}
 	}
 }

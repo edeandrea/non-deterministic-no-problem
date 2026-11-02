@@ -2,6 +2,7 @@ package org.parasol.intake.agent;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.awaitility.Awaitility.await;
 
 import java.util.List;
 import java.util.Map;
@@ -11,7 +12,6 @@ import java.util.stream.Stream;
 
 import jakarta.inject.Inject;
 
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.ChatStubs;
@@ -97,7 +97,7 @@ class FailedAgenticSystemTests {
 				SENT_DATE,
 				ClaimStatusTools.scopedTo(MatchedClaim.none())));
 
-		Awaitility.await()
+		await()
 			.atMost(IntakeScenario.WAIT)
 			.untilAsserted(() -> {
 				assertThat(this.scenario.agenticRunIds())

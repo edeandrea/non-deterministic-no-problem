@@ -12,8 +12,10 @@ import org.parasol.intake.model.EmailType;
 import org.parasol.intake.review.ReviewOutcome;
 
 /**
- * Something the email intake did, fired as a CDI event so the code that did it knows nothing about metrics. Every value has
- * a small, fixed set of possibilities, never a claim number, {@code Message-ID}, address or conversation id.
+ * Something the email intake did, fired as a CDI event so the code that did it knows nothing about metrics. Every value that
+ * reaches a meter tag is bounded by the code — an enum constant, a reply template's name, a mail operation or an exception's
+ * class name — and never a claim number, {@code Message-ID}, address or conversation id. All but {@code exception} are a
+ * small fixed set.
  */
 public sealed interface IntakeActivity {
 	/**
