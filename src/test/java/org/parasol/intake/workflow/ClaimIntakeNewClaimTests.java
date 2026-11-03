@@ -22,10 +22,8 @@ import org.parasol.intake.MissingItem;
 import org.parasol.intake.config.IntakeConfig;
 import org.parasol.intake.mailbox.MailFolder;
 import org.parasol.intake.model.EmailType;
-import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 import io.serverlessworkflow.impl.WorkflowInstance;
 import io.serverlessworkflow.impl.WorkflowStatus;
 import io.serverlessworkflow.impl.persistence.PersistenceInstanceReader;
@@ -34,7 +32,6 @@ import io.serverlessworkflow.impl.persistence.PersistenceInstanceReader;
  * New claims, end to end against the Compose GreenMail and a stubbed model.
  */
 @QuarkusTest
-@TestProfile(StubbedModelsTestProfile.class)
 class ClaimIntakeNewClaimTests extends IntakeFlowTestBase {
 	@Inject
 	IntakeConfig config;

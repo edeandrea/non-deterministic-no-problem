@@ -11,17 +11,14 @@ import org.parasol.intake.IntakeScenario.Mail;
 
 import org.parasol.intake.IntakeFlowTestBase;
 import org.parasol.intake.mailbox.MailFolder;
-import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 
 /**
  * The failure path before a run waits: the email goes to the failed folder and the sender gets the processing-problem
  * reply. (Faults after the review wait are in {@code ClaimIntakeReviewTests}.)
  */
 @QuarkusTest
-@TestProfile(StubbedModelsTestProfile.class)
 class IntakeFailureHandlerTests extends IntakeFlowTestBase {
 	@Test
 	void anEmailWithoutAMessageIdIsFailedWithAProblemReplyAndNoRun() {

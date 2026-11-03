@@ -18,16 +18,13 @@ import org.parasol.claim.model.ClaimCategory;
 import org.parasol.claim.model.ClaimCorrespondence;
 import org.parasol.claim.model.CorrespondenceDirection;
 import org.parasol.intake.MissingItem;
-import org.parasol.testing.StubbedModelsTestProfile;
 import org.parasol.testing.mail.GreenMailMailbox;
 import org.parasol.testing.mail.ReceivedEmail;
 
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 
 @QuarkusTest
-@TestProfile(StubbedModelsTestProfile.class)
 class IntakeReplySenderTests {
 	private static final Duration WAIT_DURATION = Duration.ofSeconds(30);
 

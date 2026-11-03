@@ -24,7 +24,6 @@ import org.parasol.claim.model.ClaimCategory;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.model.ClaimExtraction;
 import org.parasol.intake.model.IncidentDetails;
-import org.parasol.testing.StubbedModelsTestProfile;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,14 +31,12 @@ import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
 import dev.langchain4j.guardrails.JsonExtractorOutputGuardrail;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 
 /**
  * The extraction workflow end to end against a stubbed model. Stubs match on the last message only (spike Q6), so a
  * reprompt, which arrives as a new last message, gets its own stub.
  */
 @QuarkusTest
-@TestProfile(StubbedModelsTestProfile.class)
 class ClaimExtractionWorkflowTests {
 	private static final String SENT_DATE = "2026-10-08";
 	private static final String SUMMARY = "The claimant's car hit another vehicle at the Elm Street junction.";

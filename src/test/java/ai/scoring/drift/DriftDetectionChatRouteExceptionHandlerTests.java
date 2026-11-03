@@ -19,11 +19,9 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.parasol.chat.model.ClaimBotQuery;
-import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 
 import com.github.tomakehurst.wiremock.client.WireMock;
 import dev.langchain4j.guardrail.OutputGuardrail;
@@ -39,7 +37,6 @@ import io.quarkiverse.langchain4j.chatscopes.LocalChatRoutes;
  * evaluation strategy - those are covered by {@link DriftDetectionOutputGuardrailTests}.
  */
 @QuarkusTest
-@TestProfile(StubbedModelsTestProfile.class)
 class DriftDetectionChatRouteExceptionHandlerTests {
 	private static final DriftDetectionException DRIFT = DriftDetectionException.builder()
 		.sampleSetName("langchain4j.aiservices.ClaimService.chat")

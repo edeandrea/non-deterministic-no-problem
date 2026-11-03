@@ -19,12 +19,10 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.Mock;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 
 import ai.scoring.config.InteractionMode;
 import ai.scoring.config.ScoringConfig;
@@ -51,7 +49,6 @@ import io.smallrye.config.Config;
 import io.smallrye.config.SmallRyeConfig;
 
 @QuarkusTest
-@TestProfile(StubbedModelsTestProfile.class)
 class DriftDetectionOutputGuardrailTests {
 	private static final String DATASET_NAME = "langchain4j.aiservices.SomeInterface.method";
 	private static final OutputGuardrailRequest DEFAULT_REQUEST = OutputGuardrailRequest.builder()

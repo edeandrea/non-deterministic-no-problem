@@ -645,7 +645,7 @@ The two Ollama profiles are **not** equivalent:
 | Profile | Purpose |
 |---|---|
 | `dev` | `datasource.dev-ui.allow-sql`, `parasol.dev-seed.enabled` and the intake watcher's `idle-refresh: 10s`. The LGTM, PostgreSQL and Langfuse dev services do run in dev mode, but they come from the extensions' own Dev Services defaults, not from this profile block. The GreenMail/Roundcube mail stack and `mailer.mock: false` are root-level config (see Commands) |
-| `test` | Observability + Langfuse init/session scoring disabled; `compose.devservices.profiles` blanked so Roundcube doesn't start (`UiTestProfile` turns it back on) |
+| `test` | Observability + Langfuse init/session scoring disabled; `compose.devservices.profiles` blanked so Roundcube doesn't start (`UiTestProfile` turns it back on); also carries the default test-group model stubbing (see *Testing* and C1/C2 there). Not active under `DriftTestProfile` (`ai.scoring.it.DriftDetectionTests`), which replaces the config profile with `drift` entirely rather than adding to it, so none of `%test`'s stubbing applies to the gated-off drift tests |
 | `ollama` | Local Ollama via the Ollama extension; OpenAI/Cohere keys stubbed to `changeme`; Langfuse session scoring + startup init disabled |
 | `ollama-openai` | Local Ollama via the OpenAI client (`base-url: http://localhost:11434/v1`); no key stubs, no `quarkus.aiscoring` overrides |
 | `drift` | Parent `langfuse-ocp`; sets `quarkus.aiscoring.interaction-mode: drift-detection` |
@@ -800,10 +800,12 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   for chat tests (`ClaimWebsocketChatBotTests`).
 - Playwright E2E tests in `org.parasol.ui`, extending the `@WithPlaywright` `PlaywrightTests` base
   class (records video to `target/playwright`). They all share `UiTestProfile` (one boot): Quinoa's `EnableAndRunTests`
-  overrides, which also run the frontend Jest suite (see Frontend above), plus only the `claim-intake` model on WireMock
-  (`StubbedModelsTestProfile.claimIntakeOnWireMock()`). Every other model stays real, with Easy RAG ingestion at boot, because
-  `ClaimsDetailPageTests.pageLoads` talks to the real chat bot.
-  - **`ClaimReviewPanelPageTests`** is why `claim-intake` is on WireMock there (and `UiTestProfile` carries `@ConnectWireMock`): the review
+  overrides, plus un-stubbing `parasol-chat` and the embedding model back to real (with real Easy RAG ingestion at boot,
+  because `ClaimsDetailPageTests.pageLoads` talks to the real chat bot) via the `parasol.models.*` indirection (see
+  *Models* below). `claim-intake` needs no override here: the `%test` config profile already pins it on WireMock, the
+  same as every other test. WireMock itself is connected globally (`org.parasol.testing.GlobalTestResources`), not per
+  profile.
+  - **`ClaimReviewPanelPageTests`** is why `claim-intake` stays on WireMock there: the review
     panel only renders its buttons for a claim whose review is genuinely open (`ClaimReviewState.open`), which only a real
     waiting `ClaimIntakeFlow` run produces. It drives a real email through `IntakeScenario` to get one, then uses the
     panel: the controls (every "Ask customer" checkbox, the edit fields, Submit/Request more information and Regenerate)
@@ -860,57 +862,110 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   was tried and rejected: its 256K context blows the test's 5-minute transaction budget even at
   `num-ctx=8192`. **Don't re-enable the last leg by relaxing the guardrail** — the system prompt and
   the reprompt both say "EXACTLY as it appears below", and enforcing that is the point of the demo.
-- **Mocking LLM calls:** the Quarkus WireMock dev service (`@ConnectWireMock` + an injected
-  `WireMock`). A `QuarkusTestProfile` repoints every relevant `quarkus.langchain4j.openai.*.base-url`
-  (including `parasol-chat`, `session-sentiment`, `judge`) at
-  `http://localhost:${quarkus.wiremock.devservices.port}/v1`, then stubs the
-  OpenAI-compatible `/chat/completions` endpoint. Stubs are registered programmatically in
-  `@BeforeEach`; there are no WireMock mapping files. (`src/test/resources` only holds
+- **Mocking LLM calls:** the Quarkus WireMock dev service, connected globally (`org.parasol.testing.GlobalTestResources`)
+  and injected as a `WireMock` field. The `%test` config profile repoints the relevant
+  `quarkus.langchain4j.openai.*.base-url`s (`parasol-chat`, `claim-intake`, the unnamed/embedding client) at
+  `http://localhost:${quarkus.wiremock.devservices.port}/v1`; `LangfuseExportTestProfile` adds `session-sentiment` and
+  `judge` for the session-scoring tests, then stubs the OpenAI-compatible `/chat/completions` endpoint. Stubs are
+  registered programmatically in `@BeforeEach`; there are no WireMock mapping files. (`src/test/resources` only holds
   `seed/claim-images/empty-for-tests.jpg`, an empty file for `ClaimImageSeederTests`; WireMock reads only its
   `mappings/` and `__files/` subdirectories, so it's unaffected.)
 - **Every distinct `@TestProfile` class is a full application boot.** Quarkus restarts the application, and with it the Dev
   Services (Postgres, GreenMail, Langfuse, WireMock), whenever the profile class changes, which is most of this suite's
   run time. Quarkus already runs the classes grouped by profile (`QuarkusTestProfileAwareClassOrderer` is registered as a
   global `ClassOrderer` by default; `quarkus.test.class-orderer` sets its secondary order), so the number of boots is the
-  number of distinct profiles. **Don't add a profile for one test;** a test whose config is additive belongs in an existing one.
+  number of distinct profiles. **Don't add a profile for one test;** a test whose config is additive belongs in the `%test`
+  config profile (the bare group) or an existing `@TestProfile`.
   **A change in a class's test resources is a boot too.** Quarkus compares each class's set of `@QuarkusTestResource`s
   (`TestResourceManager.testResourcesRequireReload`), and `@ConnectWireMock` and `@WithPlaywright` are both test resources.
-  So `@ConnectWireMock` sits on the profile classes, never on a test class: Quarkus reads test-resource annotations on the profile
-  too, so every class on a profile gets the same set, and `WireMock` fields are still injected. A test class on one of these
-  profiles adds no test-resource annotation of its own. **The Playwright classes still boot once each:** `@WithPlaywright` has
-  array attributes, which Quarkus 3.40 compares by identity, so two identical annotations never match. quarkusio/quarkus#56443
-  (4.0.0.Beta1) fixes it; once a Quarkus we're on has it, the UI classes share one boot.
-  There are four profiles (five with the gated-off drift tests), so eight boots in a full `verify` (five of them the five Playwright classes):
-  - **none** (the `%test` defaults): the tests that need real models, a real key and boot-time Easy RAG ingestion.
-  - **`org.parasol.testing.StubbedModelsTestProfile`**: every test whose models are stubbed or never called. That's the intake
-    tests, the tests of what the intake stores, `DriftDetectionOutputGuardrailTests`, `LangfuseDatasetSampleLoaderTests` and
-    `DriftDetectionChatRouteExceptionHandlerTests`. It sets stub keys and Easy RAG ingestion off, and points `claim-intake`,
-    `parasol-chat`, the default OpenAI model and embeddings at WireMock with their providers pinned. It also turns Hibernate
-    statistics on, exports spans every 100 ms and starts Toxiproxy. **No test on it may `@InjectMock` an intake agent:**
-    quarkus-langchain4j resolves and unwraps a sub-agent once, when the root agent is built, so a mock installed while the
-    root is built can stay baked into it for the rest of the application's life — and this profile is one boot shared by
-    every intake test class. Today none do; every agent runs as a real bean against WireMock, which is what keeps the whole
-    topology on the tested path. A test that must mock one needs its own profile, and another boot.
-  - **`org.parasol.ui.UiTestProfile`**: every Playwright test (see above). It also starts Roundcube.
-  - **`org.parasol.testing.LangfuseExportTestProfile`** (extends the stubbed one): the build-time Langfuse exporter
-    (`AI_ONLY`), session scoring, dataset creation and startup initialization, for `LangfuseSessionScoringServiceTests` and
-    `IntakeLangfuseDeliveryTests`. The intake never ends a chat scope, so its runs aren't scored.
+  WireMock and Toxiproxy are registered once, globally, by `org.parasol.testing.GlobalTestResources` (a plain holder class
+  carrying `@QuarkusTestResource(WireMockServerConnector.class)` and `@QuarkusTestResource(ToxiproxyTestResource.class)`
+  directly — **not** `@ConnectWireMock`), so every test class in the module gets the identical reload key regardless of
+  profile, and `WireMock`/`Toxiproxy` fields are still injected. **This keeps the boot count from fragmenting on these two
+  resources — it does not mean their Dev Service containers survive across boots.** Measured directly (2026-11-03,
+  `-Pollama verify` log): both the WireMock Dev Service and the Toxiproxy container restart once per boot (3 times total)
+  regardless of this `GLOBAL` scope, because a `@TestProfile` change still forces a new `FacadeClassLoader`/augmentation,
+  and a Dev-Service-backed test resource is tied to that build, not to `TestResourceManager`'s JUnit-level
+  resource-identity comparison. `GLOBAL` scope only guarantees every class in a boot shares the same reload key (so the
+  resource doesn't itself split the group into more boots) — it's not a mechanism for sharing a container *across* boots.
+  Toxiproxy costs ~8.3-8.9s per boot (~25s/run for a container only `ClaimsInboxWatcherTests` needs); not worth chasing
+  further, since scoping it to just that class would give it a different resource signature than its ~53 siblings and
+  fragment the bare `%test` group back into two boots — undoing the consolidation to save a smaller amount.
+  **`@ConnectWireMock` can't be put on a holder class for
+  this:** it's a meta-annotation, and `TestResourceManager.getUniqueTestResourceClassEntries` only discovers
+  meta-annotations by reflecting over a test class's own superclass chain, enclosing-class chain and `@TestProfile` class
+  (`collectMetaAnnotations`) — never over an unrelated class, even though the Jandex-indexed direct-annotation path would
+  otherwise see it (it explicitly skips annotation types in `keepTestResourceAnnotation`). With no profile class for the
+  default test group there is nowhere to hang `@ConnectWireMock`, so `WireMockServerConnector` is registered directly.
+  Filed upstream as [quarkusio/quarkus#58084](https://github.com/quarkusio/quarkus/issues/58084) — revert to
+  `@ConnectWireMock` on the holder once that's fixed. **The Playwright classes now share one boot:** `@WithPlaywright` has
+  the array attribute `args()`, and the JDK annotation proxy clones a non-empty array on every read, so the default
+  `{"--disable-gpu"}` gave each of the five UI classes a different reload key. `PlaywrightTests` sets `args = {}` (an
+  explicitly empty array isn't cloned) as a workaround. quarkusio/quarkus#56443 (4.0.0.Beta1) was the first attempted fix
+  but didn't override `toString()` (what `getReloadGroupIdentifier` actually joins on), so it didn't help; the real fix is
+  [quarkusio/quarkus#57464](https://github.com/quarkusio/quarkus/issues/57464)
+  ([PR #57465](https://github.com/quarkusio/quarkus/pull/57465), milestone 4.0.0.Beta2, carries the `triage/backport-3.40`
+  label for a queued-but-unreleased 3.40.x backport). Restore the real `args` default once a 3.40.x with that backport
+  ships — see [#286](https://github.com/edeandrea/non-deterministic-no-problem/issues/286).
+  There are **three** profiles (four with the gated-off drift tests), so **three boots** in a full `verify`:
+  - **none** (the bare `%test` group): everything whose models are stubbed or never called — the intake tests, the tests
+    of what the intake stores, `DriftDetectionOutputGuardrailTests`, `LangfuseDatasetSampleLoaderTests`,
+    `DriftDetectionChatRouteExceptionHandlerTests`, and every other class with no `@TestProfile`. The model stubbing
+    (stub keys, Easy RAG ingestion off, `claim-intake`/`parasol-chat`/the default OpenAI model/embeddings on WireMock with
+    their providers pinned), Hibernate statistics and the 100 ms span-export interval all live directly in the `%test`
+    config profile of `application.yml` now — there is no profile class carrying them. **No test in this group may
+    `@InjectMock` an intake agent:** quarkus-langchain4j resolves and unwraps a sub-agent once, when the root agent is
+    built, so a mock installed while the root is built can stay baked into it for the rest of the application's life —
+    and this group is one boot shared by every intake test class (and everything else with no `@TestProfile`, ~54 classes
+    total). Today none do; every agent runs as a real bean against WireMock, which is what keeps the whole topology on the
+    tested path. A test that must mock one needs its own `@TestProfile`, and another boot.
+  - **`org.parasol.ui.UiTestProfile`**: every Playwright test (see above). It also starts Roundcube, and disables the
+    Langfuse Dev Service (`quarkus.langfuse.devservices.enabled: false`) since no UI test touches `LangfuseOperations` —
+    without it the Dev Service's six-container stack (Postgres, ClickHouse, Redis, MinIO, Langfuse, Langfuse-worker)
+    started here for no reason, costing ~20-30s.
+  - **`org.parasol.testing.LangfuseExportTestProfile`** (`implements QuarkusTestProfile` directly — the `%test` stubbing
+    applies on its own, with no superclass needed): the build-time Langfuse exporter (`AI_ONLY`), session scoring, dataset
+    creation and startup initialization, for `LangfuseSessionScoringServiceTests` and `IntakeLangfuseDeliveryTests`. The
+    intake never ends a chat scope, so its runs aren't scored.
+- **C1 — multiple active profiles resolve right-to-left, the opposite of intuition.**
+  `io.smallrye.config.ProfileConfigSourceInterceptor` reverses the profile list before resolving, and the pom sets
+  `quarkus.test.profile=ollama,test` / `=ollama-openai,test`, so **`%test` always wins over `%ollama` and
+  `%ollama-openai`**, not the other way round. Any key added to `%test` therefore silently overrides both Maven profiles —
+  this is *why* the model stubbing in `%test` works at all (it has to beat `%ollama`'s `provider: ollama`), and it's also
+  why `parasol.models.provider` / `parasol.models.base-url` (the indirection `UiTestProfile` reads to recover "the real
+  model" under whichever Maven profile is active) are owned by the Maven profiles (`%ollama`, `%ollama-openai`, and the
+  root default), never by `%test`. Be careful adding anything new to `%test`: it is not scoped to "test mode on top of
+  whatever Maven profile is active" the way you'd expect — it's on top, and in charge.
+- **C2 — named OpenAI clients do not inherit the unnamed client's config.** Each named config group
+  (`quarkus.langchain4j.openai.<name>.*`) carries its own `@WithDefault` `base-url`/`api-key`
+  (`LangChain4jOpenAiConfig.OpenAiConfig`), and `OpenAiRecorder` resolves `defaultConfig()` vs `namedConfig().get(name)`
+  with no fallback between them. `application.yml` proves it by repeating the keys everywhere (`generate-email` repeats
+  `api-key`; `%ollama-openai` repeats `base-url` for all four chat models). So stubbing the unnamed
+  `quarkus.langchain4j.openai.base-url`/`api-key` does **not** touch `generate-email` or `politeness` — that's
+  deliberate: those two keep real keys and real models, by design (see *No live coverage is lost* in the test-profile
+  consolidation history), so `NotificationServiceTests.emailSendsWhenUserExists` keeps exercising a live model. The
+  `embedding-model` segment *is* part of the unnamed client, so it does need stubbing there.
 - **A WireMock-backed profile must also pin the provider.** Redirecting `...openai.*.base-url` is
   not enough: `%ollama` sets `quarkus.langchain4j.parasol-chat.chat-model.provider: ollama` (and the
   same for `embedding-model`), so under `-Pollama` the request never goes near the OpenAI client and
   the stub is silently bypassed — the test then runs against a real model and inherits its
-  non-determinism. Every mocking profile (`StubbedModelsTestProfile`) therefore also sets
-  `quarkus.langchain4j.parasol-chat.chat-model.provider=openai` and
+  non-determinism. `%test` therefore also sets `quarkus.langchain4j.parasol-chat.chat-model.provider=openai`,
+  `quarkus.langchain4j.claim-intake.chat-model.provider=openai` and
   `quarkus.langchain4j.embedding-model.provider=openai`. They look redundant under the default
-  profile; they are not. This is what made `LangfuseSessionScoringServiceTests` flaky — llama3.2
-  decided to call `updateClaimStatus`, which produced a second `GENERATION`.
-- **Easy RAG in WireMock-backed profiles:** `StubbedModelsTestProfile` repoints the default
+  profile; they are not — and per C1, `%test`'s pin always wins over `%ollama`'s. This is what made
+  `LangfuseSessionScoringServiceTests` flaky before this was in place — llama3.2
+  decided to call `updateClaimStatus`, which produced a second `GENERATION`. `UiTestProfile` has to reverse the pin back
+  to `${parasol.models.provider}` for `parasol-chat` and the embedding model, since it needs them real.
+- **Easy RAG in WireMock-backed profiles:** `%test` repoints the default
   `quarkus.langchain4j.openai.base-url` at WireMock (for `DriftDetectionChatRouteExceptionHandlerTests` and
-  `LangfuseSessionScoringServiceTests`), so it also sets `quarkus.langchain4j.easy-rag.ingestion-strategy=OFF`.
-  Otherwise Easy RAG ingests the policy documents at boot, calling `/v1/embeddings` before the
-  `@BeforeEach` stubs exist. With `OFF` the in-memory store starts empty and `easy-rag-embeddings.json`
-  is neither read nor written; queries are still embedded at chat time, so those tests keep a
-  1536-dimension `/v1/embeddings` stub.
+  `LangfuseSessionScoringServiceTests`), so it also sets `quarkus.langchain4j.easy-rag.ingestion-strategy: "OFF"` —
+  **quoted**, because YAML 1.1 parses an unquoted `OFF` as the boolean `false`, which then fails to convert to the
+  `IngestionStrategy` enum at boot (`SRCFG00049: Cannot convert false to enum class …IngestionStrategy`) for every test
+  class on the affected profile, not just one. Otherwise Easy RAG ingests the policy documents at boot, calling
+  `/v1/embeddings` before the `@BeforeEach` stubs exist. With `OFF` the in-memory store starts empty and
+  `easy-rag-embeddings.json` is neither read nor written; queries are still embedded at chat time, so those tests keep a
+  1536-dimension `/v1/embeddings` stub. `UiTestProfile` overrides it back to `"ON"` (set as a plain Java `String` literal
+  in `getConfigOverrides()`, so it never goes through YAML parsing and the boolean-coercion trap doesn't apply there).
 - **Easy RAG with stub keys:** `OFF` matters for the tests that only need the stub keys
   (`DriftDetectionOutputGuardrailTests`, `LangfuseDatasetSampleLoaderTests`) too. Under the default profile, boot-time
   ingestion would call the real OpenAI embeddings API with the `changeme` stub key and fail startup with a
@@ -949,12 +1004,12 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   through `ClaimsMailbox`: plain text, HTML-only, alternative, image and skipped attachments, auto-reply headers, quoted
   text, find by `Message-ID` and moving between folders. `QuotedTextTests` and `HtmlTextTests` are plain unit tests.
   `IntakeExtensionsTests` checks the app boots with the agentic and quarkus-flow extensions and Flow's three tables
-  exist. They share `org.parasol.testing.StubbedModelsTestProfile` (stub keys, Easy RAG ingestion off).
-- **Inbox watcher tests** (`ClaimsInboxWatcherTests`, `org.parasol.intake.mailbox`): each test builds its own `ClaimsInboxWatcher` with short timings and a mocked `Event<EmailReceived>`. It can't be `@InjectMock ClaimIntakeDispatcher`: `@InjectMock` disables the observers declared on the mocked bean (quarkusio/quarkus#11122; `@InjectSpy` keeps them, since #51790), so the mock would never be notified. Network faults (connection dropped, silent, unreachable) come from a **Toxiproxy** Testcontainers container, because WireMock only speaks HTTP: `ToxiproxyTestResource` (a `QuarkusTestResourceLifecycleManager`, registered by `StubbedModelsTestProfile.testResources()`, so no extra boot) starts it, and `org.parasol.testing.mail.Toxiproxy` drives it. Its upstream is GreenMail's mapped IMAP port through `host.testcontainers.internal`, since GreenMail is a Compose container. Only the watcher's IDLE session goes through the proxy. Track [quarkus-network-faults#14](https://github.com/quarkiverse/quarkus-network-faults/issues/14) (IMAP support): it may replace this.
+  exist. They share the bare `%test` group (stub keys, Easy RAG ingestion off).
+- **Inbox watcher tests** (`ClaimsInboxWatcherTests`, `org.parasol.intake.mailbox`): each test builds its own `ClaimsInboxWatcher` with short timings and a mocked `Event<EmailReceived>`. It can't be `@InjectMock ClaimIntakeDispatcher`: `@InjectMock` disables the observers declared on the mocked bean (quarkusio/quarkus#11122; `@InjectSpy` keeps them, since #51790), so the mock would never be notified. Network faults (connection dropped, silent, unreachable) come from a **Toxiproxy** Testcontainers container, because WireMock only speaks HTTP: `ToxiproxyTestResource` (a `QuarkusTestResourceLifecycleManager`, registered globally by `org.parasol.testing.GlobalTestResources`, so it starts once for the whole run) starts it, and `org.parasol.testing.mail.Toxiproxy` drives it. Its upstream is GreenMail's mapped IMAP port through `host.testcontainers.internal`, since GreenMail is a Compose container. Only the watcher's IDLE session goes through the proxy. Track [quarkus-network-faults#14](https://github.com/quarkiverse/quarkus-network-faults/issues/14) (IMAP support): it may replace this.
 - **Intake workflow tests** (`ClaimIntake*Tests` in `org.parasol.intake.workflow` and its sub-packages, `dispatch` and `failure`; tests sit in the package of what they test) run the real `ClaimIntakeFlow`
   against the Compose GreenMail and a WireMock model, one test per rule: new claims, pending claims and replies, the
   review (supersede, the decision race, both decisions, a fault in a decision step), the policy rules, `resolveClaim`, and the
-  starter (it doesn't wait; per-sender order). They share `StubbedModelsTestProfile` (one boot; it also pins `claim-intake` to WireMock and turns Hibernate statistics on, so every test of what the intake stores or loads uses it too, and **a new intake test uses it rather than adding a profile**: each profile is another full application boot) and:
+  starter (it doesn't wait; per-sender order). They share the bare `%test` group (one boot; it also pins `claim-intake` to WireMock and turns Hibernate statistics on, so every test of what the intake stores or loads uses it too, and **a new intake test needs no profile of its own**: adding one would be another full application boot) and:
   - `IntakeScenario` (`org.parasol.intake`, an `@ApplicationScoped` test helper) sends a real MIME message to the claims address, moves it to
     the processing folder and calls `ClaimIntakeDispatcher.submit`, as the watcher will; it also reads replies, finds a
     claim's waiting run, simulates claiming the review (`claimReview`, the same `reviewRunId` → `decidingRunId` move the
@@ -982,7 +1037,7 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
     lookups by run, trace and conversation id. `IntakeFlowTestBase` starts a fresh capture before each test and stops/clears it in teardown,
     even if cleanup fails; standalone consumers manage that lifecycle too. Appends and lifecycle changes share a monitor, without copy-on-write
     accumulation or a size cap that could hide evidence. `TestSpansTests` covers that lifecycle and concurrent export/stop.
-    `StubbedModelsTestProfile` exports every 100 ms so a run's spans show up soon after it ends. Tracing assertions use a bounded SDK
+    `%test` exports spans every 100 ms so a run's spans show up soon after it ends. Tracing assertions use a bounded SDK
     force-flush and per-run expected workflow/mail/AI/JDBC families rather than a fixed settle delay; setup also flushes already-ended
     spans before capture starts. A flush does not end active work or guarantee that unrelated asynchronous work can never finish later.
     `IntakeSpanPropagationTests`, `IntakeTracingTests`, `IntakeMetricsTests` and `AgentMonitorConfigurerTests` (`org.parasol.intake.observability`) cover task 11.
@@ -990,7 +1045,7 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
     (`org.parasol.intake.mailbox`) is a plain unit test, and `ClaimsMailboxTests` pins that the received date survives the move to the processing folder.
     `IntakeLangfuseDeliveryTests` adds real Langfuse Dev Services ingestion coverage: first email, follow-up and review decision,
     exact exported workflow/task observation IDs, AGENT/CHAIN types, and one session across two traces and separate exports. It shares
-    `LangfuseExportTestProfile` (extends `StubbedModelsTestProfile`) with `LangfuseSessionScoringServiceTests`: the build-time Langfuse
+    `LangfuseExportTestProfile` (its own `QuarkusTestProfile`, on top of `%test`'s stubbing) with `LangfuseSessionScoringServiceTests`: the build-time Langfuse
     exporter with `AI_ONLY`, LGTM disabled. Session scoring and initialization are on for the other test; the intake never ends a
     chat scope, so they don't touch its runs. WireMock stubs only model responses. Tempo/Loki/Prometheus delivery is not covered.
 - **Intake reply tests** (`org.parasol.intake.reply`): `IntakeTemplatesTests` renders both variants of every template
@@ -1005,10 +1060,10 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   records through the Quarkus `ObjectMapper` (what Flow persists with); `IntakeOutcomeTests` checks `@JsonSubTypes`
   lists every permitted `IntakeOutcome` variant. `ClaimExtractionWorkflowTests`,
   `ClaimsMailboxAgentTests`, `FailedAgenticSystemTests` and `ClaimResolverTests` run the real agents against WireMock:
-  - they share `StubbedModelsTestProfile` (one app boot) and the `ChatStubs` helper;
+  - they share the bare `%test` group (one app boot) and the `ChatStubs` helper;
   - stubs match on the **last** message (`matchingJsonPath("$.messages[-1:].content", ...)`), so a reprompt or a tool
     result gets its own stub;
-  - the profile pins `claim-intake`'s provider to `openai` and its `model-name` to `claim-intake-model`, so the WireMock
+  - `%test` pins `claim-intake`'s provider to `openai` and its `model-name` to `claim-intake-model`, so the WireMock
     stubs are hit under every CI profile, and an agent on the wrong model shows up;
   - parallelism is checked from WireMock's own timings (every request arrives before the first is answered), not from
     wall-clock time.

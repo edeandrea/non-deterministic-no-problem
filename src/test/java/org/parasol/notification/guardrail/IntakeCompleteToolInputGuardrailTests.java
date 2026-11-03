@@ -11,17 +11,14 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.parasol.claim.model.Claim;
 import org.parasol.claim.model.ClaimCategory;
-import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkiverse.langchain4j.guardrails.ToolInputGuardrailRequest;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 
 @QuarkusTest
-@TestProfile(StubbedModelsTestProfile.class)
 class IntakeCompleteToolInputGuardrailTests {
 	@Inject
 	IntakeCompleteToolInputGuardrail guardrail;

@@ -16,7 +16,14 @@ import com.microsoft.playwright.options.LoadState;
 import io.quarkiverse.playwright.InjectPlaywright;
 import io.quarkiverse.playwright.WithPlaywright;
 
-@WithPlaywright(recordVideoDir = RECORD_DIR, slowMo = 500)
+// args MUST stay empty. Quarkus 3.40 builds a test class's reload key from the reflected values of a test-resource
+// annotation's attributes (TestResourceManager.prepareTestResourceComparisonInfo), and the JDK annotation proxy
+// clones a non-empty array on every read, so the default {"--disable-gpu"} gives each subclass a different key and
+// its own application boot. An empty array is not cloned (AnnotationInvocationHandler guards on
+// Array.getLength(result) != 0), so all five share one boot. Fixed upstream by quarkusio/quarkus#57464
+// (PR #57465, 4.0.0.Beta2); the earlier #56443 fix was incomplete because it did not override toString(). Queued
+// for a 3.40 backport - restore the flag once we are on a Quarkus that has it.
+@WithPlaywright(args = {}, recordVideoDir = RECORD_DIR, slowMo = 500)
 abstract class PlaywrightTests {
 	protected static final String RECORD_DIR = "target/playwright";
 

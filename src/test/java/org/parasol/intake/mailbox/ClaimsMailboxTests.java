@@ -30,15 +30,12 @@ import org.junit.jupiter.api.Test;
 import org.parasol.claim.model.ClaimImageContentType;
 import org.parasol.intake.config.IntakeConfig;
 import org.parasol.intake.mailbox.SkippedAttachment.Reason;
-import org.parasol.testing.StubbedModelsTestProfile;
 import org.parasol.testing.mail.GreenMailMailbox;
 
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 
 // Sends real MIME messages over SMTP to the Compose GreenMail and reads them back through ClaimsMailbox over IMAP
 @QuarkusTest
-@TestProfile(StubbedModelsTestProfile.class)
 class ClaimsMailboxTests {
 	private static final Duration WAIT_DURATION = Duration.ofSeconds(30);
 	private static final String SENDER = "jane.doe@example.com";

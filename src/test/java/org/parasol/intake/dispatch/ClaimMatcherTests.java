@@ -12,17 +12,14 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.IntakeScenario;
 import org.parasol.intake.mailbox.InboundEmail;
-import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 
 /**
  * Matching an email to a claim, and which conversation id the run starts in: the matched claim's, otherwise a fresh
  * {@link java.util.UUID} that names nobody. Uses the first seeded claim.
  */
 @QuarkusTest
-@TestProfile(StubbedModelsTestProfile.class)
 class ClaimMatcherTests {
 	private static final long CLAIM_ID = 1L;
 	private static final String OWNER = "marty.mcfly@email.com";

@@ -304,9 +304,20 @@ parasol:
   # Email claim intake (IntakeConfig). The IMAP host and port default to the GreenMail the app sends through
   intake:
     address: claims@parasol.com
+  # What "the real model" means under the active config profile. %test stubs the models outright, and UiTestProfile
+  # has to point its own back at the real ones - but it cannot hard-code openai / https://api.openai.com/v1, which
+  # are wrong under -Pollama and -Pollama-openai. %test WINS over %ollama and %ollama-openai (multiple profiles
+  # resolve right-to-left: ProfileConfigSourceInterceptor reverses the list), so the un-stubbing has to come from a
+  # key the Maven profiles own.
+  models:
+    provider: openai
+    base-url: https://api.openai.com/v1
 
 # Ollama profile config
 '%ollama':
+  parasol:
+    models:
+      provider: ollama
   quarkus:
     aiscoring:
       langfuse:
@@ -338,24 +349,27 @@ parasol:
 
 # Ollama using OpenAI endpoint profile config
 '%ollama-openai':
+  parasol:
+    models:
+      base-url: http://localhost:11434/v1
   quarkus:
     langchain4j:
       openai:
-        base-url: http://localhost:11434/v1
+        base-url: "${parasol.models.base-url}"
         parasol-chat:
-          base-url: "${%ollama-openai.quarkus.langchain4j.openai.base-url}"
+          base-url: "${parasol.models.base-url}"
           chat-model:
             model-name: "${quarkus.langchain4j.ollama.parasol-chat.chat-model.model-id}"
         generate-email:
-          base-url: "${%ollama-openai.quarkus.langchain4j.openai.base-url}"
+          base-url: "${parasol.models.base-url}"
           chat-model:
             model-name: "${quarkus.langchain4j.ollama.parasol-chat.chat-model.model-id}"
         politeness:
-          base-url: "${%ollama-openai.quarkus.langchain4j.openai.base-url}"
+          base-url: "${parasol.models.base-url}"
           chat-model:
             model-name: "${quarkus.langchain4j.ollama.parasol-chat.chat-model.model-id}"
         claim-intake:
-          base-url: "${%ollama-openai.quarkus.langchain4j.openai.base-url}"
+          base-url: "${parasol.models.base-url}"
           chat-model:
             model-name: "${quarkus.langchain4j.ollama.parasol-chat.chat-model.model-id}"
         embedding-model:
@@ -398,6 +412,12 @@ parasol:
         level: DEBUG
 
 # test mode config
+#
+# C1 - precedence gotcha: multiple active profiles resolve RIGHT-TO-LEFT (ProfileConfigSourceInterceptor reverses the
+# list), and the pom sets quarkus.test.profile=ollama,test / =ollama-openai,test, so %test is always the last-listed
+# profile and WINS over %ollama and %ollama-openai. Any key set here therefore silently overrides both Maven
+# profiles - that is why the model stubbing below works at all, and why parasol.models.* (read back by UiTestProfile
+# to get "the real model" under whichever Maven profile is active) is owned by the Maven profiles, never by %test.
 '%test':
   quarkus:
     # GreenMail only in tests, no Roundcube. Covers IDE runs and continuous testing; Maven builds also force
@@ -425,6 +445,10 @@ parasol:
           enabled: false
       logs:
         enabled: false
+      # So TestSpans sees a run's spans soon after they end
+      bsp:
+        schedule:
+          delay: 100ms
     observability:
       enabled: false
     micrometer:
@@ -432,10 +456,53 @@ parasol:
         otlp:
           enabled: "${%test.quarkus.observability.enabled}"
 
+    # For the tests that assert what a request loads (e.g. ClaimRetrievalHasNoIntakeBookkeepingTests)
+    hibernate-orm:
+      statistics: true
+
+    # Model stubbing: every test gets a stubbed model unless it @InjectMocks the AI service or never references one.
+    # Only NotificationServiceTests.emailSendsWhenUserExists (generate-email/politeness) and
+    # ClaimsDetailPageTests.pageLoads (parasol-chat, via UiTestProfile) keep a live model - see C2 below.
+    langchain4j:
+      # C2 - named OpenAI clients do NOT inherit the unnamed client's config: each named group carries its own
+      # @WithDefault base-url/api-key and OpenAiRecorder resolves defaultConfig() vs namedConfig().get(name) with no
+      # fallback. So stubbing the unnamed client's base-url/api-key here does not touch generate-email or politeness
+      # - they keep real keys and real models, by design. Do not add base-url/api-key entries for them here.
+      easy-rag:
+        # Quoted: unquoted OFF/ON/YES/NO parse as YAML 1.1 booleans, which fails this enum's conversion
+        ingestion-strategy: "OFF"
+      # Load-bearing, not redundant: %ollama would otherwise route these around the stubs into a real model
+      parasol-chat:
+        chat-model:
+          provider: openai
+      claim-intake:
+        chat-model:
+          provider: openai
+      embedding-model:
+        provider: openai
+      openai:
+        # The unnamed client, which is also the default embedding model
+        base-url: "${parasol.test.wiremock-base-url}"
+        parasol-chat:
+          api-key: changeme
+          base-url: "${parasol.test.wiremock-base-url}"
+        claim-intake:
+          api-key: changeme
+          base-url: "${parasol.test.wiremock-base-url}"
+          chat-model:
+            model-name: claim-intake-model
+        session-sentiment:
+          api-key: changeme
+        judge:
+          api-key: changeme
+
   # Only the watcher tests turn the intake on
   parasol:
     intake:
       enabled: false
+    # Kept inside %test so it is never an active key in the production jar
+    test:
+      wiremock-base-url: "http://localhost:${quarkus.wiremock.devservices.port}/v1"
 
 # Prod mode config
 '%prod':

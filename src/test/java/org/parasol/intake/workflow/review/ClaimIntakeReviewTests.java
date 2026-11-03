@@ -22,10 +22,8 @@ import org.parasol.intake.review.ReviewDecided;
 import org.parasol.intake.review.ReviewDecision;
 import org.parasol.intake.review.ReviewOutcome;
 import org.parasol.intake.review.ReviewedFields;
-import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.junit.mockito.InjectSpy;
 import io.serverlessworkflow.impl.WorkflowStatus;
 
@@ -33,7 +31,6 @@ import io.serverlessworkflow.impl.WorkflowStatus;
  * The review: superseding a waiting review, the race with a decision, and the decision steps.
  */
 @QuarkusTest
-@TestProfile(StubbedModelsTestProfile.class)
 class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 	private static final Duration DECISION_DELAY = Duration.ofSeconds(6);
 

@@ -10,8 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.StreamSupport;
 
-import org.parasol.testing.StubbedModelsTestProfile;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.client.WireMock;
@@ -24,6 +22,12 @@ import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
  * message, gets its own stub.
  */
 public final class ChatStubs {
+	/**
+	 * The model name every stubbed {@code claim-intake} request carries, under every profile. Must match
+	 * {@code quarkus.langchain4j.openai.claim-intake.chat-model.model-name} in {@code %test}.
+	 */
+	public static final String MODEL_NAME = "claim-intake-model";
+
 	private static final String CHAT_PATH = "/v1/chat/completions";
 
 	private final WireMock wiremock;
@@ -149,7 +153,7 @@ public final class ChatStubs {
 				"id", "chatcmpl-test",
 				"object", "chat.completion",
 				"created", 1234567890,
-				"model", StubbedModelsTestProfile.MODEL_NAME,
+				"model", MODEL_NAME,
 				"choices", List.of(Map.of(
 					"index", 0,
 					"message", message,

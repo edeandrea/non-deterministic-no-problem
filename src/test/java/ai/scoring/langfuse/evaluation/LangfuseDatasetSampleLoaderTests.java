@@ -12,10 +12,8 @@ import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 
 import com.langfuse.api.datasetItems.DatasetItemsApi.APIDatasetItemsCreateRequest;
 import com.langfuse.api.model.CreateDatasetItemRequest;
@@ -24,7 +22,6 @@ import io.quarkiverse.langfuse.api.LangfuseOperations;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
 
 @QuarkusTest
-@TestProfile(StubbedModelsTestProfile.class)
 @TestMethodOrder(OrderAnnotation.class)
 class LangfuseDatasetSampleLoaderTests {
 	@Inject
