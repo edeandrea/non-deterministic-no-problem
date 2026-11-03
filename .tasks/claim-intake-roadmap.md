@@ -29,6 +29,12 @@ and the AI panels move to #277, and the app ends up with one custom dashboard ra
 #218; it inherits cluster provisioning and the AI row from it) and #284 Make the email intake safe to run with more
 than one replica (unblocked, and independent of everything above).
 
+**Related, not part of the numbered order:** #290 Triage the unrecognized configuration keys reported at startup
+(planned 2026-11-03; body in `github-issues/issue-10-unrecognized-config-keys.md`, plan in
+[`07-gh290-unrecognized-config-keys/PLAN.md`](07-gh290-unrecognized-config-keys/PLAN.md)). Found while planning #218,
+which turned up one of the keys and deliberately left it alone. Unblocked, and touches nothing the intake depends on
+beyond `application.yml`.
+
 **Related, not part of the five-step order:** #221 Spike: compare a LangChain4j decision model (Jev)
 with the LLM email classifier (body in `github-issues/issue-07-decision-model-spike.md`; a follow-up
 to step 5, blocked by step 5 and by a quarkus-langchain4j release that ships `quarkus-langchain4j-typesafe`).

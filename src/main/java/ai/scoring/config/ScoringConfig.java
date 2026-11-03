@@ -5,7 +5,7 @@ import io.quarkus.runtime.annotations.ConfigDocDefault;
 import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
 
-@ConfigMapping(prefix = "quarkus.aiscoring")
+@ConfigMapping(prefix = "aiscoring")
 public interface ScoringConfig {
 	@WithDefault("NORMAL")
 	@ConfigDocDefault("NORMAL")

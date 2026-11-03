@@ -43,8 +43,10 @@ jobs:
     name: "jvm-build-test-${{ matrix.java }}-${{ matrix.ai-provider }}"
     # Both Ollama profiles expect an Ollama on localhost:11434: %ollama-openai points its base-url
     # there explicitly, and %ollama falls back to the same default once the extension's Dev Service
-    # is disabled below. One service container serves both, instead of the Dev Service recreating a
-    # container per augmentation and leaving earlier builds pointed at a dead port.
+    # is disabled below (ollama leg only - quarkus-langchain4j-ollama isn't on the classpath under
+    # ollama-openai, so there's no Dev Service there to disable). One service container serves both,
+    # instead of the Dev Service recreating a container per augmentation and leaving earlier builds
+    # pointed at a dead port.
     services:
       ollama:
         image: ollama/ollama
@@ -81,9 +83,11 @@ jobs:
           OPENAI_API_KEY: change-me
           COHERE_API_KEY: change-me
           GEMINI_API_KEY: change-me
+          # Only the ollama leg has quarkus-langchain4j-ollama on the classpath, so only it has a Dev Service to disable
+          OLLAMA_DEVSERVICES_FLAG: ${{ matrix.ai-provider == 'ollama' && '-Dquarkus.langchain4j.ollama.devservices.enabled=false' || '' }}
         run: |
           ./mvnw -B clean verify \
             -P${{ matrix.ai-provider }} \
             -Dquarkus.http.host=0.0.0.0 \
             -Dmaven.compiler.release=${{ matrix.java }} \
-            -Dquarkus.langchain4j.ollama.devservices.enabled=false
+            $OLLAMA_DEVSERVICES_FLAG

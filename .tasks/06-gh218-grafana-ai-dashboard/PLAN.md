@@ -209,6 +209,9 @@ exception simple name, and `status` on `claim.status.transitions` is the human l
   `quarkus.rest.jackson.optimization.enable-reflection-free-serialization` (`application.yml:242`), where the declared
   key is `…-serializers`, so that optimization has never applied. **None of it belongs in #218**, which stays a pure
   deletion.
+  - **Done in #290** (2026-11-03): both dead keys deleted, the Jackson spelling fixed and kept on, plus the rest of
+    that issue's scope (the Ollama block moved into `%ollama`, `aiscoring.*` renamed out of the `quarkus.` namespace).
+    See `.tasks/07-gh290-unrecognized-config-keys/PLAN.md`.
 - **Doc contradiction to settle in task 02:** `.tasks/github-issues/issue-06-grafana-dashboard.md:17,31` says
   "Prometheus (Mimir)" / "confirm each one in Mimir"; `CLAUDE.md:778` says the `grafana/otel-lgtm` image ships
   Prometheus, not Mimir, despite the "M". CLAUDE.md is right.

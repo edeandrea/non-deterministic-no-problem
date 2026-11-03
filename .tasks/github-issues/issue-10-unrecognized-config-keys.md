@@ -1,4 +1,12 @@
 TITLE: Triage the unrecognized configuration keys reported at startup
+
+> **Superseded 2026-11-03.** All 36 keys (the 35 found here plus a 36th CI-only one) were resolved to zero: the two
+> dead keys deleted, the CI Ollama Dev Service flag scoped to the `ollama` leg, the Jackson key's spelling corrected
+> (and kept on), the Ollama block moved into `%ollama` behind `parasol.models.ollama.*`, and `quarkus.aiscoring.*`
+> renamed to `aiscoring.*` (outside the `quarkus.` namespace, so it's never checked). See
+> `.tasks/07-gh290-unrecognized-config-keys/PLAN.md` for the full decision record, including two indentation/ambiguity
+> bugs the move itself introduced and fixed along the way. The body below is left as filed, for history.
+
 ## Summary
 
 Every application boot logs a batch of `Unrecognized configuration key "…" was provided; it will be ignored`

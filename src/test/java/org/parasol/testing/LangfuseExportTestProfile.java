@@ -28,11 +28,11 @@ public class LangfuseExportTestProfile implements QuarkusTestProfile {
 			Map.entry("quarkus.langfuse.otel.span-filter", "AI_ONLY"),
 			Map.entry("quarkus.otel.exporter.otlp.enabled", "true"),
 			Map.entry("quarkus.observability.enabled", "false"),
-			Map.entry("quarkus.aiscoring.interaction-mode", "normal"),
-			Map.entry("quarkus.aiscoring.langfuse.evaluation.initialize-on-startup", "true"),
-			Map.entry("quarkus.aiscoring.langfuse.evaluation.gemini.api-key", "changeme"),
-			Map.entry("quarkus.aiscoring.langfuse.evaluation.session.score-session", "true"),
-			Map.entry("quarkus.aiscoring.langfuse.evaluation.session.create-dataset-on-session-close", "true"),
+			Map.entry("aiscoring.interaction-mode", "normal"),
+			Map.entry("aiscoring.langfuse.evaluation.initialize-on-startup", "true"),
+			Map.entry("aiscoring.langfuse.evaluation.gemini.api-key", "changeme"),
+			Map.entry("aiscoring.langfuse.evaluation.session.score-session", "true"),
+			Map.entry("aiscoring.langfuse.evaluation.session.create-dataset-on-session-close", "true"),
 			Map.entry("quarkus.langchain4j.openai.session-sentiment.base-url", WIREMOCK_URL),
 			Map.entry("quarkus.langchain4j.openai.judge.base-url", WIREMOCK_URL)
 		);

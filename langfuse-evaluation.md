@@ -55,7 +55,7 @@ This is the only viable approach — Langfuse cannot orchestrate session-level e
 
 Step 2 is not instantaneous. Spans reach Langfuse asynchronously twice over — the OpenTelemetry batch exporter flushes on its own schedule, and Langfuse then ingests OTLP traces into ClickHouse asynchronously — so a query fired the moment the session ends usually returns nothing, and the session would silently go unscored.
 
-`LangfuseSessionScoringService` therefore waits an initial flush period and then polls until at least one complete exchange (an observation with both input and output) is visible, or a deadline passes. It's implemented as a small Mutiny pipeline (`retry().withBackOff().expireIn()`) collapsed back to blocking with `await()`, since the scorer already runs on a background worker thread. These properties under `quarkus.aiscoring.langfuse.evaluation.session` control it (every blocking `await()` in the scorer is bounded, so a hung Langfuse call can never pin the worker thread):
+`LangfuseSessionScoringService` therefore waits an initial flush period and then polls until at least one complete exchange (an observation with both input and output) is visible, or a deadline passes. It's implemented as a small Mutiny pipeline (`retry().withBackOff().expireIn()`) collapsed back to blocking with `await()`, since the scorer already runs on a background worker thread. These properties under `aiscoring.langfuse.evaluation.session` control it (every blocking `await()` in the scorer is bounded, so a hung Langfuse call can never pin the worker thread):
 
 | Property | Default | Purpose |
 |---|---|---|

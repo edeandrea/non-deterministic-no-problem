@@ -79,9 +79,9 @@ pinned PlantUML release into a temp directory on first use, and already globs bo
 
 | Tier | What | Where it runs | Active when |
 |---|---|---|---|
-| 1 — per-trace | Langfuse-native LLM-as-a-judge relevance evaluator, provisioned at startup by `LangfuseEvaluationInitializer` | Inside Langfuse, using Gemini. The application never calls Gemini itself — it only registers the LLM connection | `quarkus.aiscoring.langfuse.evaluation.initialize-on-startup` (default `true`) |
-| 2 — session-level | Custom code: when the chat scope ends, the conversation's observations are pulled back from Langfuse, turned into dataset items, and scored for sentiment. Langfuse has no session-level evaluation target, so this tier exists entirely in application code | In the app, on a background thread (`LangfuseSessionScoringService`) | `quarkus.aiscoring.langfuse.evaluation.session.score-session` (default `true`) |
-| 3 — drift detection | `DriftDetectionOutputGuardrail` replays past dataset samples through the `quarkus-langchain4j` evaluation framework and fails the response if the pass rate drops below the threshold | In the app, inline in the guardrail | `quarkus.aiscoring.interaction-mode: drift-detection` |
+| 1 — per-trace | Langfuse-native LLM-as-a-judge relevance evaluator, provisioned at startup by `LangfuseEvaluationInitializer` | Inside Langfuse, using Gemini. The application never calls Gemini itself — it only registers the LLM connection | `aiscoring.langfuse.evaluation.initialize-on-startup` (default `true`) |
+| 2 — session-level | Custom code: when the chat scope ends, the conversation's observations are pulled back from Langfuse, turned into dataset items, and scored for sentiment. Langfuse has no session-level evaluation target, so this tier exists entirely in application code | In the app, on a background thread (`LangfuseSessionScoringService`) | `aiscoring.langfuse.evaluation.session.score-session` (default `true`) |
+| 3 — drift detection | `DriftDetectionOutputGuardrail` replays past dataset samples through the `quarkus-langchain4j` evaluation framework and fails the response if the pass rate drops below the threshold | In the app, inline in the guardrail | `aiscoring.interaction-mode: drift-detection` |
 
 **Non-obvious:** tiers 2 and 3 are mutually exclusive in practice. `%drift` is the only profile that
 arms tier 3, and it inherits `%langfuse-ocp`, which sets `score-session: false` — so when drift
@@ -276,7 +276,7 @@ the Langfuse UI (see https://github.com/orgs/langfuse/discussions/8241).
 That is no longer the case here. `ai.scoring.langfuse.init.LangfuseEvaluationInitializer` provisions
 everything on application startup through the `LangfuseOperations` layer of the
 [quarkus-langfuse](https://github.com/quarkiverse/quarkus-langfuse) extension, gated on
-`quarkus.aiscoring.langfuse.evaluation.initialize-on-startup` (default `true`). On a `StartupEvent`
+`aiscoring.langfuse.evaluation.initialize-on-startup` (default `true`). On a `StartupEvent`
 it creates-or-reuses:
 
 - a score config for session sentiment

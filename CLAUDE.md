@@ -185,9 +185,11 @@ merges.
 `granite4:micro` and `snowflake-arctic-embed` pulled in a step before the build. Both profiles reach
 it: `%ollama-openai` points there explicitly, and `%ollama` falls back to the Ollama extension's
 default `base-url` because the workflow passes
-`-Dquarkus.langchain4j.ollama.devservices.enabled=false`. That flag is the **only** CI-specific
-config — everything else, including the model id, is in `application.yml`, so local runs and CI
-exercise the same thing.
+`-Dquarkus.langchain4j.ollama.devservices.enabled=false` — **on the `ollama` leg only**, since
+`quarkus-langchain4j-ollama` (and so its Dev Service) isn't even on the classpath under `ollama-openai`
+([#290](https://github.com/edeandrea/non-deterministic-no-problem/issues/290)). That flag is the only
+CI-specific config — everything else, including the model id, is in `application.yml`, so local runs
+and CI exercise the same thing.
 
 Don't re-enable the Dev Service in CI. It recreates its container once per augmentation (once per
 test profile in a full `verify`) and shuts the previous one down, so an app whose build-time config captured an
@@ -426,8 +428,8 @@ and no intake columns (not even a version), so no claim fetch can load it, and `
 
 ### AI quality layer — `ai.scoring`
 
-Configuration is driven by `ScoringConfig` (`quarkus.aiscoring.*`) and `LangfuseConfig`
-(`quarkus.aiscoring.langfuse.*`), both `@ConfigMapping` interfaces.
+Configuration is driven by `ScoringConfig` (`aiscoring.*`) and `LangfuseConfig`
+(`aiscoring.langfuse.*`), both `@ConfigMapping` interfaces.
 
 `InteractionMode` (default `NORMAL`) selects whether tier 3 is armed:
 
@@ -435,7 +437,7 @@ Configuration is driven by `ScoringConfig` (`quarkus.aiscoring.*`) and `Langfuse
 - `DRIFT_DETECTION` — the guardrail actually evaluates and can fail the response.
 
 Tiers 1 and 2 are independent of this switch; they are controlled by the
-`quarkus.aiscoring.langfuse.evaluation.*` flags instead.
+`aiscoring.langfuse.evaluation.*` flags instead.
 
 The three evaluation tiers (see `langfuse-evaluation.md` for the full rationale):
 
@@ -476,7 +478,7 @@ The three evaluation tiers (see `langfuse-evaluation.md` for the full rationale)
    items are created in parallel through `async().datasetItems().create(...)`.
 3. **Drift detection** — `DriftDetectionOutputGuardrail` runs the quarkus-langchain4j evaluation
    framework (`Evaluation.withSamples(<datasetName>)`) and returns a `fatal` result carrying a
-   `DriftDetectionException` when the score falls below `quarkus.aiscoring.threshold`.
+   `DriftDetectionException` when the score falls below `aiscoring.threshold`.
    `DriftDetectionChatRouteExceptionHandler` turns that into a `DRIFT DETECTED!!!` chat-route error
    instead of a stack trace.
 
@@ -618,6 +620,26 @@ Because `reuse-embeddings` is enabled, the ingested vectors are cached in `easy-
 `snowflake-arctic-embed` (1024-dimension) vectors are incompatible, so delete that file when
 switching between the default and the Ollama profiles.
 
+**The three Ollama model ids live at root, under `parasol.models.ollama.*`** (`chat-model-id: granite4:micro`,
+`email-model-id: qwen3:4b`, `embedding-model-id: snowflake-arctic-embed`), not under
+`quarkus.langchain4j.ollama.*` — that config root only exists once `quarkus-langchain4j-ollama` is on the classpath
+(`-Pollama`), so `%ollama-openai`, which never brings that extension in, couldn't read it there. The actual
+`quarkus.langchain4j.ollama.*` block (timeouts, temperatures, `model-options.think`) lives entirely inside `%ollama`
+and interpolates these ids; `%ollama-openai` interpolates the same root keys into its `model-name`s. See *The
+zero-unrecognized-keys invariant* above — this split is why the Ollama block warned 21 times on every leg except
+`-Pollama` before [#290](https://github.com/edeandrea/non-deterministic-no-problem/issues/290).
+
+**Every named model's provider is pinned to `openai` unconditionally at root**, not just under the default profile
+([#290](https://github.com/edeandrea/non-deterministic-no-problem/issues/290)). Once `quarkus-langchain4j-ollama` is
+on the classpath (`-Pollama`), both providers' deployment processors are active for *every* config profile that
+Maven profile builds — `%drift`, `%langfuse-ocp`, `%test`, `%ollama-openai`, not just `%ollama` — so a model
+reachable through both provider namespaces needs a provider resolved in every one of them, or the build fails with
+`A ChatModel or StreamingChatModel bean was requested, but since there are multiple available providers, …needs to be
+set`. This bit the `%drift`-profile augmentation (which replaces the config profile outright, so `%ollama`'s and
+`%test`'s pins are both inactive there) once the Ollama block's per-model sub-nodes moved from an always-active root
+block into `%ollama`. `parasol-chat` and `embedding-model` already had this root pin before #290 (hence never
+affected); `generate-email`, `politeness`, `claim-intake`, `session-sentiment` and `judge` needed it added.
+
 The two Ollama profiles are **not** equivalent:
 - `%ollama` switches `parasol-chat`, `generate-email`, `politeness`, `claim-intake` and the embedding model to
   `provider: ollama` (`granite4:micro`, embeddings `snowflake-arctic-embed`) — **except
@@ -626,17 +648,48 @@ The two Ollama profiles are **not** equivalent:
   only model measured to reproduce `EMAIL_ENDING` verbatim for
   `EmailEndsAppropriatelyOutputGuardrail`, and qwen3 reasons by default (~6k tokens per email
   versus ~140 with thinking off). Note `%ollama-openai` does **not** inherit this: all four of its chat
-  `model-name`s interpolate from `quarkus.langchain4j.ollama.parasol-chat.chat-model.model-id`, not
+  `model-name`s interpolate from `parasol.models.ollama.chat-model-id`, not
   from their own, so changing `generate-email`'s id moves only the Ollama-native leg. That is
   deliberate — `model-options.think` has no equivalent on the OpenAI-compatible endpoint. It also
   stubs
   `quarkus.langchain4j.openai.api-key` plus the `session-sentiment` and `judge` API keys to
   `changeme`, and disables Langfuse session scoring + startup initialization. Note
   `session-sentiment` and `judge` keep `provider: openai` pointed at the Cohere-compatible
-  endpoint — they are *not* moved to Ollama, they are just given a dummy key.
+  endpoint — they are *not* moved to Ollama; the root pin above covers them, so `%ollama` has nothing left to
+  override for either.
 - `%ollama-openai` only repoints the OpenAI client's `base-url` at `http://localhost:11434/v1` for
   `parasol-chat`, `generate-email`, `politeness`, `claim-intake` and the embedding model. It stubs **no** API keys
   and does **not** disable session scoring or startup initialization.
+
+### The zero-unrecognized-keys invariant
+
+**A clean boot logs no `Unrecognized configuration key` warnings** ([#290](https://github.com/edeandrea/non-deterministic-no-problem/issues/290)).
+One appearing is a real finding — a typo or a missing extension — not noise to read around. There is no suppression
+switch: `quarkus-core` declares only `quarkus.config.fixed-at-build-time` and `quarkus.config.sources.system-only`,
+and muting the `io.quarkus.config` logger would just hide the next real typo. Four structural rules keep it true:
+
+- **Application config lives outside the `quarkus.` namespace** — `parasol.*` and `aiscoring.*`. Quarkus builds its
+  known-key model for `quarkus.` from extension metadata (`META-INF/quarkus-config-doc/quarkus-config-model.json` in
+  each `*-deployment` jar), so an application `@ConfigMapping` under `quarkus.` is always "unrecognized", however well
+  it works. Don't put a new app config root there.
+- **A key belonging to a profile-scoped extension lives in that profile's block.** `quarkus.langchain4j.ollama.*` sits
+  under `%ollama` because `quarkus-langchain4j-ollama` is only a dependency under the `ollama` Maven profile; at root
+  level it warned 21 times on every other build. `%ollama-openai` reads the two model ids it needs through
+  `parasol.models.ollama.*` instead of the extension's own root, since that root doesn't exist there.
+- **A moved or profile-scoped node needs its indentation double-checked, not just a grep for the old key.** A
+  mis-indented YAML node silently becomes a sibling of the wrong parent instead of a parse error — a grep for the old
+  key passes, and a *new* unrecognized key quietly takes its place. Confirm with a real boot (`quarkus:dev` is cheaper
+  feedback than a full `verify`), not just a text search.
+- **A profile-scoped extension's config can't be the only source of a provider pin.** Once `-Pollama` puts a second
+  LangChain4j provider extension on the classpath, *every* config profile built with it — not just `%ollama` — has
+  both providers' deployment processors active, so any named model reachable through both providers' namespaces needs
+  its provider resolved for every one of them (see *Models* above). Moving the Ollama block's per-model sub-nodes from
+  an always-active root block into `%ollama` broke the `%drift` profile's augmentation this way, since `%drift`
+  replaces the config profile outright and neither `%ollama`'s nor `%test`'s provider pins apply there. The fix is a
+  root-level, unconditional `provider: openai` pin for every such model, overridden inside `%ollama` only where it
+  needs to be. **A local smoke boot under one config profile (`quarkus:dev`, a single test class) does not exercise
+  every profile a CI matrix leg does** — `%drift` and `%langfuse-ocp` only build under `./mvnw verify`, so this one
+  surfaced from CI, not a local check.
 
 ### Configuration profiles
 
@@ -647,8 +700,8 @@ The two Ollama profiles are **not** equivalent:
 | `dev` | `datasource.dev-ui.allow-sql`, `parasol.dev-seed.enabled` and the intake watcher's `idle-refresh: 10s`. The LGTM, PostgreSQL and Langfuse dev services do run in dev mode, but they come from the extensions' own Dev Services defaults, not from this profile block. The GreenMail/Roundcube mail stack and `mailer.mock: false` are root-level config (see Commands) |
 | `test` | Observability + Langfuse init/session scoring disabled; `compose.devservices.profiles` blanked so Roundcube doesn't start (`UiTestProfile` turns it back on); also carries the default test-group model stubbing (see *Testing* and C1/C2 there). Not active under `DriftTestProfile` (`ai.scoring.it.DriftDetectionTests`), which replaces the config profile with `drift` entirely rather than adding to it, so none of `%test`'s stubbing applies to the gated-off drift tests |
 | `ollama` | Local Ollama via the Ollama extension; OpenAI/Cohere keys stubbed to `changeme`; Langfuse session scoring + startup init disabled |
-| `ollama-openai` | Local Ollama via the OpenAI client (`base-url: http://localhost:11434/v1`); no key stubs, no `quarkus.aiscoring` overrides |
-| `drift` | Parent `langfuse-ocp`; sets `quarkus.aiscoring.interaction-mode: drift-detection` |
+| `ollama-openai` | Local Ollama via the OpenAI client (`base-url: http://localhost:11434/v1`); no key stubs, no `aiscoring` overrides |
+| `drift` | Parent `langfuse-ocp`; sets `aiscoring.interaction-mode: drift-detection` |
 | `langfuse-ocp` | Points at a deployed Langfuse instance; disables OTLP export and LGTM |
 | `instana` | Exports OTLP to Instana instead of LGTM |
 | `prod`, `openshift` | Schema drop-and-create + `import.sql`; OpenShift deployment config |
@@ -837,7 +890,7 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
 - `ai.scoring.it.DriftDetectionTests` is annotated with the custom meta-annotation
   `ai.scoring.it.DriftDetectionTest`, which combines `@QuarkusTest` with **four** independent
   enablement conditions, each carrying its own `disabledReason`:
-  `@EnabledIfConfig(named = "quarkus.aiscoring.interaction-mode", matches = "drift-detection")`
+  `@EnabledIfConfig(named = "aiscoring.interaction-mode", matches = "drift-detection")`
   (`io.quarkus.test.junit.condition.EnabledIfConfig`, which ships with Quarkus itself — not
   `@EnabledIfApplicationProperty`, and there is no local copy of the condition classes),
   `@EnabledIfSystemProperty(named = "quarkus.profile", matches = "drift")`,
@@ -1131,6 +1184,22 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   - Call Panache statics through a lambda in `assertThatThrownBy(() -> ClaimImage.flush())`: a method reference
     (`ClaimImage::flush`) bypasses Panache's enhancement and throws "did you forget to annotate your entity with
     @Entity?".
+- **`ClaimReviewResourceTests`** carries the same raw-JSON wire-shape guard as the other REST DTOs: `jsonFieldNames`
+  (the full `ClaimReviewState` key set, including `requested_items` only when non-empty — it's omitted under
+  `non-empty` inclusion for an open review with nothing requested, same as every other empty collection) and the
+  `MissingItem` values on the wire, asserted as the `@JsonValue` labels rather than the enum constant names.
+  `sentimentIsAssessedAgainAndStoredWithoutTouchingTheReview` carries the equivalent one-key check for
+  `SentimentAssessment`.
+- **`quarkus.rest.jackson.optimization.enable-reflection-free-serializers` is on** (correctly spelled;
+  [#290](https://github.com/edeandrea/non-deterministic-no-problem/issues/290) fixed a typo that had silently kept it
+  off: the declared key is `…-serializers`, not `…-serialization`). `GeneratedSerializersRegister` registers
+  application-wide via `ObjectMapperCustomizer`, but generation is seeded only from JAX-RS return types and
+  POST/PUT/PATCH parameter types — **no record ever gets a generated deserializer** in this Quarkus version
+  (`JacksonDeserializerFactory.shouldGenerateCodeFor` additionally requires `ClassInfo.hasNoArgsConstructor()`, which
+  a record never has), so every REST input DTO here (all of them are records) keeps deserializing through reflective
+  Jackson regardless of this flag. **`ProblemDetail` is also out of scope**, for a different reason: every mapper
+  returns `Response` with the entity typed only at runtime, so there is no static return type to generate a
+  serializer from, and `application/problem+json` stays on reflective Jackson too.
 
 ## Conventions
 
@@ -1175,7 +1244,7 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
   that exists any more** — it collapsed into this single app scoring against Langfuse in-process,
   and `InteractionMode` is now `NORMAL`/`DRIFT_DETECTION`. Do not reintroduce references to it.
 - **Tiers 2 and 3 are mutually exclusive in practice.** `%drift` is the only profile that sets
-  `quarkus.aiscoring.interaction-mode: drift-detection`, and it declares `langfuse-ocp` as its
+  `aiscoring.interaction-mode: drift-detection`, and it declares `langfuse-ocp` as its
   parent profile — which sets `score-session: false` and disables the OTLP exporter. So whenever
   tier 3 is armed, tier-2 session scoring is off; only tiers 1 and 3 are live under `%drift`.
 - **The quarkus-langfuse operations layer (`LangfuseOperations`) covers broadly, but not
@@ -1221,7 +1290,7 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
   them via the Langfuse API in `LangfuseEvaluationInitializer`. Langfuse's own `LANGFUSE_INIT_*`
   env vars do **not** cover evaluators.
 - Session scoring is inherently racy against Langfuse's async ingest. The wait/poll knobs live
-  under `quarkus.aiscoring.langfuse.evaluation.session` (`otel-flush-wait-time`,
+  under `aiscoring.langfuse.evaluation.session` (`otel-flush-wait-time`,
   `observation-poll-interval`, `observation-max-wait-time`, `dataset-creation-max-wait-time`).
   If session scores go missing, tune
   these before suspecting the scorer.
@@ -1281,7 +1350,7 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
   key** pointing at a demo OpenShift cluster. There is a `.gitleaks.toml` at the root. Do not copy
   this pattern for new credentials.
 - **Two different score scales meet in `DriftDetectionOutputGuardrail`.**
-  `quarkus.aiscoring.threshold` defaults to `0.75` (a 0–1 fraction), but `EvaluationReport.score()`
+  `aiscoring.threshold` defaults to `0.75` (a 0–1 fraction), but `EvaluationReport.score()`
   is `100.0 * passed / total` — a **pass-rate percentage**, not an average of the judge's
   confidence. The guardrail divides by `100.0` to reconcile them. Consequently the per-sample
   `EvaluatorResult.score()` returned by `EvaluatorAgent` never reaches the threshold comparison
