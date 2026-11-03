@@ -1,11 +1,11 @@
 package org.parasol.testing;
 
 import java.util.Map;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+
+import io.quarkus.test.junit.QuarkusTestProfile;
 
 /**
- * {@link StubbedModelsTestProfile}, plus spans exported to the Langfuse dev service, for the tests that read back what
+ * {@code %test}'s model stubbing, plus spans exported to the Langfuse dev service, for the tests that read back what
  * Langfuse ingested: the chat's session scoring and the intake's delivery. Its own boot, since the exporter is build-time
  * config ({@code %test} leaves it out); share it rather than adding another.
  * <ul>
@@ -18,12 +18,12 @@ import java.util.stream.Stream;
  *   <li><b>OTLP export on, LGTM off:</b> nothing reads Tempo, Loki or Prometheus here.</li>
  * </ul>
  */
-public class LangfuseExportTestProfile extends StubbedModelsTestProfile {
+public class LangfuseExportTestProfile implements QuarkusTestProfile {
 	private static final String WIREMOCK_URL = "http://localhost:${quarkus.wiremock.devservices.port}/v1";
 
 	@Override
 	public Map<String, String> getConfigOverrides() {
-		var overrides = Map.ofEntries(
+		return Map.ofEntries(
 			Map.entry("quarkus.langfuse.otel.enabled", "true"),
 			Map.entry("quarkus.langfuse.otel.span-filter", "AI_ONLY"),
 			Map.entry("quarkus.otel.exporter.otlp.enabled", "true"),
@@ -36,8 +36,5 @@ public class LangfuseExportTestProfile extends StubbedModelsTestProfile {
 			Map.entry("quarkus.langchain4j.openai.session-sentiment.base-url", WIREMOCK_URL),
 			Map.entry("quarkus.langchain4j.openai.judge.base-url", WIREMOCK_URL)
 		);
-
-		return Stream.concat(super.getConfigOverrides().entrySet().stream(), overrides.entrySet().stream())
-			.collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
 	}
 }

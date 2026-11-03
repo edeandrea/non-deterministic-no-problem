@@ -9,18 +9,15 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 import org.parasol.claim.model.ClaimCategory;
 import org.parasol.intake.MissingItem;
-import org.parasol.testing.StubbedModelsTestProfile;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 
 /**
  * Flow persists step data and the agentic scope with the Quarkus {@code ObjectMapper}, so every extraction value must
  * survive a round trip through it.
  */
 @QuarkusTest
-@TestProfile(StubbedModelsTestProfile.class)
 class ClaimExtractionValueRoundTripTests {
 	@Inject
 	ObjectMapper objectMapper;

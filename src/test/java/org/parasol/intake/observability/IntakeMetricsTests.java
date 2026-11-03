@@ -52,7 +52,6 @@ import org.parasol.intake.review.ReviewOutcome;
 import org.parasol.intake.review.ReviewedFields;
 import org.parasol.intake.workflow.outcome.ApplyOutcomeStep;
 import org.parasol.intake.workflow.review.ReviewDecisionSteps;
-import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
@@ -62,7 +61,6 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.quarkus.mailer.MailTemplate.MailTemplateInstance;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.junit.mockito.InjectSpy;
 
 /**
@@ -70,7 +68,6 @@ import io.quarkus.test.junit.mockito.InjectSpy;
  * a person, an email's id or a claim.
  */
 @QuarkusTest
-@TestProfile(StubbedModelsTestProfile.class)
 class IntakeMetricsTests extends IntakeFlowTestBase {
 	private static final String NO_LOCATION = details(true, "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());
 

@@ -9,10 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.parasol.intake.IntakeFlowTestBase;
 // Restore with theAgentMonitorRetainsNothingOutsideDevMode
 // import org.parasol.intake.agent.ClaimsMailboxAgent;
-import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 import io.quarkiverse.langfuse.runtime.otel.LangfuseSpanProcessor;
 
 /**
@@ -21,7 +19,6 @@ import io.quarkiverse.langfuse.runtime.otel.LangfuseSpanProcessor;
  * {@code MonitoredAgent} (see its Javadoc); restore it with {@code extends MonitoredAgent} and {@code AgentMonitorConfigurer}.
  */
 @QuarkusTest
-@TestProfile(StubbedModelsTestProfile.class)
 class AgentMonitorConfigurerTests extends IntakeFlowTestBase {
 	// @Inject
 	// ClaimsMailboxAgent agent;

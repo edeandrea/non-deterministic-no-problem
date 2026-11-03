@@ -16,17 +16,14 @@ import org.parasol.intake.IntakeScenario.Mail;
 import org.parasol.intake.mailbox.EmailReceived;
 import org.parasol.intake.mailbox.MailFolder;
 import org.parasol.intake.model.EmailType;
-import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 
 /**
  * The starter: it doesn't wait for runs, keeps one sender's emails in order, and starts no run for auto-replies, self-sent
  * mail or a duplicate {@code Message-ID}.
  */
 @QuarkusTest
-@TestProfile(StubbedModelsTestProfile.class)
 class ClaimIntakeDispatcherTests extends IntakeFlowTestBase {
 	@Inject
 	ClaimIntakeDispatcher starter;

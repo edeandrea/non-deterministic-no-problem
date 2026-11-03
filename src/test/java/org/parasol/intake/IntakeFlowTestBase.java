@@ -25,8 +25,9 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 /**
- * Shared setup of the intake workflow tests. Each subclass carries the annotations ({@code @QuarkusTest},
- * {@code @TestProfile(StubbedModelsTestProfile.class)}) so every class shares one app boot; the profile connects WireMock.
+ * Shared setup of the intake workflow tests. Each subclass carries only {@code @QuarkusTest}: the stubbed models and the
+ * claim-intake WireMock pin live in the {@code %test} config profile, so every bare-profile class (this base's subclasses
+ * included) shares one app boot, and WireMock is connected globally (see {@code org.parasol.testing.GlobalTestResources}).
  * <p>
  *   Stubs match on a prompt phrase (which agent) and a marker in the email (which test), so each email is stubbed on its own.
  * </p>

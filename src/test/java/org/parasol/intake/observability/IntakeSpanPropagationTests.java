@@ -28,7 +28,6 @@ import org.parasol.intake.observability.SpanCensus.Kind;
 import org.parasol.intake.review.ReviewOutcome;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
 import org.parasol.intake.workflow.review.ReviewDecisionSteps;
-import org.parasol.testing.StubbedModelsTestProfile;
 
 import ai.scoring.langfuse.otel.LangfuseFlowSpanTypingProcessor;
 import io.opentelemetry.api.trace.StatusCode;
@@ -37,7 +36,6 @@ import io.opentelemetry.semconv.incubating.GenAiIncubatingAttributes;
 import io.opentelemetry.semconv.incubating.GenAiIncubatingAttributes.GenAiOperationNameIncubatingValues;
 import io.quarkus.logging.Log;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.junit.mockito.InjectSpy;
 import io.serverlessworkflow.impl.WorkflowStatus;
 
@@ -51,7 +49,6 @@ import io.serverlessworkflow.impl.WorkflowStatus;
  * </p>
  */
 @QuarkusTest
-@TestProfile(StubbedModelsTestProfile.class)
 class IntakeSpanPropagationTests extends IntakeFlowTestBase {
 	private static final int CONCURRENT_RUNS = 8;
 	// No location, so each run asks for it and ends instead of waiting for review, and all its spans are exported

@@ -12,16 +12,13 @@ import org.parasol.intake.IntakeScenario;
 import org.parasol.intake.IntakeScenario.Mail;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.model.EmailType;
-import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 
 /**
  * Follow-up emails: merging into pending claims, status replies, and emails that match no claim of the sender's.
  */
 @QuarkusTest
-@TestProfile(StubbedModelsTestProfile.class)
 class ClaimIntakePendingClaimTests extends IntakeFlowTestBase {
 	private static final String NO_LOCATION = details(true, "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());
 	// A reply has to say which of the requested items it answers, as the agent does from its prompt

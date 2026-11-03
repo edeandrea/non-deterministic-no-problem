@@ -16,10 +16,8 @@ import org.parasol.intake.model.IntakeOutcome.NoMatchingClaim;
 import org.parasol.intake.model.IntakeOutcome.NotAClaim;
 import org.parasol.intake.model.IntakeOutcome.PendingClaimUpdate;
 import org.parasol.intake.model.IntakeOutcome.StatusReply;
-import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -29,7 +27,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * a round trip through it.
  */
 @QuarkusTest
-@TestProfile(StubbedModelsTestProfile.class)
 class IntakeOutcomeRoundTripTests {
 	private static final ClaimExtraction EXTRACTION = new ClaimExtraction("summary", "sentiment", new IncidentDetails(
 		true, "2026-10-08", "14:30", "Elm Street", ClaimCategory.SINGLE_VEHICLE, "AC-1234567", Set.of(MissingItem.LOCATION)));

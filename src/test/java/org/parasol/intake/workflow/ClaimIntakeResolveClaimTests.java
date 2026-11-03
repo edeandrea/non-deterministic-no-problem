@@ -8,17 +8,14 @@ import org.junit.jupiter.api.Test;
 import org.parasol.intake.IntakeFlowTestBase;
 import org.parasol.intake.IntakeScenario.Mail;
 import org.parasol.intake.model.EmailType;
-import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 
 /**
  * An email that names no claim and carries no reply headers, from a sender with pending claims: the resolver routes it, or
  * the customer is asked which claim it's about.
  */
 @QuarkusTest
-@TestProfile(StubbedModelsTestProfile.class)
 class ClaimIntakeResolveClaimTests extends IntakeFlowTestBase {
 	private static final String NO_LOCATION = details(true, "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());
 	private static final String LOCATION_ANSWERED = details(true, "2026-10-07", "Elm Street", "SINGLE_VEHICLE", null, List.of("LOCATION"));

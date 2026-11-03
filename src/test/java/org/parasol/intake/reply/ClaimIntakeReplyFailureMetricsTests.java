@@ -17,11 +17,9 @@ import org.parasol.intake.observability.FailureOutcome;
 import org.parasol.intake.IntakeScenario;
 import org.parasol.intake.IntakeScenario.Mail;
 import org.parasol.intake.failure.IntakeFailureHandler;
-import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.micrometer.core.instrument.Counter;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.junit.mockito.InjectSpy;
 
 /**
@@ -29,7 +27,6 @@ import io.quarkus.test.junit.mockito.InjectSpy;
  * constructor is package-private: the sender throws it, nothing else does.
  */
 @QuarkusTest
-@TestProfile(StubbedModelsTestProfile.class)
 class ClaimIntakeReplyFailureMetricsTests extends IntakeFlowTestBase {
 	private static final String NO_LOCATION = details(true, "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());
 

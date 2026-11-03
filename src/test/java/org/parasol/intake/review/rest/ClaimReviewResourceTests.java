@@ -29,10 +29,8 @@ import org.parasol.intake.review.ReviewOutcome;
 import org.parasol.intake.review.rest.ReviewDecisionRequest.Fields;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
 import org.parasol.problem.ProblemDetail;
-import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.junit.mockito.InjectSpy;
 
 import io.restassured.http.ContentType;
@@ -46,7 +44,6 @@ import io.serverlessworkflow.impl.WorkflowStatus;
  * races between a reply, a decision and a reassessment on the same claim.
  */
 @QuarkusTest
-@TestProfile(StubbedModelsTestProfile.class)
 class ClaimReviewResourceTests extends IntakeFlowTestBase {
 	// A seeded claim, never Pending Review: no intake state exists for it, so the review is never open
 	private static final long NEVER_REVIEWED_CLAIM_ID = 1L;
