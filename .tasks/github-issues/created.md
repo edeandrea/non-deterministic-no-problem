@@ -14,6 +14,7 @@ Repo: edeandrea/non-deterministic-no-problem. All issues labelled `enhancement` 
 | related | #221 | Spike: compare a LangChain4j decision model (Jev) with the LLM email classifier | https://github.com/edeandrea/non-deterministic-no-problem/issues/221 |
 | related | #222 | Repackage org.parasol by domain, with layer sub-packages | https://github.com/edeandrea/non-deterministic-no-problem/issues/222 |
 | 4a | #237 | Give the seeded claimants' Roundcube identities their names | https://github.com/edeandrea/non-deterministic-no-problem/issues/237 |
+| related | #290 | Triage the unrecognized configuration keys reported at startup | https://github.com/edeandrea/non-deterministic-no-problem/issues/290 |
 
 ## Sub-issues of #217
 
@@ -28,6 +29,7 @@ Verified via `GET /repos/edeandrea/non-deterministic-no-problem/issues/217/sub_i
 7. #221 (related; follow-up spike to #216, not part of the five-step order)
 8. #222 (related; repackaging housekeeping, done before #213 and #215)
 9. #237 (step 4a, filed 2026-10-11; a #215 follow-up that lands before #216's task 08)
+10. #290 (related; filed 2026-11-03 while planning #218, body in `issue-10-unrecognized-config-keys.md`)
 
 ## Dependencies (blocked by)
 
@@ -43,3 +45,4 @@ Verified via `GET /repos/edeandrea/non-deterministic-no-problem/issues/{n}/depen
 | #237 | #215 |
 | #218 | #212 (#212 bumps the `grafana/otel-lgtm` image) |
 | #221 | #216 (the spike compares against the #216 classifier; it also waits for a quarkus-langchain4j release with `quarkus-langchain4j-typesafe`) |
+| #290 | — |
