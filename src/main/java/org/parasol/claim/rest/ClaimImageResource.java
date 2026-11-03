@@ -18,7 +18,7 @@ import org.parasol.claim.model.ClaimImageNotFoundException;
  * {@link ClaimExceptionMappings} turns into RFC 9457 Problem Details.
  */
 @Path("/api/db/claims/{id}/images")
-public class ClaimImageResource {
+class ClaimImageResource {
 	private final ClaimMapper mapper;
 
 	ClaimImageResource(ClaimMapper mapper) {

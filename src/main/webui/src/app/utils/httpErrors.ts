@@ -6,3 +6,10 @@ import axios from 'axios';
  */
 export const isNotFound = (error: unknown): boolean =>
     axios.isAxiosError(error) && (error.response?.status === 404);
+
+/**
+ * Whether a failed request lost an optimistic lock: the review decision endpoint answers a stale version, a claim no
+ * longer open for review, or a run that isn't waiting with an RFC 9457 Problem Details `409`.
+ */
+export const isConflict = (error: unknown): boolean =>
+    axios.isAxiosError(error) && (error.response?.status === 409);

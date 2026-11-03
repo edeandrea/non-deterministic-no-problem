@@ -1,0 +1,14 @@
+Dear {customerName.orElse('Customer')},
+
+We received your email regarding claim {claimNumber} (Status: {IntakeClaimStatus:PENDING_INFORMATION.label}). To continue processing your claim, we need the following details:
+
+{#for item in missingItems}
+- {item.label}
+{/for}
+
+Please reply directly to this email with the requested information.
+{#include IntakeTemplates/attachmentNotes.txt /}
+
+Sincerely,
+{config:['parasol.claims-department.name']}
+Phone: {config:['parasol.claims-department.phone']}

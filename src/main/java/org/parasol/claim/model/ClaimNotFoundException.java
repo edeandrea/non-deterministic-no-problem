@@ -12,7 +12,8 @@ public class ClaimNotFoundException extends RuntimeException {
 	 * @param claimId the id of the missing claim
 	 */
 	public ClaimNotFoundException(long claimId) {
-		super("Claim %d was not found".formatted(claimId));
+		// An expected outcome that is mapped to a response: no stack trace is ever shown or logged, so don't compute one
+		super("Claim %d was not found".formatted(claimId), null, false, false);
 		this.claimId = claimId;
 	}
 

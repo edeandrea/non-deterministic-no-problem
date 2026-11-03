@@ -12,4 +12,11 @@ public class UnknownClaimCategoryException extends IllegalArgumentException {
 	public UnknownClaimCategoryException(String value) {
 		super("Unknown claim category: %s".formatted(value));
 	}
+
+	// IllegalArgumentException has no constructor to skip the trace. This is an expected outcome that is mapped to a
+	// response, so no stack trace is ever shown or logged
+	@Override
+	public Throwable fillInStackTrace() {
+		return this;
+	}
 }

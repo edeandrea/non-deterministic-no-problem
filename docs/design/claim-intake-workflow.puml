@@ -81,7 +81,7 @@ else (yes)
     :Reply: thank you, we're working on your claim;
   else (Needs more information)
     :Claim → Pending Information;
-    :Reply: exactly the items the processor ticked;
+    :Reply: exactly the items the processor checked;
   endif
   stop
 endif

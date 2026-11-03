@@ -1,4 +1,4 @@
-import { formatIncident, formatIncidentDate, formatIncidentTime } from '@app/utils/formatIncident';
+import { formatIncident, formatIncidentDate, formatIncidentTime, toLocalIsoDate } from '@app/utils/formatIncident';
 
 describe('formatIncidentDate', () => {
     it.each([
@@ -43,5 +43,16 @@ describe('formatIncident', () => {
 
     it('returns undefined when there is no date, even with a time', () => {
         expect(formatIncident(undefined, '15:30')).toBeUndefined();
+    });
+});
+
+describe('toLocalIsoDate', () => {
+    it('uses the local calendar date, not the UTC one', () => {
+        expect(toLocalIsoDate(new Date(2024, 1, 3, 23, 30))).toBe('2024-02-03');
+        expect(toLocalIsoDate(new Date(2024, 0, 1, 0, 5))).toBe('2024-01-01');
+    });
+
+    it('pads the month and day', () => {
+        expect(toLocalIsoDate(new Date(2024, 8, 7))).toBe('2024-09-07');
     });
 });

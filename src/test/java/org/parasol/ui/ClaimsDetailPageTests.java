@@ -17,10 +17,9 @@ import io.quarkus.test.junit.TestProfile;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.assertions.PlaywrightAssertions;
-import io.quarkiverse.quinoa.testing.QuinoaTestProfiles;
 
 @QuarkusTest
-@TestProfile(QuinoaTestProfiles.EnableAndRunTests.class)
+@TestProfile(UiTestProfile.class)
 public class ClaimsDetailPageTests extends PlaywrightTests {
 	@Test
 	void pageLoads() {

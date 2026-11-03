@@ -114,7 +114,7 @@ anyone can log in as any address; that's unchanged. This only gives the seeded c
 
 ### Caveats & Problems
 - Roundcube never runs in tests or CI (surefire/failsafe set `quarkus.compose.devservices.profiles=none`), so this
-  can't have an automated test here. #216's task 12 (Roundcube E2E) will assert the named `From`.
+  can't have an automated test here. #216's task 12 (Roundcube E2E) will assert the named `From`. *(Since #216 task 12, 2026-10-30, it does: `RoundcubeClaimIntakeE2ETests` sends from Roundcube as Marty McFly and asserts the named `From`.)*
 - The map duplicates the claimant names in `import.sql`; a comment on both sides must say so.
 
 ### Follow-ups in #216 (apply on `gh216-email-intake` when merging `main` into it)

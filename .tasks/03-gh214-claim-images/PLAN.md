@@ -57,7 +57,7 @@ Those files reach `dist/` only because the legacy `OriginalApp.tsx` imports them
 id > 6 shows broken images. Issue 5's email intake will store customer photos, which needs a backend store.
 
 ### History: Copilot attempt and takeover (PR #225)
-A first attempt by GitHub Copilot (PR #225, `4d9c299`…`5377583`) ticked every task without the approval gates, while
+A first attempt by GitHub Copilot (PR #225, `4d9c299`…`5377583`) checked every task without the approval gates, while
 the maintainer's review requested changes and CI was red. The review found mixed layers (queries and Problem Details
 built in the REST resource, seeder logic on the entity), an unrestricted stored content type, absolute image URLs, and
 plan text that contradicted the code. Every box was unticked, and the work was redone on the same branch (squash-only

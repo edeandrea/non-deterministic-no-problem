@@ -1,0 +1,7 @@
+Dear {customerName.orElse('Customer')},
+
+Thank you for reaching out. This inbox is dedicated solely to handling insurance claims. If your inquiry is unrelated to an insurance claim, please contact customer support at {config:['parasol.claims-department.phone']}.
+
+Sincerely,
+{config:['parasol.claims-department.name']}
+Phone: {config:['parasol.claims-department.phone']}

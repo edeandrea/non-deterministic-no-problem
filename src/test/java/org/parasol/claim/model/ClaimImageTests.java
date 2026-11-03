@@ -163,7 +163,35 @@ class ClaimImageTests {
 		}
 	}
 
+	@Test
+	void deletingTheEmailUnlinksItsImageAndKeepsTheImage() {
+		var ids = QuarkusTransaction.requiringNew().call(() -> {
+			var claim = newClaim();
+			var email = ClaimCorrespondence.recordReply(claim, "<unlink-%d@parasol.com>".formatted(System.nanoTime()), "claims@parasol.com", "Subject", "Text");
+			var image = ClaimImage.store(email, ClaimImageKind.ORIGINAL, "photo.jpg", ClaimImageContentType.JPEG, IMAGE_DATA);
+
+			return new StoredEmailImage(claim.id, image.id, email.id);
+		});
+
+		try {
+			assertThat(QuarkusTransaction.requiringNew().call(() -> ClaimImage.<ClaimImage>findById(ids.imageId()).correspondence.id))
+				.isEqualTo(ids.emailId());
+
+			QuarkusTransaction.requiringNew().run(() -> ClaimCorrespondence.deleteById(ids.emailId()));
+
+			assertThat(QuarkusTransaction.requiringNew().call(() -> ClaimImage.<ClaimImage>findByIdOptional(ids.imageId())))
+				.get()
+				.returns(null, image -> image.correspondence);
+		}
+		finally {
+			QuarkusTransaction.requiringNew().run(() -> Claim.deleteById(ids.claimId()));
+		}
+	}
+
 	private record StoredImage(long claimId, long imageId) {
+	}
+
+	private record StoredEmailImage(long claimId, long imageId, long emailId) {
 	}
 
 	private static Claim newClaim() {

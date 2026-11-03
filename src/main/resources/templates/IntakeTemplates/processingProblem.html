@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+<body>
+<p>Dear {customerName.orElse('Customer')},</p>
+
+<p>We received your email, but encountered a problem processing it automatically. A member of our team will follow up, or you can call us at {config:['parasol.claims-department.phone']}.</p>
+
+<p>Sincerely,<br>
+{config:['parasol.claims-department.name']}<br>
+Phone: {config:['parasol.claims-department.phone']}</p>
+</body>
+</html>

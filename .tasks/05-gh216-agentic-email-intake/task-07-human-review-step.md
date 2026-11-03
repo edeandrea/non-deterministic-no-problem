@@ -2,6 +2,8 @@
 
 **Type:** — (retired)
 
+**Issue:** [#255](https://github.com/edeandrea/non-deterministic-no-problem/issues/255) (task 08's issue; task 07 was merged into task 08)
+
 **This task is merged into [task 08](task-08-intake-processor.md) (user decision, 2026-10-07).** Under the
 quarkus-flow design (task 01b = ADOPT, option b1), the whole intake is one Flow workflow, and the human review is its
 last few steps: mark the claim `Pending Review` → wait for the decision event (`listen`) → route the decision

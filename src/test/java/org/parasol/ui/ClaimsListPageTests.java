@@ -19,10 +19,9 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.assertions.PlaywrightAssertions;
 import com.microsoft.playwright.options.AriaRole;
-import io.quarkiverse.quinoa.testing.QuinoaTestProfiles;
 
 @QuarkusTest
-@TestProfile(QuinoaTestProfiles.EnableAndRunTests.class)
+@TestProfile(UiTestProfile.class)
 public class ClaimsListPageTests extends PlaywrightTests {
 	private static final int NB_CLAIMS = 6;
 

@@ -47,7 +47,7 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies)
     - image attachments
     - auto-reply headers
   - Moves messages to the processed or failed folder.
-- **Agents:** side-effect free and **stateless**, using model `claim-intake`. Every AI agent opts out of chat memory and the policy Easy RAG (`@RegisterAiService(retrievalAugmentor = NoRetrievalAugmentorSupplier.class, chatMemoryProviderSupplier = NoChatMemoryProviderSupplier.class)`); the processor passes the claim history (correspondence, fields extracted so far, requested items including reviewer-ticked ones) in on every run. Each leaf agent belongs to exactly one root.
+- **Agents:** side-effect free and **stateless**, using model `claim-intake`. Every AI agent opts out of chat memory and the policy Easy RAG (`@RegisterAiService(retrievalAugmentor = NoRetrievalAugmentorSupplier.class, chatMemoryProviderSupplier = NoChatMemoryProviderSupplier.class)`); the processor passes the claim history (correspondence, fields extracted so far, requested items including reviewer-checked ones) in on every run. Each leaf agent belongs to exactly one root.
   - `ClaimsMailboxAgent` (`@SequenceAgent`) is the root, `process(@MemoryId messageId, …)` (memory id = the inbound `Message-ID`), and returns a sealed `IntakeOutcome`. It receives the claim the processor matched in code (or none).
   - `EmailClassifierAgent` → `NEW_CLAIM` / `CLAIM_FOLLOW_UP` / `NOT_A_CLAIM`
   - `EmailRouter` (`@ConditionalAgent`, no LLM): typed, cheap `@ActivationCondition`s on the **matched claim first**, then the email type:
@@ -65,7 +65,7 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies)
   `AgenticScopeStore` SPI.
 - **`ClaimReviewService`:** claims the review under optimistic locking, completes the pending response, re-runs the root with the same memory
   id and the original arguments read back from the scope, applies the outcome and evicts the scope. Exposed as `POST /api/db/claims/{id}/review-decisions`
-  (`READY` / `NEEDS_INFORMATION` + ticked missing items; RFC 9457 Problem Details: 400, 404 for an unknown claim or missing scope, 409 when no review is pending or the lock is lost).
+  (`READY` / `NEEDS_INFORMATION` + checked missing items; RFC 9457 Problem Details: 400, 404 for an unknown claim or missing scope, 409 when no review is pending or the lock is lost).
 - **`ClaimEmailProcessor`** matches the claim and checks the sender (code, before the workflow), runs the root, checks the policy number, and does all persistence, mail, folder moves and scope eviction. LLM calls run outside
   transactions (including on resume), persistence uses `QuarkusTransaction.requiringNew()`, and it stays idempotent around the scope saves, which commit separately.
 - **`IntakeConfig`** (`@ConfigMapping`, `parasol.intake.*`):
@@ -80,7 +80,7 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies)
    If any is missing, the claim is created as **`Pending Information`** and the customer is emailed the exact list of missing items.
    When every required detail is present — in the first email or after any number of replies — the claim moves to **`Pending Review`** and the customer is sent a "received — final review" email. A claims processor then does a final review on the claim detail page:
    - **Ready** → **`In Process`**, and the customer is sent a "thank you, we're working on your claim" email.
-   - **Needs more information** → the processor ticks the missing items → `Pending Information`, and the customer is emailed exactly the ticked items. That run ends; the customer's next email starts a new one. The claim stays incomplete until the ticked items are answered, so an empty reply stays `Pending Information`.
+   - **Needs more information** → the processor checks the missing items → `Pending Information`, and the customer is emailed exactly the checked items. That run ends; the customer's next email starts a new one. The claim stays incomplete until the checked items are answered, so an empty reply stays `Pending Information`.
 
    Intake uses `Pending Information`, `Pending Review` and `In Process`, and never leaves a claim in `New`.
 2. **Where fields come from:**
@@ -135,7 +135,7 @@ Roundcube ──SMTP──▶ GreenMail ◀──SMTP── app (Qute replies)
 Fixed **Qute** mail templates (HTML + text), deliberately contrasting with the AI-written `GenerateEmailService`:
 - received — final review (sent whenever a claim becomes complete: in the first email, or after back-and-forth), plus a "we've added your latest information" variant for a reply during review
 - thank you / claim in process (sent **only** after the reviewer clicks Ready)
-- missing information (also used for the reviewer's "Needs more information", listing the ticked items)
+- missing information (also used for the reviewer's "Needs more information", listing the checked items)
 - still missing
 - policy inconsistency
 - not a claim
@@ -190,7 +190,7 @@ Verified on quarkus-langchain4j 1.14.1 / langchain4j-agentic 1.20.2-beta30. **Ve
 - **Unit:**
   - activation conditions (exactly one true per matched-claim status × email type) and outcome mapping
   - the `@Output` combiner
-  - the missing-information calculation (`OTHER` vs null; reviewer-ticked items; blank reply)
+  - the missing-information calculation (`OTHER` vs null; reviewer-checked items; blank reply)
   - the JSON guardrail, the length guardrail at 5000 and 5001 characters, and the future-date rule
 - **Agent tests (WireMock-mocked LLM, stubs matching the last message only):** each route and each extraction case; the matched claim wins over the label; an unmatched follow-up → no matching claim; every request carries one user message (no memory, no RAG).
 - **Mailbox tests** against the Compose GreenMail:
@@ -205,7 +205,7 @@ Verified on quarkus-langchain4j 1.14.1 / langchain4j-agentic 1.20.2-beta30. **Ve
   - a complete claim suspends; resume (also after a simulated restart) doesn't re-invoke earlier agents; `READY` / `NEEDS_INFORMATION` outcomes; eviction deletes the row
   - `ClaimReviewService`: not-in-review, second decision, stale version and missing scope are rejected without partial state
   - a reply racing a decision: exactly one wins (optimistic locking)
-- **Review API:** `READY` → `In Process` + one thank-you email; `NEEDS_INFORMATION` → `Pending Information` + exactly the ticked items; 400/404/409 Problem Details.
+- **Review API:** `READY` → `In Process` + one thank-you email; `NEEDS_INFORMATION` → `Pending Information` + exactly the checked items; 400/404/409 Problem Details.
 - **Processor integration tests, one per rule:**
   - complete claim (→ `Pending Review`, one received email, one scope row); each missing item; `OTHER`; no photos; skipped attachments
   - each policy case (a rejection leaves no claim and no scope row, even after the run paused); inception date before incident date
@@ -213,7 +213,7 @@ Verified on quarkus-langchain4j 1.14.1 / langchain4j-agentic 1.20.2-beta30. **Ve
   - matched claim wins over the label; an unmatched follow-up gets the no-matching-claim reply
   - after Needs more information, an empty reply stays `Pending Information`
   - reply during review supersedes (old scope row gone, new row, stays `Pending Review`, variant email) / makes it incomplete (→ `Pending Information`)
-  - reviewer outcome applied: Ready → `In Process` + thank-you; Needs more information → `Pending Information` + ticked items
+  - reviewer outcome applied: Ready → `In Process` + thank-you; Needs more information → `Pending Information` + checked items
   - wrong sender; header vs subject matching
   - duplicate `Message-ID`; reprocessing after a partial failure sends exactly one reply; auto-reply / self-sent; HTML-only
   - agent failure (failed folder, processing-problem email, no claim)

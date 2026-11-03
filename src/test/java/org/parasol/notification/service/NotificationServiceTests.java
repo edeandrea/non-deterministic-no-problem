@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.List;
 
 import jakarta.inject.Inject;
@@ -15,7 +16,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.parasol.claim.model.Claim;
+import org.parasol.claim.model.ClaimCategory;
 import org.parasol.notification.ai.GenerateEmailService;
+import org.parasol.notification.guardrail.EmailEndsAppropriatelyOutputGuardrail;
 import org.parasol.testing.mail.GreenMailMailbox;
 import org.parasol.testing.mail.ReceivedEmail;
 
@@ -33,6 +36,9 @@ class NotificationServiceTests {
 	@Inject
 	NotificationService emailService;
 
+	@Inject
+	EmailEndsAppropriatelyOutputGuardrail endsAppropriately;
+
 	// Before rather than after each test, so mail left over by other test classes can't leak into the assertions
 	@BeforeEach
 	void purgeMail() {
@@ -44,7 +50,7 @@ class NotificationServiceTests {
 		named = "quarkus.test.profile",
 		matches = ".*ollama-openai.*",
 		disabledReason = """
-			Needs a model that reproduces GenerateEmailService.EMAIL_ENDING verbatim, or \
+			Needs a model that reproduces the rendered GenerateEmailService.EMAIL_ENDING verbatim, or \
 			EmailEndsAppropriatelyOutputGuardrail reprompts until max-retries. %ollama gives generate-email qwen3:4b \
 			with thinking off, which does reproduce it. %ollama-openai can't: it reaches Ollama through the \
 			OpenAI-compatible endpoint, where model-options.think isn't available, and qwen3:4b spends ~6k reasoning \
@@ -71,7 +77,7 @@ class NotificationServiceTests {
 				.returns(List.of(claim.emailAddress), ReceivedEmail::to)
 				.extracting(message -> message.body().strip().replace("\r\n", "\n"), STRING)
 				.startsWith(GenerateEmailService.EMAIL_STARTING.strip())
-				.endsWith(GenerateEmailService.EMAIL_ENDING.strip())
+				.endsWith(this.endsAppropriately.expectedEnding().strip())
 				.contains(claim.clientName)
 				.containsIgnoringCase(claim.claimNumber)
 				.containsIgnoringCase(status);
@@ -105,6 +111,29 @@ class NotificationServiceTests {
 		assertThat(this.emailService.updateClaimStatus(1L, status))
 			.isNotNull()
 			.isEqualTo(NotificationService.INVALID_STATUS, status);
+
+		assertNoEmailSent();
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "Pending Review", "Pending Information" })
+	@TestTransaction
+	void noActionWhileIntakeIsNotComplete(String status) {
+		var claim = new Claim();
+		claim.category = ClaimCategory.OTHER;
+		claim.clientName = "Intake Test Client";
+		claim.emailAddress = "intake.test@example.com";
+		claim.policyNumber = "AC-0000001";
+		claim.inceptionDate = LocalDate.of(2020, 1, 1);
+		claim.status = status;
+		claim.persistAndFlush();
+
+		assertThat(this.emailService.updateClaimStatus(claim.id, "Approved"))
+			.isEqualTo(NotificationService.INTAKE_NOT_COMPLETE.formatted(claim.claimNumber, status));
+
+		assertThat(Claim.<Claim>findById(claim.id))
+			.extracting(c -> c.status)
+			.isEqualTo(status);
 
 		assertNoEmailSent();
 	}

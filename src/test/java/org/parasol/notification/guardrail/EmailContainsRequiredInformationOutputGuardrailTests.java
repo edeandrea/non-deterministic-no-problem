@@ -40,7 +40,7 @@ class EmailContainsRequiredInformationOutputGuardrailTests {
 		If you have any questions or concerns regarding this decision, please do not hesitate to contact us at 800-CAR-SAFE or email claims@parasol.com. A member of our team will be happy to assist you.
 		
 		Sincerely,
-		Parasoft Insurance Claims Department
+		Parasol Insurance Claims Department
 		
 		--------------------------------------------
 		Please note this is an unmonitored email box.

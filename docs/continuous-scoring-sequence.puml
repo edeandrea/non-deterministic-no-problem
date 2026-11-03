@@ -51,10 +51,12 @@ actor "User / Browser" as User
 
 box "<$quarkus>\nParasol Application — request thread" #F9F9F9
 	participant "<$robot>\nClaimService\n<i>@ChatScoped</i>" as ClaimService
-	participant "ConversationalBaggageHandler" as Baggage
+	participant "ConversationalBaggageHandler\n<i>ai.scoring.conversation.chat</i>" as Baggage
+	participant "ConversationEvents\n<i>ai.scoring.conversation</i>" as Events
 end box
 
 box "<$quarkus>\nParasol Application — background worker" #EFF7EF
+	participant "ConversationEndedScorer\n<i>@ObservesAsync</i>" as Scorer
 	participant "LangfuseSessionScoringService" as Scoring
 	participant "ConversationExchange" as Exchange
 	participant "<$robot>\nSessionSentimentService\n<i>model: session-sentiment</i>" as Sentiment
@@ -82,12 +84,18 @@ end note
 User -> ClaimService : closes the chat scope
 ClaimService -> Baggage : <<CDI>> ChatScopeEnded
 activate Baggage
-Baggage -> Baggage : ConversationTracker.remove(conversationId)
-Baggage ->> Scoring : <<async>> Infrastructure.getDefaultExecutor()\n.execute(() -> scoreSession(conversationId))
+Baggage -> Baggage : ConversationTracker.end(conversationId)\n(closes the baggage scope)
+Baggage -> Events : ended(conversationId)
+activate Events
+Events ->> Scorer : <<CDI fireAsync>> ConversationEndedEvent
+Events --> Baggage : CompletionStage\n<i>a failed observer is logged</i>
+deactivate Events
 deactivate Baggage
 
 note right of Baggage #EFEFEF : User is already gone —\nnothing below is on the request path
 
+activate Scorer
+Scorer -> Scoring : scoreSession(conversationId)
 activate Scoring
 Scoring -> OTel : start INTERNAL span "ComputeSessionScore"\n(made current)
 
@@ -148,5 +156,6 @@ end
 
 Scoring -> OTel : end span "ComputeSessionScore" (finally)
 deactivate Scoring
+deactivate Scorer
 
 @enduml

@@ -19,17 +19,16 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.parasol.testing.StubbedModelsTestProfile;
 
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.Mock;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 
 import ai.scoring.config.InteractionMode;
 import ai.scoring.config.ScoringConfig;
 import ai.scoring.langfuse.evaluation.Evaluator;
-import ai.scoring.drift.DriftDetectionOutputGuardrailTests.KeysTestProfile;
 import com.langfuse.api.datasetItems.DatasetItemsApi.APIDatasetItemsCreateRequest;
 import com.langfuse.api.datasetItems.DatasetItemsApi.APIDatasetItemsDeleteRequest;
 import com.langfuse.api.datasetItems.DatasetItemsApi.APIDatasetItemsListRequest;
@@ -52,7 +51,7 @@ import io.smallrye.config.Config;
 import io.smallrye.config.SmallRyeConfig;
 
 @QuarkusTest
-@TestProfile(KeysTestProfile.class)
+@TestProfile(StubbedModelsTestProfile.class)
 class DriftDetectionOutputGuardrailTests {
 	private static final String DATASET_NAME = "langchain4j.aiservices.SomeInterface.method";
 	private static final OutputGuardrailRequest DEFAULT_REQUEST = OutputGuardrailRequest.builder()
@@ -180,21 +179,6 @@ class DriftDetectionOutputGuardrailTests {
 			return this.config
 				.unwrap(SmallRyeConfig.class)
 				.getConfigMapping(ScoringConfig.class);
-		}
-	}
-
-	public static class KeysTestProfile implements QuarkusTestProfile {
-		@Override
-		public Map<String, String> getConfigOverrides() {
-			return Map.of(
-				"quarkus.langchain4j.openai.api-key", "changeme",
-				"quarkus.langchain4j.openai.session-sentiment.api-key", "changeme",
-				"quarkus.langchain4j.openai.judge.api-key", "changeme",
-				// Boot-time Easy RAG ingestion would call the embedding model with the stub key above (401 from OpenAI, or
-				// localhost:11434 under -Pollama-openai) unless a cached easy-rag-embeddings.json happens to exist. This test
-				// doesn't use RAG, and OFF also skips reading/writing that file.
-				"quarkus.langchain4j.easy-rag.ingestion-strategy", "OFF"
-			);
 		}
 	}
 }

@@ -2,6 +2,8 @@
 
 **Type:** Exploration (throwaway, timeboxed)
 
+**Issue:** [#249](https://github.com/edeandrea/non-deterministic-no-problem/issues/249)
+
 ## Goal
 
 Decide, on evidence rather than docs, whether [quarkus-flow](https://docs.quarkiverse.io/quarkus-flow/dev/index.html)

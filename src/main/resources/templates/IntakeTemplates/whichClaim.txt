@@ -1,0 +1,13 @@
+Dear {customerName.orElse('Customer')},
+
+We received your email, but we have multiple pending claims on file for your address:
+
+{#for claimNumber in pendingClaimNumbers}
+- {claimNumber}
+{/for}
+
+Please reply directly to this email or include the specific claim number in your subject line so we know which claim you are following up on.
+
+Sincerely,
+{config:['parasol.claims-department.name']}
+Phone: {config:['parasol.claims-department.phone']}

@@ -56,8 +56,9 @@ These are the scripts actually defined in [`package.json`](./package.json):
 Jest tests live next to the code (`*.test.ts` / `*.test.tsx`).
 - **What they cover:** `src/app/app.test.tsx` renders the whole app against a snapshot in
   `src/app/__snapshots__/`. `src/app/utils/formatIncident.test.ts` covers the incident date/time formatting,
-  `claimImages.test.ts` which images the detail page shows and their URLs, and `httpErrors.test.ts` the 404 check.
-- **Run by Maven:** the Playwright `@QuarkusTest`s use Quinoa's `EnableAndRunTests` profile, so Quinoa runs
+  `claimImages.test.ts` which images the detail page shows and their URLs, `correspondence.test.ts` the email transcript,
+  and `httpErrors.test.ts` the 404 check.
+- **Run by Maven:** the Playwright `@QuarkusTest`s use `UiTestProfile`, which carries Quinoa's `EnableAndRunTests` overrides, so Quinoa runs
   `npm test` during their build, and a failing Jest test fails the Maven test run.
 - **Config:** [`jest.config.js`](./jest.config.js) maps CSS and asset imports to the stubs in
   [`__mocks__/`](./__mocks__). It also maps deep `@patternfly/react-icons/dist/esm/...` imports to the CommonJS
@@ -98,8 +99,14 @@ shell variable or a `.env` file both work. The root [`pom.xml`](../../../pom.xml
   - `ClaimDetail` also gets `GET {backend_api_url}/db/claims/{id}/images`. Each entry's `url` is root-relative
     (`/api/db/claims/{id}/images/{imageId}`); `imageSource` in [`claimImages.ts`](./src/app/utils/claimImages.ts)
     resolves it against the origin of `backend_api_url`, so the bytes come from the same server as the rest of the API.
-    The Documents tab shows the `ORIGINAL` images; the right-hand panel shows the `PROCESSED` ones, otherwise the
-    originals, otherwise "No images attached" (`imagesToDisplay`).
+    The right-hand panel shows the `PROCESSED` images, otherwise the originals, otherwise "No images attached"
+    (`imagesToDisplay`).
+  - `ClaimDetail`'s Documents tab is the two-sided email transcript, not an image gallery: `Correspondence` fetches
+    `GET {backend_api_url}/db/claims/{id}/correspondence` and renders the customer's emails and the intake's replies in
+    the order they happened, each with the photos it carried (`correspondence.ts`). A claim entered by hand has none, so
+    the tab falls back to the claim's own content and its `ORIGINAL` images.
+  - The review panel uses `GET {backend_api_url}/db/claims/{id}/review`, `POST .../review-decision` and
+    `POST .../sentiment`.
   - Both requests are aborted when the claim id changes, so a slow response for the previous claim can't overwrite the
     current one.
 * **Chat** — [`Chat.tsx`](./src/app/components/Chat/Chat.tsx) is a WebSocket, not REST. It derives the

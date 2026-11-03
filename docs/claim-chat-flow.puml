@@ -30,7 +30,7 @@ sprite $otel [16x16/16] {
 0000000000000000
 }
 
-title Application Flow: Parasol Claim Assistant
+title Claim Chat Flow: the chat bot, its tool call, and the generated email
 
 skinparam linetype polyline
 skinparam nodesep 50
@@ -63,11 +63,12 @@ rectangle "AI replacing humans\n<i>a conversation a human used to have</i>" as H
 ' "AI replacing software" — deterministic work done by an LLM
 ' =====================================================================
 rectangle "AI replacing software\n<i>code a developer used to write</i>" as Software <<Software>> {
+	component "<$shield_alt>\nIntakeCompleteToolInputGuardrail\n<i>the one TOOL input guardrail:</i>\n<i>refuses a claim still in intake</i>" as ToolGuard #FFFFFF
 	component "Claim Status Notification\n<i>NotificationService</i>\n<i>@Tool updateClaimStatus</i>" as Notification
 	component "<$robot>\nGenerate Email AI Assistant\n<i>GenerateEmailService · model generate-email</i>" as GenEmail
 	component "<$brain>\nEmail Model\n<i>gpt-5-mini</i>" as EmailModel #FFFFFF
 
-	rectangle "<$shield_alt>\nOutput Guardrails\n<i>there are NO input guardrails</i>" as Guardrails #FFFFFF {
+	rectangle "<$shield_alt>\nOutput Guardrails\n<i>there are NO LLM input guardrails</i>" as Guardrails #FFFFFF {
 		component "EmailContainsRequiredInformation" as G1
 		component "EmailStartsAppropriately" as G2
 		component "EmailEndsAppropriately" as G3
@@ -83,7 +84,7 @@ rectangle "AI replacing software\n<i>code a developer used to write</i>" as Soft
 ' =====================================================================
 rectangle "ai.scoring — AI quality layer\n<i>how we test a non-deterministic system</i>" as Scoring <<Scoring>> {
 	component "Tier 1\nLangfuseEvaluationInitializer\n<i>provisions the Langfuse</i>\n<i>LLM-as-a-judge (Gemini)</i>" as Tier1
-	component "Tier 2\nConversationalBaggageHandler ->\nLangfuseSessionScoringService ->\nSessionSentimentService" as Tier2
+	component "Tier 2\nConversationalBaggageHandler ->\nConversationEndedEvent ->\nConversationEndedScorer ->\nLangfuseSessionScoringService ->\nSessionSentimentService" as Tier2
 	component "Tier 3\nDriftDetectionOutputGuardrail +\nLangfuseDatasetSampleLoader +\nEvaluator / EvaluatorAgent" as Tier3
 }
 
@@ -100,7 +101,8 @@ ChatBot -down-> ClaimService : ClaimBotQuery\n<i>route "chat"</i>
 ClaimService -right-> Policies : RAG retrieval
 ClaimService -down-> ChatModel : <<sync HTTP>> prompt + context
 
-ClaimService -down-> Notification : tool invocation\n<i>updateClaimStatus(claimId, status)</i>
+ClaimService -down-> ToolGuard : tool invocation\n<i>updateClaimStatus(claimId, status)</i>
+ToolGuard -down-> Notification : the claim's intake is complete
 Notification -down-> DB : persist new status
 Notification -down-> GenEmail : generateEmail(ClaimInfo)
 

@@ -35,7 +35,10 @@ import io.quarkus.panache.common.Sort;
  * read them. Deleting a claim deletes its images ({@code on delete cascade}).
  */
 @Entity
-@Table(name = "claim_images", indexes = @Index(name = "claim_images_claim_id_idx", columnList = "claim_id"))
+@Table(name = "claim_images", indexes = {
+	@Index(name = "claim_images_claim_id_idx", columnList = "claim_id"),
+	@Index(name = "claim_images_correspondence_id_idx", columnList = "correspondence_id")
+})
 public class ClaimImage extends PanacheEntity {
 	@NotNull
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -66,9 +69,27 @@ public class ClaimImage extends PanacheEntity {
 	@Column(nullable = false, length = Length.LONG32)
 	public byte[] data;
 
+	/**
+	 * The email that carried the image, empty for a seeded image. Deleting the email keeps the image.
+	 */
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "correspondence_id")
+	@OnDelete(action = OnDeleteAction.SET_NULL)
+	public ClaimCorrespondence correspondence;
+
 	@CreationTimestamp
 	@Column(nullable = false, updatable = false)
 	public Instant createdAt;
+
+	/**
+	 * Lists a claim's images, oldest first. The image bytes aren't loaded.
+	 *
+	 * @param claim the claim
+	 * @return the claim's images; empty if the claim has none
+	 */
+	public static List<ClaimImage> listForClaim(Claim claim) {
+		return ClaimImage.<ClaimImage>list("claim", Sort.by("createdAt").and("id"), claim);
+	}
 
 	/**
 	 * Lists a claim's images, oldest first. The image bytes aren't loaded.
@@ -79,7 +100,7 @@ public class ClaimImage extends PanacheEntity {
 	 */
 	public static List<ClaimImage> listForClaim(long claimId) {
 		return Claim.<Claim>findByIdOptional(claimId)
-			.map(claim -> ClaimImage.<ClaimImage>list("claim", Sort.by("createdAt").and("id"), claim))
+			.map(claim -> listForClaim(claim))
 			.orElseThrow(() -> new ClaimNotFoundException(claimId));
 	}
 
@@ -130,6 +151,27 @@ public class ClaimImage extends PanacheEntity {
 		image.contentType = contentType;
 		image.data = data;
 		image.persist();
+
+		return image;
+	}
+
+	/**
+	 * Stores an image that an email carried, for the claim the email belongs to. Like
+	 * {@link #store(Claim, ClaimImageKind, String, ClaimImageContentType, byte[])}, but the image also links to the email, so the
+	 * transcript shows it with its message.
+	 *
+	 * @param correspondence the email that carried the image; its claim must be set
+	 * @param kind the image kind
+	 * @param fileName the original file name
+	 * @param contentType the image format, served back as the {@code Content-Type}
+	 * @param data the image bytes; must not be empty
+	 * @return the persisted image
+	 * @throws jakarta.validation.ConstraintViolationException at flush, if a value is missing, blank or empty
+	 */
+	public static ClaimImage store(ClaimCorrespondence correspondence, ClaimImageKind kind, String fileName, ClaimImageContentType contentType, byte[] data) {
+		var image = store(correspondence.claim, kind, fileName, contentType, data);
+
+		image.correspondence = correspondence;
 
 		return image;
 	}

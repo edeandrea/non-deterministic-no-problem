@@ -1,0 +1,1 @@
+/Users/edeandre/dotfiles/agents/AGENTS.md

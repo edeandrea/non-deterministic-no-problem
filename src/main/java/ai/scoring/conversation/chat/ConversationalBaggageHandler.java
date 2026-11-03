@@ -1,4 +1,4 @@
-package ai.scoring.conversation;
+package ai.scoring.conversation.chat;
 
 import java.util.Map;
 import java.util.Optional;
@@ -9,44 +9,38 @@ import jakarta.enterprise.event.Observes;
 
 import io.quarkus.logging.Log;
 
-import ai.scoring.config.ScoringConfig;
-import ai.scoring.evaluation.SessionScoringService;
-import ai.scoring.langfuse.config.LangfuseConfig;
-import io.opentelemetry.api.baggage.Baggage;
-import io.opentelemetry.context.Context;
+import ai.scoring.conversation.ConversationContext;
+import ai.scoring.conversation.ConversationEvents;
 import io.opentelemetry.context.Scope;
-import io.opentelemetry.semconv.incubating.GenAiIncubatingAttributes;
 import io.quarkiverse.langchain4j.chatscopes.ChatScopeActivated;
 import io.quarkiverse.langchain4j.chatscopes.ChatScopeDeactivated;
 import io.quarkiverse.langchain4j.chatscopes.ChatScopeEnded;
 import io.quarkiverse.langchain4j.chatscopes.ChatScopeStarted;
-import io.smallrye.mutiny.infrastructure.Infrastructure;
 
 /**
- * A listener class that manages the lifecycle events of conversational scopes. This class
- * enables the tracking and handling of conversations, including their activation, deactivation,
- * and successful termination. It integrates with services to process sessions and utilizes
- * baggage propagation for context management.
+ * The chat adapter of the conversation core: translates the quarkus-langchain4j chat-scope lifecycle into
+ * {@link ConversationContext} (the scope id is the conversation id, current while the scope is active) and, when a
+ * scope ends, fires a {@link ai.scoring.conversation.ConversationEndedEvent ConversationEndedEvent}.
  */
 @ApplicationScoped
 public class ConversationalBaggageHandler {
-	private static final String CONVERSATION_ID_KEY = GenAiIncubatingAttributes.GEN_AI_CONVERSATION_ID.getKey();
-
-	private final SessionScoringService sessionScoringService;
+	private final ConversationContext conversationContext;
+	private final ConversationEvents conversationEvents;
 	private final ConversationTracker tracker = new ConversationTracker();
 
-	public ConversationalBaggageHandler(SessionScoringService sessionScoringService) {
-		this.sessionScoringService = sessionScoringService;
+	public ConversationalBaggageHandler(ConversationContext conversationContext, ConversationEvents conversationEvents) {
+		this.conversationContext = conversationContext;
+		this.conversationEvents = conversationEvents;
 	}
 
 	public void conversationStarted(@Observes ChatScopeStarted event) {
 		var conversationId = event.scope().getId();
 		Log.debugf("Conversation started with ID: %s", conversationId);
 
-		Optional.ofNullable(Baggage.current().getEntryValue(CONVERSATION_ID_KEY))
+		this.conversationContext.currentId()
 			.ifPresentOrElse(
 				existingId -> Log.debugf("Existing conversation ID %s found in baggage", existingId),
-				() -> this.tracker.start(conversationId)
+				() -> this.tracker.start(new ConversationState(conversationId, this.conversationContext))
 			);
 	}
 
@@ -63,15 +57,16 @@ public class ConversationalBaggageHandler {
 		Log.debugf("Conversation ended with ID: %s", conversationId);
 
 		this.tracker.end(conversationId);
-
-		Infrastructure.getDefaultExecutor().execute(() -> sessionScoringService.scoreSession(conversationId));
+		this.conversationEvents.ended(conversationId);
 	}
 
 	private static class ConversationTracker {
 		private final Map<String, ConversationState> conversations = new ConcurrentHashMap<>();
 
-		void start(String conversationId) {
-			Optional.ofNullable(this.conversations.put(conversationId, new ConversationState(conversationId)))
+		void start(ConversationState conversation) {
+			var conversationId = conversation.conversationId();
+
+			Optional.ofNullable(this.conversations.put(conversationId, conversation))
 				.ifPresent(previous -> {
 					Log.warnf("Overwriting active conversation for ID: %s", conversationId);
 					previous.deactivate();
@@ -96,18 +91,20 @@ public class ConversationalBaggageHandler {
 
 	private static class ConversationState {
 		private final String conversationId;
+		private final ConversationContext conversationContext;
 		private Scope baggageScope;
 
-		ConversationState(String conversationId) {
+		ConversationState(String conversationId, ConversationContext conversationContext) {
 			this.conversationId = conversationId;
+			this.conversationContext = conversationContext;
+		}
+
+		String conversationId() {
+			return this.conversationId;
 		}
 
 		void activate() {
-			this.baggageScope = Baggage.current().toBuilder()
-				.put(CONVERSATION_ID_KEY, this.conversationId)
-				.build()
-				.storeInContext(Context.current())
-				.makeCurrent();
+			this.baggageScope = this.conversationContext.enter(this.conversationId);
 		}
 
 		void deactivate() {

@@ -31,9 +31,7 @@ abstract class PlaywrightTests {
 	}
 
 	protected Page loadPage(String subPage, String testName) {
-		var page = this.context.newPage();
-		page.onClose(p -> saveVideoWithReadableName(p, testName));
-
+		var page = newPage(testName);
 		var response = page.navigate(getUrl(subPage));
 
 		assertThat(response)
@@ -42,6 +40,16 @@ abstract class PlaywrightTests {
 			.isEqualTo(Status.OK.getStatusCode());
 
 		page.waitForLoadState(LoadState.NETWORKIDLE);
+
+		return page;
+	}
+
+	/**
+	 * A blank page whose video is saved as {@code <testName>.webm} when it closes, for a page outside the app (Roundcube).
+	 */
+	protected Page newPage(String testName) {
+		var page = this.context.newPage();
+		page.onClose(p -> saveVideoWithReadableName(p, testName));
 
 		return page;
 	}

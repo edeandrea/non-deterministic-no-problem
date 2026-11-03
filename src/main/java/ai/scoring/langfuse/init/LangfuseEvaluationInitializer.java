@@ -122,7 +122,8 @@ public class LangfuseEvaluationInitializer {
 					                                                                           .column("environment")
 					                                                                           .operator(EvaluationRuleOptionsFilterOperator.NONE_OF)
 					                                                                           .type(StringOptionsEvaluationRuleFilter1.TypeEnum.STRING_OPTIONS)
-					                                                                           .value(List.of("langfuse-llm-as-a-judge", CreateLlmAsJudgeEvaluatorRequest1.TypeEnum.LLM_AS_JUDGE.getValue()))
+					                                                                           .value(List.of("langfuse-llm-as-a-judge",
+					                                                                                             CreateLlmAsJudgeEvaluatorRequest1.TypeEnum.LLM_AS_JUDGE.getValue()))
 					                                                                           .build()
 				                                         ),
 				                                         new EvaluationRuleFilter(
@@ -266,7 +267,9 @@ public class LangfuseEvaluationInitializer {
 			                                              PublicEvaluatorNumericScore1.builder()
 			                                                                          .dataType(PublicEvaluatorNumericScore1.DataTypeEnum.NUMERIC)
 			                                                                          .scoreReasoningInstructions("Explain the assigned score in one concise sentence.")
-			                                                                          .scoreValueInstructions("Return a numeric score between 0 and 1, where 0 means \"completely irrelevant\" and 1 means \"completely relevant\".")
+			                                                                          .scoreValueInstructions("Return a numeric score between 0 and 1, "
+			                                                                                                             + "where 0 means \"completely irrelevant\" "
+			                                                                                                             + "and 1 means \"completely relevant\".")
 			                                                                          .minValue(0.0)
 			                                                                          .maxValue(1.0)
 			                                                                          .build()
@@ -431,7 +434,8 @@ public class LangfuseEvaluationInitializer {
 		                                      .name(SessionSentiment.SCORE_NAME)
 		                                      .dataType(ScoreConfigDataType.CATEGORICAL)
 		                                      .categories(categories)
-		                                      .description("Overall user sentiment for the conversation session. Evaluates whether the user's queries were answered, if they left satisfied, or if they appeared frustrated.")
+		                                      .description("Overall user sentiment for the conversation session. Evaluates whether the user's queries were answered, "
+		                                                    + "if they left satisfied, or if they appeared frustrated.")
 		                                      .build();
 
 		try {

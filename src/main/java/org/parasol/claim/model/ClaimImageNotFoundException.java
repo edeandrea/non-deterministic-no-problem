@@ -16,7 +16,8 @@ public class ClaimImageNotFoundException extends RuntimeException {
 	 * @param imageId the id of the requested image
 	 */
 	public ClaimImageNotFoundException(long claimId, long imageId) {
-		super("Image %d was not found for claim %d".formatted(imageId, claimId));
+		// An expected outcome that is mapped to a response: no stack trace is ever shown or logged, so don't compute one
+		super("Image %d was not found for claim %d".formatted(imageId, claimId), null, false, false);
 		this.claimId = claimId;
 		this.imageId = imageId;
 	}

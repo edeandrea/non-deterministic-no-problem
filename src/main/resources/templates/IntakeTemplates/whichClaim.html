@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<body>
+<p>Dear {customerName.orElse('Customer')},</p>
+
+<p>We received your email, but we have multiple pending claims on file for your address:</p>
+
+<ul>
+{#for claimNumber in pendingClaimNumbers}
+  <li><strong>{claimNumber}</strong></li>
+{/for}
+</ul>
+
+<p>Please reply directly to this email or include the specific claim number in your subject line so we know which claim you are following up on.</p>
+
+<p>Sincerely,<br>
+{config:['parasol.claims-department.name']}<br>
+Phone: {config:['parasol.claims-department.phone']}</p>
+</body>
+</html>

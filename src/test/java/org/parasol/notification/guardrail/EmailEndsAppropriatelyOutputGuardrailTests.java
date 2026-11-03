@@ -4,7 +4,6 @@ import static dev.langchain4j.test.guardrail.GuardrailAssertions.assertThat;
 import static org.mockito.Mockito.verify;
 
 import org.junit.jupiter.api.Test;
-import org.parasol.notification.ai.GenerateEmailService;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.mockito.InjectSpy;
@@ -23,8 +22,7 @@ class EmailEndsAppropriatelyOutputGuardrailTests {
 	void guardrailSuccess() {
 		var text = """
 			Hello. Claim number 1234 has been approved.
-			
-			""" + GenerateEmailService.EMAIL_ENDING;
+			""" + this.guardrail.expectedEnding();
 		var json = JSON.formatted(text).replaceAll("\n", "\\\\n");
 		var aiMessage = AiMessage.from(json);
 
@@ -37,12 +35,14 @@ class EmailEndsAppropriatelyOutputGuardrailTests {
 	void emailDoesntEndAppropriately() {
 		var json = JSON.formatted("Hello. Claim number 1234 has been approved.");
 		var aiMessage = AiMessage.from(json);
+		// Read before verify(...): a call on the spy inside verify(...) is taken as the interaction being verified
+		var expectedPrompt = this.guardrail.repromptPrompt();
 		var guardrailResult = this.guardrail.validate(aiMessage);
 
 		assertThat(guardrailResult)
 			.hasResult(Result.FATAL)
 			.hasSingleFailureWithMessage(EmailEndsAppropriatelyOutputGuardrail.REPROMPT_MESSAGE);
 
-		verify(this.guardrail).reprompt(EmailEndsAppropriatelyOutputGuardrail.REPROMPT_MESSAGE, EmailEndsAppropriatelyOutputGuardrail.REPROMPT_PROMPT);
+		verify(this.guardrail).reprompt(EmailEndsAppropriatelyOutputGuardrail.REPROMPT_MESSAGE, expectedPrompt);
 	}
 }

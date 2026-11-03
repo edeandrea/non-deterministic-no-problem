@@ -64,7 +64,22 @@ quarkus:
     default-transaction-timeout: 3m
 
   application:
+    # Also quarkus-flow's application_id, which is part of the primary key of all three Flow tables: renaming the
+    # application orphans every waiting intake run
     name: parasol-app
+
+  flow:
+    validation:
+      input:
+        # quarkus-flow 1.3.0 turns this on by default (quarkiverse/quarkus-flow#1077). For a quarkus-flow-langchain4j
+        # generated agentic workflow (ClaimsMailboxAgent, ClaimExtractionWorkflow) the generated schema is
+        # unsatisfiable: it marks every field of every record in the agent topology as required, with no
+        # nullable/Optional support, including fields that are the agentic system's own not-yet-computed outputs and
+        # the InvocationParameters execution-context parameter (which langchain4j-agentic deliberately keeps out of
+        # AgenticScope.state()). There is no way to scope this flag to just the hand-authored ClaimIntakeFlow, whose
+        # own IntakeRun input is unaffected. Filed upstream as quarkiverse/quarkus-flow#1111; re-enable once it's
+        # addressed there.
+        enabled: false
 
   langfuse:
     environment: dev
@@ -119,6 +134,13 @@ quarkus:
           top-p: 1
         timeout: 600s
         api-key: "${quarkus.langchain4j.openai.api-key}"
+      claim-intake:
+        chat-model:
+          model-name: gpt-5-mini
+          temperature: 1
+          top-p: 1
+        timeout: 600s
+        api-key: "${quarkus.langchain4j.openai.api-key}"
       session-sentiment:
         chat-model:
           model-name: command-r7b-12-2024
@@ -160,6 +182,14 @@ quarkus:
         chat-model:
           model-id: granite4:micro
           temperature: 0.3
+      claim-intake:
+        timeout: 600s
+        chat-model:
+          # Same as generate-email
+          model-id: qwen3:4b
+          temperature: 0.3
+          model-options:
+            think: false
       session-sentiment:
         timeout: 600s
         chat-model:
@@ -185,10 +215,14 @@ quarkus:
     host: localhost
 
   # Also start Roundcube (http://localhost:8000) from compose-devservices.yml in dev mode, whatever the
-  # config profile (Dev Services follow the launch mode, so this has no effect in prod). Turned off in %test
+  # config profile (Dev Services follow the launch mode, so this has no effect in prod). Turned off in %test.
+  # ROUNDCUBE_PORT is its host port: compose-devservices.yml can't default it itself (Quarkus parses the file and can't
+  # read ${VAR:-default}). The Playwright tests' UiTestProfile sets it to 0, a random port
   compose:
     devservices:
       profiles: webmail
+      env-variables:
+        ROUNDCUBE_PORT: 8000
 
   # HTTP
   http:
@@ -260,6 +294,17 @@ quarkus:
   rest-client:
     follow-redirects: true
 
+parasol:
+  # The sign-off on every customer email. No @ConfigMapping reads these: GenerateEmailService.EMAIL_ENDING, the
+  # intake's templates (templates/IntakeTemplates) and EmailEndsAppropriatelyOutputGuardrail read them through Qute's
+  # config: namespace, so there's no Java default and they must stay set here
+  claims-department:
+    name: Parasol Insurance Claims Department
+    phone: 1-800-CAR-SAFE
+  # Email claim intake (IntakeConfig). The IMAP host and port default to the GreenMail the app sends through
+  intake:
+    address: claims@parasol.com
+
 # Ollama profile config
 '%ollama':
   quarkus:
@@ -285,6 +330,9 @@ quarkus:
       politeness:
         chat-model:
           provider: ollama
+      claim-intake:
+        chat-model:
+          provider: ollama
       embedding-model:
         provider: ollama
 
@@ -306,6 +354,10 @@ quarkus:
           base-url: "${%ollama-openai.quarkus.langchain4j.openai.base-url}"
           chat-model:
             model-name: "${quarkus.langchain4j.ollama.parasol-chat.chat-model.model-id}"
+        claim-intake:
+          base-url: "${%ollama-openai.quarkus.langchain4j.openai.base-url}"
+          chat-model:
+            model-name: "${quarkus.langchain4j.ollama.parasol-chat.chat-model.model-id}"
         embedding-model:
           model-name: "${quarkus.langchain4j.ollama.embedding-model.model-id}"
 
@@ -315,6 +367,14 @@ quarkus:
     datasource:
       dev-ui:
         allow-sql: true
+  parasol:
+    # A build property: the Ollama Maven profiles set it for quarkus:dev in the pom
+    dev-seed:
+      enabled: true
+    intake:
+      watcher:
+        # Quick pick-up of mail sent from Roundcube if a wake-up is missed
+        idle-refresh: 10s
 
 # Dev and test modes config
 '%dev,test':
@@ -341,10 +401,16 @@ quarkus:
 '%test':
   quarkus:
     # GreenMail only in tests, no Roundcube. Covers IDE runs and continuous testing; Maven builds also force
-    # quarkus.compose.devservices.profiles=none from surefire/failsafe, which covers config profiles without 'test'
+    # quarkus.compose.devservices.profiles=none from surefire/failsafe, which covers config profiles without 'test'.
+    # The Playwright tests' UiTestProfile overrides both and starts Roundcube on a random port
     compose:
       devservices:
         profiles: ""
+
+    # Build-time: removes only the span processor that exports to Langfuse. The SDK, the dev service and LangfuseOperations stay
+    langfuse:
+      otel:
+        enabled: false
 
     aiscoring:
       langfuse:
@@ -365,6 +431,11 @@ quarkus:
       export:
         otlp:
           enabled: "${%test.quarkus.observability.enabled}"
+
+  # Only the watcher tests turn the intake on
+  parasol:
+    intake:
+      enabled: false
 
 # Prod mode config
 '%prod':
@@ -389,6 +460,12 @@ quarkus:
       builder: openshift
       registry: image-registry.openshift-image-registry.svc:5000
     openshift:
+      # The email intake only works correctly with one replica: ReviewDecisionPublisher's in-memory event
+      # publisher, SupersedeStep's in-JVM activeInstance() lookup, ClaimIntakeDispatcher's per-sender queues
+      # and ClaimsInboxWatcher's process-local lock all assume a single instance. This is the extension's
+      # own default, pinned here so it's documented rather than incidental. See
+      # https://github.com/edeandrea/non-deterministic-no-problem/issues/284 for the HA follow-up.
+      replicas: 1
       part-of: parasol-insurance
       base-jvm-image: registry.access.redhat.com/ubi10/openjdk-25:1.24
       labels:

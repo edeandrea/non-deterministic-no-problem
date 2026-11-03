@@ -4,11 +4,14 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 
 import io.quarkus.logging.Log;
+import io.quarkus.runtime.ShutdownEvent;
 
 import ai.scoring.evaluation.SessionScoringService;
 import ai.scoring.langfuse.config.LangfuseConfig;
@@ -41,12 +44,18 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 	private final Tracer tracer;
 	private final LangfuseOperations langfuse;
 	private final SessionSentimentService sessionSentimentService;
+	private volatile boolean stopped;
 
 	public LangfuseSessionScoringService(LangfuseConfig langfuseConfig, Tracer tracer, LangfuseOperations langfuse, SessionSentimentService sessionSentimentService) {
 		this.langfuseConfig = langfuseConfig;
 		this.tracer = tracer;
 		this.langfuse = langfuse;
 		this.sessionSentimentService = sessionSentimentService;
+	}
+
+	// Scoring runs on a background thread and can outlive the application; a failure after shutdown is expected, not worth a warning
+	void onShutdown(@Observes ShutdownEvent event) {
+		this.stopped = true;
 	}
 
 	@Override
@@ -116,7 +125,8 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 	 * Implemented as a Mutiny pipeline and then collapsed back to blocking with {@code await()}, purely because
 	 * {@code retry().withBackOff().expireIn()} expresses "poll until condition or deadline" more clearly than a
 	 * hand-rolled loop with sleeps, deadline arithmetic and interrupt handling. This method is always called on a
-	 * background worker thread (see {@code ConversationalBaggageHandler}), so blocking here is fine.
+		 * background worker thread (the async {@code ConversationEndedEvent} observer, {@code ConversationEndedScorer}), so
+	 * blocking here is fine.
 	 */
 	private List<ObservationV2> awaitSessionObservations(String conversationId) {
 		var sessionConfig = this.langfuseConfig.evaluation().session();
@@ -153,7 +163,13 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 			// more specific "gave up waiting" message still wins for the ordinary polling timeout.
 			.onFailure()
 				.recoverWithItem(failure -> {
-					Log.warnf(failure, "Failed to fetch observations for session %s: %s", conversationId, describeFailure(failure));
+					if (this.stopped) {
+						Log.debugf("Stopped waiting for observations for session %s: the application is shutting down", conversationId);
+					}
+					else {
+						Log.warnf(failure, "Failed to fetch observations for session %s: %s", conversationId, describeFailure(failure));
+					}
+
 					return List.of();
 				});
 
@@ -168,6 +184,16 @@ public class LangfuseSessionScoringService implements SessionScoringService {
 		}
 		catch (TimeoutException e) {
 			Log.warnf("Timed out after %s collecting observations for session %s", backstop, conversationId);
+			return List.of();
+		}
+		catch (CompletionException e) {
+			// Quarkus interrupts a worker still running when the thread pool's shutdown grace period ends. Mutiny cancels the pipeline
+			if (!(e.getCause() instanceof InterruptedException)) {
+				throw e;
+			}
+
+			Thread.currentThread().interrupt();
+			Log.debugf("Interrupted while waiting for observations for session %s", conversationId);
 			return List.of();
 		}
 	}

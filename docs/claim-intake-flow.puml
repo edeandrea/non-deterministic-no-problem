@@ -1,0 +1,118 @@
+@startuml
+!include <C4/C4_Container>
+
+' --- INCLUDES ---
+!include <tupadr3/devicons2/quarkus>
+!include <tupadr3/devicons2/postgresql>
+!include <tupadr3/font-awesome-5/robot>
+!include <tupadr3/font-awesome-5/brain>
+!include <tupadr3/font-awesome-5/database>
+!include <tupadr3/font-awesome-5/envelope>
+!include <tupadr3/font-awesome-5/inbox>
+!include <tupadr3/font-awesome-5/user_check>
+
+title Email Claim Intake: workflow, agents and review
+
+skinparam linetype ortho
+skinparam nodesep 40
+skinparam ranksep 45
+
+skinparam rectangle {
+	BackgroundColor<<Mail>> #FFF8E1
+	BorderColor<<Mail>> #F9A825
+	BackgroundColor<<Workflow>> #E3F2FD
+	BorderColor<<Workflow>> #1565C0
+	BackgroundColor<<Agents>> #F3E5F5
+	BorderColor<<Agents>> #6A1B9A
+	BackgroundColor<<Review>> #E8F5E9
+	BorderColor<<Review>> #2E7D32
+	Padding 10
+}
+
+actor "Customer" as Customer
+
+component "Roundcube\n<i>webmail</i>" as Roundcube #FFFFFF
+
+rectangle "Mail: GreenMail\n<i>claims@parasol.com</i>" as Mail <<Mail>> {
+	component "<$envelope>\nSMTP / IMAP" as GreenMail #FFFFFF
+}
+
+rectangle "quarkus-flow: ClaimIntakeFlow\n<i>single replica</i>" as WorkflowBox <<Workflow>> {
+	component "<$inbox>\nClaimsInboxWatcher\n<i>IMAP IDLE</i>" as Watcher
+	component "ClaimIntakeDispatcher\n<i>per-sender queue ·</i>\n<i>loop/duplicate/match checks</i>" as Dispatcher
+	component "AgentStep\n<i>one workflow step</i>" as AgentStep
+
+	rectangle "<$robot>\nClaimsMailboxAgent" as Agents <<Agents>> {
+		component "EmailClassifierAgent" as Classifier
+		component "EmailRouter" as Router
+		component "ClaimExtractionWorkflow\n<i>parallel: Summary ·</i>\n<i>Sentiment · IncidentDetails</i>" as Extraction
+		component "ClaimFollowUpAgent" as FollowUp
+		component "UnmatchedEmailAgent\n<i>no LLM</i>" as Unmatched
+	}
+
+	component "<$brain>\nclaim-intake model" as Model #FFFFFF
+
+	component "PolicyCheckStep" as Policy
+	component "SupersedeStep\n<i>cancels a waiting review run</i>" as Supersede
+	component "ApplyOutcomeStep\n<i>persist claim + photos</i>" as Persist
+	component "ReplySteps\n<i>IntakeReplySender ·</i>\n<i>Qute templates</i>" as Reply
+	component "FileEmailStep" as File
+	component "waitReview\n<i>listen / switch</i>" as WaitReview
+}
+
+rectangle "Review (REST)" as ReviewBox <<Review>> {
+	actor "Claims processor" as Reviewer
+	component "ClaimReviewResource\n<i>POST .../review-decision</i>\n<i>POST .../sentiment</i>" as ReviewApi
+	component "ReviewDecisionPublisher\n<i>ReviewDecided CloudEvent</i>" as Publisher
+}
+
+database "<$postgresql>\nPostgreSQL\n<i>claims · claim_intake_state ·</i>\n<i>Flow's own tables</i>" as DB
+
+' =====================================================================
+' FLOWS — one continuous top-to-bottom spine; everything else is a short
+' side attachment off that spine (model, database, review), never a
+' second long edge back up through the diagram.
+' =====================================================================
+Customer -down-> Roundcube : writes to\nclaims@parasol.com
+Roundcube -down-> GreenMail : SMTP
+GreenMail -down-> Watcher : IMAP IDLE
+Watcher -down-> Dispatcher : starts a run\n<i>per-sender order</i>
+Dispatcher -down-> AgentStep
+AgentStep -down-> Classifier
+
+Classifier -down-> Router
+Router -down-> Extraction
+Router -down-> FollowUp
+Router -down-> Unmatched
+Extraction -down-> Policy
+FollowUp -down-> Policy
+Unmatched -down-> Policy
+
+Agents -right-> Model : <<sync HTTP>>\n<i>classifier, extraction,</i>\n<i>follow-up agent</i>
+
+Policy -down-> Supersede
+Supersede -down-> Persist
+Persist -down-> Reply
+Reply -down-> File
+File -down-> WaitReview
+
+Persist -right-> DB : save claim + photos
+WaitReview -right-> DB : Flow persists\nthe waiting run
+
+note right of Reply
+  Sent through GreenMail (SMTP),
+  the same path as the inbound mail,
+  reversed — visible to the
+  customer back in Roundcube.
+end note
+
+Reviewer -down-> ReviewApi : decides on the\nclaim detail page
+ReviewApi -down-> Publisher : claims the review,\nchecks the run is WAITING
+Publisher .down.> WaitReview : ReviewDecided\n<i>wakes the run</i>
+
+' --- LAYOUT ANCHORS ---
+Mail -[hidden]down-> WorkflowBox
+WorkflowBox -[hidden]down-> ReviewBox
+DB -[hidden]right-> ReviewBox
+
+@enduml

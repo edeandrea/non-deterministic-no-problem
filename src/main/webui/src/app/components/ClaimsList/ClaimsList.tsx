@@ -1,10 +1,11 @@
 import config from '@app/config';
-import { Card, Flex, FlexItem, FormSelect, FormSelectOption, Label, Page, PageSection, Text, TextContent, TextInput, TextVariants } from '@patternfly/react-core';
+import { Card, Flex, FlexItem, FormSelect, FormSelectOption, Page, PageSection, Text, TextContent, TextInput, TextVariants } from '@patternfly/react-core';
 import SearchIcon from '@patternfly/react-icons/dist/esm/icons/search-icon';
 import { Table, Tbody, Td, Th, Thead, ThProps, Tr } from '@patternfly/react-table';
 import axios from 'axios';
 import * as React from 'react';
 import { Link } from 'react-router-dom';
+import { StatusLabel } from '../StatusLabel/StatusLabel';
 
 interface Row {
     id: number;
@@ -123,14 +124,6 @@ const ClaimsList: React.FunctionComponent = () => {
         columnIndex
     });
 
-    // Custom render for the status column
-    const labelColors = {
-        'Processed': 'green',
-        'New': 'blue',
-        'Denied': 'red',
-        'In Process': 'gold'
-    };
-
     return (
         <Page>
             <PageSection>
@@ -176,9 +169,11 @@ const ClaimsList: React.FunctionComponent = () => {
                         >
                             <FormSelectOption key={0} value="Any status" label="Any status" />
                             <FormSelectOption key={1} value="New" label="New" />
-                            <FormSelectOption key={2} value="In Process" label="In Process" />
-                            <FormSelectOption key={3} value="Processed" label="Processed" />
-                            <FormSelectOption key={4} value="Denied" label="Denied" />
+                            <FormSelectOption key={2} value="Pending Information" label="Pending Information" />
+                            <FormSelectOption key={3} value="Pending Review" label="Pending Review" />
+                            <FormSelectOption key={4} value="In Process" label="In Process" />
+                            <FormSelectOption key={5} value="Processed" label="Processed" />
+                            <FormSelectOption key={6} value="Denied" label="Denied" />
                         </FormSelect>
                     </FlexItem>
                 </Flex>
@@ -204,7 +199,7 @@ const ClaimsList: React.FunctionComponent = () => {
                                     <Td dataLabel={columnNames.category}>{row.category}</Td>
                                     <Td dataLabel={columnNames.client_name}>{row.client_name}</Td>
                                     <Td dataLabel={columnNames.policy_number}>{row.policy_number}</Td>
-                                    <Td dataLabel={columnNames.status}><Label color={labelColors[row.status] || 'default'}>{row.status}</Label></Td>
+                                    <Td dataLabel={columnNames.status}><StatusLabel status={row.status} /></Td>
                                 </Tr>
                             ))}
                         </Tbody>

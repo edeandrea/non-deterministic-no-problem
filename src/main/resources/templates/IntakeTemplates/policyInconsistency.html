@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+<body>
+<p>Dear {customerName.orElse('Customer')},</p>
+
+<p>There is an inconsistency with the policy information provided. Please call us at {config:['parasol.claims-department.phone']} to resolve this issue.</p>
+
+<p>Sincerely,<br>
+{config:['parasol.claims-department.name']}<br>
+Phone: {config:['parasol.claims-department.phone']}</p>
+</body>
+</html>

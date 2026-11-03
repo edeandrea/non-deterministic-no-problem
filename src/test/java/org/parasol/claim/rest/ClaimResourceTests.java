@@ -16,7 +16,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.parasol.claim.model.Claim;
 import org.parasol.claim.model.ClaimCategory;
-import org.parasol.claim.rest.ClaimExceptionMappings.ProblemDetail;
+import org.parasol.problem.ProblemDetail;
 
 import io.quarkus.panache.mock.PanacheMock;
 import io.quarkus.test.junit.QuarkusTest;
@@ -191,7 +191,7 @@ class ClaimResourceTests {
 	private static ProblemDetail getProblem(String path, Object... pathParams) {
 		return get(path, pathParams).then()
 			.statusCode(Status.NOT_FOUND.getStatusCode())
-			.contentType(ClaimExceptionMappings.PROBLEM_JSON)
+			.contentType(ProblemDetail.MEDIA_TYPE)
 			.extract()
 			.as(ProblemDetail.class);
 	}
