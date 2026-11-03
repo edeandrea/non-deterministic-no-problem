@@ -32,7 +32,10 @@ import io.quarkiverse.quinoa.testing.QuinoaTestProfiles;
  *   <b>The Langfuse Dev Service is disabled here:</b> no Playwright test references {@code LangfuseOperations} or any
  *   Langfuse API, and {@code %test} already turns off {@code initialize-on-startup}/{@code score-session}/OTel export, so
  *   nothing needs a live connection. Without this override the Dev Service's six-container stack (Postgres, ClickHouse,
- *   Redis, MinIO, Langfuse, Langfuse-worker) still started on this boot for no reason, costing ~20-30s.
+ *   Redis, MinIO, Langfuse, Langfuse-worker) still started on this boot for no reason, costing ~20-30s. The Dev Service
+ *   normally injects {@code quarkus.langfuse.base-url}/{@code public-key}/{@code secret-key}, which carry no
+ *   {@code @WithDefault}, so turning it off needs literal stand-ins for those three required properties too — the same
+ *   required-but-unused stubbing pattern {@code %ollama} already uses for the OpenAI/Cohere keys.
  * </p>
  */
 public class UiTestProfile implements QuarkusTestProfile {
@@ -51,7 +54,10 @@ public class UiTestProfile implements QuarkusTestProfile {
 	);
 
 	private static final Map<String, String> NO_LANGFUSE = Map.of(
-		"quarkus.langfuse.devservices.enabled", "false"
+		"quarkus.langfuse.devservices.enabled", "false",
+		"quarkus.langfuse.base-url", "http://localhost:0",
+		"quarkus.langfuse.public-key", "changeme",
+		"quarkus.langfuse.secret-key", "changeme"
 	);
 
 	@Override
