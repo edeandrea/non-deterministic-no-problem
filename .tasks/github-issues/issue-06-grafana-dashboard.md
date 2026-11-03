@@ -1,4 +1,13 @@
 TITLE: Clean up the Grafana AI dashboard
+
+> **Superseded 2026-11-03.** The scope below (replace the dead panels and provision the dashboard on the cluster) was
+> settled instead as a straight deletion: `grafana-dashboard-ai.json` is deleted outright, with no replacement built
+> in this issue. Cluster provisioning and a new AI row both move to
+> [#277](https://github.com/edeandrea/non-deterministic-no-problem/issues/277), which builds the one custom
+> dashboard this app now carries (the intake meters plus an AI row) and provisions it in both dev and the cluster.
+> See `.tasks/06-gh218-grafana-ai-dashboard/PLAN.md` for the reasoning and the findings handed to #277. The body
+> below is left as filed, for history.
+
 ## Summary
 
 `src/main/resources/META-INF/grafana/grafana-dashboard-ai.json` ("AI Dashboard", uid `few3cxgl3sf`) mostly charts

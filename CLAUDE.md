@@ -778,6 +778,17 @@ OpenTelemetry + Micrometer. Dev mode uses the LGTM dev service (Grafana/Loki/Tem
 The `grafana/otel-lgtm` image ships Prometheus as its metrics store, not Mimir, despite the "M" in LGTM.
 Traces are also exported to Langfuse via the `quarkus-langfuse` extension.
 
+**The app ships no custom Grafana dashboard.** The old `grafana-dashboard-ai.json` was deleted (#218): its AI and
+GraphQL panels charted metrics removed with the old scorer architecture, and its JVM/HTTP/Agroal panels duplicated
+what the LGTM dev service already provisions. In dev mode Grafana shows the four dashboards the dev service bundles
+("Quarkus Micrometer OpenTelemetry", "Quarkus Micrometer OTLP registry", "Quarkus Micrometer Prometheus registry",
+"Quarkus OpenTelemetry Logging") — "Quarkus Micrometer OpenTelemetry" covers the JVM, HTTP and Agroal view the
+deleted dashboard used to. AI quality observability is Langfuse (see *AI quality layer* above), not Grafana.
+`src/main/resources/META-INF/grafana/grafana-dashboard-*.json` is a dev-mode-only mechanism
+(`io.quarkus.observability.testcontainers.GrafanaUtils` scans it at Dev Service startup); nothing provisions a
+Grafana dashboard on the cluster today. A dashboard for the intake's `claim.intake.*` meters plus an AI row, in both
+dev and on the cluster, is tracked as [#277](https://github.com/edeandrea/non-deterministic-no-problem/issues/277).
+
 ## Testing
 
 Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/scoring/...`, plus the test-only
