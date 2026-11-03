@@ -80,8 +80,30 @@ quarkus:
     environment: dev
 
   # Default LangChain4j configuration
+  # Every named model is pinned to openai here, unconditionally, not just under the default profile: once
+  # quarkus-langchain4j-ollama is on the classpath (-Pollama), both providers' deployment processors are active
+  # for every config profile that Maven profile builds (drift, langfuse-ocp, test, ollama-openai - not just %ollama
+  # itself), so a model reachable through both provider namespaces needs a provider resolved in every one of them or
+  # the build fails with "multiple available providers" (#290: this is what broke the %drift-profile augmentation
+  # once the Ollama block's per-model sub-nodes moved from root into %ollama). %ollama overrides five of these back
+  # to ollama; session-sentiment and judge never are (see Models section)
   langchain4j:
     parasol-chat:
+      chat-model:
+        provider: openai
+    generate-email:
+      chat-model:
+        provider: openai
+    politeness:
+      chat-model:
+        provider: openai
+    claim-intake:
+      chat-model:
+        provider: openai
+    session-sentiment:
+      chat-model:
+        provider: openai
+    judge:
       chat-model:
         provider: openai
     embedding-model:
@@ -303,14 +325,6 @@ parasol:
           provider: ollama
       embedding-model:
         provider: ollama
-      # Not moved to Ollama (see CLAUDE.md -> Models); pinned explicitly now that the ollama block below also configures
-      # these two model names, which would otherwise leave their provider ambiguous between openai and ollama
-      session-sentiment:
-        chat-model:
-          provider: openai
-      judge:
-        chat-model:
-          provider: openai
 
       # Ollama
       ollama:

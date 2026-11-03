@@ -629,6 +629,17 @@ and interpolates these ids; `%ollama-openai` interpolates the same root keys int
 zero-unrecognized-keys invariant* above — this split is why the Ollama block warned 21 times on every leg except
 `-Pollama` before [#290](https://github.com/edeandrea/non-deterministic-no-problem/issues/290).
 
+**Every named model's provider is pinned to `openai` unconditionally at root**, not just under the default profile
+([#290](https://github.com/edeandrea/non-deterministic-no-problem/issues/290)). Once `quarkus-langchain4j-ollama` is
+on the classpath (`-Pollama`), both providers' deployment processors are active for *every* config profile that
+Maven profile builds — `%drift`, `%langfuse-ocp`, `%test`, `%ollama-openai`, not just `%ollama` — so a model
+reachable through both provider namespaces needs a provider resolved in every one of them, or the build fails with
+`A ChatModel or StreamingChatModel bean was requested, but since there are multiple available providers, …needs to be
+set`. This bit the `%drift`-profile augmentation (which replaces the config profile outright, so `%ollama`'s and
+`%test`'s pins are both inactive there) once the Ollama block's per-model sub-nodes moved from an always-active root
+block into `%ollama`. `parasol-chat` and `embedding-model` already had this root pin before #290 (hence never
+affected); `generate-email`, `politeness`, `claim-intake`, `session-sentiment` and `judge` needed it added.
+
 The two Ollama profiles are **not** equivalent:
 - `%ollama` switches `parasol-chat`, `generate-email`, `politeness`, `claim-intake` and the embedding model to
   `provider: ollama` (`granite4:micro`, embeddings `snowflake-arctic-embed`) — **except
@@ -644,9 +655,8 @@ The two Ollama profiles are **not** equivalent:
   `quarkus.langchain4j.openai.api-key` plus the `session-sentiment` and `judge` API keys to
   `changeme`, and disables Langfuse session scoring + startup initialization. Note
   `session-sentiment` and `judge` keep `provider: openai` pointed at the Cohere-compatible
-  endpoint — they are *not* moved to Ollama; this is now an **explicit** `provider: openai` pin on each (not just a
-  dummy key), because once the Ollama block's `session-sentiment`/`judge` sub-nodes moved inside `%ollama` too,
-  leaving the provider unpinned made it ambiguous between `ollama` and `openai` and failed the boot.
+  endpoint — they are *not* moved to Ollama; the root pin above covers them, so `%ollama` has nothing left to
+  override for either.
 - `%ollama-openai` only repoints the OpenAI client's `base-url` at `http://localhost:11434/v1` for
   `parasol-chat`, `generate-email`, `politeness`, `claim-intake` and the embedding model. It stubs **no** API keys
   and does **not** disable session scoring or startup initialization.
@@ -656,7 +666,7 @@ The two Ollama profiles are **not** equivalent:
 **A clean boot logs no `Unrecognized configuration key` warnings** ([#290](https://github.com/edeandrea/non-deterministic-no-problem/issues/290)).
 One appearing is a real finding — a typo or a missing extension — not noise to read around. There is no suppression
 switch: `quarkus-core` declares only `quarkus.config.fixed-at-build-time` and `quarkus.config.sources.system-only`,
-and muting the `io.quarkus.config` logger would just hide the next real typo. Three structural rules keep it true:
+and muting the `io.quarkus.config` logger would just hide the next real typo. Four structural rules keep it true:
 
 - **Application config lives outside the `quarkus.` namespace** — `parasol.*` and `aiscoring.*`. Quarkus builds its
   known-key model for `quarkus.` from extension metadata (`META-INF/quarkus-config-doc/quarkus-config-model.json` in
@@ -670,6 +680,16 @@ and muting the `io.quarkus.config` logger would just hide the next real typo. Th
   mis-indented YAML node silently becomes a sibling of the wrong parent instead of a parse error — a grep for the old
   key passes, and a *new* unrecognized key quietly takes its place. Confirm with a real boot (`quarkus:dev` is cheaper
   feedback than a full `verify`), not just a text search.
+- **A profile-scoped extension's config can't be the only source of a provider pin.** Once `-Pollama` puts a second
+  LangChain4j provider extension on the classpath, *every* config profile built with it — not just `%ollama` — has
+  both providers' deployment processors active, so any named model reachable through both providers' namespaces needs
+  its provider resolved for every one of them (see *Models* above). Moving the Ollama block's per-model sub-nodes from
+  an always-active root block into `%ollama` broke the `%drift` profile's augmentation this way, since `%drift`
+  replaces the config profile outright and neither `%ollama`'s nor `%test`'s provider pins apply there. The fix is a
+  root-level, unconditional `provider: openai` pin for every such model, overridden inside `%ollama` only where it
+  needs to be. **A local smoke boot under one config profile (`quarkus:dev`, a single test class) does not exercise
+  every profile a CI matrix leg does** — `%drift` and `%langfuse-ocp` only build under `./mvnw verify`, so this one
+  surfaced from CI, not a local check.
 
 ### Configuration profiles
 
