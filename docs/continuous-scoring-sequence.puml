@@ -100,7 +100,7 @@ activate Scoring
 Scoring -> OTel : start INTERNAL span "ComputeSessionScore"\n(made current)
 
 ' --- WAIT FOR THE FLUSH ---
-Scoring -> Scoring : delay quarkus.aiscoring.langfuse.session\n.otel-flush-wait-time (**5s**)
+Scoring -> Scoring : delay aiscoring.langfuse.evaluation.session\n.otel-flush-wait-time (**5s**)
 
 ' --- POLL UNTIL READY ---
 loop retry every 2s, expires after observation-max-wait-time (30s)

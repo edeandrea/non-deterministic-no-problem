@@ -6,7 +6,7 @@ import java.util.Optional;
 import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
 
-@ConfigMapping(prefix = "quarkus.aiscoring.langfuse")
+@ConfigMapping(prefix = "aiscoring.langfuse")
 public interface LangfuseConfig {
 	Evaluation evaluation();
 

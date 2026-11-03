@@ -21,7 +21,7 @@ import io.quarkus.test.junit.condition.EnabledIfConfig;
 @Documented
 @Inherited
 @EnabledIfConfig(
-	named = "quarkus.aiscoring.interaction-mode",
+	named = "aiscoring.interaction-mode",
 	matches = "drift-detection",
 	disabledReason = "Drift detection is not enabled because interaction-mode != 'drift-detection'")
 @EnabledIfSystemProperty(

@@ -1,5 +1,6 @@
 package org.parasol.intake.review.rest;
 
+import static io.restassured.RestAssured.get;
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -34,6 +35,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.mockito.InjectSpy;
 
 import io.restassured.http.ContentType;
+import io.restassured.path.json.JsonPath;
 import io.restassured.response.Response;
 import io.serverlessworkflow.impl.WorkflowInstance;
 import io.serverlessworkflow.impl.WorkflowStatus;
@@ -112,6 +114,41 @@ class ClaimReviewResourceTests extends IntakeFlowTestBase {
 		await()
 			.atMost(IntakeScenario.WAIT)
 			.until(() -> this.scenario.instanceRows() == 0);
+	}
+
+	@Test
+	void jsonFieldNames() {
+		var created = createClaim(SENDER, COMPLETE_DETAILS);
+		this.scenario.awaitWaitingRun(created.claim().id);
+		var review = getReview(created.claim().id);
+		var fields = new Fields("A car hit a post on Elm Street, denting the bumper.", LocalDate.of(2026, 10, 6), null, null, null);
+
+		postDecision(created.claim().id, new ReviewDecisionRequest(ReviewOutcome.NEEDS_INFORMATION, Set.of(MissingItem.LOCATION, MissingItem.CATEGORY), fields, review.version()))
+			.then()
+			.statusCode(Status.ACCEPTED.getStatusCode());
+
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.scenario.claim(created.claim().id).status.equals("Pending Information"));
+
+		// Deliberately raw JSON, not as(ClaimReviewState.class): the record serializes and deserializes through the same
+		// @JsonNaming, so a round-trip passes even if a key changes and the review panel / pending-information banner break.
+		// requested_items is present here because this claim has outstanding items; an open review with nothing requested
+		// omits it instead (non-empty inclusion) - see requestedItemsOmittedWhenNothingIsRequested.
+		var json = getJson("/api/db/claims/{id}/review", created.claim().id);
+		assertThat(json.getMap(".").keySet())
+			.containsExactlyInAnyOrder("status", "version", "open", "requested_items", "available_items");
+		// MissingItem values are the @JsonValue labels, not the enum constant names
+		assertThat(json.getList("requested_items", String.class))
+			.containsExactlyInAnyOrder("location", "category");
+		assertThat(json.getList("available_items", String.class))
+			.containsExactlyInAnyOrder("incident description", "incident date", "location", "category");
+	}
+
+	@Test
+	void requestedItemsOmittedWhenNothingIsRequested() {
+		assertThat(getJson("/api/db/claims/{id}/review", NEVER_REVIEWED_CLAIM_ID).getMap(".").keySet())
+			.containsExactlyInAnyOrder("status", "version", "open", "available_items");
 	}
 
 	@Test
@@ -322,14 +359,16 @@ class ClaimReviewResourceTests extends IntakeFlowTestBase {
 		var review = getReview(created.claim().id);
 		this.stubs.answer(SENTIMENT, "  Frustrated: the customer has written twice.  ");
 
-		var assessment = postSentiment(created.claim().id, review.version())
+		var response = postSentiment(created.claim().id, review.version())
 			.then()
 			.statusCode(Status.OK.getStatusCode())
 			.contentType(ContentType.JSON)
-			.extract()
-			.as(SentimentAssessment.class);
+			.extract();
 
-		assertThat(assessment).isEqualTo(new SentimentAssessment("Frustrated: the customer has written twice."));
+		// Deliberately raw JSON too, not just as(SentimentAssessment.class) below: the single field is already lowercase, so
+		// @JsonNaming is a no-op here, but the key set is still pinned the same way as every other DTO
+		assertThat(response.jsonPath().getMap(".").keySet()).containsExactly("sentiment");
+		assertThat(response.as(SentimentAssessment.class)).isEqualTo(new SentimentAssessment("Frustrated: the customer has written twice."));
 		assertThat(this.scenario.claim(created.claim().id))
 			.extracting(c -> c.sentiment, c -> c.summary, c -> c.status)
 			.containsExactly("Frustrated: the customer has written twice.", "A car hit a post on Elm Street.", "Pending Review");
@@ -472,14 +511,19 @@ class ClaimReviewResourceTests extends IntakeFlowTestBase {
 	}
 
 	private static ClaimReviewState getReview(long claimId) {
-		return given()
-			.when()
-			.get("/api/db/claims/{id}/review", claimId)
-			.then()
+		return get("/api/db/claims/{id}/review", claimId).then()
 			.statusCode(Status.OK.getStatusCode())
 			.contentType(ContentType.JSON)
 			.extract()
 			.as(ClaimReviewState.class);
+	}
+
+	private static JsonPath getJson(String path, Object... pathParams) {
+		return get(path, pathParams).then()
+			.statusCode(Status.OK.getStatusCode())
+			.contentType(ContentType.JSON)
+			.extract()
+			.jsonPath();
 	}
 
 	private static ReviewDecisionRequest ready(Long version) {

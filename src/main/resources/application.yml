@@ -13,12 +13,12 @@
           protocol: http/protobuf
 
 "%drift":
+  aiscoring:
+    interaction-mode: drift-detection
   quarkus:
     config:
       profile:
         parent: langfuse-ocp
-    aiscoring:
-      interaction-mode: drift-detection
     otel:
       exporter:
         otlp:
@@ -29,12 +29,13 @@
         disabled: true
     observability:
       enabled: false
-    micrometer:
-      export:
-        otlp:
-          enabled: false
 
 "%langfuse-ocp":
+  aiscoring:
+    langfuse:
+      evaluation:
+        session:
+          score-session: false
   quarkus:
     otel:
       exporter:
@@ -52,12 +53,6 @@
       pretty-print: true
       devservices:
         enabled: false
-
-    aiscoring:
-      langfuse:
-        evaluation:
-          session:
-            score-session: false
 
 quarkus:
   transaction-manager:
@@ -158,51 +153,6 @@ quarkus:
         api-key: "${COHERE_API_KEY}"
         base-url: https://api.cohere.ai/compatibility/v1
 
-    # Ollama
-    ollama:
-      parasol-chat:
-        timeout: 600s
-        chat-model:
-          model-id: granite4:micro
-          temperature: 0.3
-      generate-email:
-        timeout: 600s
-        chat-model:
-          # Not granite4:micro like the others: EmailEndsAppropriatelyOutputGuardrail needs EMAIL_ENDING reproduced
-          # verbatim, and granite4:micro (like llama3.2, ministral-3:3b and qwen2.5:3b) reflows it - it collapses the
-          # three disclaimer lines onto one - so the guardrail reprompts until max-retries. qwen3:4b reproduces it.
-          model-id: qwen3:4b
-          temperature: 0.3
-          model-options:
-            # qwen3 reasons by default: ~6k thinking tokens per email, which is minutes on a CI runner. Off, it's ~140.
-            # This only reaches the Ollama-native API, which is why %ollama-openai stays on parasol-chat's model id.
-            think: false
-      politeness:
-        timeout: 600s
-        chat-model:
-          model-id: granite4:micro
-          temperature: 0.3
-      claim-intake:
-        timeout: 600s
-        chat-model:
-          # Same as generate-email
-          model-id: qwen3:4b
-          temperature: 0.3
-          model-options:
-            think: false
-      session-sentiment:
-        timeout: 600s
-        chat-model:
-          model-id: granite4:micro
-          temperature: 0
-      judge:
-        timeout: 600s
-        chat-model:
-          model-id: granite4:micro
-          temperature: 0
-      embedding-model:
-        model-id: snowflake-arctic-embed
-
   # Mail
   # Send through GreenMail from compose-devservices.yml (the port is mapped in by the compose labels).
   # Set at root rather than %dev so it also applies when dev mode runs as <ai>,prod (-Pollama / -Pollama-openai)
@@ -229,9 +179,6 @@ quarkus:
     cors:
       enabled: true
       origins: '*'
-  dev-ui:
-    cors:
-      enabled: true
   tls:
     trust-all: true
 
@@ -239,7 +186,7 @@ quarkus:
   rest:
     jackson:
       optimization:
-        enable-reflection-free-serialization: true
+        enable-reflection-free-serializers: true
 
   jackson:
     serialization-inclusion: non-empty
@@ -312,19 +259,29 @@ parasol:
   models:
     provider: openai
     base-url: https://api.openai.com/v1
+    # The Ollama model ids live here, not under quarkus.langchain4j.ollama.*, because %ollama-openai needs two of
+    # them and that config root only exists when the Ollama extension is on the classpath (-Pollama). A key outside
+    # the `quarkus.` namespace is also never reported as an unrecognized configuration key - see #290
+    ollama:
+      chat-model-id: granite4:micro
+      # Not granite4:micro like the others: EmailEndsAppropriatelyOutputGuardrail needs EMAIL_ENDING reproduced
+      # verbatim, and granite4:micro (like llama3.2, ministral-3:3b and qwen2.5:3b) reflows it - it collapses the
+      # three disclaimer lines onto one - so the guardrail reprompts until max-retries. qwen3:4b reproduces it
+      email-model-id: qwen3:4b
+      embedding-model-id: snowflake-arctic-embed
 
 # Ollama profile config
 '%ollama':
+  aiscoring:
+    langfuse:
+      evaluation:
+        session:
+          score-session: false
+        initialize-on-startup: false
   parasol:
     models:
       provider: ollama
   quarkus:
-    aiscoring:
-      langfuse:
-        evaluation:
-          session:
-            score-session: false
-          initialize-on-startup: false
     langchain4j:
       openai:
         api-key: changeme
@@ -346,6 +303,56 @@ parasol:
           provider: ollama
       embedding-model:
         provider: ollama
+      # Not moved to Ollama (see CLAUDE.md -> Models); pinned explicitly now that the ollama block below also configures
+      # these two model names, which would otherwise leave their provider ambiguous between openai and ollama
+      session-sentiment:
+        chat-model:
+          provider: openai
+      judge:
+        chat-model:
+          provider: openai
+
+      # Ollama
+      ollama:
+        parasol-chat:
+          timeout: 600s
+          chat-model:
+            model-id: "${parasol.models.ollama.chat-model-id}"
+            temperature: 0.3
+        generate-email:
+          timeout: 600s
+          chat-model:
+            model-id: "${parasol.models.ollama.email-model-id}"
+            temperature: 0.3
+            model-options:
+              # qwen3 reasons by default: ~6k thinking tokens per email, which is minutes on a CI runner. Off, it's ~140.
+              # This only reaches the Ollama-native API, which is why %ollama-openai stays on the chat model id.
+              think: false
+        politeness:
+          timeout: 600s
+          chat-model:
+            model-id: "${parasol.models.ollama.chat-model-id}"
+            temperature: 0.3
+        claim-intake:
+          timeout: 600s
+          chat-model:
+            # Same as generate-email
+            model-id: "${parasol.models.ollama.email-model-id}"
+            temperature: 0.3
+            model-options:
+              think: false
+        session-sentiment:
+          timeout: 600s
+          chat-model:
+            model-id: "${parasol.models.ollama.chat-model-id}"
+            temperature: 0
+        judge:
+          timeout: 600s
+          chat-model:
+            model-id: "${parasol.models.ollama.chat-model-id}"
+            temperature: 0
+        embedding-model:
+          model-id: "${parasol.models.ollama.embedding-model-id}"
 
 # Ollama using OpenAI endpoint profile config
 '%ollama-openai':
@@ -359,21 +366,21 @@ parasol:
         parasol-chat:
           base-url: "${parasol.models.base-url}"
           chat-model:
-            model-name: "${quarkus.langchain4j.ollama.parasol-chat.chat-model.model-id}"
+            model-name: "${parasol.models.ollama.chat-model-id}"
         generate-email:
           base-url: "${parasol.models.base-url}"
           chat-model:
-            model-name: "${quarkus.langchain4j.ollama.parasol-chat.chat-model.model-id}"
+            model-name: "${parasol.models.ollama.chat-model-id}"
         politeness:
           base-url: "${parasol.models.base-url}"
           chat-model:
-            model-name: "${quarkus.langchain4j.ollama.parasol-chat.chat-model.model-id}"
+            model-name: "${parasol.models.ollama.chat-model-id}"
         claim-intake:
           base-url: "${parasol.models.base-url}"
           chat-model:
-            model-name: "${quarkus.langchain4j.ollama.parasol-chat.chat-model.model-id}"
+            model-name: "${parasol.models.ollama.chat-model-id}"
         embedding-model:
-          model-name: "${quarkus.langchain4j.ollama.embedding-model.model-id}"
+          model-name: "${parasol.models.ollama.embedding-model-id}"
 
 # Dev mode config
 '%dev':
@@ -419,6 +426,12 @@ parasol:
 # profiles - that is why the model stubbing below works at all, and why parasol.models.* (read back by UiTestProfile
 # to get "the real model" under whichever Maven profile is active) is owned by the Maven profiles, never by %test.
 '%test':
+  aiscoring:
+    langfuse:
+      evaluation:
+        session:
+          score-session: false
+        initialize-on-startup: false
   quarkus:
     # GreenMail only in tests, no Roundcube. Covers IDE runs and continuous testing; Maven builds also force
     # quarkus.compose.devservices.profiles=none from surefire/failsafe, which covers config profiles without 'test'.
@@ -432,13 +445,6 @@ parasol:
       otel:
         enabled: false
 
-    aiscoring:
-      langfuse:
-        evaluation:
-          session:
-            score-session: false
-          initialize-on-startup: false
-
     otel:
       exporter:
         otlp:
@@ -451,10 +457,6 @@ parasol:
           delay: 100ms
     observability:
       enabled: false
-    micrometer:
-      export:
-        otlp:
-          enabled: "${%test.quarkus.observability.enabled}"
 
     # For the tests that assert what a request loads (e.g. ClaimRetrievalHasNoIntakeBookkeepingTests)
     hibernate-orm:
