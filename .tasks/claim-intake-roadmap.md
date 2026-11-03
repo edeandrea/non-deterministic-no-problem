@@ -2,10 +2,11 @@
 
 The end goal is an agentic, email-driven claim intake: a customer emails `claims@parasol.com` from a
 webmail client, and the app triages the email with `quarkus-langchain4j-agentic`, creates or updates a
-claim, and replies. The work is split into five issues, executed **in order, one at a time**. Each has
+claim, and replies. The work is split into the steps below, executed **in order, one at a time**. Each has
 its own task directory and `PLAN.md`.
 
-Filed on GitHub as **#212–#216** (bodies in `github-issues/`, numbers in `github-issues/created.md`).
+Filed on GitHub as **#212–#216**, plus **#237** (step 4a) and **#218** (step 6); bodies in `github-issues/`, numbers
+in `github-issues/created.md`.
 
 | # | Issue (GitHub title) | Plan | Depends on |
 |---|---|---|---|
@@ -15,10 +16,18 @@ Filed on GitHub as **#212–#216** (bodies in `github-issues/`, numbers in `gith
 | 4 | Replace Mailpit with GreenMail and Roundcube webmail | [`04-gh215-greenmail-roundcube/PLAN.md`](04-gh215-greenmail-roundcube/PLAN.md) | 1 |
 | 4a | Give the seeded claimants' Roundcube identities their names (#237, added 2026-10-11) | [`04a-gh237-roundcube-identities/PLAN.md`](04a-gh237-roundcube-identities/PLAN.md) | 4 |
 | 5 | Agentic email claim intake and triage | [`05-gh216-agentic-email-intake/PLAN.md`](05-gh216-agentic-email-intake/PLAN.md) | 1, 2, 3, 4, 4a (before task 08) |
+| 6 | Retire the AI Grafana dashboard (#218, planned 2026-11-03) | [`06-gh218-grafana-ai-dashboard/PLAN.md`](06-gh218-grafana-ai-dashboard/PLAN.md) | 1, 5 |
 
-**Related, not part of the five-step order:** #218 Clean up the Grafana AI dashboard
-(body in `github-issues/issue-06-grafana-dashboard.md`; independent of steps 2–5, blocked by step 1
-because step 1 bumps the `grafana/otel-lgtm` image).
+**Step 6 (#218) is a deletion, not a clean-up.** The filed body
+(`github-issues/issue-06-grafana-dashboard.md`) scoped it as replacing the dead AI panels and provisioning the
+dashboard on the cluster. On 2026-11-03 the maintainer's own question on the issue — "Does it make sense to just
+delete the dashboard completely?" — was settled as yes: `grafana-dashboard-ai.json` is deleted, cluster provisioning
+and the AI panels move to #277, and the app ends up with one custom dashboard rather than two. See
+[`06-gh218-grafana-ai-dashboard/PLAN.md`](06-gh218-grafana-ai-dashboard/PLAN.md).
+
+**Related, not part of the numbered order:** #277 Add a Grafana dashboard for the email intake metrics (blocked by
+#218; it inherits cluster provisioning and the AI row from it) and #284 Make the email intake safe to run with more
+than one replica (unblocked, and independent of everything above).
 
 **Related, not part of the five-step order:** #221 Spike: compare a LangChain4j decision model (Jev)
 with the LLM email classifier (body in `github-issues/issue-07-decision-model-spike.md`; a follow-up
