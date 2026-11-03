@@ -234,6 +234,26 @@ evidence:
   *Baseline*; there is no new before/after local measurement to add beyond what's already there, since the final
   measurement is CI's.
 
+### CI outcome (2026-11-03, PR #293)
+
+The PR's first CI run caught a real bug task 04's local smoke testing missed: `ai.scoring.it.DriftDetectionTests`
+(which needs to boot just to evaluate its `@EnabledIfConfig` gate) failed augmentation on the `ollama` leg with
+`multiple available providers (ollama,openai)` for `claim-intake` — `DriftTestProfile` replaces the config profile
+with `drift` outright, so neither `%ollama`'s nor `%test`'s provider pins for `claim-intake` applied there, and once
+`-Pollama` puts both provider extensions on the classpath, *every* config profile built with it needs a resolved
+provider for a model reachable through both namespaces, not just `%ollama`. `parasol-chat`/`embedding-model` already
+had an unconditional root-level `provider: openai` pin (untouched by this issue) and were never affected;
+`generate-email`, `politeness`, `claim-intake`, `session-sentiment` and `judge` didn't, and needed the same root pin
+added (commit `5e5802a`). Reproduced locally with a single fast command
+(`./mvnw test -Pollama -Dtest=DriftDetectionTests`) before and after the fix, confirming the exact CI failure and its
+resolution without a local full `verify`. A second CI run then hit one `LangfuseSessionScoringServiceTests` timeout
+(`ConditionTimeout` polling Langfuse's observations API for 15s with empty responses throughout — classic async-ingest
+lag on a loaded runner, a test this PR never touched and which passed locally); a re-run of just that job came back
+green with no code change needed.
+
+**Final state:** both CI legs (`ollama`, `ollama-openai`) green; `ollama`'s full console log carries **zero**
+`Unrecognized configuration key` warnings — the acceptance check for the whole issue. #290 is resolved.
+
 ### Overview
 
 Quarkus builds its known-key model for the `quarkus.` namespace from **extension metadata**
