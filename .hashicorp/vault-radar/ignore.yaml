@@ -1,0 +1,5 @@
+# Mirrors the path allowlist in .gitleaks.toml: demo-only credentials in the OpenShift manifests and scripts
+- paths:
+    - src/main/kubernetes/dependencies.yml
+    - langfuse-helm.values.yml
+    - deploy-to-openshift.sh

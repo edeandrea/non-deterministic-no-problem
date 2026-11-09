@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.LongStream;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -54,6 +55,16 @@ import io.micrometer.core.instrument.Timer;
 @Startup
 @ApplicationScoped
 class IntakeMetrics {
+	// Explicit bucket boundaries, so a dashboard's p50/p95 is meaningful: without them the OTel bridge exports the SDK's default
+	// millisecond boundaries (0 to 10 s) and a review wait of hours all lands in +Inf. Not publishPercentileHistogram(), which is ~70 buckets per series.
+	static final Duration[] EMAIL_LATENCY_BUCKETS = seconds(1, 5, 15, 30, 60, 120, 300, 600, 1800);
+	static final Duration[] COMPLETION_BUCKETS = seconds(60, 300, 900, 3600, 4 * 3600, 86400, 3 * 86400, 7 * 86400);
+	static final Duration[] MAIL_CLIENT_BUCKETS = millis(5, 10, 25, 50, 100, 250, 500, 1000, 5000);
+	static final Duration[] LOCK_WAIT_BUCKETS = millis(1, 5, 10, 50, 100, 500, 1000, 5000);
+	static final double[] EMAIL_SIZE_BUCKETS = { 4_096, 16_384, 65_536, 262_144, 1_048_576, 4_194_304, 16_777_216 };
+	static final double[] COMPLETENESS_BUCKETS = { 0.2, 0.4, 0.6, 0.8, 1.0 };
+	static final double[] CLAIM_EMAILS_BUCKETS = { 1, 2, 3, 5, 8 };
+
 	private final MeterRegistry registry;
 	private final AtomicInteger watcherConnected = new AtomicInteger();
 	private final AtomicInteger inboxDepth = new AtomicInteger(-1);
@@ -97,6 +108,7 @@ class IntakeMetrics {
 		       .ifPresent(latency -> Timer.builder("claim.intake.email.latency")
 		                                  .description("From the mailbox receiving an email to it leaving the processing folder, a review wait excluded")
 		                                  .tag("outcome", handled.outcome().tag())
+		                                  .serviceLevelObjectives(EMAIL_LATENCY_BUCKETS)
 		                                  .register(this.registry)
 		                                  .record(latency.isNegative() ? Duration.ZERO : latency));
 	}
@@ -105,6 +117,7 @@ class IntakeMetrics {
 		DistributionSummary.builder("claim.intake.email.size")
 			.description("The size of an accepted email")
 			.baseUnit("bytes")
+			.serviceLevelObjectives(EMAIL_SIZE_BUCKETS)
 			.register(this.registry)
 			.record(accepted.sizeBytes());
 
@@ -125,6 +138,7 @@ class IntakeMetrics {
 	void onNewClaimExtracted(@Observes(during = TransactionPhase.AFTER_SUCCESS) NewClaimExtracted extracted) {
 		DistributionSummary.builder("claim.intake.extraction.completeness")
 			.description("The share of the required fields the agents filled for a new claim, from 0 to 1")
+			.serviceLevelObjectives(COMPLETENESS_BUCKETS)
 			.register(this.registry)
 			.record(extracted.completeness());
 
@@ -135,11 +149,13 @@ class IntakeMetrics {
 	void onClaimCompleted(@Observes(during = TransactionPhase.AFTER_SUCCESS) ClaimCompleted completed) {
 		DistributionSummary.builder("claim.intake.claim.emails")
 			.description("The inbound emails in a claim's correspondence when a reviewer marked it ready")
+			.serviceLevelObjectives(CLAIM_EMAILS_BUCKETS)
 			.register(this.registry)
 			.record(completed.inboundEmails());
 
 		Timer.builder("claim.intake.claim.time.to.complete")
 			.description("From a claim's first inbound email arriving to a reviewer marking it ready")
+			.serviceLevelObjectives(COMPLETION_BUCKETS)
 			.register(this.registry)
 			.record(completed.timeToComplete().isNegative() ? Duration.ZERO : completed.timeToComplete());
 	}
@@ -148,6 +164,7 @@ class IntakeMetrics {
 		Timer.builder("claim.intake.mail.client.duration")
 			.description("How long a call to the mail server took")
 			.tags("protocol", completed.protocol().name().toLowerCase(Locale.ROOT), "operation", completed.operation(), "outcome", completed.failed() ? "error" : "success")
+			.serviceLevelObjectives(MAIL_CLIENT_BUCKETS)
 			.register(this.registry)
 			.record(completed.duration());
 	}
@@ -156,6 +173,7 @@ class IntakeMetrics {
 		Timer.builder("claim.intake.mailbox.lock.wait")
 			.description("How long a call to the claims mailbox waited for its lock")
 			.tag("mode", acquired.mode().tag())
+			.serviceLevelObjectives(LOCK_WAIT_BUCKETS)
 			.register(this.registry)
 			.record(acquired.waited());
 	}
@@ -183,6 +201,7 @@ class IntakeMetrics {
 		applied.waited()
 		       .ifPresent(waited -> Timer.builder("claim.intake.review.wait")
 		                                 .description("How long a claim waited in Pending Review for a decision")
+		                                 .serviceLevelObjectives(COMPLETION_BUCKETS)
 		                                 .register(this.registry)
 		                                 .record(waited));
 	}
@@ -241,5 +260,13 @@ class IntakeMetrics {
 	@Transactional(TxType.REQUIRES_NEW)
 	double pendingReviews() {
 		return Claim.countPendingReview();
+	}
+
+	private static Duration[] seconds(long... values) {
+		return LongStream.of(values).mapToObj(Duration::ofSeconds).toArray(Duration[]::new);
+	}
+
+	private static Duration[] millis(long... values) {
+		return LongStream.of(values).mapToObj(Duration::ofMillis).toArray(Duration[]::new);
 	}
 }

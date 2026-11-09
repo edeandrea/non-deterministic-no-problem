@@ -236,6 +236,14 @@ these files are 15–150 KB.
    the chat-scope sense, so `ConversationEndedScorer` never fires for it — intake LLM calls get tier-1
    per-trace scores only (see `langfuse-evaluation.md`).
 
+### In Grafana
+
+The **Parasol Claim Intake** dashboard shows the same scenarios as numbers: *Emails by outcome*, *Replies by template*,
+the review-loop row (*Reviews pending*, *Review wait*, *Reviewer agrees with the agents*) and the *Workflow* row for
+`claim-intake`. **Parasol AI** shows tokens, latency and guardrails per model and AI service. Dev: the Grafana URL the LGTM
+Dev Service prints; cluster: the Route `deploy-to-openshift.sh` prints. Panels fill after the first emails, and a few
+(failures, reconnects, tool guardrails, estimated cost on Ollama) stay empty by design.
+
 ## Observability: the Flow Dev UI
 
 1. Open the Quarkus Dev UI (http://localhost:8080/q/dev-ui in dev mode) → the **Workflows** card (from
@@ -255,6 +263,7 @@ The same five scenarios run unchanged against an OpenShift deployment
 
 - Roundcube: the Route URL the deploy script prints at the end.
 - The claims app: the `parasol-app` Route.
+- Grafana: the Route the deploy script prints; both dashboards are under Dashboards.
 - Langfuse and the Flow Dev UI: through the deployed app's own Dev UI is not available outside dev mode
   (the Dev UI is a dev-mode-only feature), so on the cluster, show the Langfuse session only; the Flow
   workflow diagram is a dev-mode-only demonstration.
