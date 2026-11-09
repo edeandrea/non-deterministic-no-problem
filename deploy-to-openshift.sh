@@ -86,6 +86,12 @@ oc create configmap roundcube-identities \
   --from-file=parasol-identities.php=src/main/docker/roundcube/config/parasol-identities.php \
   --from-file=10-parasol-identities-plugin.sh=src/main/docker/roundcube/entrypoint-tasks/post-setup/10-parasol-identities-plugin.sh \
   --dry-run=client -o yaml | oc apply -f -
+
+# The app's Grafana dashboards: the same files dev mode provisions from META-INF/grafana (the grafana-lgtm Deployment mounts them)
+oc create configmap grafana-dashboards \
+  --from-file=claim-intake.json=src/main/resources/META-INF/grafana/grafana-dashboard-claim-intake.json \
+  --from-file=ai.json=src/main/resources/META-INF/grafana/grafana-dashboard-ai.json \
+  --dry-run=client -o yaml | oc apply -f -
 oc apply -f src/main/kubernetes/dependencies.yml
 ./mvnw clean package -DskipTests \
   -Dquarkus.kubernetes.deploy=true \
@@ -94,3 +100,4 @@ oc apply -f src/main/kubernetes/dependencies.yml
 
 echo
 echo "Roundcube webmail (log in as any address, any password): https://$(oc get route roundcube -o jsonpath='{.spec.host}')"
+echo "Grafana dashboards (Dashboards → Parasol Claim Intake / Parasol AI): https://$(oc get route grafana -o jsonpath='{.spec.host}')"

@@ -134,6 +134,24 @@ spec:
       targetPort: 4318
   type: ClusterIP
 ---
+# Tells Grafana to load the app's dashboards from the directory the grafana-lgtm Deployment mounts them at. The dashboards
+# themselves are in the grafana-dashboards ConfigMap, which deploy-to-openshift.sh creates from src/main/resources/META-INF/grafana
+# (the files dev mode provisions), so there is one copy of the JSON. A ConfigMap is capped at 1 MiB.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provisioning
+data:
+  custom.yaml: |
+    apiVersion: 1
+    providers:
+      - name: parasol
+        type: file
+        disableDeletion: true
+        options:
+          path: /otel-lgtm/grafana/conf/provisioning/dashboards/custom
+          foldersFromFilesStructure: false
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -155,6 +173,7 @@ spec:
     spec:
       containers:
         - name: lgtm
+          # Same tag as quarkus.observability.lgtm.image-name in application.yml (dev): change both together
           image: grafana/otel-lgtm:0.38.1
           ports:
             - containerPort: 3000
@@ -191,12 +210,28 @@ spec:
             # throw-away state; the real trace storage stays on the /data PVC.
             - mountPath: /var/tempo
               name: tempo-run
+            # The provider file beside the image's own provisioning files (which stay), and the dashboards as a directory, with no
+            # subPath, so a re-applied grafana-dashboards ConfigMap reaches the running pod and Grafana picks it up without a restart.
+            # This Deployment needs that ConfigMap, which deploy-to-openshift.sh creates, and won't start without it.
+            - mountPath: /otel-lgtm/grafana/conf/provisioning/dashboards/custom.yaml
+              subPath: custom.yaml
+              name: dashboard-provisioning
+              readOnly: true
+            - mountPath: /otel-lgtm/grafana/conf/provisioning/dashboards/custom
+              name: dashboards
+              readOnly: true
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: otel-lgtm-data-pvc
         - name: tempo-run
           emptyDir: {}
+        - name: dashboard-provisioning
+          configMap:
+            name: grafana-dashboard-provisioning
+        - name: dashboards
+          configMap:
+            name: grafana-dashboards
 ---
 apiVersion: route.openshift.io/v1
 kind: Route

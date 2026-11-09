@@ -724,10 +724,17 @@ and muting the `io.quarkus.config` logger would just hide the next real typo. Fo
 ### OpenShift deployment
 
 `deploy-to-openshift.sh` installs Langfuse (Helm), applies `src/main/kubernetes/dependencies.yml`, then builds and
-deploys the app with `-Dquarkus.profile=openshift`. It ends by printing the Roundcube Route URL.
+deploys the app with `-Dquarkus.profile=openshift`. It ends by printing the Roundcube and Grafana Route URLs.
 
 - **`dependencies.yml`** holds PostgreSQL, LGTM and the mail stack, plus the `parasol-app-config` ConfigMap the app
   reads (`quarkus.mailer.host: greenmail`, port `3025`).
+- **Grafana's dashboards come from two ConfigMaps.** `deploy-to-openshift.sh` creates `grafana-dashboards` from the two
+  `META-INF/grafana/grafana-dashboard-*.json` files (the `roundcube-identities` pattern: one copy of the JSON, none in
+  YAML), and `dependencies.yml` holds `grafana-dashboard-provisioning` (a `file` provider at
+  `/otel-lgtm/grafana/conf/provisioning/dashboards/custom`). The `grafana-lgtm` Deployment mounts the provider with a
+  `subPath` and the dashboards as a **directory** (no `subPath`, so a re-applied ConfigMap reaches the running pod), and
+  won't start without the `grafana-dashboards` ConfigMap. The image's own provisioning files stay. Verified locally with
+  podman as an arbitrary UID; not run on a cluster by the agent.
 - **LGTM's Grafana needs `GF_PLUGINS_PREINSTALL_AUTO_UPDATE=false` or it shows no datasources.** Grafana 13
   (`grafana/otel-lgtm` ≥ `0.32.0`) ships the Prometheus, Loki, Tempo and Pyroscope datasources as bundled plugins
   inside the image, at `/otel-lgtm/grafana/data/plugins-bundled`. Grafana loads them fine; what breaks is that its
@@ -747,8 +754,9 @@ deploys the app with `-Dquarkus.profile=openshift`. It ends by printing the Roun
   - **This is UID-specific, not universal.** A plain `docker`/`podman run` of the same image is fine: as root the
     delete succeeds and the plugin is replaced by a fresh download. Don't expect to reproduce it locally, and
     don't expect an image bump to remove the need for the env var.
-  - Local dev mode is unaffected for a different reason: the Quarkus LGTM Dev Service still runs `0.24.0`
-    (Grafana 12), where these were ordinary core plugins with no bundled-plugin update path.
+  - Dev mode runs the same image: `quarkus.observability.lgtm.image-name` (root level in `application.yml`) is pinned
+    to `docker.io/grafana/otel-lgtm:0.38.1`, like `dependencies.yml`. **Change both together.** Quarkus 3.40's default
+    is `0.24.0` (Grafana 12), which is why dev used to differ from the cluster.
 - **The two PVC-backed Deployments (`grafana-lgtm`, `non-deterministic-db`) use `strategy: Recreate`.** Their PVCs
   are `ReadWriteOnce`, so a rolling update deadlocks: the new pod can't attach the volume until the old one
   releases it, and the old one isn't terminated until the new one is ready (`Multi-Attach error for volume …`,
@@ -831,16 +839,33 @@ OpenTelemetry + Micrometer. Dev mode uses the LGTM dev service (Grafana/Loki/Tem
 The `grafana/otel-lgtm` image ships Prometheus as its metrics store, not Mimir, despite the "M" in LGTM.
 Traces are also exported to Langfuse via the `quarkus-langfuse` extension.
 
-**The app ships no custom Grafana dashboard.** The old `grafana-dashboard-ai.json` was deleted (#218): its AI and
-GraphQL panels charted metrics removed with the old scorer architecture, and its JVM/HTTP/Agroal panels duplicated
-what the LGTM dev service already provisions. In dev mode Grafana shows the four dashboards the dev service bundles
-("Quarkus Micrometer OpenTelemetry", "Quarkus Micrometer OTLP registry", "Quarkus Micrometer Prometheus registry",
-"Quarkus OpenTelemetry Logging") — "Quarkus Micrometer OpenTelemetry" covers the JVM, HTTP and Agroal view the
-deleted dashboard used to. AI quality observability is Langfuse (see *AI quality layer* above), not Grafana.
-`src/main/resources/META-INF/grafana/grafana-dashboard-*.json` is a dev-mode-only mechanism
-(`io.quarkus.observability.testcontainers.GrafanaUtils` scans it at Dev Service startup); nothing provisions a
-Grafana dashboard on the cluster today. A dashboard for the intake's `claim.intake.*` meters plus an AI row, in both
-dev and on the cluster, is tracked as [#277](https://github.com/edeandrea/non-deterministic-no-problem/issues/277).
+**Two Grafana dashboards**, in `src/main/resources/META-INF/grafana/` (dev mode provisions every
+`grafana-dashboard-*.json` there at Dev Service startup, via `io.quarkus.observability.testcontainers.GrafanaUtils`; on the
+cluster the ConfigMaps in *OpenShift deployment* do), linking to each other:
+- **Parasol Claim Intake** (`grafana-dashboard-claim-intake.json`, uid `parasol-claim-intake`): every `claim.intake.*`
+  meter in rows (what came in, pipeline health, agent and routing quality, review loop, mail and operations) plus Flow's
+  `quarkus_flow_*` meters for `workflow="claim-intake"`. Its link to the AI dashboard presets `var-ai_service` to the intake's agents.
+- **Parasol AI** (`grafana-dashboard-ai.json`, uid `parasol-ai`): `gen_ai_client_*`, `langchain4j_aiservices_*` and
+  `guardrail_*`/`tool_guardrail_*`, with `$ai_service` and `$model` variables. **`gen_ai_*` carries no AI service**
+  (`ai_service_class_name` is always `none`), so tokens, latency and cost are per model only; `guardrail_*` labels the
+  service with its fully qualified name, `langchain4j_aiservices_*` with the simple one (the guardrail queries match
+  `.*\.${ai_service:regex}`). `gen_ai_client_estimated_cost_total` and `tool_guardrail_invoked_total` are named by the translation
+  rules, never seen: an Ollama model has no price and no tool call ran.
+- **The panels query the OTLP-translated names.** Metrics reach Prometheus by OTLP push only (the OTel bridge,
+  `quarkus-micrometer-opentelemetry`): dots become `_`, counters get `_total`, timers are `…_milliseconds_{bucket,count,sum}`
+  (milliseconds, not seconds), summaries `…_<unit>_*`. A series appears only after its first increment.
+- **The dev scrape is off** (`quarkus.observability.lgtm.force-scraping: false`, root level). `quarkus-micrometer-registry-prometheus`
+  brings a class the dev service treats as a reason to scrape `/q/metrics`, and its opt-out only knows `micrometer-registry-otlp`,
+  so every counter arrived twice (pushed and scraped) and `sum by` read double. `/q/metrics` still answers; nothing reads it.
+- **The intake's timers and summaries have explicit buckets** (`IntakeMetrics`' constants, `serviceLevelObjectives`; not
+  `publishPercentileHistogram`, which is ~70 buckets per series). Without them the bridge exports the SDK's default
+  0 to 10 s millisecond boundaries and a review wait of hours lands in `+Inf`.
+- **`GrafanaDashboardTests`** (plain JUnit over the two resources) fails when a `claim.intake.*` meter in `IntakeMeterSchema`
+  (shared with `IntakeMetricsTests`) has no panel, a panel's datasource isn't uid `prometheus`, a panel id repeats, the
+  dashboards don't link to each other, or a query groups by an identifying label. **A new intake meter needs a panel.**
+- **Flow's own bundled dashboard ("Quarkus Flow") is empty in dev and on the cluster, on purpose:** it queries the scrape
+  names, and the intake dashboard's Workflow row replaces it. Dev also shows the four Quarkus built-ins ("Quarkus Micrometer
+  OpenTelemetry" covers JVM, HTTP and Agroal). AI quality observability beyond the metrics is Langfuse (see *AI quality layer*).
 
 ## Testing
 
@@ -1052,6 +1077,8 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   - **Purge in `@BeforeEach`,** not `@AfterEach`, so mail from other test classes can't leak into "no email sent"
     assertions (`NotificationServiceTests.assertNoEmailSent` checks `allMessages()` is empty).
   - `GreenMailMailboxTests` covers the helper with the app's own `Mailer`, no LLM: mailbox isolation and purge.
+- **Dashboard tests** (`org.parasol.intake.observability`): `GrafanaDashboardTests` and the `IntakeMeterSchema` it shares with
+  `IntakeMetricsTests` (see *Observability*). `IntakeMetricsTests` also pins each timer's and summary's bucket boundaries.
 - **Claims mailbox tests** (`org.parasol.intake.mailbox`): `ClaimsMailboxTests` sends real MIME messages over SMTP with
   Jakarta Mail (the app's `Mailer` can't build multipart/alternative or set arbitrary headers) and reads them back
   through `ClaimsMailbox`: plain text, HTML-only, alternative, image and skipped attachments, auto-reply headers, quoted

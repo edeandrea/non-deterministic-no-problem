@@ -8,19 +8,16 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
-import java.lang.reflect.Method;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import jakarta.inject.Inject;
 import jakarta.persistence.PersistenceException;
@@ -37,7 +34,6 @@ import org.parasol.intake.MissingItem;
 import org.parasol.intake.failure.IntakeFailureHandler;
 import org.parasol.intake.mailbox.ClaimsMailbox;
 import org.parasol.intake.mailbox.MailFolder;
-import org.parasol.intake.mailbox.SkippedAttachment;
 import org.parasol.intake.model.EmailType;
 import org.parasol.intake.observability.IntakeActivity.ClaimCompleted;
 import org.parasol.intake.observability.IntakeActivity.InboxDepthMeasured;
@@ -45,7 +41,6 @@ import org.parasol.intake.observability.IntakeActivity.NewClaimExtracted;
 import org.parasol.intake.observability.IntakeActivity.ClaimStatusChanged;
 import org.parasol.intake.observability.IntakeActivity.ReviewDecisionApplied;
 import org.parasol.intake.reply.IntakeReplySender;
-import org.parasol.intake.reply.IntakeTemplates;
 import org.parasol.intake.review.ReviewDecided;
 import org.parasol.intake.review.ReviewDecision;
 import org.parasol.intake.review.ReviewOutcome;
@@ -58,7 +53,6 @@ import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import io.quarkus.mailer.MailTemplate.MailTemplateInstance;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.mockito.InjectSpy;
@@ -122,6 +116,39 @@ class IntakeMetricsTests extends IntakeFlowTestBase {
 		assertThat(this.registry.timer("claim.intake.review.wait").count()).isEqualTo(waits + 1);
 		assertReviewWaitDuration(waitedBefore, openedAt, decidingAt);
 		assertThat(pendingReviewsGauge()).isZero();
+	}
+
+	@Test
+	void everyTimerAndSummaryExportsItsExplicitBuckets() {
+		var claim = createClaim(SENDER, COMPLETE_DETAILS).claim();
+		this.scenario.awaitWaitingRun(claim.id);
+		this.scenario.decide(claim.id, ReviewOutcome.READY, Set.of());
+		this.scenario.awaitReplies(SENDER, 1);
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.registry.find("claim.intake.claim.time.to.complete").timer() != null);
+
+		var timers = Map.of(
+			"claim.intake.email.latency", IntakeMetrics.EMAIL_LATENCY_BUCKETS,
+			"claim.intake.claim.time.to.complete", IntakeMetrics.COMPLETION_BUCKETS,
+			"claim.intake.review.wait", IntakeMetrics.COMPLETION_BUCKETS,
+			"claim.intake.mail.client.duration", IntakeMetrics.MAIL_CLIENT_BUCKETS,
+			"claim.intake.mailbox.lock.wait", IntakeMetrics.LOCK_WAIT_BUCKETS);
+		timers.forEach((name, expected) -> assertThat(this.registry.find(name).timers())
+			.isNotEmpty()
+			.allSatisfy(timer -> assertThat(Arrays.stream(timer.takeSnapshot().histogramCounts()).map(count -> count.bucket(TimeUnit.MILLISECONDS)).toList())
+				.as(name)
+				.containsExactlyElementsOf(Arrays.stream(expected).map(bound -> (double) bound.toMillis()).toList())));
+
+		var summaries = Map.of(
+			"claim.intake.email.size", IntakeMetrics.EMAIL_SIZE_BUCKETS,
+			"claim.intake.extraction.completeness", IntakeMetrics.COMPLETENESS_BUCKETS,
+			"claim.intake.claim.emails", IntakeMetrics.CLAIM_EMAILS_BUCKETS);
+		summaries.forEach((name, expected) -> assertThat(this.registry.find(name).summaries())
+			.isNotEmpty()
+			.allSatisfy(summary -> assertThat(Arrays.stream(summary.takeSnapshot().histogramCounts()).map(count -> count.bucket()).toList())
+				.as(name)
+				.containsExactlyElementsOf(Arrays.stream(expected).boxed().toList())));
 	}
 
 	@Test
@@ -722,51 +749,18 @@ class IntakeMetricsTests extends IntakeFlowTestBase {
 		var created = createClaim(SENDER, COMPLETE_DETAILS);
 		var conversationId = this.scenario.intake(created.claim().id).orElseThrow().intakeConversationId;
 		var forbidden = Set.of(SENDER, created.claim().claimNumber, created.messageId(), conversationId);
-		// Derive template names from their declarations, not a second list that can drift from Qute.
-		var templates = Stream.concat(
-				Arrays.stream(IntakeTemplates.class.getDeclaredMethods())
-					.filter(method -> method.getReturnType().equals(MailTemplateInstance.class))
-					.map(Method::getName),
-				Stream.of("status_answer"))
-			.collect(Collectors.toUnmodifiableSet());
-		var schemas = Map.ofEntries(
-			Map.entry("claim.intake.emails", Map.of("outcome", Arrays.stream(EmailOutcome.values()).map(EmailOutcome::tag).collect(Collectors.toSet()))),
-			Map.entry("claim.intake.claim.status.transitions", Map.of("status", Arrays.stream(IntakeClaimStatus.values()).map(IntakeClaimStatus::label).collect(Collectors.toSet()))),
-			Map.entry("claim.intake.replies", Map.of("template", templates)),
-			Map.entry("claim.intake.review.decisions", Map.of("decision", Arrays.stream(ReviewOutcome.values())
-				.map(outcome -> outcome.name().toLowerCase(Locale.ROOT))
-				.collect(Collectors.toSet()))),
-			Map.entry("claim.intake.review.wait", Map.<String, Set<String>>of()),
-			Map.entry("claim.intake.failures", Map.of("stage", Arrays.stream(FailureStage.values()).map(FailureStage::tag).collect(Collectors.toSet()),
-				"outcome", Arrays.stream(FailureOutcome.values()).map(FailureOutcome::tag).collect(Collectors.toSet()), "exception", Set.<String>of())),
-			Map.entry("claim.intake.reviews.pending", Map.<String, Set<String>>of()),
-			Map.entry("claim.intake.watcher.connected", Map.<String, Set<String>>of()),
-			Map.entry("claim.intake.watcher.reconnects", Map.<String, Set<String>>of()),
-			Map.entry("claim.intake.email.latency", Map.of("outcome", Arrays.stream(EmailOutcome.values()).map(EmailOutcome::tag).collect(Collectors.toSet()))),
-			Map.entry("claim.intake.attachments", Map.of("result", Set.of("kept", "skipped"),
-				"reason", Stream.concat(Stream.of("none"), Arrays.stream(SkippedAttachment.Reason.values()).map(reason -> reason.name().toLowerCase(Locale.ROOT))).collect(Collectors.toSet()))),
-			Map.entry("claim.intake.email.size", Map.<String, Set<String>>of()),
-			Map.entry("claim.intake.classifications", Map.of("email_type", Arrays.stream(EmailType.values()).map(type -> type.name().toLowerCase(Locale.ROOT)).collect(Collectors.toSet()),
-				"matched_claim", Arrays.stream(MatchedClaimKind.values()).map(MatchedClaimKind::tag).collect(Collectors.toSet()))),
-			Map.entry("claim.intake.matcher.result", Map.of("result", Arrays.stream(MatcherResult.values()).map(MatcherResult::tag).collect(Collectors.toSet()))),
-			Map.entry("claim.intake.extraction.completeness", Map.<String, Set<String>>of()),
-			Map.entry("claim.intake.missing.items", Map.of("item", Arrays.stream(MissingItem.values()).map(item -> item.name().toLowerCase(Locale.ROOT)).collect(Collectors.toSet()))),
-			Map.entry("claim.intake.claim.emails", Map.<String, Set<String>>of()),
-			Map.entry("claim.intake.claim.time.to.complete", Map.<String, Set<String>>of()),
-			Map.entry("claim.intake.review.overrides", Map.of("agreement", Arrays.stream(ReviewAgreement.values()).map(ReviewAgreement::tag).collect(Collectors.toSet()))),
-			Map.entry("claim.intake.mail.client.duration", Map.of("protocol", Set.of("imap", "smtp"), "operation", Set.<String>of(), "outcome", Set.of("success", "error"))),
-			Map.entry("claim.intake.mailbox.lock.wait", Map.of("mode", Arrays.stream(MailboxLockMode.values()).map(MailboxLockMode::tag).collect(Collectors.toSet()))),
-			Map.entry("claim.intake.inbox.depth", Map.<String, Set<String>>of()),
-			Map.entry("claim.intake.review.oldest.pending", Map.<String, Set<String>>of()));
+		var schemas = IntakeMeterSchema.byName();
 		var meters = this.registry.getMeters().stream()
 			.filter(meter -> meter.getId().getName().startsWith("claim.intake."))
+			// The registry's own per-bucket gauges for a meter with explicit buckets
+			.filter(meter -> !meter.getId().getName().endsWith(".histogram"))
 			.toList();
 
 		assertThat(meters).isNotEmpty().allSatisfy(meter -> {
 			var id = meter.getId();
 			assertThat(schemas).containsKey(id.getName());
 			var schema = schemas.get(id.getName());
-			assertThat(id.getTags()).extracting(Tag::getKey).containsExactlyInAnyOrderElementsOf(schema.keySet());
+			assertThat(id.getTags()).extracting(Tag::getKey).containsExactlyInAnyOrderElementsOf(schema.tagKeys());
 			assertThat(id.getTags()).allSatisfy(tag -> {
 				assertThat(forbidden).doesNotContain(tag.getValue());
 				if (tag.getKey().equals("exception") || tag.getKey().equals("operation")) {
@@ -774,7 +768,7 @@ class IntakeMetricsTests extends IntakeFlowTestBase {
 					assertThat(tag.getValue()).matches("[A-Za-z_$][A-Za-z0-9_$]*");
 				}
 				else {
-					assertThat(schema.get(tag.getKey())).contains(tag.getValue());
+					assertThat(schema.tags().get(tag.getKey())).contains(tag.getValue());
 				}
 			});
 		});

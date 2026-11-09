@@ -58,6 +58,13 @@ quarkus:
   transaction-manager:
     default-transaction-timeout: 3m
 
+  observability:
+    lgtm:
+      # The cluster's image (src/main/kubernetes/dependencies.yml): change both together
+      image-name: docker.io/grafana/otel-lgtm:0.38.1
+      # Metrics reach LGTM by OTLP push only; without this the dev service also scrapes /q/metrics and every series arrives twice
+      force-scraping: false
+
   application:
     # Also quarkus-flow's application_id, which is part of the primary key of all three Flow tables: renaming the
     # application orphans every waiting intake run
