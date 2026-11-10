@@ -7,6 +7,11 @@ import * as React from 'react';
 import orb from '@app/assets/bgimages/orb.svg';
 import userAvatar from '@app/assets/bgimages/avatar-user.svg';
 
+// Served by quarkus-langchain4j-chat-scopes-websocket as an ES module; loaded at runtime from the page's own origin, never bundled.
+const CHAT_SCOPES_CLIENT_URL = '/_chat/javascript/chatscopes.js';
+
+const loadChatScopesClient = (): Promise<ChatScopesModule> => import(/* webpackIgnore: true */ CHAT_SCOPES_CLIENT_URL);
+
 const Chat: React.FunctionComponent<{ claimSummary: string, claimId: string, inceptionDate: Date }> = ({ claimSummary, claimId, inceptionDate }) => {
 
     type Query = string;
@@ -41,13 +46,17 @@ const Chat: React.FunctionComponent<{ claimSummary: string, claimId: string, inc
 
     React.useEffect(() => {
         let cancelled = false;
-        const client = new ChatScopesClient();
+        let client: ChatScopesClient | null = null;
 
         const initSession = async () => {
-            await client.open(wsUrl);
+            const chatScopes = await loadChatScopesClient();
             if (cancelled) return;
-            clientRef.current = client;
-            sessionRef.current = await createSession(client);
+            const newClient = new chatScopes.ChatScopesClient();
+            client = newClient;
+            await newClient.open(wsUrl);
+            if (cancelled) return;
+            clientRef.current = newClient;
+            sessionRef.current = await createSession(newClient);
         };
 
         initSession().catch((err) => {
@@ -58,7 +67,7 @@ const Chat: React.FunctionComponent<{ claimSummary: string, claimId: string, inc
 
         return () => {
             cancelled = true;
-            client.websocket?.close();
+            client?.websocket?.close();
             clientRef.current = null;
             sessionRef.current = null;
         };

@@ -24,8 +24,13 @@ interface ChatScopesSession {
     sendData(data: object): Promise<void>;
 }
 
-declare class ChatScopesClient {
+interface ChatScopesClient {
     websocket: WebSocket;
-    open(endpoint: string): Promise<void>;
+    open(endpoint?: string): Promise<void>;
     builder(): ChatScopesSessionBuilder;
+}
+
+// The ES module served at /_chat/javascript/chatscopes.js (quarkus-langchain4j-chat-scopes-websocket)
+interface ChatScopesModule {
+    ChatScopesClient: new () => ChatScopesClient;
 }
