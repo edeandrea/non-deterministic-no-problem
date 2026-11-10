@@ -41,7 +41,8 @@ import io.serverlessworkflow.impl.WorkflowContextData;
  * The email claim intake, start to finish. It's the only place with side effects: every step is a call into a
  * package-private bean, and the agents (one step, {@code runAgents}) only decide.
  * <pre>
- * initialize → routeMatch ─ resumes a review ──→ waitReview
+ * initialize → routeMatch ─ resumes a reply ───→ reply → file
+ *                         ─ resumes a review ──→ waitReview
  *                         ─ wrong sender ────────→ replyNoMatchingClaim → file
  *                         ─ may resolve ─→ resolveClaim ─ unsure → replyWhichClaim → file
  *            → runAgents → policyCheck ─ rejected → replyPolicyInconsistent → file
@@ -132,7 +133,8 @@ public class ClaimIntakeFlow extends Flow {
 				// Match the email to a claim, or to the customer's pending claims
 				function(INITIALIZE, this.claimMatchingSteps::initialize, IntakeRun.class, IntakeState.class),
 				switchCase(ROUTE_MATCH,
-					caseOf(IntakeState::needsReview, IntakeState.class).then(AWAIT_REVIEW),
+					caseOf(IntakeState::isResumingReply, IntakeState.class).then(REPLY),
+					caseOf(IntakeState::isResumingReview, IntakeState.class).then(AWAIT_REVIEW),
 					caseOf(IntakeState::isWrongSender, IntakeState.class).then(REPLY_NO_MATCHING_CLAIM),
 					caseOf(IntakeState::mayResolve, IntakeState.class).then(RESOLVE_CLAIM),
 					caseDefault(RUN_AGENTS)),

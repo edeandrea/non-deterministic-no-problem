@@ -23,6 +23,7 @@ import org.parasol.intake.workflow.ClaimIntakeFlow;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.logging.Log;
+import io.quarkus.runtime.Application;
 import io.quarkus.scheduler.Scheduled;
 import io.quarkus.scheduler.Scheduled.ConcurrentExecution;
 import io.serverlessworkflow.impl.WorkflowStatus;
@@ -90,7 +91,10 @@ public class RunSignalRelay {
 
 	@Scheduled(every = "${parasol.intake.signals.poll-interval}", concurrentExecution = ConcurrentExecution.SKIP)
 	void poll() {
-		deliver();
+		// A poll still in flight while the application stops finds the persistence unit closed, and would only log a warning for each poll until it's gone
+		if (Optional.ofNullable(Application.currentApplication()).filter(Application::isStarted).isPresent()) {
+			deliver();
+		}
 	}
 
 	/**

@@ -1,5 +1,6 @@
 package org.parasol.intake;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 import java.time.Duration;
@@ -562,6 +563,54 @@ public class IntakeScenario {
 	@Transactional(TxType.REQUIRES_NEW)
 	public Optional<ClaimIntakeState> intake(long claimId) {
 		return ClaimIntakeState.findForClaim(claimId);
+	}
+
+	/**
+	 * Hands an email in the processing folder to the new leader's recovery, as the watcher does for what a dead leader left there.
+	 */
+	public void recover(InboundEmail email) {
+		this.starter.recover(email);
+	}
+
+	/**
+	 * Moves a filed email back to the processing folder, as it was when the run that was handling it died.
+	 */
+	public InboundEmail backToProcessing(String messageId) {
+		assertThat(this.mailbox.move(messageId, MailFolder.PROCESSED, MailFolder.PROCESSING)).isTrue();
+
+		return this.mailbox.find(MailFolder.PROCESSING, messageId).orElseThrow();
+	}
+
+	/**
+	 * Records an email as accepted, with no claim, as the dispatcher does before a run starts.
+	 */
+	@Transactional(TxType.REQUIRES_NEW)
+	public void recordAccepted(InboundEmail email) {
+		var row = new ClaimCorrespondence();
+		row.messageId = email.messageId().orElseThrow();
+		row.direction = CorrespondenceDirection.INBOUND;
+		row.sentDate = email.sentDate();
+		row.receivedAt = email.receivedDate();
+		row.sender = email.fromAddress().orElse(null);
+		row.subject = email.subject();
+		row.strippedText = email.strippedBody();
+		row.persist();
+	}
+
+	/**
+	 * Forgets the replies sent about a claim, as if the run that sent them died before recording them.
+	 */
+	@Transactional(TxType.REQUIRES_NEW)
+	public void forgetReplies(long claimId) {
+		ClaimCorrespondence.delete("claim.id = ?1 and direction = ?2", claimId, CorrespondenceDirection.OUTBOUND);
+	}
+
+	/**
+	 * How many recorded rows an inbound email has.
+	 */
+	@Transactional(TxType.REQUIRES_NEW)
+	public long recordedRows(String messageId) {
+		return ClaimCorrespondence.count("messageId", messageId);
 	}
 
 	/**

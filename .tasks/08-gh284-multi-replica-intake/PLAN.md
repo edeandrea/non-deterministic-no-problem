@@ -56,7 +56,7 @@ Edit or create task files and update `## Task Plan`.
 - [x] [task-03-run-signals.md](task-03-run-signals.md): Deliver review decisions through a database signal table, to whichever application instance hosts the run
 - [x] [task-04-intake-leadership.md](task-04-intake-leadership.md): Elect one intake leader with a Kubernetes Lease; only it watches, dispatches and runs
 - [x] [task-05-review-reclaim.md](task-05-review-reclaim.md): Turn off Flow's auto-restore; a new leader reclaims every orphaned review
-- [ ] [task-06-processing-recovery.md](task-06-processing-recovery.md): Recover emails a dead leader left in Processing without duplicating or dropping a reply
+- [x] [task-06-processing-recovery.md](task-06-processing-recovery.md): Recover emails a dead leader left in Processing without duplicating or dropping a reply
 - [ ] [task-07-openshift.md](task-07-openshift.md): OpenShift wiring: kubernetes-client, RBAC for Leases, `POD_NAME`, leadership mode
 - [ ] [task-08-two-jvm-e2e.md](task-08-two-jvm-e2e.md): A two-JVM end-to-end test: follower decision, leader failover, recovered email
 - [ ] [task-09-docs-and-verification.md](task-09-docs-and-verification.md): Documentation, diagrams, full verification and the PR

@@ -9,11 +9,17 @@ import jakarta.transaction.Transactional;
 import jakarta.transaction.Transactional.TxType;
 
 import org.parasol.claim.model.Claim;
+import org.parasol.claim.model.ClaimCorrespondence;
+import org.parasol.claim.model.ClaimNotFoundException;
 import org.parasol.claim.model.IntakeClaimStatus;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.agent.triage.ClaimResolver;
 import org.parasol.intake.config.IntakeConfig;
+import org.parasol.intake.model.ClaimExtraction;
 import org.parasol.intake.model.ClaimIntakeState;
+import org.parasol.intake.model.IncidentDetails;
+import org.parasol.intake.model.IntakeOutcome.NewClaim;
+import org.parasol.intake.model.IntakeOutcome.PendingClaimUpdate;
 import org.parasol.intake.model.PendingClaim;
 import org.parasol.intake.observability.IntakeActivities;
 import org.parasol.intake.observability.IntakeActivity.EmailMatched;
@@ -32,6 +38,8 @@ class ClaimMatchingSteps {
 		.map(IntakeClaimStatus::label)
 		.toList();
 
+	private static final String ALREADY_APPLIED = "already applied";
+
 	private final IntakeEmailReader emails;
 	private final ClaimResolver claimResolver;
 	private final IntakeConfig config;
@@ -46,6 +54,10 @@ class ClaimMatchingSteps {
 
 	@Transactional(TxType.REQUIRES_NEW)
 	IntakeState initialize(IntakeRun run) {
+		if (run.resumesReply()) {
+			return resumeReply(run);
+		}
+
 		return run.resumesReview() ? resumeReview(run) : initializeForEmail(run);
 	}
 
@@ -54,6 +66,23 @@ class ClaimMatchingSteps {
 		return IntakeState.start(run.messageId(), run.sender(), run.receivedAt())
 			.withClaim(run.claimId(), true)
 			.withApplied(run.claimId(), Set.of(), true);
+	}
+
+	// A run that finishes an email whose outcome a dead run had applied: what the reply needs is rebuilt from the claim, since the reply
+	// only depends on the kind of outcome, whether the claim now waits for review and what it still lacks
+	private static IntakeState resumeReply(IntakeRun run) {
+		var claim = Claim.<Claim>findByIdOptional(run.claimId()).orElseThrow(() -> new ClaimNotFoundException(run.claimId()));
+		var needsReview = isPendingReview(claim);
+		var missing = needsReview ? Set.<MissingItem>of() : requestedItemsOf(claim);
+		var isUpdate = ClaimCorrespondence.findByMessageId(run.messageId()).filter(row -> row.mergedIntoClaim).isPresent();
+		// Only the outcome's kind matters from here on. The text isn't empty, because Flow persists the state with non-empty inclusion and would drop an empty one
+		var extraction = new ClaimExtraction(ALREADY_APPLIED, ALREADY_APPLIED, IncidentDetails.empty());
+
+		return IntakeState.start(run.messageId(), run.sender(), run.receivedAt())
+			.withClaim(claim.id, false)
+			.withOutcome(isUpdate ? new PendingClaimUpdate(extraction) : new NewClaim(extraction))
+			.withApplied(claim.id, missing, needsReview)
+			.withDisposition(Disposition.RESUME_REPLY);
 	}
 
 	private IntakeState initializeForEmail(IntakeRun run) {

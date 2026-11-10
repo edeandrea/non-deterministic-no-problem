@@ -1,17 +1,22 @@
 package org.parasol.intake.workflow.review;
 
+import static java.util.function.Predicate.not;
+
 import java.util.List;
-import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
-import java.util.stream.Stream;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.transaction.Transactional;
 import jakarta.transaction.Transactional.TxType;
 
+import org.parasol.claim.model.ClaimCorrespondence;
+import org.parasol.claim.model.CorrespondenceDirection;
 import org.parasol.claim.model.IntakeClaimStatus;
 import org.parasol.intake.leadership.LeadershipAcquired;
+import org.parasol.intake.mailbox.ClaimsMailbox;
+import org.parasol.intake.mailbox.MailFolder;
 import org.parasol.intake.model.ClaimIntakeState;
 import org.parasol.intake.observability.IntakeActivities;
 import org.parasol.intake.observability.IntakeActivity.ReviewReclaimed;
@@ -30,6 +35,10 @@ import io.serverlessworkflow.impl.WorkflowStatus;
  *   application instance. The dead run's persisted rows are left in Flow's tables, which the app never writes to; with nothing restoring them
  *   they're inert.
  * </p>
+ * <p>
+ *   A claim whose latest email is still in the processing folder is left to the processing recovery ({@code ClaimIntakeDispatcher#recover}): its
+ *   resumed run replies, files the email and becomes the claim's review run.
+ * </p>
  */
 @ApplicationScoped
 public class ReviewReclaimer {
@@ -37,12 +46,14 @@ public class ReviewReclaimer {
 	private final ReviewRecoverer recoverer;
 	private final ExecutorService executor;
 	private final IntakeActivities activities;
+	private final ClaimsMailbox mailbox;
 
-	ReviewReclaimer(ClaimIntakeFlow flow, ReviewRecoverer recoverer, @VirtualThreads ExecutorService executor, IntakeActivities activities) {
+	ReviewReclaimer(ClaimIntakeFlow flow, ReviewRecoverer recoverer, @VirtualThreads ExecutorService executor, IntakeActivities activities, ClaimsMailbox mailbox) {
 		this.flow = flow;
 		this.recoverer = recoverer;
 		this.executor = executor;
 		this.activities = activities;
+		this.mailbox = mailbox;
 	}
 
 	void onLeadershipAcquired(@Observes LeadershipAcquired event) {
@@ -56,8 +67,10 @@ public class ReviewReclaimer {
 	 */
 	public int reclaim() {
 		try {
-			var reclaimed = (int) orphanedRunIds().stream()
-				.filter(runId -> !isHostedHere(runId))
+			var reclaimed = (int) orphanedReviews().stream()
+				.filter(review -> !isHostedHere(review.runId()))
+				.filter(not(this::isBeingRecovered))
+				.map(OrphanedReview::runId)
 				.filter(this::reclaim)
 				.count();
 
@@ -92,11 +105,28 @@ public class ReviewReclaimer {
 	// The run a claim's review is with: the one deciding it if a decision was claimed, else the one waiting for it
 	// Non-private and non-final, so the transaction interceptor applies to the call from this class
 	@Transactional(TxType.REQUIRES_NEW)
-	List<String> orphanedRunIds() {
+	List<OrphanedReview> orphanedReviews() {
 		return ClaimIntakeState.<ClaimIntakeState>list("claim.status", IntakeClaimStatus.PENDING_REVIEW.label()).stream()
-			.flatMap(state -> Stream.of(state.decidingRunId != null ? state.decidingRunId : state.reviewRunId))
-			.filter(Objects::nonNull)
+			.filter(state -> (state.decidingRunId != null) || (state.reviewRunId != null))
+			.map(state -> new OrphanedReview(
+				(state.decidingRunId != null) ? state.decidingRunId : state.reviewRunId,
+				ClaimCorrespondence.listForClaim(state.claim).stream()
+					.filter(correspondence -> correspondence.direction == CorrespondenceDirection.INBOUND)
+					.reduce((first, second) -> second)
+					.map(correspondence -> correspondence.messageId)
+					.orElse(null)))
 			.toList();
+	}
+
+	// A claim whose latest email is still in the processing folder hasn't been answered or filed: the processing recovery owns it, and its
+	// resumed run becomes the claim's review run. Taking it here too would start a second run for the same review
+	private boolean isBeingRecovered(OrphanedReview review) {
+		return Optional.ofNullable(review.latestInboundMessageId())
+			.flatMap(messageId -> this.mailbox.find(MailFolder.PROCESSING, messageId))
+			.isPresent();
+	}
+
+	private record OrphanedReview(String runId, String latestInboundMessageId) {
 	}
 
 	// A PENDING instance is a stand-in Flow leaves behind for a run it doesn't host, and an ended one has nothing left to wait for

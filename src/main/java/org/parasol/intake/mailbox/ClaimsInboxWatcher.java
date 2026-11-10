@@ -299,21 +299,21 @@ class ClaimsInboxWatcher {
 			Log.infof("Handing over %d email(s) left in the processing folder", leftOver.size());
 		}
 
-		leftOver.forEach(this::handOver);
+		leftOver.forEach(email -> handOver(email, true));
 	}
 
 	private void handOverInbox() {
 		var next = this.mailbox.moveOldest(MailFolder.INBOX, MailFolder.PROCESSING);
 
 		while (next.isPresent() && !this.isStopping) {
-			handOver(next.get());
+			handOver(next.get(), false);
 			next = this.mailbox.moveOldest(MailFolder.INBOX, MailFolder.PROCESSING);
 		}
 	}
 
-	private void handOver(InboundEmail email) {
+	private void handOver(InboundEmail email, boolean isRecovery) {
 		try {
-			this.received.fire(new EmailReceived(email));
+			this.received.fire(new EmailReceived(email, isRecovery));
 		}
 		catch (RuntimeException e) {
 			Log.errorf(e, "Couldn't hand over the email %s", email.messageId().orElse("without a Message-ID"));

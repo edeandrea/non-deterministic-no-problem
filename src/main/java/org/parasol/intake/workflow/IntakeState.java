@@ -70,7 +70,12 @@ public record IntakeState(
 		/**
 		 * The claim is being decided; the email goes back in the sender's queue.
 		 */
-		REQUEUE
+		REQUEUE,
+
+		/**
+		 * The email's outcome was applied before the run that handled it died: this run only replies and files.
+		 */
+		RESUME_REPLY
 	}
 
 	/**
@@ -164,6 +169,23 @@ public record IntakeState(
 	@JsonIgnore
 	public boolean isWrongSender() {
 		return this.disposition == Disposition.WRONG_SENDER;
+	}
+
+	/**
+	 * Whether the run only finishes what a dead run left: the outcome is already applied, so it goes straight to the reply.
+	 */
+	@JsonIgnore
+	public boolean isResumingReply() {
+		return this.disposition == Disposition.RESUME_REPLY;
+	}
+
+	/**
+	 * Whether the run only waits for the claim's review (it takes one over). Exclusive with {@link #isResumingReply()}, which also has a
+	 * claim that needs review but still has its reply to send: {@code routeMatch}'s cases mustn't overlap, since Flow doesn't promise to try them in order.
+	 */
+	@JsonIgnore
+	public boolean isResumingReview() {
+		return this.needsReview && (this.disposition != Disposition.RESUME_REPLY);
 	}
 
 	/**

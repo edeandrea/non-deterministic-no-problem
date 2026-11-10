@@ -85,6 +85,13 @@ One per row of the table, built by putting a real email in `Processing` with the
 
 ## Done When
 
-- [ ] Each of the four rows has a passing test under `-Pollama`, and the existing intake workflow tests still pass.
-- [ ] Outbound rows record `in_reply_to`; the correspondence API's JSON keys are unchanged.
-- [ ] The residual double-reply window is documented in the code and in `CLAUDE.md`.
+- [x] Each of the four rows has a passing test under `-Pollama`, and the existing intake workflow tests still pass.
+- [x] Outbound rows record `in_reply_to`; the correspondence API's JSON keys are unchanged.
+- [x] The residual double-reply window is documented in the code and in `CLAUDE.md`.
+
+## Outcome
+
+Done, uncommitted for review. Deviation from the plan: *resume at reply* does **not** read the dead run's state from Flow (the binding "Flow is a
+black box" rule). `ClaimMatchingSteps.resumeReply` rebuilds the `IntakeState` from the claim, with a placeholder outcome of the right kind
+(`ClaimCorrespondence.mergedIntoClaim` tells an update from a new claim), so a V5 column was added besides `in_reply_to`. `wasPendingReview` is
+`false` on a recovered reply. Reclaim (task 05) skips a claim whose latest inbound email is still in `Processing`.

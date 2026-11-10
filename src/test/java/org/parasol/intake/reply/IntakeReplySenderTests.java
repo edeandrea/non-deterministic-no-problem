@@ -136,6 +136,18 @@ class IntakeReplySenderTests {
 	}
 
 	@Test
+	void aReplyRecordsTheEmailItAnswers() {
+		var claimNumber = createClaim();
+
+		this.sender.sendTextReply("jane.doe@example.com", "Status", "Body", claimNumber, ThreadingHeaders.replyingTo("<question@example.com>"));
+		this.sender.sendTextReply("jane.doe@example.com", "Status", "Body", claimNumber, ThreadingHeaders.none());
+
+		assertThat(recorded(claimNumber))
+			.extracting(row -> row.inReplyTo)
+			.containsExactly("<question@example.com>", null);
+	}
+
+	@Test
 	void aTextReplyAboutAClaimIsRecorded() {
 		var recipient = "jane.doe@example.com";
 		var claimNumber = createClaim();
