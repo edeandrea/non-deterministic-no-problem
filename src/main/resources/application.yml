@@ -576,11 +576,10 @@ parasol:
       builder: openshift
       registry: image-registry.openshift-image-registry.svc:5000
     openshift:
-      # The email intake only works correctly with one replica: ReviewDecisionPublisher's in-memory event
-      # publisher, SupersedeStep's in-JVM activeInstance() lookup, ClaimIntakeDispatcher's per-sender queues
-      # and ClaimsInboxWatcher's process-local lock all assume a single instance. This is the extension's
-      # own default, pinned here so it's documented rather than incidental. See
-      # https://github.com/edeandrea/non-deterministic-no-problem/issues/284 for the HA follow-up.
+      # The intake is safe to scale (`oc scale deployment/parasol-app --replicas=3`): one application instance leads it
+      # (a Kubernetes Lease, see parasol.intake.leadership below), every instance serves the UI, REST and chat. The default
+      # stays one replica. The app has no PVC, so the default RollingUpdate is fine: the new instance becomes ready as a
+      # follower and takes the Lease when the old one releases it on shutdown. See README -> Scaling.
       replicas: 1
       part-of: parasol-insurance
       base-jvm-image: registry.access.redhat.com/ubi10/openjdk-25:1.24
@@ -596,3 +595,21 @@ parasol:
           insecure-edge-termination-policy: Redirect
       annotations:
         "app.openshift.io/connects-to": non-deterministic-db,grafana-lgtm,greenmail,langfuse-web
+      # Least privilege for the intake leader's Lease; the Lease identity is the pod name (the host name)
+      rbac:
+        roles:
+          intake-lease:
+            policy-rules:
+              leases:
+                api-groups: coordination.k8s.io
+                resources: leases
+                verbs: get,create,update
+        role-bindings:
+          intake-lease:
+            role-name: intake-lease
+    kubernetes-client:
+      generate-rbac: false
+  parasol:
+    intake:
+      leadership:
+        mode: kubernetes-lease

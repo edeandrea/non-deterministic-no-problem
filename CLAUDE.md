@@ -1524,5 +1524,5 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
   Already safe across replicas: the `ClaimCorrespondence.messageId` database unique constraint, optimistic
   locking on `ClaimIntakeState`, and Flow's own DB-backed run persistence (`quarkus-flow-jpa`). See
   [#284](https://github.com/edeandrea/non-deterministic-no-problem/issues/284) for the follow-up to lift
-  the single-replica requirement, and `docs/email-claim-intake-demo.md` / README → *Single replica* for
+  the single-replica requirement, and `docs/email-claim-intake-demo.md` / README → *Scaling* for
   the demo-facing version of this list.
