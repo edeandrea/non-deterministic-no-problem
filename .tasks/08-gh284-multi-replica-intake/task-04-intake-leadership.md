@@ -21,7 +21,10 @@ the mailbox measurements. The other pods serve the UI, REST and chat bot, and re
     `parasol-intake-leader`; the namespace and identity come from the client and `POD_NAME`). Runs on its own thread
     (a virtual thread is fine; it blocks). `onStartLeading` fires `LeadershipAcquired`. `onStopLeading` fires
     `LeadershipLost`, then calls `Quarkus.asyncExit(1)` (fencing; PLAN.md → *Decisions made in planning*).
-    `releaseOnCancel(true)`, so a clean shutdown hands over at once.
+    `releaseOnCancel(true)`, so a clean shutdown hands over at once (about 1 s in task 01; a crash takes about one
+    `lease-duration`).
+  - **fabric8 calls `onStopLeading` when the elector is canceled too,** not only when the Lease is lost (task 01, Q3).
+    The exit must not run for a stop we caused (shutdown): set a flag before canceling, and skip the exit when it's set.
 - `IntakeConfig.leadership`: `mode`, `lease-name`, `lease-duration` (`15s`), `renew-deadline` (`10s`), `retry-period`
   (`2s`).
 
@@ -54,7 +57,8 @@ mock or k3s in dev/test.
 - Plain JUnit (no Quarkus boot) with `io.fabric8:kubernetes-server-mock` in CRUD mode, or k3s if task 01 says so: two
   `KubernetesLeaseLeadership` instances on one lock. Exactly one leads; a clean stop hands over; a missed renewal hands
   over within `lease-duration`; `LeadershipLost` fires before the exit hook (inject the exit as a `Runnable`, so the
-  test JVM survives).
+  test JVM survives); a clean shutdown releases the Lease **without** running the exit hook. Task 01 verified the mock
+  (fabric8 7.8.0, CRUD mode) rejects a stale `resourceVersion` with `409`, so it's a faithful lock; no k3s.
 - In the bare `%test` group (`SINGLE`): the watcher starts only after `LeadershipAcquired`; `InboxDepthMonitor` doesn't
   measure on a follower (drive `isLeader` with a test double).
 

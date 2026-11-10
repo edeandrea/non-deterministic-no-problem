@@ -12,14 +12,23 @@ Dev mode and the test suite still start from the six seeded claims every time. F
 
 ### 1. Dependencies and Flow's migrations
 
-Add `io.quarkus:quarkus-flyway`, `org.flywaydb:flyway-database-postgresql` (if Quarkus 3.40 still needs it for
-PostgreSQL) and `io.quarkiverse.flow:quarkus-flow-db-migration` (managed by the Flow BOM). Configure the `flow-runtime`
-named datasource exactly as task 01 verified: same URL and credentials as the default, its own history table and
-location.
+Add `io.quarkus:quarkus-flyway-postgresql` and `io.quarkiverse.flow:quarkus-flow-db-migration` (1.3.0, managed by the
+Flow BOM). **Flow's schema is never written by hand:** its six tables come only from `quarkus-flow-db-migration`, under
+its own named Flyway configuration, as the [Flow guide](https://docs.quarkiverse.io/quarkus-flow/dev/db-migration.html)
+describes. Use exactly what task 01 verified (spike-results.md Q2):
+- A `flow-runtime` named datasource (`db-kind: postgresql`; `jdbc.url`, `username`, `password` interpolated from the
+  default datasource's), with `quarkus.flyway.flow-runtime.table: flyway_flow_runtime_history`,
+  `locations: db/flow-migration/runtime/postgresql` and `migrate-at-start: true`.
+- **`quarkus.datasource.db-kind: postgresql` set explicitly** on the default datasource. Once a named datasource exists,
+  the default one is no longer implied, and the build fails with `Datasource must be defined for persistence unit '<default>'`.
+- **`baseline-on-migrate: true` and `baseline-version: 0` on both Flyway configurations.** They share schema `public`, so
+  whichever migrates second finds a non-empty schema with no history table of its own and refuses to run.
 
 ### 2. The app's baseline: `src/main/resources/db/migration/V1__baseline.sql`
 
-Generate it from the current entities, then review it by hand:
+Generate it from the current entities (`-Dquarkus.hibernate-orm.scripts.generation=create
+-Dquarkus.hibernate-orm.scripts.generation.create-target=<file>` on one test boot), drop Flow's six tables from it, then
+review it by hand (give the constraints readable names in place of Hibernate's hashes):
 - `claims` with the `claim_number` column default `'CLM' || lpad(nextval('claim_number_seq')::text, 8, '0')`, its
   unique constraint, and `claim_number_seq` (`start with 1000000 increment by 1009 maxvalue 99999999`, see `CLAUDE.md`
   → *Gotchas*). Also `claims_seq` and the other `PanacheEntity` sequences, with their allocation sizes.
@@ -71,11 +80,14 @@ documents the sequence) or goes. Its insert-and-read-back (`OnExecutionGenerator
   relied on `import.sql` being re-run
 - `CLAUDE.md`: *Seed data*, the `Claim` entity section (DDL now in Flyway), *Configuration profiles* (`%prod`,
   `%openshift`), and **delete the "No durable state across restarts (user decision)" gotcha** in favor of what's true
-  now. `README.md` wherever it says the schema is recreated on boot.
+  now. Flow has **six** tables, not three: fix `CLAUDE.md` (*Claims mailbox tests*, `IntakeExtensionsTests`) and
+  `FlowRows`' Javadoc. `README.md` wherever it says the schema is recreated on boot.
 
 ## Key Points
 
-- **Hibernate `validate` is the guard** against an entity and the migrations drifting apart. Every later schema change
+- **Hibernate `validate` is the guard** against an entity and the migrations drifting apart. It checks tables,
+  columns, types and sequences (including increment size), **not column defaults**: a missing `claim_number` default only
+  showed up when the seed migration failed. Keep a test that inserts a claim without a number and gets one. Every later schema change
   in this issue (tasks 03, 06) is a new `V<n>__…sql`, never an edit to `V1`/`V2`.
 - Tests assert claim-number **format and the 1009 step only** (`CLAUDE.md` → *Gotchas*). A test that suddenly needs an
   absolute number means the sequence DDL is wrong, not the test.

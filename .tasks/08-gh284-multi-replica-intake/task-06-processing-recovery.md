@@ -42,9 +42,12 @@ ahead of anything the INBOX brings, as today.
 ### 3. *Resume at reply* as a run variant
 
 Like `IntakeRun.resumesReview`, an `IntakeRun.resumesReply` routes `initialize` → the right `reply*` step → `file` →
-(`waitReview` if the claim is `Pending Review`). The step needs the dead run's `IntakeState` after `applyOutcome`. Use
-what task 01 found: read it from Flow's persisted data, or rebuild it from the database (`Claim.status`,
-`ClaimIntakeState.requestedItems`, `ClaimIntakeState.reviewRunId`, and the correspondence). If the dead run was the
+(`waitReview` if the claim is `Pending Review`). The step needs the dead run's `IntakeState` after `applyOutcome`. Task 01 (Q5) found it's
+fully readable from Flow's persisted data: the dead run's newest `task_info_entity` row's model, read through
+`JpaInstanceOperations.readWorkflowInfo` or natively, turns back into a complete `IntakeState` with
+`model.as(IntakeState.class)` (claim id, outcome, policy number, missing items, `needsReview`, `receivedAt`). Nothing has
+to be rebuilt from `Claim`/`ClaimIntakeState`. Read it **before** the dead run's rows are retired (task 05's `DELETE`),
+then retire them. Use the same newest-row native read as task 03, so there's one code path. If the dead run was the
 claim's review run, this resumed run **is** the new review run. Coordinate with task 05's reclaim, so a claim doesn't
 get two (decide which owns it: recommended, `resumesReply` takes the review and reclaim skips a claim whose email is
 being resumed).

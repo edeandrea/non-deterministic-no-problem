@@ -51,7 +51,7 @@ Edit or create task files and update `## Task Plan`.
 
 ## Task Plan
 
-- [ ] [task-01-spike.md](task-01-spike.md): Spike the five unknowns (Flow restore and migrations, the Lease against a mock API server, a second JVM, a dead run's persisted data)
+- [x] [task-01-spike.md](task-01-spike.md): Spike the five unknowns (Flow restore and migrations, the Lease against a mock API server, a second JVM, a dead run's persisted data)
 - [ ] [task-02-flyway.md](task-02-flyway.md): Replace `drop-and-create` with Flyway: app baseline, seed migration, Flow's own migrations, `validate`
 - [ ] [task-03-run-commands.md](task-03-run-commands.md): Deliver review decisions through a database command table, to whichever pod hosts the run
 - [ ] [task-04-intake-leadership.md](task-04-intake-leadership.md): Elect one intake leader with a Kubernetes Lease; only it watches, dispatches and runs
@@ -65,7 +65,8 @@ Edit or create task files and update `## Task Plan`.
 > plan as its first commit; every task commits there), and one PR into `main`. Its body ends `Closes #284`, and its
 > title has no closing keyword. Suggested title: *Make the email intake safe to run with more than one replica*.
 >
-> **Status (2026-11-10):** planned only. Nothing is implemented; the next agent starts at task 01.
+> **Status (2026-11-10):** task 01 (spike) done; findings in [spike-results.md](spike-results.md). The next agent starts
+> at task 02, after the task-list review below is approved.
 
 ---
 
@@ -126,14 +127,35 @@ Already safe across pods, unchanged: the `ClaimCorrespondence.messageId` unique 
   A pod that lost leadership but kept its runs in memory would compete with the new leader's reclaimed runs; a restart
   makes it a clean follower. Kubernetes restarts it.
 - **Flow's auto-restore goes off,** and recovery is the app's own. Flow's restore replays a run from its first
-  incomplete task, which would send mail twice. It would also restore on *every* pod, since they share an app ID. A
-  `listen` restored after failover isn't verified in 1.3.0 either (quarkiverse/quarkus-flow#1110, for timed waits, is
-  fixed only in the unreleased 1.4.0). `ReviewRecoverer` already does the right thing for reviews and is tested.
+  incomplete task, which would send mail twice. It would also restore on *every* pod, since they share an app ID.
+  `ReviewRecoverer` already does the right thing for reviews and is tested. *(Task 01: in 1.3.0 the restore actually
+  starts nothing and leaves a `PENDING` zombie per persisted run; quarkiverse/quarkus-flow#1110 doesn't apply, since
+  `waitReview` has no timeout. Turning it off is still required. See spike-results.md Q1.)*
 - **DB-count gauges** (`claim.intake.reviews.pending`, `.review.oldest.pending`, `.inbox.depth`) are measured by the
   leader only, so a `sum` across pods isn't N times the truth. A new `claim.intake.leader` gauge (1/0 per pod) shows who
   leads.
 - **The decision relay retries until the run wakes,** which moves `IntakeScenario.publishUntilWoken`'s loop into
   production code. That also closes F2b (`ClaimReviewService`'s Javadoc) for real, instead of arguing it can't happen.
+
+### Task Outcomes
+
+- **Task 01 (spike):** All five questions answered with evidence in [spike-results.md](spike-results.md). Flyway with
+  `quarkus-flow-db-migration` (its own `flow-runtime` named Flyway config), the fabric8 mock server and a jar-based pod B
+  all work. But no pod can read "`WAITING`" for a run it doesn't host: Flow persists `null`, and
+  `PersistenceInstanceReader.find` returns a `PENDING` zombie that stays in `activeInstances`. Tasks 03 and 05 therefore
+  read Flow's `task_info_entity` directly (the newest task's `next_position`).
+
+**Decisions from task 01 that bind later tasks:**
+- **Never call `PersistenceInstanceReader.find` (or anything that builds a `WorkflowPersistenceInstance`) for an intake
+  run.** It leaks a `PENDING` instance into `activeInstances` and misreports the status. "Is the run waiting?" is a native
+  read of the run's newest `task_info_entity` row (`next_position` = `waitReview`'s pointer); "is it hosted here?" is
+  `activeInstance(id)` filtered to a non-`PENDING` status. That also avoids Flow's duplicate-key read bug (Q1).
+- **A dead run's rows are retired with a direct `DELETE`** on `workflow_instance_entity` (cascades to its task and metadata
+  rows) and `hash_mapping_info_entity`; there's no Flow API for it.
+- **Flyway layout:** the app's migrations on the default configuration (`db/migration`); Flow's from
+  `quarkus-flow-db-migration` on the named `flow-runtime` configuration; explicit `quarkus.datasource.db-kind`;
+  `baseline-on-migrate: true` + `baseline-version: 0` on both.
+- **Task 08's pod B is the packaged jar** started from a `@QuarkusTest` with runtime overrides (Q4 lists them).
 
 ### Caveats & Problems
 

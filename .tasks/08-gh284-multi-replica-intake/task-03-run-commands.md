@@ -21,16 +21,29 @@ newRunId)`, used by task 05).
 ### 2. Write it with the claim
 
 In `ClaimReviewService`, the command is inserted in the **same transaction** that moves `reviewRunId` to
-`decidingRunId` (`claimReview`). The claim and the command commit together, or neither does. `ensureWaiting` stays
-before the publish. Decide whether it stays a precondition: with a dead leader, the persisted status says `WAITING`
-until task 05 reclaims the review. Recommended: keep it, since it still rejects a run that has genuinely moved on. On
-its failure path, the compensating `restoreReview` also deletes the command.
+`decidingRunId` (`claimReview`). The claim and the command commit together, or neither does. On `ensureWaiting`'s
+failure path, the compensating `restoreReview` also deletes the command.
+
+**`ensureWaiting` stays a precondition, but it can no longer use `PersistenceInstanceReader`** (spike-results.md Q1):
+- Flow persists `status = null` for a waiting run, and `find` on a run this JVM doesn't host returns a
+  `WorkflowPersistenceInstance` in `PENDING`. Every decision POSTed to a follower would be a `409`.
+- `find` also registers that `PENDING` instance in the definition's `activeInstances`, where it stays.
+- Reading a run that has completed a task twice (one waiting a third time, after two decision faults) throws Flow's
+  `Duplicate key do/16/waitReview`, which is a `500` from today's single-pod endpoint.
+
+Replace it with a database-only read of the run's newest `task_info_entity` row: the run is waiting (or about to be)
+when that row's `next_position` is `waitReview`'s JSON pointer (read it from the definition, don't hard-code
+`do/16/waitReview`). No instance row means "not found". Put it in one small bean in `org.parasol.intake.workflow`
+(native SQL, like `FlowRows` in the tests), and use it in `isReadyForDecision` too. Drop the
+`PersistenceInstanceReader` injection, and don't call `find` anywhere in the app.
 
 ### 3. The relay: `RunCommandRelay` (`org.parasol.intake.workflow.command`, a new sub-package)
 
 On every pod:
-- Right after `submit` commits, it tries once at once: if `ClaimIntakeFlow.definition().activeInstance(runId)` is local,
-  it publishes through `ReviewDecisionPublisher`. That keeps today's single-pod latency.
+- Right after `submit` commits, it tries once at once: if the run is hosted in this JVM, it publishes through
+  `ReviewDecisionPublisher`. That keeps today's single-pod latency. "Hosted here" is
+  `activeInstance(runId).filter(run -> run.status() != WorkflowStatus.PENDING)`: a `PENDING` instance is a stand-in
+  Flow left behind, not a run.
 - A `@Scheduled(every = "${parasol.intake.commands.poll-interval}", concurrentExecution = SKIP)` job reads the pending
   commands whose `run_id` is active **in this JVM**, and publishes each one.
 - A command is **delivered** once the run has taken it: the run left `WAITING`, or `decidingRunId` no longer names it.
@@ -55,6 +68,10 @@ for tests that bypass REST. Decide, and say which in the test's Javadoc. Add, in
 - A command for a run not hosted in this JVM stays pending, and isn't lost.
 - A failed `ensureWaiting` leaves no command behind.
 - A rollback of the claim transaction leaves no command behind.
+- A decision POSTed while the run waits for the third time (two injected decision faults) is accepted and applied.
+  Today that's a `500` (Flow's duplicate-key read).
+- `GET /review` and a decision both work for a run this JVM doesn't host (simulate it with a `ClaimIntakeState` naming
+  a run whose rows exist but that isn't in `activeInstances`): no `PENDING` instance is left in `activeInstances`.
 
 ## Files/Areas
 

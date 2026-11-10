@@ -10,9 +10,21 @@ over its reviews and its Processing emails.
 
 ## What to Do
 
-Build the harness task 01 chose (Option A: the failsafe `@QuarkusTest` is pod A and spawns the packaged jar as pod B;
-or Option B). Both pods run `KUBERNETES_LEASE` mode against one fabric8 mock API server (or k3s, if task 01 said so)
-started by the test, with a short `lease-duration`. Inject the exit hook so pod A doesn't actually exit the test JVM:
+Build the harness task 01 chose, **Option A** (spike-results.md Q4): the failsafe `@QuarkusTest` is pod A and spawns
+`target/quarkus-app/quarkus-run.jar` as pod B (ready in about 2.5 s; under `verify` the jar already exists). Pod B's
+`-D` overrides, as verified:
+- Copied from pod A's config: `quarkus.datasource.jdbc.url`/`username`/`password`, `quarkus.mailer.port`,
+  `parasol.mail.imap-port`, `quarkus.langfuse.base-url`/`public-key`/`secret-key` (the prod jar's Langfuse exporter is
+  built in and fails config validation without them).
+- Fixed: `quarkus.profile=ollama,prod` (or the CI leg's), a free `quarkus.http.port`,
+  `quarkus.langchain4j.easy-rag.ingestion-strategy=OFF`, `quarkus.flow.persistence.auto-restore=false`.
+- Still to add: pod A's WireMock base URLs for the model clients, and the mock API server's URL
+  (`quarkus.kubernetes-client.api-server-url`). Keep pod B's spans on only if a scenario asserts them.
+- Not needed after task 02: the spike also set `schema-management.strategy=none`, because pod B's `%prod`
+  `drop-and-create` would otherwise have wiped pod A's database.
+
+Both pods run `KUBERNETES_LEASE` mode against one fabric8 mock API server in CRUD mode (task 01 found it rejects a stale
+Lease update with `409`, so no k3s), started by the test, with a short `lease-duration`. Inject the exit hook so pod A doesn't actually exit the test JVM:
 make the test's pod A the one that **stays** alive, and kill pod B (the spawned process) for the failover cases.
 
 Scenarios, in one class (`MultiReplicaIntakeE2ETests`, `org.parasol.intake`, failsafe):
