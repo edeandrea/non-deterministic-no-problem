@@ -20,6 +20,7 @@ import org.parasol.intake.observability.IntakeActivity.NewClaimExtracted;
 import org.parasol.intake.observability.IntakeActivity.ReplySent;
 import org.parasol.intake.observability.IntakeActivity.ReviewDecisionApplied;
 import org.parasol.intake.observability.IntakeActivity.WatcherConnectionChanged;
+import org.parasol.intake.observability.IntakeActivity.RunSignalDelivered;
 import org.parasol.intake.observability.IntakeActivity.WatcherReconnecting;
 
 import io.micrometer.core.instrument.MeterRegistry;
@@ -54,6 +55,7 @@ public final class IntakeActivityEvents {
 				case IntakeFailed failed -> metrics.onFailed(failed);
 				case WatcherConnectionChanged changed -> metrics.onWatcherConnectionChanged(changed);
 				case WatcherReconnecting reconnecting -> metrics.onWatcherReconnecting(reconnecting);
+				case RunSignalDelivered delivered -> metrics.onRunSignalDelivered(delivered);
 			}
 
 			return null;

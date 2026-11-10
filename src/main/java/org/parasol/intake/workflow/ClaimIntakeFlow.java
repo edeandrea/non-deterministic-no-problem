@@ -58,6 +58,9 @@ public class ClaimIntakeFlow extends Flow {
 	 */
 	public static final String NAME = "claim-intake";
 
+	private static final String AWAIT_REVIEW = "awaitReview";
+	private static final String WAIT_REVIEW = "waitReview";
+
 	private final ClaimMatchingSteps claimMatchingSteps;
 	private final AgentStep agenticRoot;
 	private final PolicyCheckStep policyCheckStep;
@@ -93,7 +96,7 @@ public class ClaimIntakeFlow extends Flow {
 			.tasks(tasks(
 				function("initialize", this.claimMatchingSteps::initialize, IntakeRun.class, IntakeState.class),
 				switchCase("routeMatch",
-					caseOf(IntakeState::needsReview, IntakeState.class).then("waitReview"),
+					caseOf(IntakeState::needsReview, IntakeState.class).then(AWAIT_REVIEW),
 					caseOf(IntakeState::isWrongSender, IntakeState.class).then("replyNoMatchingClaim"),
 					caseOf(IntakeState::mayResolve, IntakeState.class).then("resolveClaim"),
 					caseDefault("runAgents")),
@@ -115,8 +118,14 @@ public class ClaimIntakeFlow extends Flow {
 				function("replyPolicyInconsistent", this.replySteps::replyPolicyInconsistent, IntakeState.class, IntakeState.class)
 					.then("file"),
 				function("file", this.fileEmailStep::file, IntakeState.class, IntakeState.class),
-				switchWhenOrElse("routeAfterFile", IntakeState::needsReview, "waitReview", FlowDirectiveEnum.END, IntakeState.class),
-				listen("waitReview", toOne(consumed(ReviewDecisionPublisher.REVIEW_DECIDED).dataAs(ReviewDecided.class, this::isForThisRun)).first()),
+				switchWhenOrElse("routeAfterFile", IntakeState::needsReview, AWAIT_REVIEW, FlowDirectiveEnum.END, IntakeState.class),
+				// Records that this run is about to wait, for any application instance to read: Flow's own status isn't visible outside the application instance that hosts the run
+				withContext(AWAIT_REVIEW, (input, context) -> {
+					this.reviewDecisionSteps.awaitReview(context.instanceData().id());
+
+					return input;
+				}, Object.class, Object.class),
+				listen(WAIT_REVIEW, toOne(consumed(ReviewDecisionPublisher.REVIEW_DECIDED).dataAs(ReviewDecided.class, this::isForThisRun)).first()),
 				switchWhenOrElse(
 					"routeDecision",
 					ReviewDecided::isReviewReady,
@@ -135,7 +144,7 @@ public class ClaimIntakeFlow extends Flow {
 						this.reviewDecisionSteps.markPendingInformation(decided, runOf(context), context.instanceData().id()), ReviewDecided.class, AfterDecision.class)))
 					.catchType(ReviewDecisionSteps.DECISION_FAILED, tasks(withContext("restoreAfterNeedsInformation", (_, context) ->
 						this.reviewDecisionSteps.restoreReview(context.instanceData().id()), Object.class, AfterDecision.class)))),
-				switchWhenOrElse("afterDecision", ClaimIntakeFlow::shouldWaitAgain, "waitReview", FlowDirectiveEnum.END, AfterDecision.class)))
+				switchWhenOrElse("afterDecision", ClaimIntakeFlow::shouldWaitAgain, AWAIT_REVIEW, FlowDirectiveEnum.END, AfterDecision.class)))
 			.build();
 	}
 

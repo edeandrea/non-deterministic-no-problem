@@ -39,6 +39,7 @@ import org.parasol.intake.mailbox.ClaimsMailbox;
 import org.parasol.intake.mailbox.MailFolder;
 import org.parasol.intake.mailbox.SkippedAttachment;
 import org.parasol.intake.model.EmailType;
+import org.parasol.intake.model.IntakeRunSignal;
 import org.parasol.intake.observability.IntakeActivity.ClaimCompleted;
 import org.parasol.intake.observability.IntakeActivity.InboxDepthMeasured;
 import org.parasol.intake.observability.IntakeActivity.NewClaimExtracted;
@@ -757,7 +758,9 @@ class IntakeMetricsTests extends IntakeFlowTestBase {
 			Map.entry("claim.intake.mail.client.duration", Map.of("protocol", Set.of("imap", "smtp"), "operation", Set.<String>of(), "outcome", Set.of("success", "error"))),
 			Map.entry("claim.intake.mailbox.lock.wait", Map.of("mode", Arrays.stream(MailboxLockMode.values()).map(MailboxLockMode::tag).collect(Collectors.toSet()))),
 			Map.entry("claim.intake.inbox.depth", Map.<String, Set<String>>of()),
-			Map.entry("claim.intake.review.oldest.pending", Map.<String, Set<String>>of()));
+			Map.entry("claim.intake.review.oldest.pending", Map.<String, Set<String>>of()),
+			Map.entry("claim.intake.signals.pending", Map.<String, Set<String>>of()),
+			Map.entry("claim.intake.signal.delivery", Map.of("kind", Arrays.stream(IntakeRunSignal.Kind.values()).map(kind -> kind.name().toLowerCase(Locale.ROOT)).collect(Collectors.toSet()))));
 		var meters = this.registry.getMeters().stream()
 			.filter(meter -> meter.getId().getName().startsWith("claim.intake."))
 			.toList();

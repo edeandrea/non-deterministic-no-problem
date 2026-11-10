@@ -16,7 +16,7 @@ directory. No production code lands. Any throwaway code lives on a scratch branc
 - Find out whether Flow 1.3.0 (or serverlessworkflow sdk-java 7.35.3) can **cancel or delete a persisted instance that
   isn't active in this JVM** (`PersistenceInstanceWriter`/`…Operations`). Task 05 needs to retire a dead leader's
   `WAITING` rows. If there's no API, say which table rows would need a direct `DELETE`/`UPDATE`, and whether that's safe.
-- Find out what `PersistenceInstanceReader.find(...)` reports for a dead pod's run (`WAITING` forever, presumably).
+- Find out what `PersistenceInstanceReader.find(...)` reports for a dead application instance's run (`WAITING` forever, presumably).
   `ClaimReviewService.ensureWaiting` reads it.
 
 ### 2. `quarkus-flow-db-migration` with this app
@@ -44,14 +44,14 @@ one `LeaseLock`:
 
 ### 4. A second JVM in a test
 
-Task 08 needs pod B: a second app process sharing pod A's Postgres, GreenMail, WireMock and mock API server.
+Task 08 needs instance B: a second app process sharing instance A's Postgres, GreenMail, WireMock and mock API server.
 Prototype the cheapest harness that works:
-- **Option A:** a failsafe `@QuarkusTest` (pod A) spawns `target/quarkus-app/quarkus-run.jar` (pod B, a `prod` build)
-  with `-D` overrides read from pod A's config: datasource URL/user/password, `quarkus.mailer.*`,
+- **Option A:** a failsafe `@QuarkusTest` (instance A) spawns `target/quarkus-app/quarkus-run.jar` (instance B, a `prod` build)
+  with `-D` overrides read from instance A's config: datasource URL/user/password, `quarkus.mailer.*`,
   `parasol.intake.imap.*`, the WireMock base URLs, the Kubernetes API URL and a different `quarkus.http.port`. Which
   build-time settings of the prod jar get in the way (the Langfuse exporter, LGTM, Compose Dev Services, Easy RAG
   ingestion, `quarkus.flow.validation`)? Can each be turned off at runtime?
-- **Option B,** if A is impractical: both pods as spawned jars, the test plain JUnit, and Postgres/GreenMail/WireMock
+- **Option B,** if A is impractical: both application instances as spawned jars, the test plain JUnit, and Postgres/GreenMail/WireMock
   started by Testcontainers directly.
 - Measure the extra wall-clock cost.
 

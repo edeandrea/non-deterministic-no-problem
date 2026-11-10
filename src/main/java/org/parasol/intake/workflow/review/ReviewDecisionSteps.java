@@ -150,6 +150,21 @@ public class ReviewDecisionSteps {
 	}
 
 	/**
+	 * Records that a run is about to wait for its claim's review, so the review can accept a decision. It does nothing if the run no longer
+	 * owns a review (a reply superseded it, or a reviewer has claimed it). The run's event consumer registers a moment after this, which
+	 * is why a decision is queued and republished until the run takes it.
+	 *
+	 * @param runId the run that's about to wait
+	 */
+	// Non-private and non-final, so the transaction interceptor applies to the call from the flow's task
+	@Transactional(TxType.REQUIRES_NEW)
+	public void awaitReview(String runId) {
+		ClaimIntakeState.<ClaimIntakeState>find("reviewRunId", runId)
+			.firstResultOptional()
+			.ifPresent(intake -> intake.reviewWaitingRunId = runId);
+	}
+
+	/**
 	 * Puts a claim back in review after a fault in a decision step, so the reviewer can decide again and the same run waits
 	 * again. If the claim's status has already changed there's nothing to put back: it only logs.
 	 */

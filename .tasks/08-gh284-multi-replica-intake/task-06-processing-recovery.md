@@ -20,7 +20,7 @@ For each email the new leader finds in `Processing` (`ClaimsInboxWatcher.recover
 | claim linked, and an `OUTBOUND` row has `in_reply_to` = this `Message-ID` | applied **and** answered; only filing was left | file it, and fire `EmailHandled` once |
 | claim linked, no such `OUTBOUND` row | applied, reply not recorded | **resume at reply → file**: a new run variant |
 
-The residual gap is accepted, and should be stated in the code: a pod that dies between the SMTP send and
+The residual gap is accepted, and should be stated in the code: an application instance that dies between the SMTP send and
 `ReplyRecorder`'s commit (or a recording that failed with only a WARN) leaves no `OUTBOUND` row, so the customer gets
 that reply twice.
 

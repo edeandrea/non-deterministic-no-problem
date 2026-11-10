@@ -14,12 +14,12 @@ sdk-java 7.35.3.Final (`~/workspaces/IntelliJ/sdk-java`, tag `7.35.3.Final`), fa
    **`PENDING`** whatever was persisted. `ClaimReviewService.ensureWaiting` would therefore reject *every* decision POSTed to
    a follower with a `409` (Q1). Task 03 needs a database-only check.
 2. **`find` leaks a zombie into `activeInstances`.** The `PENDING` instance it builds registers itself in the definition's
-   `activeInstances` and is never removed. After one `find`, `activeInstance(runId)` is non-empty on that pod, so "is the run
+   `activeInstances` and is never removed. After one `find`, `activeInstance(runId)` is non-empty on that application instance, so "is the run
    local?" can't be `activeInstance(...).isPresent()` (Q1). Task 03's relay and task 05's reclaim must not use `find`.
 3. **Flow 1.3.0's auto-restore never starts anything.** `FlowPersistenceRestore` builds each instance through the same
    self-registering constructor, then skips it because `activeInstance(id)` is now non-empty. It leaves a `PENDING` zombie for
    every persisted run of this app ID at boot (Q1). quarkiverse/quarkus-flow#1116 (on `main`, unreleased, for 1.4.0)
-   removes that check and starts every persisted run, which would replay runs on every pod. Turning it off (task 05) stops
+   removes that check and starts every persisted run, which would replay runs on every application instance. Turning it off (task 05) stops
    today's leak and tomorrow's replays, and loses nothing.
 4. **There is no API to retire a run that isn't live.** `cancel()` on the zombie returns `false` (`PENDING` isn't active) and
    leaves the rows. Retiring a dead run is a direct `DELETE` (Q1).
@@ -28,14 +28,14 @@ sdk-java 7.35.3.Final (`~/workspaces/IntelliJ/sdk-java`, tag `7.35.3.Final`), fa
    also carries `nextPosition`, so "the run's next task is `waitReview`" is readable from the database (Q1, Q5).
 6. **Flow bug: a task that completed twice breaks every read.** `readWorkflowInfo` collects tasks with `Collectors.toMap` keyed on
    `json_pointer`, but each iteration is its own row. After two decision faults (a run waiting a third time), it throws
-   `IllegalStateException: Duplicate key do/16/waitReview`, and so do `find` and the restore scan. Today's single-pod
+   `IllegalStateException: Duplicate key do/16/waitReview`, and so do `find` and the restore scan. Today's single-application instance
    `ensureWaiting` fails the same way, as a `500` (Q1).
 7. **`quarkus-flow-db-migration` works with `validate`,** under its own named Flyway configuration (`flow-runtime`), as the Flow
    guide describes, with two additions the guide doesn't mention: an explicit default `db-kind`, and `baseline-on-migrate` with
    `baseline-version: 0` on **both** configurations. Here, 65 tests across seven classes passed (Q2).
 8. **The fabric8 mock API server is good enough.** In CRUD mode it rejects a stale `resourceVersion` with `409`. Exactly one of
    five electors leads, graceful failover takes about 1 s and a crash about one `leaseDuration`. No k3s is needed (Q3).
-9. **Pod B can be the packaged jar,** booted from a `@QuarkusTest` with runtime `-D` overrides. It's ready in about 2.5 s (Q4).
+9. **Instance B can be the packaged jar,** booted from a `@QuarkusTest` with runtime `-D` overrides. It's ready in about 2.5 s (Q4).
 
 ## Q1. Flow's restore, cancel and persisted status
 
@@ -45,7 +45,7 @@ and `scan-interval` (an empty `Optional`, so periodic scans are off by default):
 it's off (`FlowPersistenceRestore.java:47`).
 
 **What a run that isn't live looks like** (spike: a real run driven to `WAITING`, then removed from `activeInstances` by
-reflection to simulate another pod):
+reflection to simulate another application instance):
 
 | Observation | Result |
 |---|---|
@@ -89,7 +89,7 @@ completed task is `do/15/routeAfterFile` with `next=do/16/waitReview` (after a d
 workflow instances unconditionally", on `main`, for 1.4.0) drops the `activeInstance(...).isEmpty()` check and calls
 `start()` on every scanned instance (`start()` on an already-running one is a no-op). quarkiverse/quarkus-flow#1110 was
 the report of a restored timed wait that never resumed. `waitReview` has no timeout (`ClaimIntakeFlow.java:119`, a plain
-`listen(...).first()`), but once Flow 1.4.0 is in, auto-restore would genuinely restart runs, on every pod sharing the app
+`listen(...).first()`), but once Flow 1.4.0 is in, auto-restore would genuinely restart runs, on every application instance sharing the app
 ID.
 
 **What it means for later tasks:**
@@ -98,9 +98,9 @@ ID.
   desc limit 1`, expecting the `waitReview` pointer). That avoids the zombie and the duplicate-key bug at once. A run with no
   instance row is "not found". The relay's "is the run hosted here?" must ignore zombies:
   `activeInstance(id).filter(i -> i.status() != PENDING)`, and better, nothing in the app ever calls `find` again.
-- **04/05:** turn auto-restore off whatever leadership mode, or a restarted pod is left holding zombies, and
+- **04/05:** turn auto-restore off whatever leadership mode, or a restarted application instance is left holding zombies, and
   `SupersedeStep`'s `activeInstance(oldRunId)` finds one and its `cancel()` silently returns `false`. Retire a dead run with the
-  `DELETE`s above. Keep it off after a Flow upgrade too: with #1116 it would restart every persisted run on every pod.
+  `DELETE`s above. Keep it off after a Flow upgrade too: with #1116 it would restart every persisted run on every application instance.
 - **Upstream:** the restore is fixed by quarkiverse/quarkus-flow#1116 (unreleased). The duplicate-key read is still on
   quarkus-flow `main`: filed as quarkiverse/quarkus-flow#1154, fixed by quarkiverse/quarkus-flow#1155. `find` registering a
   `PENDING` instance is open-workflow-specification/sdk-java#1816's territory (PR open-workflow-specification/sdk-java#1820
@@ -170,23 +170,23 @@ Scratch Maven project (Quarkus 3.40.1.1 BOM: `kubernetes-client`/`kubernetes-ser
 
 ## Q4. A second JVM in a test
 
-**Option A works.** A throwaway `@QuarkusTest` (pod A) spawned `target/quarkus-app/quarkus-run.jar` (built with `-Pollama`,
-about 20 s; under `verify`, failsafe runs after `package`, so the jar is already there). Pod B was ready on `/q/health/ready`
-**2.5–2.7 s** after the spawn and served pod A's six seeded claims from `/api/db/claims`.
+**Option A works.** A throwaway `@QuarkusTest` (instance A) spawned `target/quarkus-app/quarkus-run.jar` (built with `-Pollama`,
+about 20 s; under `verify`, failsafe runs after `package`, so the jar is already there). Instance B was ready on `/q/health/ready`
+**2.5–2.7 s** after the spawn and served instance A's six seeded claims from `/api/db/claims`.
 
-Pod B's overrides:
-- **Copied from pod A's config:** `quarkus.datasource.jdbc.url`/`username`/`password`, `quarkus.mailer.port`,
+Instance B's overrides:
+- **Copied from instance A's config:** `quarkus.datasource.jdbc.url`/`username`/`password`, `quarkus.mailer.port`,
   `parasol.mail.imap-port`, and `quarkus.langfuse.base-url`/`public-key`/`secret-key`. The prod jar's Langfuse exporter is a
   build-time decision, and without these the boot fails config validation (`SRCFG00014`).
 - **Fixed:** `quarkus.profile=ollama,prod`, a free `quarkus.http.port`,
-  `quarkus.hibernate-orm.schema-management.strategy=none` (**without it, pod B's `%prod` `drop-and-create` would wipe pod A's
+  `quarkus.hibernate-orm.schema-management.strategy=none` (**without it, instance B's `%prod` `drop-and-create` would wipe instance A's
   database**: mechanism 5; task 02 removes the need), `quarkus.langchain4j.easy-rag.ingestion-strategy=OFF`,
   `quarkus.otel.sdk.disabled=true`, `quarkus.flow.persistence.auto-restore=false`, `parasol.intake.enabled=false`.
 - Everything else here is runtime config. Compose Dev Services and LGTM aren't in a prod jar, so they didn't get in the way.
 
-**What it means for task 08:** use Option A. It also needs pod A's WireMock base URLs for the model clients
-(`quarkus.wiremock.devservices.port`) and the mock API server's URL (`quarkus.kubernetes-client.api-server-url`). Pod B must
-keep spans on if task 08 wants to assert them across pods.
+**What it means for task 08:** use Option A. It also needs instance A's WireMock base URLs for the model clients
+(`quarkus.wiremock.devservices.port`) and the mock API server's URL (`quarkus.kubernetes-client.api-server-url`). Instance B must
+keep spans on if task 08 wants to assert them across application instances.
 
 ## Q5. A dead run's last persisted state
 

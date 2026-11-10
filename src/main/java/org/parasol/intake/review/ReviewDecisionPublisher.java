@@ -13,10 +13,11 @@ import io.cloudevents.core.builder.CloudEventBuilder;
 import io.serverlessworkflow.impl.WorkflowApplication;
 
 /**
- * Publishes a reviewer's decision as the CloudEvent the waiting intake run listens for.
+ * Publishes a reviewer's decision as the CloudEvent the waiting intake run listens for. This is the local leg: it reaches only runs
+ * hosted in this JVM, so the review's decision isn't published from here directly but written as a signal and handed over by
+ * {@code RunSignalRelay} on the application instance that hosts the run.
  * <p>
- *   A run that hasn't reached its wait yet misses the event, so a caller that must be sure it was delivered republishes
- *   until the run leaves {@code WAITING}.
+ *   A run that hasn't reached its wait yet misses the event, so the relay republishes until the run has taken it.
  * </p>
  */
 @ApplicationScoped

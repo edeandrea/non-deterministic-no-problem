@@ -135,10 +135,12 @@ the policy PDF): the workflow passes the claim's history (correspondence, fields
 requested) in on every run.
 
 **The review decision** (`POST /api/db/claims/{id}/review-decision`) claims the review under the claim's
-lock, checks that the claim's run is still waiting (404 if it's gone, 409 if it isn't waiting), and
-publishes the decision event. It returns once the event is published (202), and the waiting run applies it.
+lock, checks that the claim's run has reached its wait (409 if it hasn't; the run records this itself just before it waits), and
+writes the decision to the `intake_run_signal` table in the same transaction. It returns once that commits (202). The
+relay on the application instance that hosts the run publishes the decision event, and keeps republishing it until the run has taken it,
+and the waiting run applies it.
 The decision also carries the claim's fields as the reviewer confirmed or corrected them: every field is either given a
-value or asked of the customer, and nothing is published unless the claim is still `Pending Review` at the version the
+value or asked of the customer, and nothing is queued unless the claim is still `Pending Review` at the version the
 reviewer saw and the values fit the claim (400/409/422). The run sets them along with the new status. A separate
 `POST /api/db/claims/{id}/sentiment` re-runs only the sentiment agent for a claim under review.
 

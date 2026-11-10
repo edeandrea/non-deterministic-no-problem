@@ -4,9 +4,9 @@
 
 ## Goal
 
-Exactly one pod, the **intake leader**, runs the IMAP watcher, the dispatcher (and so every `ClaimIntakeFlow` run) and
-the mailbox measurements. The other pods serve the UI, REST and chat bot, and relay decisions (task 03). Off-cluster
-(dev mode, the test suite) the pod is always the leader, so nothing about today's behavior changes there. Fixes
+Exactly one application instance, the **intake leader**, runs the IMAP watcher, the dispatcher (and so every `ClaimIntakeFlow` run) and
+the mailbox measurements. The other application instances serve the UI, REST and chat bot, and relay decisions (task 03). Off-cluster
+(dev mode, the test suite) the application instance is always the leader, so nothing about today's behavior changes there. Fixes
 **mechanisms 3, 4 and 7**, and **2** by co-location.
 
 ## What to Do
@@ -34,7 +34,7 @@ the mailbox measurements. The other pods serve the UI, REST and chat bot, and re
   shutdown. Its `recoverOnce` (the Processing hand-over) now runs once per *leadership*, not once per JVM. Its Javadoc
   stops saying "the intake runs as a single replica".
 - `InboxDepthMonitor`: measures only while leading (it already does nothing while the intake is off).
-- `IntakeMetrics`: the DB-count gauges (`reviews.pending`, `review.oldest.pending`, `commands.pending`) report only on
+- `IntakeMetrics`: the DB-count gauges (`reviews.pending`, `review.oldest.pending`, `signals.pending`) report only on
   the leader. Decide: `NaN` or not registered on followers. Add `claim.intake.leader` (1/0).
 - `ClaimIntakeDispatcher.submit` and `ReviewRecoverer`: assert, cheaply, that they run on the leader (a WARN, and the
   email takes the failure path). That catches a regression, not a normal case.

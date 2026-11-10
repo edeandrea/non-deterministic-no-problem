@@ -11,22 +11,22 @@ Every document describes the multi-replica intake as built. Both CI legs are gre
 ### 1. Documents
 
 - `CLAUDE.md`:
-  - Replace the *intake only works correctly with one replica* gotcha with how it works now: the leader, the command
-    table, reclaim, Processing recovery, fencing by exit, and what's still per-pod (the chat bot, the Langfuse
+  - Replace the *intake only works correctly with one replica* gotcha with how it works now: the leader, the signal
+    table, reclaim, Processing recovery, fencing by exit, and what's still per-application instance (the chat bot, the Langfuse
     initializer race).
-  - The package table: `org.parasol.intake.leadership`, `…workflow.command`, `IntakeRunCommand`.
-  - The `parasol.intake.*` config table: `leadership.*`, `commands.poll-interval`.
-  - The metrics list: `claim.intake.leader`, `commands.pending`, `command.delivery`, leader-only gauges, and the reclaim
+  - The package table: `org.parasol.intake.leadership`, `…workflow.signal`, `IntakeRunSignal`.
+  - The `parasol.intake.*` config table: `leadership.*`, `signals.poll-interval`.
+  - The metrics list: `claim.intake.leader`, `signals.pending`, `signal.delivery`, leader-only gauges, and the reclaim
     metric.
   - *Testing*: four boots, not three.
   - Confirm task 02 removed "No durable state across restarts".
 - `README.md`: *Single replica* → *Scaling*; the config table; anything that says the schema is recreated.
-- `docs/design/email-claim-intake.md`: the "single replica" paragraph; the command table, reclaim and recovery in the
+- `docs/design/email-claim-intake.md`: the "single replica" paragraph; the signal table, reclaim and recovery in the
   workflow description. It's kept in sync with the implementation, not retired (`CLAUDE.md`).
 - `docs/email-claim-intake-demo.md`: the single-replica caveat; a restart now keeps claims and waiting reviews (mail on
-  OpenShift still doesn't survive a GreenMail restart). Optional: a sixth scenario that scales to two pods and kills the
+  OpenShift still doesn't survive a GreenMail restart). Optional: a sixth scenario that scales to two application instances and kills the
   leader.
-- `docs/claim-intake-flow.puml` (the `resumesReply` route; the decision through the command table) and
+- `docs/claim-intake-flow.puml` (the `resumesReply` route; the decision through the signal table) and
   `docs/design/claim-intake-*.puml` where they show the decision path. Re-render with `./docs/render-diagrams.sh`;
   only the changed diagrams' PNGs should differ.
 - `.tasks/claim-intake-roadmap.md`: #284 now has a plan here.

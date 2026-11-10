@@ -4,7 +4,7 @@
 
 ## Goal
 
-When a leader dies (or the only pod restarts, now that the database survives it), every claim left in `Pending Review`
+When a leader dies (or the only application instance restarts, now that the database survives it), every claim left in `Pending Review`
 gets a live run waiting for its decision again, and a decision already POSTed for the dead run reaches the new one.
 Flow's own restore no longer starts anything. Fixes **mechanism 6**, and closes mechanism 2's failover window.
 
@@ -17,7 +17,7 @@ its scan builds each persisted run as a `WorkflowPersistenceInstance`, which reg
 `PENDING`, and then skips it as "already active" (task 01, Q1). What it does leave is a `PENDING` stand-in for every
 persisted run, which `SupersedeStep`'s `activeInstance(oldRunId)` then finds, and whose `cancel()` silently returns
 `false`. quarkiverse/quarkus-flow#1116 (unreleased, 1.4.0) makes it start every persisted run, so after a Flow upgrade
-it would replay from the first incomplete task (mail sent twice) on every pod, since they share the app ID. Leave `scan-interval` unset.
+it would replay from the first incomplete task (mail sent twice) on every application instance, since they share the app ID. Leave `scan-interval` unset.
 
 ### 2. `ReviewReclaimer` (`org.parasol.intake.workflow.review`)
 
@@ -28,8 +28,8 @@ On `LeadershipAcquired`, on the managed executor (not the event's thread):
 - For each one, hand the review over through `ReviewRecoverer`'s existing take-over: a new `IntakeRun.resumesReview`
   run, registered as the review run before it starts, under the claim's optimistic lock. Generalize `recover` to take
   the orphaned run id rather than a faulted run's input: the conversation id already comes from `ClaimIntakeState`.
-- **A pending decision:** if `decidingRunId` named the dead run (the reviewer had decided, and the command never got
-  delivered), re-address the command to the new run (`IntakeRunCommand.retarget`) and keep the claim *being decided*
+- **A pending decision:** if `decidingRunId` named the dead run (the reviewer had decided, and the signal never got
+  delivered), re-address the signal to the new run (`IntakeRunSignal.retarget`) and keep the claim *being decided*
   by the new run (`decidingRunId = newRunId`, not back to open). Once the new run waits, the relay delivers the decision.
   The reviewer's work isn't lost.
 - Retire the dead run's persisted Flow instance, so task 03's database check (the newest task's `next_position` is
@@ -50,7 +50,7 @@ did) leaves its `listen` consumer registered, so it could still take the decisio
 run whose Flow rows exist but that has no live instance (cancel the real run, then write its rows back, or insert them
 from a copy). Then:
 - A new run waits, it's the claim's `reviewRunId`, and a decision through the REST endpoint completes the claim.
-- With a decision already claimed (`decidingRunId` = the dead run, command pending), the new run applies **that**
+- With a decision already claimed (`decidingRunId` = the dead run, signal pending), the new run applies **that**
   decision with no second POST.
 - A review whose run is alive in this JVM isn't touched.
 - Two `LeadershipAcquired` events in a row don't start two runs for one claim (the optimistic lock).
@@ -60,7 +60,7 @@ from a copy). Then:
 
 - `src/main/resources/application.yml`
 - `src/main/java/org/parasol/intake/workflow/review/ReviewReclaimer.java` (new), `ReviewRecoverer.java`
-- `IntakeRunCommand` (task 03), `IntakeFailureListener` (if `recover`'s signature changes)
+- `IntakeRunSignal` (task 03), `IntakeFailureListener` (if `recover`'s signature changes)
 - `IntakeScenario` (test), a new `ReviewReclaimerTests`
 - `CLAUDE.md` (*A claim's review always has a live run*, the package table), `docs/design/email-claim-intake.md`,
   `docs/email-claim-intake-demo.md` (a restart no longer loses a waiting review)

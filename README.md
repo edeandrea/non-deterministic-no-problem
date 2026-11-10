@@ -184,8 +184,8 @@ The email intake adds four more endpoints: `GET /api/db/claims/{id}/corresponden
 transcript, oldest first, each message with the photos it carried; `404` for an unknown claim), `GET
 /api/db/claims/{id}/review` (the claim's review state — whether a review is open, its requested items, and the full
 missing-item checklist), `POST /api/db/claims/{id}/review-decision` (the claims processor's decision; it's
-**asynchronous** — it returns `202 Accepted` once the decision is published, not once the workflow has applied it;
-`400` for an invalid request body, `404` for an unknown claim or a vanished run, `409` for a claim not open for
+**asynchronous** — it returns `202 Accepted` once the decision is queued, not once the workflow has applied it;
+`400` for an invalid request body, `404` for an unknown claim, `409` for a claim not open for
 review or a stale version, `422` if the reviewed values don't fit the claim) and `POST
 /api/db/claims/{id}/sentiment` (re-runs the sentiment agent for a claim under review, `200 { "sentiment": … }`).
 None of them require authentication — this is a demo app.
@@ -241,6 +241,7 @@ The intake is configured under `parasol.intake.*` (`IntakeConfig`,
 | `watcher.idle-refresh` | `1m` (`10s` in `%dev`) | How often the IMAP IDLE is renewed |
 | `watcher.reconnect-delay` / `.max-reconnect-delay` | `1s` / `1m` | Reconnect backoff |
 | `metrics.inbox-depth-interval` | `30s` | How often `claim.intake.inbox.depth` is measured |
+| `signals.poll-interval` | `1s` | How often pending review decisions are handed to the runs this application instance hosts |
 
 ### Single replica
 

@@ -72,6 +72,12 @@ public interface IntakeConfig {
 	Metrics metrics();
 
 	/**
+	 * How signals for intake runs (a reviewer's decision) are delivered.
+	 *
+	 * @return the signal settings
+	 */
+	Signals signals();
+	/**
 	 * The IMAP connection to the claims mailbox.
 	 */
 	interface Imap {
@@ -211,5 +217,18 @@ public interface IntakeConfig {
 		 */
 		@WithDefault("30s")
 		Duration inboxDepthInterval();
+	}
+
+	/**
+	 * Settings of the delivery of signals to intake runs.
+	 */
+	interface Signals {
+		/**
+		 * How often pending signals are handed to the runs this application instance hosts. A signal is also tried once, right after it's written.
+		 *
+		 * @return the polling interval
+		 */
+		@WithDefault("1s")
+		Duration pollInterval();
 	}
 }

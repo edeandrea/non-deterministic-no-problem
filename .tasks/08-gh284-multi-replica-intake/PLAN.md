@@ -4,12 +4,12 @@
 
 The email claim intake ([#216](https://github.com/edeandrea/non-deterministic-no-problem/issues/216)) only works with
 **one** replica, and nothing enforces it beyond the OpenShift extension's default `replicas: 1`. Lift that: any number
-of `parasol-app` pods can run, and every claim email, review decision and failover still does the right thing.
+of `parasol-app` application instances can run, and every claim email, review decision and failover still does the right thing.
 
-The shape is **active/passive for the intake, active/active for everything else.** One pod, the *intake leader*
-(Kubernetes Lease), runs the IMAP watcher, the dispatcher and every `ClaimIntakeFlow` run. Every pod serves the UI, the
-REST API (review decisions included) and the chat bot. A decision POSTed to any pod reaches the run through a
-database-backed command table. A new leader takes over what a dead one left: the reviews it was waiting on and the
+The shape is **active/passive for the intake, active/active for everything else.** One application instance, the *intake leader*
+(Kubernetes Lease), runs the IMAP watcher, the dispatcher and every `ClaimIntakeFlow` run. Every application instance serves the UI, the
+REST API (review decisions included) and the chat bot. A decision POSTed to any application instance reaches the run through a
+database-backed signal table. A new leader takes over what a dead one left: the reviews it was waiting on and the
 emails it was processing. The database now survives restarts (Flyway), which is what makes any of that possible.
 
 **GitHub issue:** [#284](https://github.com/edeandrea/non-deterministic-no-problem/issues/284). The issue lists four
@@ -53,7 +53,7 @@ Edit or create task files and update `## Task Plan`.
 
 - [x] [task-01-spike.md](task-01-spike.md): Spike the five unknowns (Flow restore and migrations, the Lease against a mock API server, a second JVM, a dead run's persisted data)
 - [x] [task-02-flyway.md](task-02-flyway.md): Replace `drop-and-create` with Flyway: app baseline, seed migration, Flow's own migrations, `validate`
-- [ ] [task-03-run-commands.md](task-03-run-commands.md): Deliver review decisions through a database command table, to whichever pod hosts the run
+- [x] [task-03-run-signals.md](task-03-run-signals.md): Deliver review decisions through a database signal table, to whichever application instance hosts the run
 - [ ] [task-04-intake-leadership.md](task-04-intake-leadership.md): Elect one intake leader with a Kubernetes Lease; only it watches, dispatches and runs
 - [ ] [task-05-review-reclaim.md](task-05-review-reclaim.md): Turn off Flow's auto-restore; a new leader reclaims every orphaned review
 - [ ] [task-06-processing-recovery.md](task-06-processing-recovery.md): Recover emails a dead leader left in Processing without duplicating or dropping a reply
@@ -75,36 +75,36 @@ Edit or create task files and update `## Task Plan`.
 ### Overview
 
 **Why active/passive and not active/active.** Mechanisms 2 and 3 (the in-JVM cancel lookup, and the per-sender queue
-driven by a status listener that only hears local runs) disappear once every run lives on one pod. Making them
-cluster-wide (a cross-pod cancel, and a database-backed per-sender queue with a cluster-wide status feed) is the large,
-risky part of active/active. Flow 1.3.0 offers none of it: no cross-pod event delivery, no cancel of a non-local
+driven by a status listener that only hears local runs) disappear once every run lives on one application instance. Making them
+cluster-wide (a cross-application instance cancel, and a database-backed per-sender queue with a cluster-wide status feed) is the large,
+risky part of active/active. Flow 1.3.0 offers none of it: no cross-application instance event delivery, no cancel of a non-local
 instance, and its messaging bridge gives each event to *one* consumer by default. The intake is mail-bound and
-low-volume, so one leader has more than enough throughput. Every pod still serves the parts that see user traffic.
+low-volume, so one leader has more than enough throughput. Every application instance still serves the parts that see user traffic.
 
 **What "the leader hosts every run" buys, mechanism by mechanism:**
 
 | No. | Mechanism | Fixed by | Task |
 |---|---|---|---|
-| 1 | `ReviewDecisionPublisher` → Flow's in-memory publisher: a decision POSTed to the wrong pod is a silent `202` | The decision is written to `intake_run_command` in the transaction that claims the review; the pod hosting the run delivers it | 03 |
+| 1 | `ReviewDecisionPublisher` → Flow's in-memory publisher: a decision POSTed to the wrong application instance is a silent `202` | The decision is written to `intake_run_signal` in the transaction that claims the review; the application instance hosting the run delivers it | 03 |
 | 2 | `SupersedeStep`'s in-JVM `activeInstance(oldRunId)` | Co-location: the superseding run and the waiting run are both on the leader. A miss now logs at WARN, and reclaim covers it | 04, 05 |
 | 3 | `ClaimIntakeDispatcher`'s in-memory per-sender queues + local status listener | Co-location: only the leader dispatches, and it hosts every run | 04 |
-| 4 | `ClaimsInboxWatcher` on every pod + process-local mailbox lock | Only the leader watches | 04 |
-| 5 | **New.** `%prod`/`%openshift` `drop-and-create` + `import.sql`: every pod boot wipes the shared database | Flyway, Hibernate `validate` | 02 |
-| 6 | **New.** All pods share Flow's app ID `parasol-app`, so Flow's startup auto-restore on pod B restarts pod A's waiting runs (duplicates) | Auto-restore off; app-level reclaim on leadership | 05 |
-| 7 | **New.** The watcher's "hand over what's left in Processing" runs on every pod's first connection, and steals what another pod is processing; the duplicate check then *files* it out from under that pod | Only the leader watches; a recovered email is no longer treated as a duplicate | 04, 06 |
+| 4 | `ClaimsInboxWatcher` on every application instance + process-local mailbox lock | Only the leader watches | 04 |
+| 5 | **New.** `%prod`/`%openshift` `drop-and-create` + `import.sql`: every application instance boot wipes the shared database | Flyway, Hibernate `validate` | 02 |
+| 6 | **New.** All application instances share Flow's app ID `parasol-app`, so Flow's startup auto-restore on instance B restarts instance A's waiting runs (duplicates) | Auto-restore off; app-level reclaim on leadership | 05 |
+| 7 | **New.** The watcher's "hand over what's left in Processing" runs on every application instance's first connection, and steals what another application instance is processing; the duplicate check then *files* it out from under that application instance | Only the leader watches; a recovered email is no longer treated as a duplicate | 04, 06 |
 
-Already safe across pods, unchanged: the `ClaimCorrespondence.messageId` unique constraint, the optimistic lock on
+Already safe across application instances, unchanged: the `ClaimCorrespondence.messageId` unique constraint, the optimistic lock on
 `ClaimIntakeState`, Flow's database-backed run persistence.
 
 ### Key Decisions (user, 2026-11-10)
 
 - **Active/passive intake** rather than active/active, or enforcing one replica.
 - **Kubernetes Lease** for leader election (fabric8 `LeaderElector` through `quarkus-kubernetes-client`), not a Postgres
-  advisory lock and not `quarkus-flow-durable-kubernetes`. Off-cluster (dev mode, the test suite) the pod is always the
+  advisory lock and not `quarkus-flow-durable-kubernetes`. Off-cluster (dev mode, the test suite) the application instance is always the
   leader. The trade-offs were presented: the advisory lock needs no RBAC and runs the same everywhere, but its crash
   failover depends on TCP keepalive. The Lease has a bounded failover and is the standard Kubernetes pattern, but needs
   RBAC and a mock API server in tests.
-- **A database command table** for cross-pod decisions, not Kafka, and not LISTEN/NOTIFY.
+- **A database signal table** for cross-application instance decisions, not Kafka, and not LISTEN/NOTIFY.
 - **Flyway** replaces `drop-and-create`: application state now survives restarts. This **reverses** the earlier
   "No durable state across restarts (user decision)" gotcha in `CLAUDE.md`.
 - **A new leader reclaims** orphaned reviews (through `ReviewRecoverer`) and the emails left in Processing. Loss is not
@@ -118,22 +118,22 @@ Already safe across pods, unchanged: the `ClaimCorrespondence.messageId` unique 
 
 ### Decisions made in planning (not asked; revisit at a task review if wrong)
 
-- **Supersede's cancel stays in-process.** The user picked the command table "for decisions and cancels", but with
-  active/passive the superseding run and the run it cancels are always on the same pod (the leader). A cancel command
+- **Supersede's cancel stays in-process.** The user picked the signal table "for decisions and cancels", but with
+  active/passive the superseding run and the run it cancels are always on the same application instance (the leader). A cancel signal
   would be dead code. The table's `kind` column leaves room for a `CANCEL` if a review ever shows the need. A miss
   (`activeInstance` empty) moves from DEBUG to WARN, because after task 05 it means a review that reclaim should already
   have covered.
 - **Losing the Lease ends the process** (`Quarkus.asyncExit`), the same fencing `quarkus-flow-durable-kubernetes` uses.
-  A pod that lost leadership but kept its runs in memory would compete with the new leader's reclaimed runs; a restart
+  An application instance that lost leadership but kept its runs in memory would compete with the new leader's reclaimed runs; a restart
   makes it a clean follower. Kubernetes restarts it.
 - **Flow's auto-restore goes off,** and recovery is the app's own. Flow's restore replays a run from its first
-  incomplete task, which would send mail twice. It would also restore on *every* pod, since they share an app ID.
+  incomplete task, which would send mail twice. It would also restore on *every* application instance, since they share an app ID.
   `ReviewRecoverer` already does the right thing for reviews and is tested. *(Task 01: in 1.3.0 the restore actually
   starts nothing and leaves a `PENDING` zombie per persisted run. quarkiverse/quarkus-flow#1116, unreleased (1.4.0),
-  makes it start every persisted run, which is the replay-on-every-pod problem above. Turning it off is required either
+  makes it start every persisted run, which is the replay-on-every-application instance problem above. Turning it off is required either
   way. See spike-results.md Q1.)*
 - **DB-count gauges** (`claim.intake.reviews.pending`, `.review.oldest.pending`, `.inbox.depth`) are measured by the
-  leader only, so a `sum` across pods isn't N times the truth. A new `claim.intake.leader` gauge (1/0 per pod) shows who
+  leader only, so a `sum` across application instances isn't N times the truth. A new `claim.intake.leader` gauge (1/0 per application instance) shows who
   leads.
 - **The decision relay retries until the run wakes,** which moves `IntakeScenario.publishUntilWoken`'s loop into
   production code. That also closes F2b (`ClaimReviewService`'s Javadoc) for real, instead of arguing it can't happen.
@@ -141,8 +141,8 @@ Already safe across pods, unchanged: the `ClaimCorrespondence.messageId` unique 
 ### Task Outcomes
 
 - **Task 01 (spike):** All five questions answered with evidence in [spike-results.md](spike-results.md). Flyway with
-  `quarkus-flow-db-migration` (its own `flow-runtime` named Flyway config), the fabric8 mock server and a jar-based pod B
-  all work. But no pod can read "`WAITING`" for a run it doesn't host: Flow persists `null`, and
+  `quarkus-flow-db-migration` (its own `flow-runtime` named Flyway config), the fabric8 mock server and a jar-based instance B
+  all work. But no application instance can read "`WAITING`" for a run it doesn't host: Flow persists `null`, and
   `PersistenceInstanceReader.find` returns a `PENDING` zombie that stays in `activeInstances`. Tasks 03 and 05 therefore
   read Flow's `task_info_entity` directly (the newest task's `next_position`).
 - **Task 02 (Flyway):** `V1__baseline.sql` (hand-reviewed from Hibernate's DDL, named constraints) and `V2__seed_claims.sql` replace
@@ -152,6 +152,9 @@ Already safe across pods, unchanged: the `ClaimCorrespondence.messageId` unique 
   two same-named attachments), so `ClaimImageSeeder` takes a Postgres advisory lock instead, and `DevClaimEmailSeeder` sends only
   while no claim beyond the six seeded exists. `ClaimNumberGenerator` stays. Not yet checked: a two-boot run against one database
   (task 08/09).
+
+- **Task 03 (run signals):** `intake_run_signal` (`V3`) holds a decision, written in `ClaimReviewService.claimReview`'s transaction, which also checks the run has reached its wait. `RunSignalRelay` delivers it from the application instance that hosts a `WAITING` run (Flow's API, once after commit, then a 1 s poll) and deletes it once `decidingRunId` no longer names the run. **Flow is a black box (user, 2026-11-10): the app never reads or writes its tables.** The wait is recorded by the app itself: an `awaitReview` task before `waitReview` sets `ClaimIntakeState.reviewWaitingRunId` (`V4`). Consequences: a decision for a vanished run is queued rather than a `404` (user's choice); `ReviewRunNotFoundException` is gone; `ReviewRunNotWaitingException` lost its `status`; `retarget` isn't written yet (task 05 adds it); delivered rows are deleted; `IntakeScenario.publishUntilWoken` stays for tests that bypass the service.
+- **Binding rule for tasks 05 and 06:** no direct SQL against Flow's tables, so the `DELETE` of a dead run's rows described under *Decisions from task 01* is **withdrawn**. Reclaim must use Flow's API or the app's own tables, and the task-01 finding that a dead run's persisted data can be read via `JpaInstanceOperations` needs the same scrutiny (it's Flow-internal API). Rework tasks 05 and 06 at the task-list review.
 
 **Decisions from task 01 that bind later tasks:**
 - **Never call `PersistenceInstanceReader.find` (or anything that builds a `WorkflowPersistenceInstance`) for an intake
@@ -163,7 +166,7 @@ Already safe across pods, unchanged: the `ClaimCorrespondence.messageId` unique 
 - **Flyway layout:** the app's migrations on the default configuration (`db/migration`); Flow's from
   `quarkus-flow-db-migration` on the named `flow-runtime` configuration; explicit `quarkus.datasource.db-kind`;
   `baseline-on-migrate: true` + `baseline-version: 0` on both.
-- **Task 08's pod B is the packaged jar** started from a `@QuarkusTest` with runtime overrides (Q4 lists them).
+- **Task 08's instance B is the packaged jar** started from a `@QuarkusTest` with runtime overrides (Q4 lists them).
 
 ### Caveats & Problems
 
@@ -182,11 +185,11 @@ Already safe across pods, unchanged: the `ClaimCorrespondence.messageId` unique 
 - **`DevClaimEmailSeeder` re-sends its two sample claims on every start.** That was harmless while each boot wiped the
   database; with a persistent dev database (live reload keeps the Dev Services container) it piles up claims. Task 02
   decides.
-- **`ClaimImageSeeder` races itself** when two pods boot at once (`hasImage` then `store`). Task 02 adds a unique
+- **`ClaimImageSeeder` races itself** when two application instances boot at once (`hasImage` then `store`). Task 02 adds a unique
   constraint and makes the insert idempotent.
-- **`LangfuseEvaluationInitializer` runs on every pod.** `createIfAbsent` isn't atomic (`CLAUDE.md` → *AI quality
-  layer*), so two pods booting together could race. That's out of scope: note it in the docs, don't fix it.
-- **The chat bot is per-pod already** (`@ChatScoped` over a websocket bound to one connection), so it needs nothing.
+- **`LangfuseEvaluationInitializer` runs on every application instance.** `createIfAbsent` isn't atomic (`CLAUDE.md` → *AI quality
+  layer*), so two application instances booting together could race. That's out of scope: note it in the docs, don't fix it.
+- **The chat bot is per-application instance already** (`@ChatScoped` over a websocket bound to one connection), so it needs nothing.
 - **Single-replica mentions are in at least six places:** `application.yml` (`%openshift` comment),
   `ClaimsInboxWatcher`'s Javadoc, `README.md` → *Single replica*, `docs/design/email-claim-intake.md`,
   `docs/email-claim-intake-demo.md`, and `CLAUDE.md` (the *intake only works correctly with one replica* gotcha).
@@ -196,14 +199,14 @@ Already safe across pods, unchanged: the `ClaimCorrespondence.messageId` unique 
 
 - **`quarkus-flow-durable-kubernetes`** gives each pod a stable Flow app ID by binding it to a pool-member Lease. A
   replacement pod inherits a dead pod's ID, and with it the dead pod's runs, through `FlowPersistenceRestore`. It
-  doesn't deliver events across pods, cancel a non-local run, or elect a leader for app beans. It needs RBAC for
+  doesn't deliver events across application instances, cancel a non-local run, or elect a leader for app beans. It needs RBAC for
   `leases`, `pods`, `deployments` and `replicasets`, plus `POD_NAME`/`POD_NAMESPACE`. It's bypassed in dev/test. Not
   chosen; it's the alternative if active/active is ever wanted.
-- **`FlowPersistenceRestore`** restores, on `WorkflowApplicationReadyEvent`, every persisted instance with this pod's
+- **`FlowPersistenceRestore`** restores, on `WorkflowApplicationReadyEvent`, every persisted instance with this application instance's
   app ID that isn't active locally, by calling `instance.start()`. Config: `quarkus.flow.persistence.auto-restore`
   (startup), `quarkus.flow.persistence.scan-interval` (periodic, off by default, since 1.2.0).
 - **Flow's messaging bridge** (`flow-in`/`flow-out`) dispatches only to `listen` tasks registered in the consuming JVM.
-  With a shared consumer group, one pod gets each event.
+  With a shared consumer group, one application instance gets each event.
 - **`quarkus-flow-db-migration`** ships Flow's six JPA tables as versioned Flyway scripts, under
   `db/flow-migration/runtime/postgresql`. The docs recommend a named `flow-runtime` datasource pointing at the same
   database, with its own history table (`flyway_flow_runtime_history`), plus `schema-management.strategy=validate` and

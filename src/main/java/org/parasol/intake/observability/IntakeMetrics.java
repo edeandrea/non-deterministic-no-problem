@@ -14,6 +14,7 @@ import jakarta.transaction.Transactional.TxType;
 
 import org.parasol.claim.model.Claim;
 import org.parasol.intake.model.ClaimIntakeState;
+import org.parasol.intake.model.IntakeRunSignal;
 import org.parasol.intake.observability.IntakeActivity.ClaimCompleted;
 import org.parasol.intake.observability.IntakeActivity.ClaimStatusChanged;
 import org.parasol.intake.observability.IntakeActivity.EmailAccepted;
@@ -27,6 +28,7 @@ import org.parasol.intake.observability.IntakeActivity.MailboxLockAcquired;
 import org.parasol.intake.observability.IntakeActivity.NewClaimExtracted;
 import org.parasol.intake.observability.IntakeActivity.ReplySent;
 import org.parasol.intake.observability.IntakeActivity.ReviewDecisionApplied;
+import org.parasol.intake.observability.IntakeActivity.RunSignalDelivered;
 import org.parasol.intake.observability.IntakeActivity.WatcherConnectionChanged;
 import org.parasol.intake.observability.IntakeActivity.WatcherReconnecting;
 
@@ -88,7 +90,20 @@ class IntakeMetrics {
 			.strongReference(true)
 			.register(registry);
 
-		this.gauges = List.of(connected, pending, depth, oldest);
+		var signals = Gauge.builder("claim.intake.signals.pending", this, IntakeMetrics::pendingSignalsOrNaN)
+			.description("Signals for intake runs that no run has taken yet")
+			.strongReference(true)
+			.register(registry);
+
+		this.gauges = List.of(connected, pending, depth, oldest, signals);
+	}
+
+	void onRunSignalDelivered(@Observes RunSignalDelivered delivered) {
+		Timer.builder("claim.intake.signal.delivery")
+			.description("How long a signal for an intake run waited, from being written to the run taking it")
+			.tag("kind", delivered.kind().name().toLowerCase(Locale.ROOT))
+			.register(this.registry)
+			.record(delivered.waited().isNegative() ? Duration.ZERO : delivered.waited());
 	}
 
 	void onEmailHandled(@Observes EmailHandled handled) {
@@ -214,6 +229,25 @@ class IntakeMetrics {
 		}
 
 		return Double.NaN;
+	}
+
+	private double pendingSignalsOrNaN() {
+		if (!this.stopped) {
+			try {
+				return pendingSignals();
+			}
+			catch (RuntimeException e) {
+				Log.debugf(e, "Couldn't count the pending signals");
+			}
+		}
+
+		return Double.NaN;
+	}
+
+	// Non-private, so the transaction interceptor applies
+	@Transactional(TxType.REQUIRES_NEW)
+	double pendingSignals() {
+		return IntakeRunSignal.count();
 	}
 
 	private double oldestPendingReviewSecondsOrNaN() {

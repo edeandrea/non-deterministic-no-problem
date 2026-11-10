@@ -4,7 +4,7 @@
 
 ## Goal
 
-No pod wipes the database when it boots. The schema is versioned Flyway migrations (the app's own, plus Flow's from
+No application instance wipes the database when it boots. The schema is versioned Flyway migrations (the app's own, plus Flow's from
 `quarkus-flow-db-migration`), Hibernate only `validate`s, and the seed data is a migration that runs once per database.
 Dev mode and the test suite still start from the six seeded claims every time. Fixes **mechanism 5**.
 
@@ -35,7 +35,7 @@ review it by hand (give the constraints readable names in place of Hibernate's h
 - `claim_images` (`bytea`, `on delete cascade` foreign key and index, the enum CHECK constraints),
   `claim_correspondence` (unique `message_id`, `on delete set null` from images), `claim_intake_state` (`@MapsId`, `on
   delete cascade`, the version) and `claim_requested_items`.
-- A **unique constraint on `claim_images (claim_id, kind, file_name)`**, so `ClaimImageSeeder` is safe when two pods
+- A **unique constraint on `claim_images (claim_id, kind, file_name)`**, so `ClaimImageSeeder` is safe when two application instances
   boot at once (see 5).
 
 ### 3. Seed data: `V2__seed_claims.sql`
@@ -59,7 +59,7 @@ claims_seq RESTART WITH 7`). Delete `import.sql` and every `sql-load-script`.
 ### 5. The two seeders
 
 - `ClaimImageSeeder`: insert-if-absent against the new unique constraint (catch the violation per image, or `insert …
-  on conflict do nothing` through the entity's own query), so two pods booting together insert each image once. Keep
+  on conflict do nothing` through the entity's own query), so two application instances booting together insert each image once. Keep
   the `SeedResult` counts honest ("already present" includes losing that race).
 - `DevClaimEmailSeeder`: with a database that outlives a live reload, re-sending the two samples on every start piles
   up claims. Recommended: send only when no claim beyond the six seeded ones exists. Decide and record.

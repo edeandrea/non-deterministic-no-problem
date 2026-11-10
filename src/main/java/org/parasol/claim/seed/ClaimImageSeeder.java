@@ -32,7 +32,7 @@ import io.quarkus.runtime.StartupEvent;
  */
 @ApplicationScoped
 class ClaimImageSeeder {
-	// Arbitrary, but fixed: every pod must take the same advisory lock
+	// Arbitrary, but fixed: every application instance must take the same advisory lock
 	private static final long SEED_LOCK_KEY = 284_001L;
 
 	static final String RESOURCE_DIRECTORY = "/seed/claim-images/";
@@ -80,7 +80,7 @@ class ClaimImageSeeder {
 	 */
 	@Transactional
 	SeedResult seed(List<SeedImage> seedImages) {
-		// Pods booting together would each find an image missing and insert it. The lock is held until this transaction ends, so
+		// Application instances booting together would each find an image missing and insert it. The lock is held until this transaction ends, so
 		// the second one waits, then finds the images the first inserted
 		this.entityManager.createNativeQuery("select 1 from (select pg_advisory_xact_lock(:key)) as locked")
 			.setParameter("key", SEED_LOCK_KEY)

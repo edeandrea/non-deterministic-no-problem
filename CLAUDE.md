@@ -40,6 +40,7 @@ The Java source is split into two top-level packages representing two distinct c
 | `org.parasol.intake.workflow` | `ClaimIntakeFlow` (the whole intake as one quarkus-flow workflow, `claim-intake`; the only place with side effects), the JSON-safe `IntakeRun` (input: ids only) and `IntakeState` (threaded through every step), the `EmailRequeued` event, the `AgentStep` and `ClaimMatchingSteps` steps and `CorrespondenceText` |
 | `org.parasol.intake.workflow.policy` | `PolicyCheckStep` and its package-private `SameCustomerRule` (same customer) and `PolicyNumbers` (generated `AC-` numbers) |
 | `org.parasol.intake.workflow.outcome` | `ApplyOutcomeStep` (persists a new claim or a merged reply) and its helpers `ClaimFields` and the package-private `InceptionDates` |
+| `org.parasol.intake.workflow.signal` | `RunSignalRelay` (`enqueue` writes an `IntakeRunSignal` in the caller's transaction; `deliver()` and a `@Scheduled` poll hand pending signals to the runs hosted in this JVM and delete the ones a run has taken). `IntakeRunSignal` is in `org.parasol.intake.model` |
 | `org.parasol.intake.workflow.review` | `SupersedeStep`, `ReviewDecisionSteps` (the review wait's decision steps and its match check), `AfterDecision` (what the run does next: `END` or `WAIT_AGAIN`), and `ReviewRecoverer` (hands a faulted run's review to a new run) |
 | `org.parasol.intake.observability` | `IntakeActivity` (the sealed CDI events the intake fires) and `IntakeMetrics` (observes them into the `claim.intake.*` meters; tags are small fixed sets, never a claim number, `Message-ID`, address or conversation id), and the tag enums `EmailOutcome`, `MatcherResult`, `ReviewAgreement`, `MailboxLockMode`, `MatchedClaimKind`, `FailureStage` and `FailureOutcome` |
 | `org.parasol.intake.workflow.mail` | `IntakeEmailReader` (re-reads a run's email from the processing folder), `ReplySteps`, `FileEmailStep` |
@@ -287,10 +288,10 @@ and map to DTO records with `ClaimMapper`.
   review is open, its requested items and the full `MissingItem` list for the UI's checklist) — its own read rather than
   widening `ClaimDetails`, since the intake's bookkeeping stays off the claim DTO. `POST
   /api/db/claims/{id}/review-decision` takes a `ReviewDecisionRequest` (`outcome`, `missing_items`, `fields`, `version`),
-  claims the review under the claim's optimistic lock (`ClaimReviewService`), confirms the run is `WAITING` via `@Inject
-  PersistenceInstanceReader`, publishes the decision and returns `202 Accepted` with no body — the UI re-fetches the claim
-  itself, since the call returns once the decision is published, not once the workflow has applied it. Errors: `404` for
-  an unknown claim or a vanished run, `409` for a claim not open for review, already being decided, a run that isn't
+  claims the review under the claim's optimistic lock (`ClaimReviewService`), confirms the run has reached its wait (`ClaimIntakeState.reviewWaitingRunId`), writes the decision to `intake_run_signal` in that same
+  transaction and returns `202 Accepted` with no body — the UI re-fetches the claim itself, since the call returns once the
+  decision is durably queued, not once the workflow has applied it. Errors: `404` for
+  an unknown claim, `409` for a claim not open for review, already being decided, a run that isn't
   waiting, or a lost optimistic lock (a stale `version`, or a reply that superseded the review first); each maps through
   `ReviewExceptionMappings`, reusing the shared `org.parasol.problem.ProblemDetail`. A Bean Validation failure is a `400`
   whose `detail` names each violation as the request does (snake_case, like the DTOs' `@JsonNaming`, e.g.
@@ -325,15 +326,27 @@ and map to DTO records with `ClaimMapper`.
   moved out of `org.parasol.claim.rest` (where it first lived, nested in `ClaimExceptionMappings`) into the neutral
   `org.parasol.problem` once this resource needed it too — it carries no claim-specific fields, so leaving it under one
   domain's package would have been the same kind of accidental coupling, just one step removed.
-  - **A documented, deliberately-not-worked-around race (F2b):** `ReviewDecisionPublisher`'s Javadoc and
-    `serverlessworkflow-impl-core`'s `ListenExecutor.internalExecute` show a run's `WAITING` status can become visible a
-    couple of statements before its `listen` task actually registers a consumer. `ClaimReviewService` doesn't retry or
-    block for this: `InMemoryEvents.publish` always hops to an executor before it reads the registered consumer, and that
-    hop structurally outlasts two sequential method calls on the thread that's already running, so any real caller doing
-    actual work in between (a DB transaction, JSON (de)serialization, an HTTP round trip) can't observe the gap in
-    practice. Only a synthetic caller that calls `publish` back-to-back with nothing else could — which is why
-    `ReviewDecisionPublisher`'s republish-until-woken loop stays a caller concern (`IntakeScenario.publishUntilWoken`),
-    not something this service retries for.
+  - **Decisions travel as database signals** (#284): a run lives in one JVM and Flow's events don't cross application instances, so the application instance that
+    takes the `POST` may not host the run. `ClaimReviewService.claimReview` writes an `IntakeRunSignal` (`intake_run_signal`:
+    `run_id`, `claim_id` (cascade), `kind` (`REVIEW_DECIDED` only), the `ReviewDecided` as JSON `payload`, `created_at`,
+    `attempts`) in the same transaction that moves `reviewRunId` to `decidingRunId`, so both commit or neither does. The
+    waiting-run check is in that transaction too, so a failed one rolls everything back and leaves no signal.
+    `org.parasol.intake.workflow.signal.RunSignalRelay` (on every application instance) calls `deliver()` once right after the commit and then
+    from a `@Scheduled` poll (`parasol.intake.signals.poll-interval`, default 1 s): a signal is published through
+    `ReviewDecisionPublisher` only to a run that's hosted in this JVM **and** `WAITING` (a `PENDING` instance is a stand-in
+    Flow leaves behind, not a run), and republished on every poll until the claim's `decidingRunId` no longer names the run
+    (the decision steps clear it on success, and on a fault that puts the claim back in review), when the row is deleted.
+    That republish-until-taken is also what closes F2b (a run's `WAITING` status becomes visible a couple of statements before
+    its `listen` registers a consumer): a lost event is simply retried. A duplicate is harmless, since `isForThisRun` checks the
+    run id and the claim's state again.
+  - **Flow is a black box: the app never reads or writes its tables.** "Is the run waiting?" is the app's own
+    `ClaimIntakeState.reviewWaitingRunId`, set by the `awaitReview` task (`ReviewDecisionSteps.awaitReview`) that sits just before
+    `waitReview` on every path into it (first arrival, a resumed review, wait-again after a decision fault). The review is ready
+    (`isReadyForDecision`) when it equals `reviewRunId`; a new run id or a cleared `reviewRunId` makes the old value harmless, so
+    nothing clears it. Only the application instance that hosts a run can see it through Flow's API, so a decision for a **vanished run is queued, not a
+    `404`** (there is no `ReviewRunNotFoundException`): the signal stays pending until reclaim (task 05) re-addresses it to the run's
+    replacement. `PersistenceInstanceReader.find` is never used for an intake run (it leaves a `PENDING` stand-in in `activeInstances`,
+    and throws for a run that has waited more than twice).
 
 **The `Claim` entity** (`org.parasol.claim.model`, table `claims`; serialized only through `ClaimDetails`):
 - **`id`** is the Panache numeric primary key (`claims_seq`). REST paths, UI routes, `ClaimBotQuery.claimId`
@@ -582,6 +595,7 @@ events and never call an adapter.
     measurement) and `.review.oldest.pending` (seconds, from `ClaimIntakeState.oldestPendingReviewOpenedAt`; `0` when no review is pending). `ApplyOutcomeStep` and `ReviewDecisionSteps` publish their status, extraction,
     decision and completion activities **inside** their transaction, observed `AFTER_SUCCESS`, so a rollback counts nothing. Not built, on purpose: token usage per run (Langfuse and quarkus-langchain4j already have it), a
     separate AI-reply counter (`replies{template=status_answer}`) and loop-guard skips (`emails{outcome=skipped_auto_reply}`).
+  - **Signal delivery meters (#284):** `claim.intake.signal.delivery{kind}` (timer, from the signal being written to the run taking it; `RunSignalDelivered`, fired by `RunSignalRelay`) and the gauge `claim.intake.signals.pending` (a DB count of `intake_run_signal` rows; no run or claim id is ever a tag).
 - **Layering is enforced** by `ConversationLayeringTests` (reads the compiled classes' constant pools with
   `java.lang.classfile`): the core references no adapter or framework, adapters never reference each other.
 
@@ -736,6 +750,7 @@ drifting from the migrations (tables, columns, types, sequences, including `clai
 | `watcher.idle-refresh` | `1m` | **`10s` in `%dev`** only, for quick pickup of mail sent from Roundcube |
 | `watcher.reconnect-delay` / `.max-reconnect-delay` | `1s` / `1m` | Doubles on every reconnect failure |
 | `metrics.inbox-depth-interval` | `30s` | How often `claim.intake.inbox.depth` is measured (a gauge read would log in to IMAP on every scrape) |
+| `signals.poll-interval` | `1s` | How often `RunSignalRelay` hands pending review decisions to the runs this application instance hosts (each is also tried once right after it's written) |
 
 ### OpenShift deployment
 
@@ -1083,13 +1098,12 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
     the processing folder and calls `ClaimIntakeDispatcher.submit`, as the watcher will; it also reads replies, finds a
     claim's waiting run, simulates claiming the review (`claimReview`, the same `reviewRunId` → `decidingRunId` move the
     real `ClaimReviewService` does — these workflow-level tests exercise the decision steps directly, not through the
-    REST layer, so the simulation stays), publishes decisions with `publishUntilWoken` (a decision published the moment a
+    REST layer, so the simulation stays), publishes decisions with `publishUntilWoken` (the workflow-level helper for tests that bypass `ClaimReviewService`, so they skip the signal table; `RunSignalRelayTests` covers that path. A decision published the moment a
     run says `WAITING` can be lost, so it republishes, through Awaitility every 250 ms within `WAIT`, until the run takes
     it: it leaves `WAITING`, or `decidingRunId` no longer names it. The second condition matters: a decision that faults
     and puts the claim back in review can be back in `waitReview` between two polls, and a republish would then hand it a
     second decision, which is how `aFaultInTheDecisionStepPutsTheClaimBackAndTheSameRunWaitsAgain` failed on slow CI
-    runners. Callers claim the review first; see **Review tests** below for why the real endpoint doesn't need to
-    republish), and cleans up (every Flow run canceled, claims beyond the six seeded ones,
+    runners. Callers claim the review first), and cleans up (every Flow run canceled, claims beyond the six seeded ones,
     recorded emails and intake state). It also owns the tests' database reads and fixtures, as `@Transactional(REQUIRES_NEW)`
     methods, so the test classes need no `QuarkusTransaction`.
   - `IntakeFlowTestBase` (`org.parasol.intake`, public with `protected` members so every intake test package can extend it: `createClaim`, `stubNewClaim`, `stubFollowUp`) and `ChatStubs.answerWhenAll`: a stub matches the
@@ -1330,7 +1344,7 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
 - **`ClaimImageSeeder` runs on every start and re-inserts any missing configured image.**
   - The database now outlives a boot, so a second boot against it inserts nothing ("Processed 12 seed claim images: 0 inserted,
     12 already present, …"); only a fresh database (every test boot, a new Dev Services container) inserts all 12. `seed` takes a
-    transaction-scoped Postgres advisory lock first, so pods booting together insert each image once. A unique constraint on
+    transaction-scoped Postgres advisory lock first, so application instances booting together insert each image once. A unique constraint on
     `(claim_id, kind, file_name)` would do that too, but the intake legitimately stores two attachments of the same name.
     `ClaimImageSeederTests` covers it by calling `seed` directly.
   - **It matches the sample claims by their explicit ids in `V2__seed_claims.sql`** (claim numbers are generated, so they can't

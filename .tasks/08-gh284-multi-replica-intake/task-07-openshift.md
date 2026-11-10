@@ -16,10 +16,10 @@ On OpenShift the app elects its intake leader through a Kubernetes Lease, with t
   `quarkus.openshift.rbac.role-bindings.*`). Turn off anything broader the kubernetes-client extension would generate by
   default (`quarkus.kubernetes-client.generate-rbac`); check what lands in `target/kubernetes/openshift.yml`.
 - **`POD_NAME`** from the Downward API (`quarkus.openshift.env.fields.POD_NAME: metadata.name`) as the Lease identity.
-- **`replicas: 1`** stays, with its comment rewritten: the intake is safe to scale; one pod leads the intake (a Lease),
-  every pod serves the UI/REST/chat; see README → *Scaling*.
-- Check the Deployment strategy: the app has no PVC, so `RollingUpdate` is fine. The new pod becomes ready as a
-  follower, and takes the Lease when the old pod releases it on shutdown. Say so in the comment.
+- **`replicas: 1`** stays, with its comment rewritten: the intake is safe to scale; one application instance leads the intake (a Lease),
+  every application instance serves the UI/REST/chat; see README → *Scaling*.
+- Check the Deployment strategy: the app has no PVC, so `RollingUpdate` is fine. The new application instance becomes ready as a
+  follower, and takes the Lease when the old application instance releases it on shutdown. Say so in the comment.
 - `deploy-to-openshift.sh`: nothing, unless the generated RBAC needs applying separately. Check.
 - `src/main/kubernetes/dependencies.yml`: nothing for the app's own RBAC (it's generated). Confirm the database PVC
   and the migration path decided in task 02.
