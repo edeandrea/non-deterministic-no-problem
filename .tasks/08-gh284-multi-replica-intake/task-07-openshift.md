@@ -15,7 +15,7 @@ On OpenShift the app elects its intake leader through a Kubernetes Lease, with t
   them; check), bound to the app's ServiceAccount (`quarkus.openshift.rbac.roles.*`,
   `quarkus.openshift.rbac.role-bindings.*`). Turn off anything broader the kubernetes-client extension would generate by
   default (`quarkus.kubernetes-client.generate-rbac`); check what lands in `target/kubernetes/openshift.yml`.
-- **`POD_NAME`** from the Downward API (`quarkus.openshift.env.fields.POD_NAME: metadata.name`) as the Lease identity.
+- **No `POD_NAME` needed:** the Lease identity defaults to the host name, which is the pod name on Kubernetes (`parasol.intake.leadership.identity` overrides it).
 - **`replicas: 1`** stays, with its comment rewritten: the intake is safe to scale; one application instance leads the intake (a Lease),
   every application instance serves the UI/REST/chat; see README → *Scaling*.
 - Check the Deployment strategy: the app has no PVC, so `RollingUpdate` is fine. The new application instance becomes ready as a

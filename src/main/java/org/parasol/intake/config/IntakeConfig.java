@@ -77,6 +77,14 @@ public interface IntakeConfig {
 	 * @return the signal settings
 	 */
 	Signals signals();
+
+	/**
+	 * How the application instance that runs the intake is chosen.
+	 *
+	 * @return the leadership settings
+	 */
+	Leadership leadership();
+
 	/**
 	 * The IMAP connection to the claims mailbox.
 	 */
@@ -230,5 +238,74 @@ public interface IntakeConfig {
 		 */
 		@WithDefault("1s")
 		Duration pollInterval();
+	}
+
+	/**
+	 * Which application instance is the intake leader: the only one that watches the inbox, dispatches emails and hosts the runs.
+	 */
+	interface Leadership {
+		/**
+		 * How the leader is chosen.
+		 *
+		 * @return the mode
+		 */
+		@WithDefault("SINGLE")
+		Mode mode();
+
+		/**
+		 * The name of the Kubernetes {@code Lease} the instances compete for. Used only in {@link Mode#KUBERNETES_LEASE}.
+		 *
+		 * @return the Lease name
+		 */
+		@WithDefault("parasol-intake-leader")
+		@NotBlank
+		String leaseName();
+
+		/**
+		 * How long a Lease holder that stops renewing keeps it, so the longest a crashed leader delays its successor.
+		 *
+		 * @return the Lease duration
+		 */
+		@WithDefault("15s")
+		Duration leaseDuration();
+
+		/**
+		 * How long the leader keeps trying to renew before it gives up leading. Shorter than {@link #leaseDuration()}.
+		 *
+		 * @return the renew deadline
+		 */
+		@WithDefault("10s")
+		Duration renewDeadline();
+
+		/**
+		 * How often an instance tries to take or renew the Lease.
+		 *
+		 * @return the retry period
+		 */
+		@WithDefault("2s")
+		Duration retryPeriod();
+
+		/**
+		 * The name this application instance competes under, which must differ between instances. Without one, the host name is used
+		 * (the pod name on Kubernetes), and failing that a random one.
+		 *
+		 * @return the identity, if one is configured
+		 */
+		Optional<String> identity();
+	}
+
+	/**
+	 * How the intake leader is chosen.
+	 */
+	enum Mode {
+		/**
+		 * This application instance is always the leader: one replica, dev mode and the tests. Nothing touches the Kubernetes API.
+		 */
+		SINGLE,
+
+		/**
+		 * Instances compete for a Kubernetes {@code Lease}; losing it ends the process.
+		 */
+		KUBERNETES_LEASE
 	}
 }

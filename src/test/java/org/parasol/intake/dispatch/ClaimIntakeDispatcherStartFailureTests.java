@@ -86,7 +86,7 @@ class ClaimIntakeDispatcherStartFailureTests {
 			return null;
 		}).when(executor).execute(any(Runnable.class));
 
-		return new ClaimIntakeDispatcher(config, mailbox, recorder, matcher, failureHandler, new ConversationContext(), activities, flowInstance, executor);
+		return new ClaimIntakeDispatcher(config, mailbox, recorder, matcher, failureHandler, new ConversationContext(), activities, flowInstance, executor, () -> true);
 	}
 
 	private static InboundEmail email(String messageId) {

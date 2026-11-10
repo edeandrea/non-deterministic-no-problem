@@ -241,6 +241,9 @@ The intake is configured under `parasol.intake.*` (`IntakeConfig`,
 | `watcher.idle-refresh` | `1m` (`10s` in `%dev`) | How often the IMAP IDLE is renewed |
 | `watcher.reconnect-delay` / `.max-reconnect-delay` | `1s` / `1m` | Reconnect backoff |
 | `metrics.inbox-depth-interval` | `30s` | How often `claim.intake.inbox.depth` is measured |
+| `leadership.mode` | `SINGLE` | `SINGLE` (always the intake leader) or `KUBERNETES_LEASE` (instances compete for a Lease; only the leader watches the inbox) |
+| `leadership.lease-name` / `.identity` | `parasol-intake-leader` / the host name (the pod name on Kubernetes) | Only with `KUBERNETES_LEASE` |
+| `leadership.lease-duration` / `.renew-deadline` / `.retry-period` | `15s` / `10s` / `2s` | A crashed leader delays its successor by about the lease duration |
 | `signals.poll-interval` | `1s` | How often pending review decisions are handed to the runs this application instance hosts |
 
 ### Single replica

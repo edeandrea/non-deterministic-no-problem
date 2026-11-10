@@ -35,7 +35,7 @@ public final class IntakeActivityEvents {
 
 	@SuppressWarnings("unchecked")
 	public static IntakeActivities into(MeterRegistry registry) {
-		var metrics = new IntakeMetrics(registry);
+		var metrics = new IntakeMetrics(registry, () -> true);
 		var event = (Event<IntakeActivity>) mock(Event.class);
 
 		doAnswer(invocation -> {

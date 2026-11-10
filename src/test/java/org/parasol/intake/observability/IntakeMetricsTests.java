@@ -623,6 +623,20 @@ class IntakeMetricsTests extends IntakeFlowTestBase {
 	}
 
 	@Test
+	void aFollowerReportsNoDatabaseGaugesSoASumAcrossInstancesIsNotMultiplied() {
+		var follower = new SimpleMeterRegistry();
+		new IntakeMetrics(follower, () -> false);
+
+		assertThat(follower.get("claim.intake.leader").gauge().value()).isZero();
+
+		for (var name : List.of("claim.intake.reviews.pending", "claim.intake.review.oldest.pending", "claim.intake.signals.pending")) {
+			assertThat(follower.get(name).gauge().value()).as(name).isNaN();
+		}
+
+		assertThat(this.registry.get("claim.intake.leader").gauge().value()).isEqualTo(1);
+	}
+
+	@Test
 	void theOldestPendingReviewGaugeFollowsTheClaimThatHasWaitedLongest() {
 		assertThat(this.registry.get("claim.intake.review.oldest.pending").gauge().value()).isZero();
 
@@ -760,6 +774,7 @@ class IntakeMetricsTests extends IntakeFlowTestBase {
 			Map.entry("claim.intake.inbox.depth", Map.<String, Set<String>>of()),
 			Map.entry("claim.intake.review.oldest.pending", Map.<String, Set<String>>of()),
 			Map.entry("claim.intake.signals.pending", Map.<String, Set<String>>of()),
+			Map.entry("claim.intake.leader", Map.<String, Set<String>>of()),
 			Map.entry("claim.intake.signal.delivery", Map.of("kind", Arrays.stream(IntakeRunSignal.Kind.values()).map(kind -> kind.name().toLowerCase(Locale.ROOT)).collect(Collectors.toSet()))));
 		var meters = this.registry.getMeters().stream()
 			.filter(meter -> meter.getId().getName().startsWith("claim.intake."))

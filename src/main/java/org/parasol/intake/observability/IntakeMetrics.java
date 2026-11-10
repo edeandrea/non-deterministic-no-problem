@@ -13,6 +13,7 @@ import jakarta.transaction.Transactional;
 import jakarta.transaction.Transactional.TxType;
 
 import org.parasol.claim.model.Claim;
+import org.parasol.intake.leadership.IntakeLeadership;
 import org.parasol.intake.model.ClaimIntakeState;
 import org.parasol.intake.model.IntakeRunSignal;
 import org.parasol.intake.observability.IntakeActivity.ClaimCompleted;
@@ -61,10 +62,12 @@ class IntakeMetrics {
 	private final AtomicInteger inboxDepth = new AtomicInteger(-1);
 	private final Counter watcherReconnects;
 	private List<Gauge> gauges = List.of();
+	private final IntakeLeadership leadership;
 	private volatile boolean stopped;
 
-	IntakeMetrics(MeterRegistry registry) {
+	IntakeMetrics(MeterRegistry registry, IntakeLeadership leadership) {
 		this.registry = registry;
+		this.leadership = leadership;
 		this.watcherReconnects = Counter.builder("claim.intake.watcher.reconnects")
 			.description("How often the inbox watcher had to connect to the claims mailbox again")
 			.register(registry);
@@ -95,7 +98,12 @@ class IntakeMetrics {
 			.strongReference(true)
 			.register(registry);
 
-		this.gauges = List.of(connected, pending, depth, oldest, signals);
+		var leader = Gauge.builder("claim.intake.leader", this.leadership, value -> value.isLeader() ? 1 : 0)
+			.description("1 on the application instance that is the intake leader, 0 on the others")
+			.strongReference(true)
+			.register(registry);
+
+		this.gauges = List.of(connected, pending, depth, oldest, signals, leader);
 	}
 
 	void onRunSignalDelivered(@Observes RunSignalDelivered delivered) {
@@ -219,7 +227,7 @@ class IntakeMetrics {
 	}
 
 	private double pendingReviewsOrNaN() {
-		if (!this.stopped) {
+		if (!this.stopped && this.leadership.isLeader()) {
 			try {
 				return pendingReviews();
 			}
@@ -232,7 +240,7 @@ class IntakeMetrics {
 	}
 
 	private double pendingSignalsOrNaN() {
-		if (!this.stopped) {
+		if (!this.stopped && this.leadership.isLeader()) {
 			try {
 				return pendingSignals();
 			}
@@ -251,7 +259,7 @@ class IntakeMetrics {
 	}
 
 	private double oldestPendingReviewSecondsOrNaN() {
-		if (!this.stopped) {
+		if (!this.stopped && this.leadership.isLeader()) {
 			try {
 				return oldestPendingReviewSeconds();
 			}

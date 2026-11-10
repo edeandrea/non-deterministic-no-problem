@@ -17,6 +17,7 @@ import jakarta.enterprise.inject.Instance;
 
 import org.eclipse.microprofile.context.ManagedExecutor;
 import org.parasol.intake.config.IntakeConfig;
+import org.parasol.intake.leadership.IntakeLeadership;
 import org.parasol.intake.failure.IntakeFailureHandler;
 import org.parasol.intake.mailbox.ClaimsMailbox;
 import org.parasol.intake.mailbox.EmailReceived;
@@ -73,6 +74,7 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 	private final IntakeActivities activities;
 	private final Instance<ClaimIntakeFlow> flow;
 	private final ManagedExecutor executor;
+	private final IntakeLeadership leadership;
 
 	private final Map<String, SenderState> senders = new ConcurrentHashMap<>();
 	private final Map<String, String> senderByInstance = new ConcurrentHashMap<>();
@@ -87,7 +89,8 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 		ConversationContext conversationContext,
 		IntakeActivities activities,
 		Instance<ClaimIntakeFlow> flow,
-		ManagedExecutor executor) {
+		ManagedExecutor executor,
+		IntakeLeadership leadership) {
 
 		this.config = config;
 		this.mailbox = mailbox;
@@ -98,6 +101,7 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 		this.activities = activities;
 		this.flow = flow;
 		this.executor = executor;
+		this.leadership = leadership;
 	}
 
 	/**
@@ -122,6 +126,11 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 	 * @param email The email
 	 */
 	public void submit(InboundEmail email) {
+		if (!this.leadership.isLeader()) {
+			// Only the leader watches, so this is a regression, not a normal case. The runs this starts would compete with the leader's
+			Log.warnf("An email was submitted to the intake on an application instance that isn't its leader");
+		}
+
 		if (MailLoopGuard.shouldIgnore(email, this.config.address())) {
 			this.activities.publish(new EmailHandled(EmailOutcome.SKIPPED_AUTO_REPLY, Optional.of(latencyOf(email))));
 			this.failureHandler.fileWithoutRun(email);

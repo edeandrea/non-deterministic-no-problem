@@ -17,13 +17,14 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.Session;
 
 import org.parasol.intake.config.IntakeConfig;
+import org.parasol.intake.leadership.LeadershipAcquired;
+import org.parasol.intake.leadership.LeadershipLost;
 import org.parasol.intake.observability.IntakeActivities;
 import org.parasol.intake.observability.IntakeActivity.WatcherConnectionChanged;
 import org.parasol.intake.observability.IntakeActivity.WatcherReconnecting;
 
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
-import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduler;
 import io.quarkus.virtual.threads.VirtualThreads;
 import io.smallrye.mutiny.Multi;
@@ -33,18 +34,18 @@ import io.smallrye.mutiny.subscription.Cancellable;
 /**
  * Watches the claims INBOX with IMAP IDLE and hands every email over as an {@link EmailReceived} event, without waiting for
  * its run. A Mutiny pipeline on a virtual thread (IDLE blocks, so it mustn't hold a worker), started
- * only when the intake is enabled, and never blocking startup: if the mailbox is unreachable it keeps retrying, doubling its delay
+ * only when the intake is enabled and this application instance is the intake leader, and never blocking startup: if the mailbox is unreachable it keeps retrying, doubling its delay
  * up to a limit.
  * <p>
- *   The pipeline loops: connect; on the first connection of this JVM, hand over what a previous JVM left in the processing
+ *   The pipeline loops: connect; on the first connection of a leadership, hand over what a previous leader left in the processing
  *   folder (where it is, oldest first, since it arrived before anything in the INBOX); move each email in the INBOX to the
  *   processing folder, oldest first, and hand it over; then IDLE until the INBOX changes. Moving it out of the INBOX is what
  *   stops a second pickup. The observer records the {@code Message-ID} and skips duplicates, so the watcher doesn't look at
  *   the email.
  * </p>
  * <p>
- *   There is one watcher, and the intake runs as a single replica: several watchers on one INBOX would race for the same
- *   message, and the per-sender queue is in memory. A failure of the connection, or of the mailbox, ends the connection and
+ *   Only the intake leader watches ({@link LeadershipAcquired} starts the watcher, {@link LeadershipLost} stops it): several
+ *   watchers on one INBOX would race for the same message, and the per-sender queue is in memory. A failure of the connection, or of the mailbox, ends the connection and
  *   starts over; an observer's exception only costs that email its hand-over.
  * </p>
  */
@@ -111,13 +112,17 @@ class ClaimsInboxWatcher {
 		return Settings.from(config);
 	}
 
-	void onStart(@Observes StartupEvent event) {
+	void onLeadershipAcquired(@Observes LeadershipAcquired event) {
 		if (this.config.enabled()) {
 			start();
 		}
 		else {
 			Log.debug("The claims inbox watcher is disabled");
 		}
+	}
+
+	void onLeadershipLost(@Observes LeadershipLost event) {
+		stop();
 	}
 
 	void onShutdown(@Observes ShutdownEvent event) {
@@ -286,7 +291,7 @@ class ClaimsInboxWatcher {
 		}
 	}
 
-	// What a previous JVM left in the processing folder arrived before anything in the INBOX, so it goes first, where it is
+	// What a previous leader left in the processing folder arrived before anything in the INBOX, so it goes first, where it is
 	private void handOverProcessing() {
 		List<InboundEmail> leftOver = this.mailbox.list(MailFolder.PROCESSING);
 

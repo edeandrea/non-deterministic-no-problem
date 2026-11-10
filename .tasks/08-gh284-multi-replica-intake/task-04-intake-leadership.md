@@ -18,7 +18,7 @@ the mailbox measurements. The other application instances serve the UI, REST and
   - `SINGLE` (the default): leader from startup. Fires `LeadershipAcquired` on `StartupEvent`, and only if
     `parasol.intake.enabled`.
   - `KUBERNETES_LEASE`: fabric8 `LeaderElector` on a `LeaseLock` (`parasol.intake.leadership.lease-name`, default
-    `parasol-intake-leader`; the namespace and identity come from the client and `POD_NAME`). Runs on its own thread
+    `parasol-intake-leader`; the namespace and identity come from the client and the host name). Runs on its own thread
     (a virtual thread is fine; it blocks). `onStartLeading` fires `LeadershipAcquired`. `onStopLeading` fires
     `LeadershipLost`, then calls `Quarkus.asyncExit(1)` (fencing; PLAN.md → *Decisions made in planning*).
     `releaseOnCancel(true)`, so a clean shutdown hands over at once (about 1 s in task 01; a crash takes about one
