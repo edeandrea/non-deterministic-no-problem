@@ -1,8 +1,9 @@
 package org.parasol.intake.failure;
 
+import java.util.concurrent.ExecutorService;
+
 import jakarta.enterprise.context.ApplicationScoped;
 
-import org.eclipse.microprofile.context.ManagedExecutor;
 import org.parasol.intake.observability.FailureOutcome;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
 import org.parasol.intake.workflow.IntakeRun;
@@ -10,6 +11,7 @@ import org.parasol.intake.workflow.review.ReviewRecoverer;
 import org.parasol.intake.workflow.review.ReviewHandover;
 
 import io.quarkus.logging.Log;
+import io.quarkus.virtual.threads.VirtualThreads;
 import io.serverlessworkflow.impl.lifecycle.WorkflowExecutionListener;
 import io.serverlessworkflow.impl.lifecycle.WorkflowFailedEvent;
 
@@ -24,9 +26,9 @@ import io.serverlessworkflow.impl.lifecycle.WorkflowFailedEvent;
 public class IntakeFailureListener implements WorkflowExecutionListener {
 	private final IntakeFailureHandler failureHandler;
 	private final ReviewRecoverer reviewRecoverer;
-	private final ManagedExecutor executor;
+	private final ExecutorService executor;
 
-	IntakeFailureListener(IntakeFailureHandler failureHandler, ReviewRecoverer reviewRecoverer, ManagedExecutor executor) {
+	IntakeFailureListener(IntakeFailureHandler failureHandler, ReviewRecoverer reviewRecoverer, @VirtualThreads ExecutorService executor) {
 		this.failureHandler = failureHandler;
 		this.reviewRecoverer = reviewRecoverer;
 		this.executor = executor;

@@ -71,6 +71,10 @@ quarkus:
     name: parasol-app
 
   flow:
+    persistence:
+      # Flow's startup restore replays a persisted run from its first incomplete task (mail sent twice), and every application instance
+      # would do it, since they share the application id. ReviewReclaimer gives a review whose run is gone a new run instead, which only waits.
+      auto-restore: false
     validation:
       input:
         # quarkus-flow 1.3.0 turns this on by default (quarkiverse/quarkus-flow#1077). For a quarkus-flow-langchain4j

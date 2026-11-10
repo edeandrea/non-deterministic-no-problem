@@ -30,6 +30,7 @@ import org.parasol.intake.observability.IntakeActivity.MailboxLockAcquired;
 import org.parasol.intake.observability.IntakeActivity.NewClaimExtracted;
 import org.parasol.intake.observability.IntakeActivity.ReplySent;
 import org.parasol.intake.observability.IntakeActivity.ReviewDecisionApplied;
+import org.parasol.intake.observability.IntakeActivity.ReviewReclaimed;
 import org.parasol.intake.observability.IntakeActivity.RunSignalDelivered;
 import org.parasol.intake.observability.IntakeActivity.WatcherConnectionChanged;
 import org.parasol.intake.observability.IntakeActivity.WatcherReconnecting;
@@ -63,6 +64,7 @@ class IntakeMetrics {
 	static final Duration[] EMAIL_LATENCY_BUCKETS = seconds(1, 5, 15, 30, 60, 120, 300, 600, 1800);
 	static final Duration[] COMPLETION_BUCKETS = seconds(60, 300, 900, 3600, 4 * 3600, 86400, 3 * 86400, 7 * 86400);
 	static final Duration[] MAIL_CLIENT_BUCKETS = millis(5, 10, 25, 50, 100, 250, 500, 1000, 5000);
+	static final Duration[] SIGNAL_DELIVERY_BUCKETS = millis(100, 250, 500, 1000, 2500, 5000, 15000, 60000);
 	static final Duration[] LOCK_WAIT_BUCKETS = millis(1, 5, 10, 50, 100, 500, 1000, 5000);
 	static final double[] EMAIL_SIZE_BUCKETS = { 4_096, 16_384, 65_536, 262_144, 1_048_576, 4_194_304, 16_777_216 };
 	static final double[] COMPLETENESS_BUCKETS = { 0.2, 0.4, 0.6, 0.8, 1.0 };
@@ -121,8 +123,16 @@ class IntakeMetrics {
 		Timer.builder("claim.intake.signal.delivery")
 			.description("How long a signal for an intake run waited, from being written to the run taking it")
 			.tag("kind", delivered.kind().name().toLowerCase(Locale.ROOT))
+			.serviceLevelObjectives(SIGNAL_DELIVERY_BUCKETS)
 			.register(this.registry)
 			.record(delivered.waited().isNegative() ? Duration.ZERO : delivered.waited());
+	}
+
+	void onReviewReclaimed(@Observes ReviewReclaimed reclaimed) {
+		Counter.builder("claim.intake.reviews.reclaimed")
+			.description("Reviews whose run was gone and that a new leader gave to a new run")
+			.register(this.registry)
+			.increment();
 	}
 
 	void onEmailHandled(@Observes EmailHandled handled) {

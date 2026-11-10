@@ -2,6 +2,7 @@ package org.parasol.intake.model;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -33,7 +34,7 @@ import io.quarkus.panache.common.Sort;
 @Entity
 @Table(name = "intake_run_signal", indexes = @Index(name = "intake_run_signal_run_id_idx", columnList = "run_id"))
 public class IntakeRunSignal extends PanacheEntity {
-	@Column(nullable = false, updatable = false)
+	@Column(nullable = false)
 	public String runId;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -45,7 +46,7 @@ public class IntakeRunSignal extends PanacheEntity {
 	@Column(nullable = false, updatable = false)
 	public Kind kind;
 
-	@Column(nullable = false, updatable = false, length = Length.LONG32)
+	@Column(nullable = false, length = Length.LONG32)
 	public String payload;
 
 	@Column(nullable = false, updatable = false)
@@ -94,6 +95,26 @@ public class IntakeRunSignal extends PanacheEntity {
 	 */
 	public static List<IntakeRunSignal> listPending() {
 		return IntakeRunSignal.list("", Sort.by("id"));
+	}
+
+	/**
+	 * Re-addresses a claim's pending signals from a run that's gone to its replacement. Changes the managed signals in the caller's transaction.
+	 *
+	 * @param claimId the claim id
+	 * @param oldRunId the run the signals are for now
+	 * @param newRunId the run that takes them over
+	 * @param payloadFor the new payload, from the old one
+	 * @return how many were re-addressed
+	 */
+	public static long retarget(long claimId, String oldRunId, String newRunId, UnaryOperator<String> payloadFor) {
+		var signals = IntakeRunSignal.<IntakeRunSignal>list("claim.id = ?1 and runId = ?2", claimId, oldRunId);
+
+		signals.forEach(signal -> {
+			signal.runId = newRunId;
+			signal.payload = payloadFor.apply(signal.payload);
+		});
+
+		return signals.size();
 	}
 
 	/**

@@ -77,6 +77,6 @@ from a copy). Then:
 
 ## Done When
 
-- [ ] `quarkus.flow.persistence.auto-restore` is `false`, and a restart doesn't start any persisted run.
-- [ ] The four tests pass under `-Pollama`, along with the existing `ReviewRecoverer` and decision-fault tests.
-- [ ] Docs no longer say a restart loses a waiting review.
+- [x] `quarkus.flow.persistence.auto-restore` is `false`, and a restart doesn't start any persisted run.
+- [x] The four tests pass under `-Pollama`, along with the existing `ReviewRecoverer` and decision-fault tests.
+- [x] Docs no longer say a restart loses a waiting review.

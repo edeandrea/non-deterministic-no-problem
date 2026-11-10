@@ -42,7 +42,7 @@ The Java source is split into two top-level packages representing two distinct c
 | `org.parasol.intake.workflow.policy` | `PolicyCheckStep` and its package-private `SameCustomerRule` (same customer) and `PolicyNumbers` (generated `AC-` numbers) |
 | `org.parasol.intake.workflow.outcome` | `ApplyOutcomeStep` (persists a new claim or a merged reply) and its helpers `ClaimFields` and the package-private `InceptionDates` |
 | `org.parasol.intake.workflow.signal` | `RunSignalRelay` (`enqueue` writes an `IntakeRunSignal` in the caller's transaction; `deliver()` and a `@Scheduled` poll hand pending signals to the runs hosted in this JVM and delete the ones a run has taken). `IntakeRunSignal` is in `org.parasol.intake.model` |
-| `org.parasol.intake.workflow.review` | `SupersedeStep`, `ReviewDecisionSteps` (the review wait's decision steps and its match check), `AfterDecision` (what the run does next: `END` or `WAIT_AGAIN`), and `ReviewRecoverer` (hands a faulted run's review to a new run) |
+| `org.parasol.intake.workflow.review` | `SupersedeStep`, `ReviewReclaimer` (hands every review whose run is gone to a new run on `LeadershipAcquired`), `ReviewDecisionSteps` (the review wait's decision steps and its match check), `AfterDecision` (what the run does next: `END` or `WAIT_AGAIN`), and `ReviewRecoverer` (hands a faulted run's review to a new run) |
 | `org.parasol.intake.observability` | `IntakeActivity` (the sealed CDI events the intake fires) and `IntakeMetrics` (observes them into the `claim.intake.*` meters; tags are small fixed sets, never a claim number, `Message-ID`, address or conversation id), and the tag enums `EmailOutcome`, `MatcherResult`, `ReviewAgreement`, `MailboxLockMode`, `MatchedClaimKind`, `FailureStage` and `FailureOutcome` |
 | `org.parasol.intake.workflow.mail` | `IntakeEmailReader` (re-reads a run's email from the processing folder), `ReplySteps`, `FileEmailStep` |
 | `org.parasol.intake.dev` | `DevClaimEmailSeeder`: the bean exists only with the build property `parasol.dev-seed.enabled=true` (`%dev`, and the two Ollama Maven profiles' `quarkus-maven-plugin` `systemProperties`, since they run dev as `prod`, so `@IfBuildProfile("dev")` wouldn't match), and it acts in `LaunchMode.DEVELOPMENT` only, mails two sample claims to the claims address at startup (one complete, one with no date or place) so the real intake produces a `Pending Review` and a `Pending Information` claim to look at. Needs the same model as any intake email; GreenMail is in memory, so it re-sends on every start |
@@ -1297,6 +1297,8 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
   whose method isn't public (tried on `ClaimReviewResource`: all 17 `ClaimReviewResourceTests` failed), but the class itself needn't be.
   Exception-mapper methods can be package-private.
 - `Optional` chains over null checks and guard-clause early returns.
+- **No `ManagedExecutor`:** background and blocking work goes on the `@VirtualThreads ExecutorService` (`ClaimsInboxWatcher`, `ClaimIntakeDispatcher`, `IntakeFailureListener`, `ReviewReclaimer`).
+- **A stateless `@RegisterAiService` called outside an HTTP request is `@ApplicationScoped`** (`ClaimResolver`): AI services default to `@RequestScoped`, and a Flow step on a plain thread has no request context (`ContextNotActiveException`).
 
 ## Gotchas
 
@@ -1453,6 +1455,14 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
   - **A claim's review always has a live run.** A run that faults while it owns a review (as `reviewRunId` or `decidingRunId`)
     is replaced by `ReviewRecoverer`: a new run with `IntakeRun.resumesReview` goes straight to `waitReview`, and is set as the
     review run before it starts. Restoring `reviewRunId` alone would point at a dead run.
+    A run that's **gone** (the leader died, or the only application instance restarted: the database survives it) is replaced the same way by
+    `ReviewReclaimer` on `LeadershipAcquired` (`ReviewRecoverer.reclaim`): every `Pending Review` claim whose `reviewRunId`/`decidingRunId` names a run
+    not `RUNNING`/`WAITING` in this JVM gets a new run, built from the claim itself (its latest inbound `Message-ID`, its address, its
+    conversation id), since the old run's input isn't available. A decision already claimed for the old run stays the claim's decision: its
+    `IntakeRunSignal` is re-addressed (`IntakeRunSignal.retarget`) and `decidingRunId` moves to the new run, which applies it once it waits.
+    `quarkus.flow.persistence.auto-restore` is `false`: Flow's restore would replay a run from its first incomplete task on every application
+    instance. The dead run's rows stay in Flow's tables (the app never writes to them) and are inert. Counted by `claim.intake.reviews.reclaimed`.
+    A reclaimed run has no dispatcher sender slot, which is safe: `markWorking`/`releaseRun` look the run up by `Optional`.
   - **Never set `Claim.version` or any intake column on `Claim`:** they don't exist. Use `ClaimIntakeState`.
   - **Prefer `@Transactional` to `QuarkusTransaction`** (review decision). Where a step must not hold a transaction across an
     LLM, IMAP or SMTP call, the transactional part is its own non-private method annotated

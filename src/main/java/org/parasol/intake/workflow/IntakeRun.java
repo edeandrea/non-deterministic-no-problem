@@ -50,4 +50,17 @@ public record IntakeRun(String messageId, String conversationId, String sender, 
 	public static IntakeRun resumingReview(IntakeRun faulted, String conversationId, long claimId) {
 		return new IntakeRun(faulted.messageId(), conversationId, faulted.sender(), claimId, true, true, faulted.receivedAt());
 	}
+
+	/**
+	 * A run that takes over a claim's review from a run that's gone, with no input left to copy: it's built from what the intake recorded about the claim.
+	 *
+	 * @param messageId The {@code Message-ID} of the claim's latest inbound email
+	 * @param sender The claim's address
+	 * @param conversationId The claim's conversation id
+	 * @param claimId The claim waiting for review
+	 * @return The run's input
+	 */
+	public static IntakeRun resumingReview(String messageId, String sender, String conversationId, long claimId) {
+		return new IntakeRun(messageId, conversationId, sender, claimId, true, true, null);
+	}
 }

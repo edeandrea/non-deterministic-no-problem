@@ -56,8 +56,9 @@ workflow run**, and the steps below are that run's steps.
    those items. Each reply starts again at step 1.
 8. When nothing is missing, the claim is `Pending Review`, the customer is told it's received and in
    final review, and the run **waits** for the claims processor without holding a thread. Flow keeps
-   the waiting run in PostgreSQL while the app runs. (A restart resets the demo: the claims, the mail
-   and any waiting review.)
+   the waiting run in PostgreSQL. If the application restarts (or the leader dies), the new leader gives
+   every `Pending Review` claim whose run is gone a new run that only waits (`ReviewReclaimer`), so a
+   waiting review survives. A decision already made for the old run is re-addressed to the new one.
 9. The run files the email before it waits or ends. If any step fails, before or after the wait, a
    failure listener moves the email to a failed folder and the customer gets a "processing problem" reply.
 10. Later, and separately, the claims processor decides on the claim detail page, which wakes the

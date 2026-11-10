@@ -2,6 +2,8 @@ package org.parasol.intake.agent.triage;
 
 import java.util.List;
 
+import jakarta.enterprise.context.ApplicationScoped;
+
 import org.parasol.intake.model.ClaimResolution;
 import org.parasol.intake.model.PendingClaim;
 
@@ -17,6 +19,8 @@ import io.quarkiverse.langchain4j.RegisterAiService.NoRetrievalAugmentorSupplier
  * A plain AI service, not an agent: task 08's {@code resolveClaim} step calls it before {@code ClaimsMailboxAgent}, so
  * the agent topology is unchanged. The step must pass the answer through {@link ClaimResolution#limitToOfferedClaims}.
  */
+// Stateless, and called from a Flow step on a thread with no request context, so it isn't the default @RequestScoped
+@ApplicationScoped
 // A plain AI service reads its model only from modelName (there's no @Agent method for @ModelName)
 @RegisterAiService(
 	modelName = "claim-intake",

@@ -1475,6 +1475,264 @@
       }
     },
     {
+      "id": 33,
+      "type": "row",
+      "title": "Leadership and failover",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 83
+      },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Intake leaders",
+      "description": "Application instances that are the intake leader. Exactly 1 is healthy: 0 means nothing watches the inbox, more than 1 means two instances compete.",
+      "targets": [
+        {
+          "expr": "sum(claim_intake_leader)",
+          "legendFormat": "",
+          "editorMode": "code",
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "id": 34,
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 84
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Signals pending",
+      "description": "Review decisions written but not yet taken by their run. Stays above 0 while no run is waiting for them, for example during a failover.",
+      "targets": [
+        {
+          "expr": "claim_intake_signals_pending",
+          "legendFormat": "",
+          "editorMode": "code",
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "id": 35,
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 84
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Reviews reclaimed",
+      "description": "Reviews whose run was gone (the leader died or the application restarted) that a new leader gave to a new run. Empty until it happens.",
+      "targets": [
+        {
+          "expr": "sum(increase(claim_intake_reviews_reclaimed_total[$__rate_interval]))",
+          "legendFormat": "reclaimed",
+          "editorMode": "code",
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 40,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 36,
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 84
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Signal delivery",
+      "description": "How long a review decision waited, from being written to its run taking it. p50 and p95.",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(claim_intake_signal_delivery_milliseconds_bucket[$__rate_interval])))",
+          "legendFormat": "p50",
+          "editorMode": "code",
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(claim_intake_signal_delivery_milliseconds_bucket[$__rate_interval])))",
+          "legendFormat": "p95",
+          "editorMode": "code",
+          "range": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 37,
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 90
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      }
+    },
+    {
       "id": 29,
       "type": "row",
       "title": "Workflow (claim-intake)",
@@ -1483,7 +1741,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 83
+        "y": 96
       },
       "panels": []
     },
@@ -1566,7 +1824,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 84
+        "y": 97
       },
       "datasource": {
         "type": "prometheus",
@@ -1630,7 +1888,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 84
+        "y": 97
       },
       "datasource": {
         "type": "prometheus",
@@ -1688,7 +1946,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 84
+        "y": 97
       },
       "datasource": {
         "type": "prometheus",

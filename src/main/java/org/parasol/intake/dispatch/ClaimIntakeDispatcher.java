@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 
@@ -15,7 +16,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.enterprise.inject.Instance;
 
-import org.eclipse.microprofile.context.ManagedExecutor;
 import org.parasol.intake.config.IntakeConfig;
 import org.parasol.intake.leadership.IntakeLeadership;
 import org.parasol.intake.failure.IntakeFailureHandler;
@@ -36,6 +36,7 @@ import org.parasol.intake.workflow.IntakeRun;
 
 import ai.scoring.conversation.ConversationContext;
 import io.quarkus.logging.Log;
+import io.quarkus.virtual.threads.VirtualThreads;
 import io.serverlessworkflow.impl.WorkflowStatus;
 import io.serverlessworkflow.impl.lifecycle.TaskStartedEvent;
 import io.serverlessworkflow.impl.lifecycle.WorkflowExecutionListener;
@@ -47,7 +48,7 @@ import io.smallrye.mutiny.Uni;
  * sender's emails in order. It never waits for a run.
  * <p>
  *   {@link #submit} does the checks that need no claim (auto-replies and self-sent mail, a missing or repeated
- *   {@code Message-ID}) and queues the rest. When an email's turn comes, on the managed executor, it's re-read, matched to a
+ *   {@code Message-ID}) and queues the rest. When an email's turn comes, on a virtual thread, it's re-read, matched to a
  *   claim (so it sees what its predecessor created or changed), and the run is started inside the conversation context.
  * </p>
  * <p>
@@ -61,7 +62,7 @@ import io.smallrye.mutiny.Uni;
 public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 	private static final Set<WorkflowStatus> RELEASES = EnumSet.of(WorkflowStatus.WAITING, WorkflowStatus.COMPLETED, WorkflowStatus.CANCELLED, WorkflowStatus.FAULTED);
 	private static final Set<WorkflowStatus> ENDED = EnumSet.of(WorkflowStatus.COMPLETED, WorkflowStatus.CANCELLED, WorkflowStatus.FAULTED);
-	private static final String DECISION_TASK = "routeDecision";
+	private static final String DECISION_TASK = ClaimIntakeFlow.ROUTE_DECISION;
 	private static final Duration FIRST_RETRY_DELAY = Duration.ofMillis(250);
 	private static final int MAX_REQUEUES = 6;
 
@@ -73,7 +74,7 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 	private final ConversationContext conversationContext;
 	private final IntakeActivities activities;
 	private final Instance<ClaimIntakeFlow> flow;
-	private final ManagedExecutor executor;
+	private final ExecutorService executor;
 	private final IntakeLeadership leadership;
 
 	private final Map<String, SenderState> senders = new ConcurrentHashMap<>();
@@ -89,7 +90,7 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 		ConversationContext conversationContext,
 		IntakeActivities activities,
 		Instance<ClaimIntakeFlow> flow,
-		ManagedExecutor executor,
+		@VirtualThreads ExecutorService executor,
 		IntakeLeadership leadership) {
 
 		this.config = config;
