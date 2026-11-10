@@ -52,7 +52,7 @@ Edit or create task files and update `## Task Plan`.
 ## Task Plan
 
 - [x] [task-01-spike.md](task-01-spike.md): Spike the five unknowns (Flow restore and migrations, the Lease against a mock API server, a second JVM, a dead run's persisted data)
-- [ ] [task-02-flyway.md](task-02-flyway.md): Replace `drop-and-create` with Flyway: app baseline, seed migration, Flow's own migrations, `validate`
+- [x] [task-02-flyway.md](task-02-flyway.md): Replace `drop-and-create` with Flyway: app baseline, seed migration, Flow's own migrations, `validate`
 - [ ] [task-03-run-commands.md](task-03-run-commands.md): Deliver review decisions through a database command table, to whichever pod hosts the run
 - [ ] [task-04-intake-leadership.md](task-04-intake-leadership.md): Elect one intake leader with a Kubernetes Lease; only it watches, dispatches and runs
 - [ ] [task-05-review-reclaim.md](task-05-review-reclaim.md): Turn off Flow's auto-restore; a new leader reclaims every orphaned review
@@ -145,6 +145,13 @@ Already safe across pods, unchanged: the `ClaimCorrespondence.messageId` unique 
   all work. But no pod can read "`WAITING`" for a run it doesn't host: Flow persists `null`, and
   `PersistenceInstanceReader.find` returns a `PENDING` zombie that stays in `activeInstances`. Tasks 03 and 05 therefore
   read Flow's `task_info_entity` directly (the newest task's `next_position`).
+- **Task 02 (Flyway):** `V1__baseline.sql` (hand-reviewed from Hibernate's DDL, named constraints) and `V2__seed_claims.sql` replace
+  `drop-and-create` and `import.sql`; Flow's tables come from `quarkus-flow-db-migration` on `flow-runtime`. The targeted tests pass
+  under `-Pollama`. Deviations: `%test` cleans on **`flow-runtime` only** (it migrates first; cleaning on the default one dropped
+  Flow's tables), the planned unique constraint on `claim_images (claim_id, kind, file_name)` was **dropped** (the intake can store
+  two same-named attachments), so `ClaimImageSeeder` takes a Postgres advisory lock instead, and `DevClaimEmailSeeder` sends only
+  while no claim beyond the six seeded exists. `ClaimNumberGenerator` stays. Not yet checked: a two-boot run against one database
+  (task 08/09).
 
 **Decisions from task 01 that bind later tasks:**
 - **Never call `PersistenceInstanceReader.find` (or anything that builds a `WorkflowPersistenceInstance`) for an intake

@@ -148,7 +148,7 @@ When the chat bot is explicitly asked to update a claim's status, the app emails
    authentication turned off). There's no server to pick.
 3. Open the Inbox, and refresh it if the email arrives after you've logged in.
 
-The seeded claims (`src/main/resources/import.sql`) belong to these claimants:
+The seeded claims (`src/main/resources/db/migration/V2__seed_claims.sql`) belong to these claimants:
 
 | Claim id | Claimant | Mailbox |
 |---|---|---|
@@ -171,7 +171,7 @@ For example, log in as `marty.mcfly@email.com`, then ask the chat bot to update 
 - **Seeded claimants have their names on their identity.** Logging in as one of the six addresses above sends mail
   as `Marty McFly <marty.mcfly@email.com>`; any other address sends as a bare address. A name you clear in Settings →
   Identities comes back at the next login, and one you change is kept. The names come from
-  `src/main/docker/roundcube/config/parasol-identities.php`, which has to follow the claimants in `import.sql`.
+  `src/main/docker/roundcube/config/parasol-identities.php`, which has to follow the claimants in `V2__seed_claims.sql`.
 - **Mail lives in memory only,** so restarting dev mode empties every mailbox.
 
 The claims REST API provides `GET /api/db/claims` and `GET /api/db/claims/{id}`. Claim images are stored in
@@ -193,7 +193,7 @@ None of them require authentication — this is a demo app.
 Each claim has a numeric `id` and a separate claim number (`CLM` + 8 digits, e.g. `CLM01000000`). PostgreSQL
 generates the number from its own sequence on insert. Claims also have a category (`Single vehicle`,
 `Multiple vehicle`, `Theft` or `Other`) and a typed incident date with an optional time.
-`src/main/resources/import.sql` seeds six sample claims. See [CLAUDE.md](CLAUDE.md) for how the claim number
+`src/main/resources/db/migration/V2__seed_claims.sql` seeds six sample claims. See [CLAUDE.md](CLAUDE.md) for how the claim number
 is generated and the rules around it.
 
 ## Email claim intake

@@ -94,6 +94,14 @@
 		</dependency>
 		<dependency>
 			<groupId>io.quarkiverse.flow</groupId>
+			<artifactId>quarkus-flow-db-migration</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.quarkus</groupId>
+			<artifactId>quarkus-flyway-postgresql</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.quarkiverse.flow</groupId>
 			<artifactId>quarkus-flow-opentelemetry</artifactId>
 		</dependency>
 		<dependency>

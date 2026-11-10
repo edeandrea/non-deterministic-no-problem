@@ -361,11 +361,12 @@ and map to DTO records with `ClaimMapper`.
 - **Sizes:** `subject`, `body` and `location` are unbounded `text` (`Length.LONG32`; not `@Lob`, which
   maps to `oid` on PostgreSQL). `summary` and `sentiment` stay `length = 5000`. `status` is free text.
 
-**Seed data:** `src/main/resources/import.sql` seeds six claims (ids 1–6) and ends with
+**Schema and seed data:** Flyway owns the schema (see *Database migrations* under Configuration profiles).
+`src/main/resources/db/migration/V2__seed_claims.sql` seeds six claims (ids 1–6) and ends with
 `ALTER SEQUENCE claims_seq RESTART WITH 7`.
 - **It omits `claim_number`,** so the column default numbers the rows in insert order (`CLM01000000` … `CLM01005045`).
 - **It uses the enum constant names** for `category`.
-- Dev/test load it by default; `%prod` / `%openshift` load it via `sql-load-script` under drop-and-create.
+- It runs once per database, as a migration; the test suite cleans the database at every boot, so tests start from it.
 - `ClaimImageSeeder` attaches the 12 JPEGs in `src/main/resources/seed/claim-images/` to the six sample claims,
   matched by their explicit ids (1–6), not their generated claim numbers. See Gotchas.
 
@@ -704,7 +705,22 @@ and muting the `io.quarkus.config` logger would just hide the next real typo. Fo
 | `drift` | Parent `langfuse-ocp`; sets `aiscoring.interaction-mode: drift-detection` |
 | `langfuse-ocp` | Points at a deployed Langfuse instance; disables OTLP export and LGTM |
 | `instana` | Exports OTLP to Instana instead of LGTM |
-| `prod`, `openshift` | Schema drop-and-create + `import.sql`; OpenShift deployment config |
+| `prod`, `openshift` | OpenShift deployment config. The schema is no longer dropped on boot (Flyway migrates it) |
+
+**Database migrations** (#284): Flyway, not Hibernate, creates the schema; Hibernate only `validate`s it, which catches an entity
+drifting from the migrations (tables, columns, types, sequences, including `claim_number_seq`'s increment), **not column defaults**.
+- **Two configurations, one schema:** the app's migrations (`src/main/resources/db/migration`, `V1__baseline.sql` and
+  `V2__seed_claims.sql`) on the default one, Flow's six tables (`quarkus-flow-db-migration`) on the named `flow-runtime` one, with its
+  own history table. Never hand-write Flow's schema. Both set `baseline-on-migrate` with `baseline-version: 0`, since each finds the
+  other's tables in `public`, and `quarkus.datasource.db-kind` is explicit because the named `flow-runtime` datasource (Flyway only,
+  same database) stops the default one being implied.
+- **Never edit an applied migration.** A schema change is a new `V<n>__….sql`. `V1` carries the claim-number column default and
+  sequence verbatim (`start with 1000000 increment by 1009 maxvalue 99999999`).
+- **`%test` cleans at every boot, on `flow-runtime` only:** Quarkus migrates `flow-runtime` first, and both configurations clean all of
+  `public`, so cleaning on the default one would drop Flow's tables that had just been migrated. Dev mode doesn't clean: Dev Services'
+  database outlives a live reload, and `DevClaimEmailSeeder` sends its two samples only while no claim beyond the seeded six exists.
+  `clean-at-start` must never be set under `%prod` (Ollama dev mode runs as `<ai>,prod`).
+- **An existing OpenShift database** from the drop-and-create days has no Flyway history: delete its PVC once.
 
 **`parasol.intake.*` configuration** (`IntakeConfig`, `org.parasol.intake.config`):
 
@@ -1056,7 +1072,7 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   Jakarta Mail (the app's `Mailer` can't build multipart/alternative or set arbitrary headers) and reads them back
   through `ClaimsMailbox`: plain text, HTML-only, alternative, image and skipped attachments, auto-reply headers, quoted
   text, find by `Message-ID` and moving between folders. `QuotedTextTests` and `HtmlTextTests` are plain unit tests.
-  `IntakeExtensionsTests` checks the app boots with the agentic and quarkus-flow extensions and Flow's three tables
+  `IntakeExtensionsTests` checks the app boots with the agentic and quarkus-flow extensions and Flow's six tables
   exist. They share the bare `%test` group (stub keys, Easy RAG ingestion off).
 - **Inbox watcher tests** (`ClaimsInboxWatcherTests`, `org.parasol.intake.mailbox`): each test builds its own `ClaimsInboxWatcher` with short timings and a mocked `Event<EmailReceived>`. It can't be `@InjectMock ClaimIntakeDispatcher`: `@InjectMock` disables the observers declared on the mocked bean (quarkusio/quarkus#11122; `@InjectSpy` keeps them, since #51790), so the mock would never be notified. Network faults (connection dropped, silent, unreachable) come from a **Toxiproxy** Testcontainers container, because WireMock only speaks HTTP: `ToxiproxyTestResource` (a `QuarkusTestResourceLifecycleManager`, registered globally by `org.parasol.testing.GlobalTestResources`, so it starts once for the whole run) starts it, and `org.parasol.testing.mail.Toxiproxy` drives it. Its upstream is GreenMail's mapped IMAP port through `host.testcontainers.internal`, since GreenMail is a Compose container. Only the watcher's IDLE session goes through the proxy. Track [quarkus-network-faults#14](https://github.com/quarkiverse/quarkus-network-faults/issues/14) (IMAP support): it may replace this.
 - **Intake workflow tests** (`ClaimIntake*Tests` in `org.parasol.intake.workflow` and its sub-packages, `dispatch` and `failure`; tests sit in the package of what they test) run the real `ClaimIntakeFlow`
@@ -1312,11 +1328,12 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
 - **The number exists only after the insert is flushed.** `persist()` defers the insert, because Panache ids
   come from a pooled sequence. Use `persistAndFlush()` when the number is needed in the same transaction.
 - **`ClaimImageSeeder` runs on every start and re-inserts any missing configured image.**
-  - Every profile currently recreates the schema on each boot (`%prod` / `%openshift` set `drop-and-create`; dev/test
-    get it from Dev Services), so in practice each boot inserts all 12 ("Processed 12 seed claim images: 12 inserted,
-    0 already present, 0 claim not found, 0 file missing/unreadable/empty"). The re-insert-missing path matters for a
-    persistent schema, and `ClaimImageSeederTests` covers it by calling `seed` directly; a second run inserts nothing.
-  - **It matches the sample claims by their explicit ids in `import.sql`** (claim numbers are generated, so they can't
+  - The database now outlives a boot, so a second boot against it inserts nothing ("Processed 12 seed claim images: 0 inserted,
+    12 already present, …"); only a fresh database (every test boot, a new Dev Services container) inserts all 12. `seed` takes a
+    transaction-scoped Postgres advisory lock first, so pods booting together insert each image once. A unique constraint on
+    `(claim_id, kind, file_name)` would do that too, but the intake legitimately stores two attachments of the same name.
+    `ClaimImageSeederTests` covers it by calling `seed` directly.
+  - **It matches the sample claims by their explicit ids in `V2__seed_claims.sql`** (claim numbers are generated, so they can't
     be listed). Keep `SEED_IMAGES` aligned if the seed claims change.
   - **Seed data never fails startup.** An image whose claim doesn't exist, or whose resource file is missing,
     unreadable or empty, is logged (WARN, with the reason) and skipped, and the rest are still seeded. A file is read
@@ -1428,10 +1445,9 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
   - **`quarkus.application.name` is part of Flow's table primary keys.** Renaming the application (the
     `application.yml` comment at `quarkus.application.name` says this too) orphans every waiting intake
     run — the renamed app can no longer find its own in-flight `Pending Review` claims in Flow's tables.
-- **No durable state across restarts (user decision).** The intake has no persistence story beyond
-  "while the app and GreenMail are both up": a restart drops the database and GreenMail both (schema
-  is drop-and-create, GreenMail is in-memory), so a waiting review does not survive it, and neither does
-  any email sitting in `Processing`. This is intentional for a demo app, not a gap to file.
+- **The database survives restarts** (#284, replacing the old drop-and-create). GreenMail is still in memory, so on a GreenMail
+  restart every mailbox, and any email in `Processing`, is lost; the claims and Flow's runs are kept. Recovering a waiting review
+  or a half-processed email after a restart is the rest of #284 (tasks 05 and 06).
 - **The intake only works correctly with one replica**, though nothing enforces it beyond the OpenShift
   extension's own default (`quarkus.openshift.replicas: 1`, pinned and commented in `%openshift` in
   `application.yml`). Four mechanisms assume a single instance:
