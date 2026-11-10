@@ -16,8 +16,8 @@ Flow's own restore no longer starts anything. Fixes **mechanism 6**, and closes 
 its scan builds each persisted run as a `WorkflowPersistenceInstance`, which registers itself in `activeInstances` in
 `PENDING`, and then skips it as "already active" (task 01, Q1). What it does leave is a `PENDING` stand-in for every
 persisted run, which `SupersedeStep`'s `activeInstance(oldRunId)` then finds, and whose `cancel()` silently returns
-`false`. If a later Flow made it work, it would replay from the first incomplete task (mail sent twice) on every pod,
-since they share the app ID. Leave `scan-interval` unset.
+`false`. quarkiverse/quarkus-flow#1116 (unreleased, 1.4.0) makes it start every persisted run, so after a Flow upgrade
+it would replay from the first incomplete task (mail sent twice) on every pod, since they share the app ID. Leave `scan-interval` unset.
 
 ### 2. `ReviewReclaimer` (`org.parasol.intake.workflow.review`)
 

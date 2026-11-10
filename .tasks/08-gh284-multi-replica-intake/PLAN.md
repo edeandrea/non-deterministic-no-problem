@@ -129,8 +129,9 @@ Already safe across pods, unchanged: the `ClaimCorrespondence.messageId` unique 
 - **Flow's auto-restore goes off,** and recovery is the app's own. Flow's restore replays a run from its first
   incomplete task, which would send mail twice. It would also restore on *every* pod, since they share an app ID.
   `ReviewRecoverer` already does the right thing for reviews and is tested. *(Task 01: in 1.3.0 the restore actually
-  starts nothing and leaves a `PENDING` zombie per persisted run; quarkiverse/quarkus-flow#1110 doesn't apply, since
-  `waitReview` has no timeout. Turning it off is still required. See spike-results.md Q1.)*
+  starts nothing and leaves a `PENDING` zombie per persisted run. quarkiverse/quarkus-flow#1116, unreleased (1.4.0),
+  makes it start every persisted run, which is the replay-on-every-pod problem above. Turning it off is required either
+  way. See spike-results.md Q1.)*
 - **DB-count gauges** (`claim.intake.reviews.pending`, `.review.oldest.pending`, `.inbox.depth`) are measured by the
   leader only, so a `sum` across pods isn't N times the truth. A new `claim.intake.leader` gauge (1/0 per pod) shows who
   leads.

@@ -18,7 +18,9 @@ sdk-java 7.35.3.Final (`~/workspaces/IntelliJ/sdk-java`, tag `7.35.3.Final`), fa
    local?" can't be `activeInstance(...).isPresent()` (Q1). Task 03's relay and task 05's reclaim must not use `find`.
 3. **Flow 1.3.0's auto-restore never starts anything.** `FlowPersistenceRestore` builds each instance through the same
    self-registering constructor, then skips it because `activeInstance(id)` is now non-empty. It leaves a `PENDING` zombie for
-   every persisted run of this app ID at boot (Q1). Turning it off (task 05) stops the leak; it doesn't lose anything.
+   every persisted run of this app ID at boot (Q1). quarkiverse/quarkus-flow#1116 (on `main`, unreleased, for 1.4.0)
+   removes that check and starts every persisted run, which would replay runs on every pod. Turning it off (task 05) stops
+   today's leak and tomorrow's replays, and loses nothing.
 4. **There is no API to retire a run that isn't live.** `cancel()` on the zombie returns `false` (`PENDING` isn't active) and
    leaves the rows. Retiring a dead run is a direct `DELETE` (Q1).
 5. **A dead run's state is fully readable.** `JpaInstanceOperations.readWorkflowInfo` (an injectable bean, no instance created)
@@ -83,8 +85,12 @@ over `task_info_entity`, whose primary key includes `iteration`.
 completed task is `do/15/routeAfterFile` with `next=do/16/waitReview` (after a decision fault, it's `afterDecision`, whose
 `next` is also `waitReview`).
 
-**`waitReview` has no timeout** (`ClaimIntakeFlow.java:119`, a plain `listen(...).first()`), so quarkiverse/quarkus-flow#1110
-(timed waits restored wrongly) doesn't apply to this workflow.
+**The restore is already fixed upstream, unreleased:** quarkiverse/quarkus-flow#1116 ("Fix #1110 - Restore persisted
+workflow instances unconditionally", on `main`, for 1.4.0) drops the `activeInstance(...).isEmpty()` check and calls
+`start()` on every scanned instance (`start()` on an already-running one is a no-op). quarkiverse/quarkus-flow#1110 was
+the report of a restored timed wait that never resumed. `waitReview` has no timeout (`ClaimIntakeFlow.java:119`, a plain
+`listen(...).first()`), but once Flow 1.4.0 is in, auto-restore would genuinely restart runs, on every pod sharing the app
+ID.
 
 **What it means for later tasks:**
 - **03:** `ensureWaiting` and `isReadyForDecision` can't use `PersistenceInstanceReader`. Use a native read of the run's newest
@@ -94,9 +100,11 @@ completed task is `do/15/routeAfterFile` with `next=do/16/waitReview` (after a d
   `activeInstance(id).filter(i -> i.status() != PENDING)`, and better, nothing in the app ever calls `find` again.
 - **04/05:** turn auto-restore off whatever leadership mode, or a restarted pod is left holding zombies, and
   `SupersedeStep`'s `activeInstance(oldRunId)` finds one and its `cancel()` silently returns `false`. Retire a dead run with the
-  `DELETE`s above. The #1110 reasoning in PLAN.md is moot.
-- **Upstream (proposed; not filed):** three quarkus-flow/sdk-java issues: the duplicate-key read, restore never starting, and
-  `find` registering a `PENDING` instance that misreports the status.
+  `DELETE`s above. Keep it off after a Flow upgrade too: with #1116 it would restart every persisted run on every pod.
+- **Upstream:** the restore is fixed by quarkiverse/quarkus-flow#1116 (unreleased). The duplicate-key read is still on
+  quarkus-flow `main`: filed as quarkiverse/quarkus-flow#1154, fixed by quarkiverse/quarkus-flow#1155. `find` registering a
+  `PENDING` instance is open-workflow-specification/sdk-java#1816's territory (PR open-workflow-specification/sdk-java#1820
+  lets `cancel()` remove a `PENDING` instance); the read path was added to it as a comment.
 
 ## Q2. `quarkus-flow-db-migration` with this app
 
