@@ -116,12 +116,18 @@ shell variable or a `.env` file both work. The root [`pom.xml`](../../../pom.xml
   const wsUrl = config.backend_api_url.replace(/^http/, 'ws').replace(/\/api$/, '') + '/_chat/routes';
   ```
 
-  It connects with the `ChatScopesClient` (loaded in [`src/index.html`](./src/index.html) from
-  `/_chat/javascript/chatscopes.js`) to the route named `chat`, and sends:
+  It connects with the `ChatScopesClient` to the route named `chat`, and sends:
 
   ```json
   { "query": { "claimId": "...", "query": "...", "claim": "...", "inceptionDate": "..." } }
   ```
+
+  `ChatScopesClient` comes from `/_chat/javascript/chatscopes.js`, which `quarkus-langchain4j-chat-scopes-websocket`
+  serves as an **ES module** (since 1.15.0). `Chat.tsx` loads it at runtime with
+  `import(/* webpackIgnore: true */ '/_chat/javascript/chatscopes.js')`, from the page's own origin like any other
+  asset. It isn't bundled (the backend serves it) and it can't be a plain `<script src>` in `index.html`: a module with
+  `export` doesn't parse as a classic script, so the client would be undefined and the claim detail page, which always
+  mounts the chat, would fail to render. Its types are in [`src/typings.d.ts`](./src/typings.d.ts).
 
 ## Path aliases
 

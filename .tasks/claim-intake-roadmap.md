@@ -37,6 +37,11 @@ Kubernetes Lease, decisions through a database command table, and Flyway in plac
 which turned up one of the keys and deliberately left it alone. Unblocked, and touches nothing the intake depends on
 beyond `application.yml`.
 
+**Related, not part of the numbered order:** #277 Add a Grafana dashboard for the email intake metrics (planned
+2026-11-09 as two dashboards, "Parasol Claim Intake" and "Parasol AI", provisioned in dev and on the cluster; plan in
+[`08-gh277-claim-intake-dashboard/PLAN.md`](08-gh277-claim-intake-dashboard/PLAN.md)). Unblocked now that #218 has
+merged; touches `IntakeMetrics` (histogram buckets) but no intake behavior.
+
 **Related, not part of the five-step order:** #221 Spike: compare a LangChain4j decision model (Jev)
 with the LLM email classifier (body in `github-issues/issue-07-decision-model-spike.md`; a follow-up
 to step 5, blocked by step 5 and by a quarkus-langchain4j release that ships `quarkus-langchain4j-typesafe`).

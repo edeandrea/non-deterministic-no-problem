@@ -266,10 +266,13 @@ Micrometer meters cover emails, replies, review decisions, failures, latency, th
 reviewer overrides the extracted fields. The Quarkus Dev UI's **Workflows** card (from `quarkus-flow`) draws
 `claim-intake` as a typed, branching diagram, including the review wait — the agentic Dev UI does **not** show the
 intake's agents (`ClaimsMailboxAgent`'s `MonitoredAgent` support is commented out pending upstream fixes; see
-CLAUDE.md). The app ships no custom Grafana dashboard today — dev mode's Grafana shows only the LGTM dev service's
-four built-in dashboards, which already cover JVM, HTTP and Agroal; a dashboard charting the `claim.intake.*` meters
-above is tracked separately
-([#277](https://github.com/edeandrea/non-deterministic-no-problem/issues/277)).
+CLAUDE.md). Two Grafana dashboards chart them, in dev mode and on the cluster:
+**Parasol Claim Intake** (every `claim.intake.*` meter, plus Flow's workflow meters for `claim-intake`) and
+**Parasol AI** (tokens, model latency, estimated cost, AI service calls and errors, guardrails; filter by AI service and
+model), each linking to the other. In dev, open the Grafana URL the LGTM Dev Service prints in the Quarkus dev console;
+on OpenShift, `deploy-to-openshift.sh` prints the Grafana Route at the end. The JSON is
+`src/main/resources/META-INF/grafana/grafana-dashboard-*.json`. Estimated cost stays empty for a local Ollama model, and
+some panels (failures, reconnects, tool guardrails) are empty until the thing they count happens.
 
 # Langfuse integration
 
