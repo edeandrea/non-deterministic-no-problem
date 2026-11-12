@@ -3,8 +3,9 @@
 Measured 2026-11-12. The code lives on two unmerged spike branches, based on `main` at 08ba99c:
 
 - [`spike/gh221-decision-models`](https://github.com/edeandrea/non-deterministic-no-problem/tree/spike/gh221-decision-models):
-  the dataset, the harness, the decision agents and their config, the span listener, the raw results and this file. Its
-  test suite is green; the harness only runs with `-Dspike=true`. See [`spike/README.md`](README.md) to rerun it.
+  the dataset, the harness, the decision agents and their config, the span listener, the raw results and `spike/RESULTS.md`
+  (this write-up). The harness only runs with `-Dspike=true`. The full `-Pollama` suite passed on the earlier base (below);
+  on 08ba99c the branch was compiled and packaged on both Maven profiles, but the tests weren't rerun. See [`spike/README.md`](README.md) to rerun it.
 - [`spike/gh221-decision-agent-in-topology`](https://github.com/edeandrea/non-deterministic-no-problem/tree/spike/gh221-decision-agent-in-topology):
   one commit on top of the first that swaps `EmailClassifierDecisionAgent` into `ClaimsMailboxAgent`, routes the classifier's
   WireMock stubs to `/v1/systemone`, and adds `DecisionSpikeIntegrationTests` (Q6, Q7). It deliberately breaks the
