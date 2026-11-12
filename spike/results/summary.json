@@ -1,5 +1,282 @@
 [
  {
+  "label": "jev",
+  "backend": "agent",
+  "warmup_ms": 177,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 1.0,
+  "cls_injection_accuracy": 1.0,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "NEW_CLAIM": 49
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 14
+   },
+   "NOT_A_CLAIM": {
+    "NOT_A_CLAIM": 18
+   }
+  },
+  "cls_wrong": [],
+  "cls_ms_p50": 78,
+  "cls_ms_p95": 103,
+  "asm_n": 53,
+  "asm_errors": [],
+  "asm_fallbacks": 0,
+  "asm_item_accuracy": {
+   "described": 0.9811320754716981,
+   "dated": 1.0,
+   "located": 0.9622641509433962,
+   "category_present": 1.0
+  },
+  "asm_missing_set_exact": 0.9433962264150944,
+  "asm_category_accuracy": 1.0,
+  "asm_category_accuracy_when_described": 1.0,
+  "asm_injection_missing_set_exact": 0.8571428571428571,
+  "asm_wrong": [
+   "lg-07:described",
+   "ni-14:located",
+   "pi-05:located"
+  ],
+  "asm_ms_p50": 84,
+  "asm_ms_p95": 104.8,
+  "tokens_in_mean": 0,
+  "tokens_out_mean": 0,
+  "email_ms_p50": 146,
+  "email_ms_p95": 191.8
+ },
+ {
+  "label": "jev",
+  "backend": "jev-1.14.0",
+  "warmup_ms": 286,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 1.0,
+  "cls_injection_accuracy": 1.0,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "NEW_CLAIM": 49
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 14
+   },
+   "NOT_A_CLAIM": {
+    "NOT_A_CLAIM": 18
+   }
+  },
+  "cls_wrong": [],
+  "cls_ms_p50": 83,
+  "cls_ms_p95": 104,
+  "cls_ece_top_probability": 0.021234567901234562,
+  "cls_auroc_margin": null,
+  "cls_selective_margin": {
+   "0.5": {
+    "coverage": 0.9876543209876543,
+    "accuracy": 1,
+    "to_human": 1
+   },
+   "0.8": {
+    "coverage": 0.9753086419753086,
+    "accuracy": 1,
+    "to_human": 2
+   },
+   "0.9": {
+    "coverage": 0.9012345679012346,
+    "accuracy": 1,
+    "to_human": 8
+   },
+   "0.95": {
+    "coverage": 0.8518518518518519,
+    "accuracy": 1,
+    "to_human": 12
+   }
+  },
+  "cls_wrong_margins": [],
+  "asm_n": 53,
+  "asm_errors": [],
+  "asm_fallbacks": 0,
+  "asm_item_accuracy": {
+   "described": 0.9811320754716981,
+   "dated": 0.9811320754716981,
+   "located": 0.9622641509433962,
+   "category_present": 1.0
+  },
+  "asm_missing_set_exact": 0.9433962264150944,
+  "asm_category_accuracy": 1.0,
+  "asm_category_accuracy_when_described": 1.0,
+  "asm_injection_missing_set_exact": 0.8571428571428571,
+  "asm_wrong": [
+   "lg-07:described",
+   "ni-14:located",
+   "pi-05:dated,located"
+  ],
+  "asm_ms_p50": 88,
+  "asm_ms_p95": 113.0,
+  "yesno_brier": 0.01740440251572327,
+  "yesno_ece": 0.021698113207547193,
+  "yesno_auroc": 0.967741935483871,
+  "yesno_selective": {
+   "0.6": {
+    "coverage": 0.9937106918238994,
+    "accuracy": 0.9810126582278481,
+    "to_human": 1
+   },
+   "0.8": {
+    "coverage": 0.9748427672955975,
+    "accuracy": 0.9870967741935484,
+    "to_human": 4
+   },
+   "0.9": {
+    "coverage": 0.9119496855345912,
+    "accuracy": 0.993103448275862,
+    "to_human": 14
+   },
+   "0.95": {
+    "coverage": 0.8679245283018868,
+    "accuracy": 1,
+    "to_human": 21
+   }
+  },
+  "cat_auroc_margin": null,
+  "cat_selective_margin": {
+   "0.5": {
+    "coverage": 0.9622641509433962,
+    "accuracy": 1,
+    "to_human": 2
+   },
+   "0.8": {
+    "coverage": 0.9622641509433962,
+    "accuracy": 1,
+    "to_human": 2
+   },
+   "0.9": {
+    "coverage": 0.9245283018867925,
+    "accuracy": 1,
+    "to_human": 4
+   }
+  },
+  "tokens_in_mean": 1102.0588235294117,
+  "tokens_out_mean": 0,
+  "email_ms_p50": 156,
+  "email_ms_p95": 200.8
+ },
+ {
+  "label": "jevrepeat",
+  "backend": "jev-1.14.0",
+  "warmup_ms": 247,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 1.0,
+  "cls_injection_accuracy": 1.0,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "NEW_CLAIM": 49
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 14
+   },
+   "NOT_A_CLAIM": {
+    "NOT_A_CLAIM": 18
+   }
+  },
+  "cls_wrong": [],
+  "cls_ms_p50": 76,
+  "cls_ms_p95": 104,
+  "cls_ece_top_probability": 0.02123456790123458,
+  "cls_auroc_margin": null,
+  "cls_selective_margin": {
+   "0.5": {
+    "coverage": 0.9876543209876543,
+    "accuracy": 1,
+    "to_human": 1
+   },
+   "0.8": {
+    "coverage": 0.9753086419753086,
+    "accuracy": 1,
+    "to_human": 2
+   },
+   "0.9": {
+    "coverage": 0.8888888888888888,
+    "accuracy": 1,
+    "to_human": 9
+   },
+   "0.95": {
+    "coverage": 0.8271604938271605,
+    "accuracy": 1,
+    "to_human": 14
+   }
+  },
+  "cls_wrong_margins": [],
+  "asm_n": 53,
+  "asm_errors": [],
+  "asm_fallbacks": 0,
+  "asm_item_accuracy": {
+   "described": 0.9811320754716981,
+   "dated": 1.0,
+   "located": 0.9622641509433962,
+   "category_present": 1.0
+  },
+  "asm_missing_set_exact": 0.9433962264150944,
+  "asm_category_accuracy": 1.0,
+  "asm_category_accuracy_when_described": 1.0,
+  "asm_injection_missing_set_exact": 0.8571428571428571,
+  "asm_wrong": [
+   "lg-07:described",
+   "ni-14:located",
+   "pi-05:located"
+  ],
+  "asm_ms_p50": 77,
+  "asm_ms_p95": 101.39999999999998,
+  "yesno_brier": 0.01730188679245283,
+  "yesno_ece": 0.025157232704402555,
+  "yesno_auroc": 0.9519230769230769,
+  "yesno_selective": {
+   "0.6": {
+    "coverage": 0.9874213836477987,
+    "accuracy": 0.9808917197452229,
+    "to_human": 2
+   },
+   "0.8": {
+    "coverage": 0.9748427672955975,
+    "accuracy": 0.9870967741935484,
+    "to_human": 4
+   },
+   "0.9": {
+    "coverage": 0.9245283018867925,
+    "accuracy": 0.9931972789115646,
+    "to_human": 12
+   },
+   "0.95": {
+    "coverage": 0.8742138364779874,
+    "accuracy": 1,
+    "to_human": 20
+   }
+  },
+  "cat_auroc_margin": null,
+  "cat_selective_margin": {
+   "0.5": {
+    "coverage": 0.9622641509433962,
+    "accuracy": 1,
+    "to_human": 2
+   },
+   "0.8": {
+    "coverage": 0.9622641509433962,
+    "accuracy": 1,
+    "to_human": 2
+   },
+   "0.9": {
+    "coverage": 0.9245283018867925,
+    "accuracy": 1,
+    "to_human": 4
+   }
+  },
+  "tokens_in_mean": 1102.0588235294117,
+  "tokens_out_mean": 0,
+  "email_ms_p50": 133,
+  "email_ms_p95": 184.39999999999998
+ },
+ {
   "label": "ollama",
   "backend": "agent",
   "warmup_ms": 4298,

@@ -39,7 +39,8 @@ import io.quarkus.test.junit.TestProfile;
  * #221 spike: runs the labeled dataset through the LLM agents and the decision models, one JSON line per email and
  * backend, into {@code spike/results/<label>-<backend>.jsonl}. {@code spike/analyze.py} scores them.
  * <p>
- * {@code -Dspike=true -Dspike.label=ollama -Dspike.backends=llm,agent,nimble,tev1,clef}
+ * {@code -Dspike=true -Dspike.label=ollama -Dspike.backends=llm,agent,nimble,tev1,clef}; a {@code jev-*} backend (e.g.
+ * {@code jev-1.14.0}) is hosted Jev and needs {@code TYPESAFE_API_KEY}
  */
 @QuarkusTest
 @TestProfile(SpikeHarnessProfile.class)
@@ -47,6 +48,7 @@ import io.quarkus.test.junit.TestProfile;
 class DecisionSpikeHarnessTests {
 	private static final Path DATASET = Path.of("spike/dataset/emails.json");
 	private static final Path RESULTS = Path.of("spike/results");
+	private static final String HOSTED_JEV = "https://api.typesafe.ai";
 	private static final String WARM_UP = "Subject: Hello\n\nMy car was stolen yesterday from Main Street in Springfield.";
 
 	@Inject
@@ -121,6 +123,14 @@ class DecisionSpikeHarnessTests {
 	private static boolean scoresCompleteness(JsonNode email) {
 		var type = email.get("expected").get("email_type");
 		return type.isNull() || "NEW_CLAIM".equals(type.asText());
+	}
+
+	private static String requiredEnv(String name) {
+		var value = System.getenv(name);
+		if ((value == null) || value.isBlank()) {
+			throw new IllegalStateException(name + " must be set to run a hosted Jev backend");
+		}
+		return value;
 	}
 
 	private static <T> Timed<T> timed(Supplier<T> call) {
@@ -291,8 +301,11 @@ class DecisionSpikeHarnessTests {
 		private final SpikeDecisions decisions;
 
 		DecisionRunner(String model) {
+			// jev-* is hosted Jev (TYPESAFE_API_KEY); anything else is a decision model on the configured System One server (Ollama)
+			var hosted = model.startsWith("jev-");
 			var decisionModel = TypeSafeDecisionModel.builder()
-				.baseUrl(decisionBaseUrl)
+				.baseUrl(hosted ? HOSTED_JEV : decisionBaseUrl)
+				.apiKey(hosted ? requiredEnv("TYPESAFE_API_KEY") : null)
 				.modelName(model)
 				.timeout(Duration.ofMinutes(10))
 				.maxRetries(0)
