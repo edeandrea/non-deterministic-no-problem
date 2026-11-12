@@ -86,8 +86,8 @@ public class LangfuseEvaluationInitializer {
 			getOrRegisterModelDefinition("command-r7b", "(?i)^(command-r7b)(-.+)?$",
 				Map.of("input", 0.00000004, "output", 0.00000015));
 
-			getOrRegisterModelDefinition("gpt-5-mini", "(?i)^(openai/)?(gpt-5-mini)(-\\d{4}-\\d{2}-\\d{2})?$",
-				Map.of("input", 0.00000025, "input_cached_tokens", 0.000000025, "output", 0.000002));
+			getOrRegisterModelDefinition("gpt-6-luna", "(?i)^(openai/)?(gpt-6-luna)(-\\d{4}-\\d{2}-\\d{2})?$",
+				Map.of("input", 0.0000001, "input_cached_tokens", 0.00000001, "output", 0.0000005));
 
 			// The LLM-as-a-judge model; text/image/video paid-tier rates.
 			getOrRegisterModelDefinition("gemini-2.5-flash", "(?i)^(google/)?(gemini-2.5-flash)$",

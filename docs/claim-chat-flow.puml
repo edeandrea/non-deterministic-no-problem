@@ -56,7 +56,7 @@ component "Chat Bot\n<i>WebSocket /_chat/routes</i>\n<i>React + PatternFly UI</i
 rectangle "AI replacing humans\n<i>a conversation a human used to have</i>" as Humans <<Humans>> {
 	component "<$robot>\nClaim AI Assistant\n<i>ClaimService · model parasol-chat</i>\n<i>@ChatScoped</i>" as ClaimService
 	database "<$file_alt>\nPolicy Document Store\n<i>Easy-RAG over policies/</i>" as Policies
-	component "<$brain>\nChat Model\n<i>gpt-5-mini</i>" as ChatModel #FFFFFF
+	component "<$brain>\nChat Model\n<i>gpt-6-luna</i>" as ChatModel #FFFFFF
 }
 
 ' =====================================================================
@@ -66,7 +66,7 @@ rectangle "AI replacing software\n<i>code a developer used to write</i>" as Soft
 	component "<$shield_alt>\nIntakeCompleteToolInputGuardrail\n<i>the one TOOL input guardrail:</i>\n<i>refuses a claim still in intake</i>" as ToolGuard #FFFFFF
 	component "Claim Status Notification\n<i>NotificationService</i>\n<i>@Tool updateClaimStatus</i>" as Notification
 	component "<$robot>\nGenerate Email AI Assistant\n<i>GenerateEmailService · model generate-email</i>" as GenEmail
-	component "<$brain>\nEmail Model\n<i>gpt-5-mini</i>" as EmailModel #FFFFFF
+	component "<$brain>\nEmail Model\n<i>gpt-6-luna</i>" as EmailModel #FFFFFF
 
 	rectangle "<$shield_alt>\nOutput Guardrails\n<i>there are NO LLM input guardrails</i>" as Guardrails #FFFFFF {
 		component "EmailContainsRequiredInformation" as G1
@@ -76,7 +76,7 @@ rectangle "AI replacing software\n<i>code a developer used to write</i>" as Soft
 	}
 
 	component "<$robot>\nPoliteness AI Assistant\n<i>PolitenessService · model politeness</i>" as Politeness
-	component "<$brain>\nPoliteness Model\n<i>gpt-5-mini</i>" as PolitenessModel #FFFFFF
+	component "<$brain>\nPoliteness Model\n<i>gpt-6-luna</i>" as PolitenessModel #FFFFFF
 }
 
 ' =====================================================================
