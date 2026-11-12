@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.Optional;
 
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 
@@ -72,18 +73,11 @@ public interface IntakeConfig {
 	Metrics metrics();
 
 	/**
-	 * How signals for intake runs (a reviewer's decision) are delivered.
+	 * How a reviewer's decision reaches the waiting run.
 	 *
-	 * @return the signal settings
+	 * @return the review settings
 	 */
-	Signals signals();
-
-	/**
-	 * How the application instance that runs the intake is chosen.
-	 *
-	 * @return the leadership settings
-	 */
-	Leadership leadership();
+	Review review();
 
 	/**
 	 * The IMAP connection to the claims mailbox.
@@ -228,84 +222,25 @@ public interface IntakeConfig {
 	}
 
 	/**
-	 * Settings of the delivery of signals to intake runs.
+	 * Settings of how a reviewer's decision reaches the waiting run.
 	 */
-	interface Signals {
+	interface Review {
 		/**
-		 * How often pending signals are handed to the runs this application instance hosts. A signal is also tried once, right after it's written.
+		 * How long to wait between publishing a decision again while the run hasn't taken it.
 		 *
-		 * @return the polling interval
+		 * @return the interval
 		 */
-		@WithDefault("1s")
-		Duration pollInterval();
-	}
+		@WithDefault("250ms")
+		Duration publishInterval();
 
-	/**
-	 * Which application instance is the intake leader: the only one that watches the inbox, dispatches emails and hosts the runs.
-	 */
-	interface Leadership {
 		/**
-		 * How the leader is chosen.
+		 * How many times a decision is published before it's given up on and the review goes back to open. A run that reads as waiting
+		 * registers its listener a moment later, so a first publish can miss it.
 		 *
-		 * @return the mode
+		 * @return the number of attempts
 		 */
-		@WithDefault("SINGLE")
-		Mode mode();
-
-		/**
-		 * The name of the Kubernetes {@code Lease} the instances compete for. Used only in {@link Mode#KUBERNETES_LEASE}.
-		 *
-		 * @return the Lease name
-		 */
-		@WithDefault("parasol-intake-leader")
-		@NotBlank
-		String leaseName();
-
-		/**
-		 * How long a Lease holder that stops renewing keeps it, so the longest a crashed leader delays its successor.
-		 *
-		 * @return the Lease duration
-		 */
-		@WithDefault("15s")
-		Duration leaseDuration();
-
-		/**
-		 * How long the leader keeps trying to renew before it gives up leading. Shorter than {@link #leaseDuration()}.
-		 *
-		 * @return the renew deadline
-		 */
-		@WithDefault("10s")
-		Duration renewDeadline();
-
-		/**
-		 * How often an instance tries to take or renew the Lease.
-		 *
-		 * @return the retry period
-		 */
-		@WithDefault("2s")
-		Duration retryPeriod();
-
-		/**
-		 * The name this application instance competes under, which must differ between instances. Without one, the host name is used
-		 * (the pod name on Kubernetes), and failing that a random one.
-		 *
-		 * @return the identity, if one is configured
-		 */
-		Optional<String> identity();
-	}
-
-	/**
-	 * How the intake leader is chosen.
-	 */
-	enum Mode {
-		/**
-		 * This application instance is always the leader: one replica, dev mode and the tests. Nothing touches the Kubernetes API.
-		 */
-		SINGLE,
-
-		/**
-		 * Instances compete for a Kubernetes {@code Lease}; losing it ends the process.
-		 */
-		KUBERNETES_LEASE
+		@WithDefault("20")
+		@Min(1)
+		int maxPublishAttempts();
 	}
 }

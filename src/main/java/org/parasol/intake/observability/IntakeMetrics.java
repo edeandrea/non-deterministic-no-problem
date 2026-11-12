@@ -14,9 +14,7 @@ import jakarta.transaction.Transactional;
 import jakarta.transaction.Transactional.TxType;
 
 import org.parasol.claim.model.Claim;
-import org.parasol.intake.leadership.IntakeLeadership;
 import org.parasol.intake.model.ClaimIntakeState;
-import org.parasol.intake.model.IntakeRunSignal;
 import org.parasol.intake.observability.IntakeActivity.ClaimCompleted;
 import org.parasol.intake.observability.IntakeActivity.ClaimStatusChanged;
 import org.parasol.intake.observability.IntakeActivity.EmailAccepted;
@@ -31,7 +29,6 @@ import org.parasol.intake.observability.IntakeActivity.NewClaimExtracted;
 import org.parasol.intake.observability.IntakeActivity.ReplySent;
 import org.parasol.intake.observability.IntakeActivity.ReviewDecisionApplied;
 import org.parasol.intake.observability.IntakeActivity.ReviewReclaimed;
-import org.parasol.intake.observability.IntakeActivity.RunSignalDelivered;
 import org.parasol.intake.observability.IntakeActivity.WatcherConnectionChanged;
 import org.parasol.intake.observability.IntakeActivity.WatcherReconnecting;
 
@@ -64,7 +61,6 @@ class IntakeMetrics {
 	static final Duration[] EMAIL_LATENCY_BUCKETS = seconds(1, 5, 15, 30, 60, 120, 300, 600, 1800);
 	static final Duration[] COMPLETION_BUCKETS = seconds(60, 300, 900, 3600, 4 * 3600, 86400, 3 * 86400, 7 * 86400);
 	static final Duration[] MAIL_CLIENT_BUCKETS = millis(5, 10, 25, 50, 100, 250, 500, 1000, 5000);
-	static final Duration[] SIGNAL_DELIVERY_BUCKETS = millis(100, 250, 500, 1000, 2500, 5000, 15000, 60000);
 	static final Duration[] LOCK_WAIT_BUCKETS = millis(1, 5, 10, 50, 100, 500, 1000, 5000);
 	static final double[] EMAIL_SIZE_BUCKETS = { 4_096, 16_384, 65_536, 262_144, 1_048_576, 4_194_304, 16_777_216 };
 	static final double[] COMPLETENESS_BUCKETS = { 0.2, 0.4, 0.6, 0.8, 1.0 };
@@ -75,12 +71,10 @@ class IntakeMetrics {
 	private final AtomicInteger inboxDepth = new AtomicInteger(-1);
 	private final Counter watcherReconnects;
 	private List<Gauge> gauges = List.of();
-	private final IntakeLeadership leadership;
 	private volatile boolean stopped;
 
-	IntakeMetrics(MeterRegistry registry, IntakeLeadership leadership) {
+	IntakeMetrics(MeterRegistry registry) {
 		this.registry = registry;
-		this.leadership = leadership;
 		this.watcherReconnects = Counter.builder("claim.intake.watcher.reconnects")
 			.description("How often the inbox watcher had to connect to the claims mailbox again")
 			.register(registry);
@@ -106,31 +100,12 @@ class IntakeMetrics {
 			.strongReference(true)
 			.register(registry);
 
-		var signals = Gauge.builder("claim.intake.signals.pending", this, IntakeMetrics::pendingSignalsOrNaN)
-			.description("Signals for intake runs that no run has taken yet")
-			.strongReference(true)
-			.register(registry);
-
-		var leader = Gauge.builder("claim.intake.leader", this.leadership, value -> value.isLeader() ? 1 : 0)
-			.description("1 on the application instance that is the intake leader, 0 on the others")
-			.strongReference(true)
-			.register(registry);
-
-		this.gauges = List.of(connected, pending, depth, oldest, signals, leader);
-	}
-
-	void onRunSignalDelivered(@Observes RunSignalDelivered delivered) {
-		Timer.builder("claim.intake.signal.delivery")
-			.description("How long a signal for an intake run waited, from being written to the run taking it")
-			.tag("kind", delivered.kind().name().toLowerCase(Locale.ROOT))
-			.serviceLevelObjectives(SIGNAL_DELIVERY_BUCKETS)
-			.register(this.registry)
-			.record(delivered.waited().isNegative() ? Duration.ZERO : delivered.waited());
+		this.gauges = List.of(connected, pending, depth, oldest);
 	}
 
 	void onReviewReclaimed(@Observes ReviewReclaimed reclaimed) {
 		Counter.builder("claim.intake.reviews.reclaimed")
-			.description("Reviews whose run was gone and that a new leader gave to a new run")
+			.description("Reviews whose run was gone and that the restarted application gave to a new run")
 			.register(this.registry)
 			.increment();
 	}
@@ -256,7 +231,7 @@ class IntakeMetrics {
 	}
 
 	private double pendingReviewsOrNaN() {
-		if (!this.stopped && this.leadership.isLeader()) {
+		if (!this.stopped) {
 			try {
 				return pendingReviews();
 			}
@@ -268,27 +243,8 @@ class IntakeMetrics {
 		return Double.NaN;
 	}
 
-	private double pendingSignalsOrNaN() {
-		if (!this.stopped && this.leadership.isLeader()) {
-			try {
-				return pendingSignals();
-			}
-			catch (RuntimeException e) {
-				Log.debugf(e, "Couldn't count the pending signals");
-			}
-		}
-
-		return Double.NaN;
-	}
-
-	// Non-private, so the transaction interceptor applies
-	@Transactional(TxType.REQUIRES_NEW)
-	double pendingSignals() {
-		return IntakeRunSignal.count();
-	}
-
 	private double oldestPendingReviewSecondsOrNaN() {
-		if (!this.stopped && this.leadership.isLeader()) {
+		if (!this.stopped) {
 			try {
 				return oldestPendingReviewSeconds();
 			}

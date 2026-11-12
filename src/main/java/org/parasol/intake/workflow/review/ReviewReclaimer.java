@@ -14,7 +14,6 @@ import jakarta.transaction.Transactional.TxType;
 import org.parasol.claim.model.ClaimCorrespondence;
 import org.parasol.claim.model.CorrespondenceDirection;
 import org.parasol.claim.model.IntakeClaimStatus;
-import org.parasol.intake.leadership.LeadershipAcquired;
 import org.parasol.intake.mailbox.ClaimsMailbox;
 import org.parasol.intake.mailbox.MailFolder;
 import org.parasol.intake.model.ClaimIntakeState;
@@ -23,12 +22,13 @@ import org.parasol.intake.observability.IntakeActivity.ReviewReclaimed;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
 
 import io.quarkus.logging.Log;
+import io.quarkus.runtime.StartupEvent;
 import io.quarkus.virtual.threads.VirtualThreads;
 import io.serverlessworkflow.impl.WorkflowStatus;
 
 /**
- * Gives every review whose run is gone a live run again. A run lives in one JVM, so when the leader dies or the only application instance
- * restarts, every claim left in {@code Pending Review} names a run nobody hosts. The new leader hands each one to a new run
+ * Gives every review whose run is gone a live run again. A run lives in one instance, so when the application restarts, every claim left in
+ * {@code Pending Review} names a run nobody hosts. On startup it hands each one to a new run
  * ({@link ReviewRecoverer#reclaim}), which goes straight to the review wait: it never re-sends the review reply or re-files the email.
  * <p>
  *   Flow's own restore is off ({@code quarkus.flow.persistence.auto-restore}): it would replay a run from its first incomplete task on every
@@ -56,12 +56,12 @@ public class ReviewReclaimer {
 		this.mailbox = mailbox;
 	}
 
-	void onLeadershipAcquired(@Observes LeadershipAcquired event) {
+	void onStart(@Observes StartupEvent event) {
 		this.executor.execute(this::reclaim);
 	}
 
 	/**
-	 * Hands every review whose run isn't hosted in this JVM to a new run. A failure for one claim is logged and doesn't stop the others.
+	 * Hands every review whose run isn't hosted in this instance to a new run. A failure for one claim is logged and doesn't stop the others.
 	 *
 	 * @return how many reviews were handed over
 	 */

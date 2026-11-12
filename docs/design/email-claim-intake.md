@@ -56,9 +56,9 @@ workflow run**, and the steps below are that run's steps.
    those items. Each reply starts again at step 1.
 8. When nothing is missing, the claim is `Pending Review`, the customer is told it's received and in
    final review, and the run **waits** for the claims processor without holding a thread. Flow keeps
-   the waiting run in PostgreSQL. If the application restarts (or the leader dies), the new leader gives
+   the waiting run in PostgreSQL. If the application restarts, it gives
    every `Pending Review` claim whose run is gone a new run that only waits (`ReviewReclaimer`), so a
-   waiting review survives. A decision already made for the old run is re-addressed to the new one.
+   waiting review survives. A decision that was in flight for the old run is not kept: the review is open again for the new run.
 9. The run files the email before it waits or ends. If any step fails, before or after the wait, a
    failure listener moves the email to a failed folder and the customer gets a "processing problem" reply.
 10. Later, and separately, the claims processor decides on the claim detail page, which wakes the
@@ -136,10 +136,10 @@ the policy PDF): the workflow passes the claim's history (correspondence, fields
 requested) in on every run.
 
 **The review decision** (`POST /api/db/claims/{id}/review-decision`) claims the review under the claim's
-lock, checks that the claim's run has reached its wait (409 if it hasn't; the run records this itself just before it waits), and
-writes the decision to the `intake_run_signal` table in the same transaction. It returns once that commits (202). The
-relay on the application instance that hosts the run publishes the decision event, and keeps republishing it until the run has taken it,
-and the waiting run applies it.
+lock, checks that the claim's run has reached its wait and is hosted in this instance (409 if it hasn't; the run records the wait itself just before it waits), and
+moves the review to "being decided" in that transaction. After the commit it publishes the decision event, and keeps republishing it (every 250 ms, up to 20 times) until the
+run has taken it, then returns 202; the waiting run applies it. A decision nobody takes puts the review back to open (409). The intake runs as a single replica,
+so the run is always in the instance that took the request.
 The decision also carries the claim's fields as the reviewer confirmed or corrected them: every field is either given a
 value or asked of the customer, and nothing is queued unless the claim is still `Pending Review` at the version the
 reviewer saw and the values fit the claim (400/409/422). The run sets them along with the new status. A separate

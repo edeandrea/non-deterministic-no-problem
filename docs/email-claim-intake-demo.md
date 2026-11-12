@@ -80,7 +80,7 @@ these files are 15–150 KB.
 **Caveats that apply to every scenario:**
 
 - **GreenMail keeps mail in memory**, so restarting it empties every mailbox. Dev mode's database is Dev Services'
-  and goes with a dev mode restart (a live reload keeps both); on OpenShift the claims survive a redeploy, and so does a waiting review (the new leader gives it a new run), but the mail doesn't.
+  and goes with a dev mode restart (a live reload keeps both); on OpenShift the claims survive a redeploy, and so does a waiting review (the restarted application gives it a new run), but the mail doesn't.
   Plan a demo around one boot.
 - **Dev mode already seeds two claims by email at startup** (`DevClaimEmailSeeder`, on when
   `parasol.dev-seed.enabled=true`, which `%dev` and the two Ollama `quarkus:dev` Maven profiles set):
@@ -268,6 +268,5 @@ The same five scenarios run unchanged against an OpenShift deployment
   (the Dev UI is a dev-mode-only feature), so on the cluster, show the Langfuse session only; the Flow
   workflow diagram is a dev-mode-only demonstration.
 - The intake runs as a **single replica** on the cluster (`quarkus.openshift.replicas: 1`, pinned and
-  commented in `application.yml`) — see README → *Scaling* for why, and
-  [#284](https://github.com/edeandrea/non-deterministic-no-problem/issues/284) for the follow-up to lift
-  that constraint.
+  commented in `application.yml`) — see README → *Single replica* for why
+  ([#284](https://github.com/edeandrea/non-deterministic-no-problem/issues/284)).

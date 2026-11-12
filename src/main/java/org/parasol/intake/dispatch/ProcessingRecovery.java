@@ -11,7 +11,7 @@ import org.parasol.claim.model.IntakeClaimStatus;
 import org.parasol.intake.model.ClaimIntakeState;
 
 /**
- * Tells how far a run that died got with an email a previous leader left in the processing folder, from what the intake itself
+ * Tells how far a run that died got with an email a previous instance left in the processing folder, from what the intake itself
  * recorded about it (never from the workflow engine's tables): the email's {@code ClaimCorrespondence} row, the claim it's linked to
  * and whether an outbound row answers it.
  * <p>

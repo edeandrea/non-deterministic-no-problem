@@ -82,7 +82,7 @@ public class ClaimCorrespondence extends PanacheEntity {
 
 	/**
 	 * For an outbound row, the {@code Message-ID} of the inbound email the reply answers; {@code null} for an inbound row. It tells a
-	 * recovering leader that an email was already answered.
+	 * recovering instance that an email was already answered.
 	 */
 	public String inReplyTo;
 

@@ -38,7 +38,6 @@ import org.parasol.intake.mailbox.ClaimsMailbox;
 import org.parasol.intake.mailbox.InboundEmail;
 import org.parasol.intake.mailbox.MailFolder;
 import org.parasol.intake.model.ClaimIntakeState;
-import org.parasol.intake.model.IntakeRunSignal;
 import org.parasol.intake.review.ClaimReviewService;
 import org.parasol.intake.review.ReviewDecided;
 import org.parasol.intake.review.ReviewDecision;
@@ -46,7 +45,6 @@ import org.parasol.intake.review.ReviewedFields;
 import org.parasol.intake.review.ReviewDecisionPublisher;
 import org.parasol.intake.review.ReviewOutcome;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
-import org.parasol.intake.workflow.signal.RunSignalRelay;
 import org.parasol.testing.mail.GreenMailMailbox;
 import org.parasol.testing.mail.ReceivedEmail;
 
@@ -68,7 +66,6 @@ public class IntakeScenario {
 	private final ClaimIntakeDispatcher starter;
 	private final ClaimIntakeFlow flow;
 	private final ReviewDecisionPublisher publisher;
-	private final RunSignalRelay relay;
 	private final IntakeConfig config;
 	private final FlowRows flowRows;
 	private final String smtpHost;
@@ -80,7 +77,6 @@ public class IntakeScenario {
 		ClaimIntakeDispatcher starter,
 		ClaimIntakeFlow flow,
 		ReviewDecisionPublisher publisher,
-		RunSignalRelay relay,
 		IntakeConfig config,
 		FlowRows flowRows,
 		@ConfigProperty(name = "quarkus.mailer.host") String smtpHost,
@@ -91,7 +87,6 @@ public class IntakeScenario {
 		this.starter = starter;
 		this.flow = flow;
 		this.publisher = publisher;
-		this.relay = relay;
 		this.config = config;
 		this.flowRows = flowRows;
 		this.smtpHost = smtpHost;
@@ -191,7 +186,6 @@ public class IntakeScenario {
 	@Transactional(TxType.REQUIRES_NEW)
 	void deleteCreatedData() {
 		ClaimCorrespondence.deleteAll();
-		IntakeRunSignal.deleteAll();
 		ClaimIntakeState.deleteAll();
 		Claim.delete("id > ?1", (long) SEEDED_CLAIMS);
 	}
@@ -402,24 +396,6 @@ public class IntakeScenario {
 	}
 
 	/**
-	 * How many signals for intake runs no run has taken yet.
-	 */
-	@Transactional(TxType.REQUIRES_NEW)
-	public long signalCount() {
-		return IntakeRunSignal.count();
-	}
-
-	/**
-	 * Claims the claim's review for a run, as the review endpoint does, and queues the decision for it: the claim is
-	 * {@code decidingRunId = runId} and the signal is written. Used with a run id this JVM doesn't host.
-	 */
-	@Transactional(TxType.REQUIRES_NEW)
-	public void queueDecisionFor(long claimId, String runId, ReviewDecided decided) {
-		ClaimIntakeState.findForClaim(claimId).orElseThrow().decidingRunId = runId;
-		this.relay.enqueue(Claim.findById(claimId), decided);
-	}
-
-	/**
 	 * Puts the claim's review back, as a decision step that faulted does: nobody is deciding it.
 	 */
 	@Transactional(TxType.REQUIRES_NEW)
@@ -566,7 +542,7 @@ public class IntakeScenario {
 	}
 
 	/**
-	 * Hands an email in the processing folder to the new leader's recovery, as the watcher does for what a dead leader left there.
+	 * Hands an email in the processing folder to the recovery, as the watcher does for what a dead instance left there.
 	 */
 	public void recover(InboundEmail email) {
 		this.starter.recover(email);

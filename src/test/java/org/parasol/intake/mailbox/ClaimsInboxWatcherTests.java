@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
@@ -40,13 +39,12 @@ import org.mockito.ArgumentCaptor;
 import org.parasol.intake.IntakeScenario;
 import org.parasol.intake.IntakeScenario.Mail;
 import org.parasol.intake.config.IntakeConfig;
-import org.parasol.intake.leadership.LeadershipAcquired;
-import org.parasol.intake.leadership.LeadershipLost;
 import org.parasol.intake.mailbox.ClaimsInboxWatcher.Settings;
 import org.parasol.intake.observability.IntakeActivityEvents;
 import org.parasol.testing.mail.InjectToxiproxy;
 import org.parasol.testing.mail.Toxiproxy;
 
+import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduler;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.virtual.ShouldNotPin;
@@ -367,31 +365,8 @@ class ClaimsInboxWatcherTests {
 			IntakeActivityEvents.into(new SimpleMeterRegistry())
 		);
 
-		watcher.onLeadershipAcquired(new LeadershipAcquired());
+		watcher.onStart(new StartupEvent());
 
-		assertThat(watcher.isRunning()).isFalse();
-	}
-
-	@Test
-	void watchesWhileLeadingAndStopsWhenLeadershipIsLost() {
-		var enabled = mock(IntakeConfig.class, RETURNS_DEEP_STUBS);
-		when(enabled.enabled()).thenReturn(true);
-		var watcher = new ClaimsInboxWatcher(
-			enabled,
-			this.mailbox,
-			this.received,
-			Settings.from(this.config),
-			this.scheduler,
-			this.virtualThreads,
-			IntakeActivityEvents.into(new SimpleMeterRegistry())
-		);
-
-		assertThat(watcher.isRunning()).isFalse();
-
-		watcher.onLeadershipAcquired(new LeadershipAcquired());
-		assertThat(watcher.isRunning()).isTrue();
-
-		watcher.onLeadershipLost(new LeadershipLost());
 		assertThat(watcher.isRunning()).isFalse();
 	}
 

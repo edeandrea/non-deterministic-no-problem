@@ -19,7 +19,7 @@ class InboxDepthMonitorTests {
 	private final IntakeConfig config = mock(IntakeConfig.class);
 	private final ClaimsMailbox mailbox = mock(ClaimsMailbox.class);
 	private final IntakeActivities activities = mock(IntakeActivities.class);
-	private final InboxDepthMonitor monitor = new InboxDepthMonitor(this.config, this.mailbox, this.activities, () -> true);
+	private final InboxDepthMonitor monitor = new InboxDepthMonitor(this.config, this.mailbox, this.activities);
 
 	@Test
 	void publishesTheInboxDepth() {
@@ -40,16 +40,6 @@ class InboxDepthMonitorTests {
 
 		this.monitor.measure();
 
-		verify(this.activities, never()).publish(any());
-	}
-
-	@Test
-	void nothingIsMeasuredOnAFollower() {
-		when(this.config.enabled()).thenReturn(true);
-
-		new InboxDepthMonitor(this.config, this.mailbox, this.activities, () -> false).measure();
-
-		verify(this.mailbox, never()).inboxDepth();
 		verify(this.activities, never()).publish(any());
 	}
 

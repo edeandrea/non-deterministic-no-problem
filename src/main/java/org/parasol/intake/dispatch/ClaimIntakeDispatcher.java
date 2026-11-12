@@ -18,7 +18,6 @@ import jakarta.enterprise.event.Observes;
 import jakarta.enterprise.inject.Instance;
 
 import org.parasol.intake.config.IntakeConfig;
-import org.parasol.intake.leadership.IntakeLeadership;
 import org.parasol.intake.failure.IntakeFailureHandler;
 import org.parasol.intake.mailbox.ClaimsMailbox;
 import org.parasol.intake.mailbox.EmailReceived;
@@ -77,7 +76,6 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 	private final IntakeActivities activities;
 	private final Instance<ClaimIntakeFlow> flow;
 	private final ExecutorService executor;
-	private final IntakeLeadership leadership;
 	private final ProcessingRecovery recovery;
 	private final ReviewReclaimer reclaimer;
 
@@ -96,7 +94,6 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 		IntakeActivities activities,
 		Instance<ClaimIntakeFlow> flow,
 		@VirtualThreads ExecutorService executor,
-		IntakeLeadership leadership,
 		ProcessingRecovery recovery,
 		ReviewReclaimer reclaimer) {
 
@@ -109,7 +106,6 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 		this.activities = activities;
 		this.flow = flow;
 		this.executor = executor;
-		this.leadership = leadership;
 		this.recovery = recovery;
 		this.reclaimer = reclaimer;
 	}
@@ -130,7 +126,7 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 	}
 
 	/**
-	 * Takes an email a previous leader left in the processing folder, and does what its progress calls for (see {@link ProcessingRecovery}):
+	 * Takes an email a previous instance left in the processing folder, and does what its progress calls for (see {@link ProcessingRecovery}):
 	 * <ul>
 	 *   <li>never accepted: the normal path, {@link #submit}</li>
 	 *   <li>accepted, nothing applied: run again from the start, without the duplicate check</li>
@@ -197,11 +193,6 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 	 * @param email The email
 	 */
 	public void submit(InboundEmail email) {
-		if (!this.leadership.isLeader()) {
-			// Only the leader watches, so this is a regression, not a normal case. The runs this starts would compete with the leader's
-			Log.warnf("An email was submitted to the intake on an application instance that isn't its leader");
-		}
-
 		if (MailLoopGuard.shouldIgnore(email, this.config.address())) {
 			this.activities.publish(new EmailHandled(EmailOutcome.SKIPPED_AUTO_REPLY, Optional.of(latencyOf(email))));
 			this.failureHandler.fileWithoutRun(email);

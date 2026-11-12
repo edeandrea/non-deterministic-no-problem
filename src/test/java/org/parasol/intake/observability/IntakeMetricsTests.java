@@ -35,7 +35,6 @@ import org.parasol.intake.failure.IntakeFailureHandler;
 import org.parasol.intake.mailbox.ClaimsMailbox;
 import org.parasol.intake.mailbox.MailFolder;
 import org.parasol.intake.model.EmailType;
-import org.parasol.intake.model.IntakeRunSignal;
 import org.parasol.intake.observability.IntakeActivity.ClaimCompleted;
 import org.parasol.intake.observability.IntakeActivity.InboxDepthMeasured;
 import org.parasol.intake.observability.IntakeActivity.NewClaimExtracted;
@@ -647,20 +646,6 @@ class IntakeMetricsTests extends IntakeFlowTestBase {
 
 		this.activities.publish(new InboxDepthMeasured(0));
 		assertThat(this.registry.get("claim.intake.inbox.depth").gauge().value()).isZero();
-	}
-
-	@Test
-	void aFollowerReportsNoDatabaseGaugesSoASumAcrossInstancesIsNotMultiplied() {
-		var follower = new SimpleMeterRegistry();
-		new IntakeMetrics(follower, () -> false);
-
-		assertThat(follower.get("claim.intake.leader").gauge().value()).isZero();
-
-		for (var name : List.of("claim.intake.reviews.pending", "claim.intake.review.oldest.pending", "claim.intake.signals.pending")) {
-			assertThat(follower.get(name).gauge().value()).as(name).isNaN();
-		}
-
-		assertThat(this.registry.get("claim.intake.leader").gauge().value()).isEqualTo(1);
 	}
 
 	@Test

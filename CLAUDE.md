@@ -32,17 +32,15 @@ The Java source is split into two top-level packages representing two distinct c
 | `org.parasol.notification.guardrail` | The four email output guardrails, their `GenerateEmailOutputGuardrail` base, `PolitenessService`, `StringUtils` |
 | `org.parasol.intake` | The email claim intake ([#216](https://github.com/edeandrea/non-deterministic-no-problem/issues/216)). Only what every sub-package shares: `MissingItem` |
 | `org.parasol.intake.config` | `IntakeConfig` (`parasol.intake.*`) |
-| `org.parasol.intake.leadership` | Who the intake leader is ([#284](https://github.com/edeandrea/non-deterministic-no-problem/issues/284)): `IntakeLeadership` (`isLeader()`), the `LeadershipAcquired` / `LeadershipLost` CDI events, `ConfiguredIntakeLeadership` (the bean; `SINGLE` is always the leader and never touches the Kubernetes API, `KUBERNETES_LEASE` runs the plain-Java `KubernetesLeaseLeadership`, a fabric8 `LeaderElector` on a `Lease`). Only the leader watches the inbox (`ClaimsInboxWatcher` starts on `LeadershipAcquired`, stops on `LeadershipLost`), measures the inbox depth and reports the DB-count gauges (`NaN` elsewhere, so a sum across instances isn't multiplied). Losing the Lease fires `LeadershipLost` and then `Quarkus.asyncExit(1)`, so the instance comes back as a follower; a stop it caused itself (shutdown, which releases the Lease after the watcher stopped) skips both. Tested without Quarkus against fabric8's mock API server (`KubernetesLeaseLeadershipTests`) |
 | `org.parasol.intake.mailbox` | `ClaimsMailbox` (the `claims@parasol.com` IMAP mailbox: list, find by `Message-ID`, move between `MailFolder`s, `moveOldest`), `ClaimsInboxWatcher` (the IMAP IDLE watcher, a Mutiny pipeline on a virtual thread (`@VirtualThreads` executor): scans the INBOX, moves each email to `processing`, fires `EmailReceived`; `ClaimIntakeDispatcher` observes it), `InboxIdle` (its own IMAP session for IDLE), `InboundEmail` (with `receivedDate`, the IMAP INTERNALDATE, and `sizeBytes`) and its attachment records, `MailLoopGuard` (auto-replies and mail from the claims address), `InboxDepthMonitor` (a `@Scheduled` job that measures the INBOX and fires `InboxDepthMeasured`; does nothing while the intake is off), the package-private MIME parser, HTML-to-text and quoted-text helpers |
-| `org.parasol.intake.dispatch` | What happens to an inbound email before its run: `ClaimIntakeDispatcher` (`recover(email)` for what a dead leader left in `Processing`, with `ProcessingRecovery`; `submit(email)`: loop/duplicate/`Message-ID` checks, then a per-sender queue of immutable `SenderState`s; also the Flow status listener that drives the queue), `ClaimMatcher`, `CorrespondenceRecorder` and the package-private `ClaimReference` |
+| `org.parasol.intake.dispatch` | What happens to an inbound email before its run: `ClaimIntakeDispatcher` (`recover(email)` for what a previous instance left in `Processing`, with `ProcessingRecovery`; `submit(email)`: loop/duplicate/`Message-ID` checks, then a per-sender queue of immutable `SenderState`s; also the Flow status listener that drives the queue), `ClaimMatcher`, `CorrespondenceRecorder` and the package-private `ClaimReference` |
 | `org.parasol.intake.failure` | The failure path: `IntakeFailureHandler` (**where the email is decides what its sender hears** — see Gotchas), the `IntakeFailureListener` (`onWorkflowFailed`) and `ProcessingProblemReplySender` |
 | `org.parasol.intake.reply` | The intake's replies: `IntakeTemplates` (the fixed Qute mail templates, under `templates/IntakeTemplates/`), `IntakeReplySender` (blocking; subject prefix, `ThreadingHeaders` headers and `Auto-Submitted`; overloads with and without a claim number, no `Optional` parameters) `ReplyRecorder` (records a claim reply as an `OUTBOUND` `ClaimCorrespondence` row after it's sent) and `CustomerName` (who a reply greets) |
 | `org.parasol.intake.model` | The intake's records that Flow persists and later steps read: `IncidentDetails`, `ClaimExtraction` (JSON-safe: ISO date/time strings, no `Optional`), the sealed `IntakeOutcome`, `MatchedClaim` (`none()` rather than `null`), `EmailType`, `ClassifiedOutcome` (the root agent's return: the outcome plus the classifier's label), `ClaimResolver`'s `PendingClaim` / `ClaimResolution`, and the `ClaimIntakeState` entity (the intake's bookkeeping about a claim, kept off `Claim`) |
 | `org.parasol.intake.workflow` | `ClaimIntakeFlow` (the whole intake as one quarkus-flow workflow, `claim-intake`; the only place with side effects), the JSON-safe `IntakeRun` (input: ids only) and `IntakeState` (threaded through every step), the `EmailRequeued` event, the `AgentStep` and `ClaimMatchingSteps` steps and `CorrespondenceText` |
 | `org.parasol.intake.workflow.policy` | `PolicyCheckStep` and its package-private `SameCustomerRule` (same customer) and `PolicyNumbers` (generated `AC-` numbers) |
 | `org.parasol.intake.workflow.outcome` | `ApplyOutcomeStep` (persists a new claim or a merged reply) and its helpers `ClaimFields` and the package-private `InceptionDates` |
-| `org.parasol.intake.workflow.signal` | `RunSignalRelay` (`enqueue` writes an `IntakeRunSignal` in the caller's transaction; `deliver()` and a `@Scheduled` poll hand pending signals to the runs hosted in this JVM and delete the ones a run has taken). `IntakeRunSignal` is in `org.parasol.intake.model` |
-| `org.parasol.intake.workflow.review` | `SupersedeStep`, `ReviewReclaimer` (hands every review whose run is gone to a new run on `LeadershipAcquired`), `ReviewDecisionSteps` (the review wait's decision steps and its match check), `AfterDecision` (what the run does next: `END` or `WAIT_AGAIN`), and `ReviewRecoverer` (hands a faulted run's review to a new run) |
+| `org.parasol.intake.workflow.review` | `SupersedeStep`, `ReviewReclaimer` (hands every review whose run is gone to a new run on startup), `ReviewDecisionSteps` (the review wait's decision steps and its match check), `AfterDecision` (what the run does next: `END` or `WAIT_AGAIN`), and `ReviewRecoverer` (hands a faulted run's review to a new run) |
 | `org.parasol.intake.observability` | `IntakeActivity` (the sealed CDI events the intake fires) and `IntakeMetrics` (observes them into the `claim.intake.*` meters; tags are small fixed sets, never a claim number, `Message-ID`, address or conversation id), and the tag enums `EmailOutcome`, `MatcherResult`, `ReviewAgreement`, `MailboxLockMode`, `MatchedClaimKind`, `FailureStage` and `FailureOutcome` |
 | `org.parasol.intake.workflow.mail` | `IntakeEmailReader` (re-reads a run's email from the processing folder), `ReplySteps`, `FileEmailStep` |
 | `org.parasol.intake.dev` | `DevClaimEmailSeeder`: the bean exists only with the build property `parasol.dev-seed.enabled=true` (`%dev`, and the two Ollama Maven profiles' `quarkus-maven-plugin` `systemProperties`, since they run dev as `prod`, so `@IfBuildProfile("dev")` wouldn't match), and it acts in `LaunchMode.DEVELOPMENT` only, mails two sample claims to the claims address at startup (one complete, one with no date or place) so the real intake produces a `Pending Review` and a `Pending Information` claim to look at. Needs the same model as any intake email; GreenMail is in memory, so it re-sends on every start |
@@ -289,9 +287,9 @@ and map to DTO records with `ClaimMapper`.
   review is open, its requested items and the full `MissingItem` list for the UI's checklist) — its own read rather than
   widening `ClaimDetails`, since the intake's bookkeeping stays off the claim DTO. `POST
   /api/db/claims/{id}/review-decision` takes a `ReviewDecisionRequest` (`outcome`, `missing_items`, `fields`, `version`),
-  claims the review under the claim's optimistic lock (`ClaimReviewService`), confirms the run has reached its wait (`ClaimIntakeState.reviewWaitingRunId`), writes the decision to `intake_run_signal` in that same
-  transaction and returns `202 Accepted` with no body — the UI re-fetches the claim itself, since the call returns once the
-  decision is durably queued, not once the workflow has applied it. Errors: `404` for
+  claims the review under the claim's optimistic lock (`ClaimReviewService`), confirms the run has reached its wait (`ClaimIntakeState.reviewWaitingRunId`) and is hosted and `WAITING` in this instance, moves `reviewRunId` to `decidingRunId` in that transaction, then publishes the decision after the commit
+  and returns `202 Accepted` with no body once the run has taken it — the UI re-fetches the claim itself, since the call returns before the
+  workflow has applied the decision. Errors: `404` for
   an unknown claim, `409` for a claim not open for review, already being decided, a run that isn't
   waiting, or a lost optimistic lock (a stale `version`, or a reply that superseded the review first); each maps through
   `ReviewExceptionMappings`, reusing the shared `org.parasol.problem.ProblemDetail`. A Bean Validation failure is a `400`
@@ -327,26 +325,23 @@ and map to DTO records with `ClaimMapper`.
   moved out of `org.parasol.claim.rest` (where it first lived, nested in `ClaimExceptionMappings`) into the neutral
   `org.parasol.problem` once this resource needed it too — it carries no claim-specific fields, so leaving it under one
   domain's package would have been the same kind of accidental coupling, just one step removed.
-  - **Decisions travel as database signals** (#284): a run lives in one JVM and Flow's events don't cross application instances, so the application instance that
-    takes the `POST` may not host the run. `ClaimReviewService.claimReview` writes an `IntakeRunSignal` (`intake_run_signal`:
-    `run_id`, `claim_id` (cascade), `kind` (`REVIEW_DECIDED` only), the `ReviewDecided` as JSON `payload`, `created_at`,
-    `attempts`) in the same transaction that moves `reviewRunId` to `decidingRunId`, so both commit or neither does. The
-    waiting-run check is in that transaction too, so a failed one rolls everything back and leaves no signal.
-    `org.parasol.intake.workflow.signal.RunSignalRelay` (on every application instance) calls `deliver()` once right after the commit and then
-    from a `@Scheduled` poll (`parasol.intake.signals.poll-interval`, default 1 s): a signal is published through
-    `ReviewDecisionPublisher` only to a run that's hosted in this JVM **and** `WAITING` (a `PENDING` instance is a stand-in
-    Flow leaves behind, not a run), and republished on every poll until the claim's `decidingRunId` no longer names the run
-    (the decision steps clear it on success, and on a fault that puts the claim back in review), when the row is deleted.
-    That republish-until-taken is also what closes F2b (a run's `WAITING` status becomes visible a couple of statements before
-    its `listen` registers a consumer): a lost event is simply retried. A duplicate is harmless, since `isForThisRun` checks the
-    run id and the claim's state again.
+  - **A decision is published directly after the claiming transaction commits, and republished until the run takes it** (#284):
+    `ClaimReviewService.submit` first claims the review (`claimReview`, `REQUIRES_NEW`: the open-review, version and fit checks, then the
+    run must be ready **and** hosted here: `isReadyForDecision` is `ClaimIntakeState.isReadyForDecision()` and `activeInstance(runId)` is
+    `WAITING` in this instance, else `409` `ReviewRunNotWaitingException`; a `PENDING` instance is a stand-in Flow leaves behind, not a run). Then it
+    publishes through `ReviewDecisionPublisher` every `parasol.intake.review.publish-interval` (default `250ms`) up to
+    `parasol.intake.review.max-publish-attempts` (default `20`) times, until the claim's `decidingRunId` no longer names the run (the decision steps
+    clear it on success, and on a fault that puts the claim back in review). That republish-until-taken is what closes F2b (a run's `WAITING`
+    status becomes visible a couple of statements before its `listen` registers a consumer): a lost event is simply retried, and a duplicate is
+    harmless, since `isForThisRun` checks the run id and the claim's state again. A decision nobody takes puts the review back to open
+    (`restoreReview`, only while `decidingRunId` still names the run) and is a `409`, so the reviewer decides again. Flow's publisher is in
+    memory, so this only reaches runs in this instance: the reason the intake is single replica (see Gotchas).
   - **Flow is a black box: the app never reads or writes its tables.** "Is the run waiting?" is the app's own
     `ClaimIntakeState.reviewWaitingRunId`, set by the `awaitReview` task (`ReviewDecisionSteps.awaitReview`) that sits just before
     `waitReview` on every path into it (first arrival, a resumed review, wait-again after a decision fault). The review is ready
     (`isReadyForDecision`) when it equals `reviewRunId`; a new run id or a cleared `reviewRunId` makes the old value harmless, so
-    nothing clears it. Only the application instance that hosts a run can see it through Flow's API, so a decision for a **vanished run is queued, not a
-    `404`** (there is no `ReviewRunNotFoundException`): the signal stays pending until reclaim (task 05) re-addresses it to the run's
-    replacement. `PersistenceInstanceReader.find` is never used for an intake run (it leaves a `PENDING` stand-in in `activeInstances`,
+    nothing clears it. After a restart the claim names a run nobody hosts, so a decision is a `409` until `ReviewReclaimer` gives the claim a
+    new run. `PersistenceInstanceReader.find` is never used for an intake run (it leaves a `PENDING` stand-in in `activeInstances`,
     and throws for a run that has waited more than twice).
 
 **The `Claim` entity** (`org.parasol.claim.model`, table `claims`; serialized only through `ClaimDetails`):
@@ -579,7 +574,7 @@ events and never call an adapter.
     some boots only). Restore all three together once the fixes are released: `.tasks/05-gh216-agentic-email-intake/PLAN.md`, 2c item 6.
   - `%test` sets `quarkus.langfuse.otel.enabled: false` (build time; only the span processor goes), re-enabled in `org.parasol.testing.LangfuseExportTestProfile`.
   - Metrics: `claim.intake.emails{outcome}`, `.claim.status.transitions{status}`, `.replies{template}`, `.review.decisions{decision}`, the `.review.wait` timer,
-    `.failures{stage,exception,outcome}` (`outcome` is `fatal` for a run that faulted with nothing picking its claim up, `recovered` when something did: a decision that couldn't be applied (the claim goes back in review) or whose email couldn't be sent (`ReviewDecisionSteps` fires these, since neither reaches `IntakeFailureHandler`), or a faulted run whose review `ReviewRecoverer` handed to a new run (`IntakeFailureListener` passes that outcome to `IntakeFailureHandler.handle`). So a rising `fatal` means claims are faulting with nothing left handling them; `stage` is `fetch`, `move`, `agent`, `persist`, `reply` or `unknown`: the mailbox throws `MailboxMoveException` for a change and the reply sender wraps every send failure or timeout in `ReplyFailedException`, so the stage names the operation, not the library underneath), gauges `.reviews.pending` (a DB count, `NaN` on a follower) and `.watcher.connected`, and `.leader` (1 on the intake leader, 0 on the others), counter `.watcher.reconnects`.
+    `.failures{stage,exception,outcome}` (`outcome` is `fatal` for a run that faulted with nothing picking its claim up, `recovered` when something did: a decision that couldn't be applied (the claim goes back in review) or whose email couldn't be sent (`ReviewDecisionSteps` fires these, since neither reaches `IntakeFailureHandler`), or a faulted run whose review `ReviewRecoverer` handed to a new run (`IntakeFailureListener` passes that outcome to `IntakeFailureHandler.handle`). So a rising `fatal` means claims are faulting with nothing left handling them; `stage` is `fetch`, `move`, `agent`, `persist`, `reply` or `unknown`: the mailbox throws `MailboxMoveException` for a change and the reply sender wraps every send failure or timeout in `ReplyFailedException`, so the stage names the operation, not the library underneath), gauges `.reviews.pending` (a DB count) and `.watcher.connected`, counter `.watcher.reconnects`.
     `.emails` counts what finally became of an email, exactly once: `FileEmailStep` fires `EmailHandled` as the email is filed (every reply path ends there; a run that
     hands the email back to the queue for a decision doesn't, so its rerun counts it), the dispatcher counts `skipped_auto_reply` and `duplicate`, and the failure handler `failed`
     — but **only for an email still in the processing folder**. One that has left it was counted, and answered, when it was filed, so a run that faults after that counts no
@@ -596,7 +591,6 @@ events and never call an adapter.
     measurement) and `.review.oldest.pending` (seconds, from `ClaimIntakeState.oldestPendingReviewOpenedAt`; `0` when no review is pending). `ApplyOutcomeStep` and `ReviewDecisionSteps` publish their status, extraction,
     decision and completion activities **inside** their transaction, observed `AFTER_SUCCESS`, so a rollback counts nothing. Not built, on purpose: token usage per run (Langfuse and quarkus-langchain4j already have it), a
     separate AI-reply counter (`replies{template=status_answer}`) and loop-guard skips (`emails{outcome=skipped_auto_reply}`).
-  - **Signal delivery meters (#284):** `claim.intake.signal.delivery{kind}` (timer, from the signal being written to the run taking it; `RunSignalDelivered`, fired by `RunSignalRelay`) and the gauge `claim.intake.signals.pending` (a DB count of `intake_run_signal` rows; no run or claim id is ever a tag).
 - **Layering is enforced** by `ConversationLayeringTests` (reads the compiled classes' constant pools with
   `java.lang.classfile`): the core references no adapter or framework, adapters never reference each other.
 
@@ -751,10 +745,8 @@ drifting from the migrations (tables, columns, types, sequences, including `clai
 | `watcher.idle-refresh` | `1m` | **`10s` in `%dev`** only, for quick pickup of mail sent from Roundcube |
 | `watcher.reconnect-delay` / `.max-reconnect-delay` | `1s` / `1m` | Doubles on every reconnect failure |
 | `metrics.inbox-depth-interval` | `30s` | How often `claim.intake.inbox.depth` is measured (a gauge read would log in to IMAP on every scrape) |
-| `leadership.mode` | `SINGLE` | `SINGLE` (always the leader: dev mode, tests, one replica) or `KUBERNETES_LEASE` (compete for a Lease) |
-| `leadership.lease-name` / `.identity` | `parasol-intake-leader` / the host name (the pod name on Kubernetes), else random | Only in `KUBERNETES_LEASE`; identities must differ between instances |
-| `leadership.lease-duration` / `.renew-deadline` / `.retry-period` | `15s` / `10s` / `2s` | A crashed leader delays its successor by about the lease duration |
-| `signals.poll-interval` | `1s` | How often `RunSignalRelay` hands pending review decisions to the runs this application instance hosts (each is also tried once right after it's written) |
+| `review.publish-interval` | `250ms` | How long `ClaimReviewService` waits between publishing a reviewer's decision again while the run hasn't taken it |
+| `review.max-publish-attempts` | `20` | How many publishes before the decision is given up on, the review goes back to open and the POST is a `409` |
 
 ### OpenShift deployment
 
@@ -1129,7 +1121,7 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
     the processing folder and calls `ClaimIntakeDispatcher.submit`, as the watcher will; it also reads replies, finds a
     claim's waiting run, simulates claiming the review (`claimReview`, the same `reviewRunId` → `decidingRunId` move the
     real `ClaimReviewService` does — these workflow-level tests exercise the decision steps directly, not through the
-    REST layer, so the simulation stays), publishes decisions with `publishUntilWoken` (the workflow-level helper for tests that bypass `ClaimReviewService`, so they skip the signal table; `RunSignalRelayTests` covers that path. A decision published the moment a
+    REST layer, so the simulation stays), publishes decisions with `publishUntilWoken` (the workflow-level helper for tests that bypass `ClaimReviewService`, so they skip `ClaimReviewService`'s own retry, which `ClaimReviewServiceTests` covers. A decision published the moment a
     run says `WAITING` can be lost, so it republishes, through Awaitility every 250 ms within `WAIT`, until the run takes
     it: it leaves `WAITING`, or `decidingRunId` no longer names it. The second condition matters: a decision that faults
     and puts the claim back in review can be back in `waitReview` between two polls, and a republish would then hand it a
@@ -1452,15 +1444,15 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
     `WAITING → RUNNING` status change, with the `routeDecision` task start as a backstop; a requeued email that still finds
     its claim being decided is retried with a delay (250 ms, doubling, six times) and then takes the failure path.
     `ClaimIntakeFlow.isForThisRun` also requires the event's claim and run id to match, so a decision for another run is ignored.
-  - **An email a dead leader left in `Processing` is recovered, never dropped as a duplicate or answered twice** (#284 task 06). The watcher hands each one over as `EmailReceived(email, isRecovery=true)` on its first connection of a leadership, and `ClaimIntakeDispatcher.recover` asks `ProcessingRecovery` how far its run got, from the app's own tables only (never Flow's): no `ClaimCorrespondence` row → the normal `submit`; a row with no claim, or a status question that only linked → run again from the start, bypassing the duplicate check; a claim it created or merged into (`createdClaim` / `mergedIntoClaim`) and no `OUTBOUND` row whose `in_reply_to` is its `Message-ID` → an `IntakeRun.resumesReply` run (`Disposition.RESUME_REPLY`: `routeMatch` → `reply` → `file` → `awaitReview` if the claim is `Pending Review`; `ClaimMatchingSteps` rebuilds the `IntakeState` from the claim, with a placeholder outcome of the right kind, and `ProcessingRecovery.adoptReview` makes the resumed run the claim's review run before it starts); such a row *with* an `OUTBOUND` reply → only filed, and counted once. `ReviewReclaimer` skips a claim whose latest inbound email is still in `Processing`, so it and the resumed run never both take a review; after filing an answered email the dispatcher sweeps `reclaim()` for a claim that waits for review. `ReplyRecorder` records `in_reply_to` (`V5`; not in the API DTOs). **Residual gap, accepted:** an application instance that dies between the SMTP send and `ReplyRecorder`'s commit (or whose recording failed with only a WARN) leaves no `OUTBOUND` row, so the customer gets that reply twice.
+  - **An email a dead instance left in `Processing` is recovered, never dropped as a duplicate or answered twice** (#284). The watcher hands each one over as `EmailReceived(email, isRecovery=true)` on its first connection after a start, and `ClaimIntakeDispatcher.recover` asks `ProcessingRecovery` how far its run got, from the app's own tables only (never Flow's): no `ClaimCorrespondence` row → the normal `submit`; a row with no claim, or a status question that only linked → run again from the start, bypassing the duplicate check; a claim it created or merged into (`createdClaim` / `mergedIntoClaim`) and no `OUTBOUND` row whose `in_reply_to` is its `Message-ID` → an `IntakeRun.resumesReply` run (`Disposition.RESUME_REPLY`: `routeMatch` → `reply` → `file` → `awaitReview` if the claim is `Pending Review`; `ClaimMatchingSteps` rebuilds the `IntakeState` from the claim, with a placeholder outcome of the right kind, and `ProcessingRecovery.adoptReview` makes the resumed run the claim's review run before it starts); such a row *with* an `OUTBOUND` reply → only filed, and counted once. `ReviewReclaimer` skips a claim whose latest inbound email is still in `Processing`, so it and the resumed run never both take a review; after filing an answered email the dispatcher sweeps `reclaim()` for a claim that waits for review. `ReplyRecorder` records `in_reply_to` (`V4`; not in the API DTOs). **Residual gap, accepted:** an application instance that dies between the SMTP send and `ReplyRecorder`'s commit (or whose recording failed with only a WARN) leaves no `OUTBOUND` row, so the customer gets that reply twice.
   - **A claim's review always has a live run.** A run that faults while it owns a review (as `reviewRunId` or `decidingRunId`)
     is replaced by `ReviewRecoverer`: a new run with `IntakeRun.resumesReview` goes straight to `waitReview`, and is set as the
     review run before it starts. Restoring `reviewRunId` alone would point at a dead run.
-    A run that's **gone** (the leader died, or the only application instance restarted: the database survives it) is replaced the same way by
-    `ReviewReclaimer` on `LeadershipAcquired` (`ReviewRecoverer.reclaim`): every `Pending Review` claim whose `reviewRunId`/`decidingRunId` names a run
-    not `RUNNING`/`WAITING` in this JVM gets a new run, built from the claim itself (its latest inbound `Message-ID`, its address, its
-    conversation id), since the old run's input isn't available. A decision already claimed for the old run stays the claim's decision: its
-    `IntakeRunSignal` is re-addressed (`IntakeRunSignal.retarget`) and `decidingRunId` moves to the new run, which applies it once it waits.
+    A run that's **gone** (the application restarted: the database survives it) is replaced the same way by
+    `ReviewReclaimer` on startup (`ReviewRecoverer.reclaim`): every `Pending Review` claim whose `reviewRunId`/`decidingRunId` names a run
+    not `RUNNING`/`WAITING` in this instance gets a new run, built from the claim itself (its latest inbound `Message-ID`, its address, its
+    conversation id), since the old run's input isn't available. A decision already claimed for the old run (`decidingRunId`) is not kept, since it lived in memory: the review goes back to open for the new run
+    (`reviewRunId`, `decidingRunId` cleared) and the reviewer decides again.
     `quarkus.flow.persistence.auto-restore` is `false`: Flow's restore would replay a run from its first incomplete task on every application
     instance. The dead run's rows stay in Flow's tables (the app never writes to them) and are inert. Counted by `claim.intake.reviews.reclaimed`.
     A reclaimed run has no dispatcher sender slot, which is safe: `markWorking`/`releaseRun` look the run up by `Optional`.
@@ -1503,15 +1495,14 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
     `application.yml` comment at `quarkus.application.name` says this too) orphans every waiting intake
     run — the renamed app can no longer find its own in-flight `Pending Review` claims in Flow's tables.
 - **The database survives restarts** (#284, replacing the old drop-and-create). GreenMail is still in memory, so on a GreenMail
-  restart every mailbox, and any email in `Processing`, is lost; the claims and Flow's runs are kept. Recovering a waiting review
-  or a half-processed email after a restart is the rest of #284 (tasks 05 and 06).
-- **The intake only works correctly with one replica**, though nothing enforces it beyond the OpenShift
-  extension's own default (`quarkus.openshift.replicas: 1`, pinned and commented in `%openshift` in
-  `application.yml`). Four mechanisms assume a single instance:
+  restart every mailbox, and any email in `Processing`, is lost; the claims and Flow's runs are kept. After an application restart a
+  waiting review gets a new run (`ReviewReclaimer`) and an email left in `Processing` is recovered (`ProcessingRecovery`); a decision that was
+  in flight is not kept. A local database that applied the branch's earlier migration numbers (`V4`/`V5`) must be recreated once.
+- **The intake only works correctly with one replica, on purpose** (user decision, #284): a demo doesn't need more, and a production system would
+  more likely put a message broker in front of it. Nothing enforces it beyond the OpenShift extension's own default
+  (`quarkus.openshift.replicas: 1`, pinned and commented in `%openshift` in `application.yml`). Four mechanisms assume a single instance:
   - `ReviewDecisionPublisher.publish` → Flow's in-memory `eventPublishers()`: a decision `POST`ed to the
-    replica that isn't hosting the waiting run passes every check (`PersistenceInstanceReader` reads the
-    shared database, so it says `WAITING` either way), publishes locally, and returns `202` — **silently
-    never applied**.
+    replica that isn't hosting the waiting run is a `409` (`ClaimReviewService` checks the run is `WAITING` in its own instance), never delivered.
   - `SupersedeStep`'s `…definition().activeInstance(oldRunId)` is an in-JVM lookup, so a reply on
     replica B can't cancel a run waiting on replica A; `cancel` returns `false` and the step only logs at
     debug.
@@ -1521,8 +1512,11 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
   - `ClaimsInboxWatcher` + `ClaimsMailbox`'s process-local `ReentrantReadWriteLock`: two replicas both
     IDLE the same INBOX and race to move the same message.
 
+  Lifting it would take a leader (a Kubernetes Lease) so one instance watches the inbox and hosts every run, plus a way to get a decision to that
+  instance (a database outbox or a message broker). A Lease election and a database signal table were built on the #284 branch and removed again as
+  too much for a demo.
+
   Already safe across replicas: the `ClaimCorrespondence.messageId` database unique constraint, optimistic
   locking on `ClaimIntakeState`, and Flow's own DB-backed run persistence (`quarkus-flow-jpa`). See
-  [#284](https://github.com/edeandrea/non-deterministic-no-problem/issues/284) for the follow-up to lift
-  the single-replica requirement, and `docs/email-claim-intake-demo.md` / README → *Scaling* for
+  [#284](https://github.com/edeandrea/non-deterministic-no-problem/issues/284), and `docs/email-claim-intake-demo.md` / README → *Single replica* for
   the demo-facing version of this list.

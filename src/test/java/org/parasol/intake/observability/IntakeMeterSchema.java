@@ -14,7 +14,6 @@ import org.parasol.claim.model.IntakeClaimStatus;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.mailbox.SkippedAttachment;
 import org.parasol.intake.model.EmailType;
-import org.parasol.intake.model.IntakeRunSignal;
 import org.parasol.intake.reply.IntakeTemplates;
 import org.parasol.intake.review.ReviewOutcome;
 
@@ -83,9 +82,6 @@ final class IntakeMeterSchema {
 			meter("claim.intake.mailbox.lock.wait", Map.of("mode", Arrays.stream(MailboxLockMode.values()).map(MailboxLockMode::tag).collect(Collectors.toSet()))),
 			meter("claim.intake.inbox.depth", Map.<String, Set<String>>of()),
 			meter("claim.intake.review.oldest.pending", Map.<String, Set<String>>of()),
-			meter("claim.intake.signals.pending", Map.<String, Set<String>>of()),
-			meter("claim.intake.leader", Map.<String, Set<String>>of()),
-			meter("claim.intake.reviews.reclaimed", Map.<String, Set<String>>of()),
-			meter("claim.intake.signal.delivery", Map.of("kind", Arrays.stream(IntakeRunSignal.Kind.values()).map(kind -> kind.name().toLowerCase(Locale.ROOT)).collect(Collectors.toSet()))));
+			meter("claim.intake.reviews.reclaimed", Map.<String, Set<String>>of()));
 	}
 }

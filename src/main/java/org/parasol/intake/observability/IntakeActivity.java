@@ -9,7 +9,6 @@ import org.parasol.claim.model.IntakeClaimStatus;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.mailbox.SkippedAttachment;
 import org.parasol.intake.model.EmailType;
-import org.parasol.intake.model.IntakeRunSignal;
 import org.parasol.intake.review.ReviewOutcome;
 
 /**
@@ -146,16 +145,7 @@ public sealed interface IntakeActivity {
 	}
 
 	/**
-	 * A run took a signal that was written for it.
-	 *
-	 * @param kind What the signal asked
-	 * @param waited How long it waited, from being written to the run taking it
-	 */
-	record RunSignalDelivered(IntakeRunSignal.Kind kind, Duration waited) implements IntakeActivity {
-	}
-
-	/**
-	 * A new leader gave a review whose run was gone to a new run.
+	 * The restarted application gave a review whose run was gone to a new run.
 	 */
 	record ReviewReclaimed() implements IntakeActivity {
 	}

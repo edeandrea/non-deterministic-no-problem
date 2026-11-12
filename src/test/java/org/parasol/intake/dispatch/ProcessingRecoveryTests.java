@@ -14,7 +14,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.serverlessworkflow.impl.WorkflowStatus;
 
 /**
- * What a new leader does with an email the dead one left in the processing folder, one test per row of how far its run got. The state is built
+ * What the restarted application does with an email the dead one left in the processing folder, one test per row of how far its run got. The state is built
  * from a real run, then rewound to how it was when the run died.
  */
 @QuarkusTest

@@ -21,7 +21,6 @@ import org.parasol.intake.observability.IntakeActivity.ReplySent;
 import org.parasol.intake.observability.IntakeActivity.ReviewDecisionApplied;
 import org.parasol.intake.observability.IntakeActivity.WatcherConnectionChanged;
 import org.parasol.intake.observability.IntakeActivity.ReviewReclaimed;
-import org.parasol.intake.observability.IntakeActivity.RunSignalDelivered;
 import org.parasol.intake.observability.IntakeActivity.WatcherReconnecting;
 
 import io.micrometer.core.instrument.MeterRegistry;
@@ -36,7 +35,7 @@ public final class IntakeActivityEvents {
 
 	@SuppressWarnings("unchecked")
 	public static IntakeActivities into(MeterRegistry registry) {
-		var metrics = new IntakeMetrics(registry, () -> true);
+		var metrics = new IntakeMetrics(registry);
 		var event = (Event<IntakeActivity>) mock(Event.class);
 
 		doAnswer(invocation -> {
@@ -56,7 +55,6 @@ public final class IntakeActivityEvents {
 				case IntakeFailed failed -> metrics.onFailed(failed);
 				case WatcherConnectionChanged changed -> metrics.onWatcherConnectionChanged(changed);
 				case WatcherReconnecting reconnecting -> metrics.onWatcherReconnecting(reconnecting);
-				case RunSignalDelivered delivered -> metrics.onRunSignalDelivered(delivered);
 				case ReviewReclaimed reclaimed -> metrics.onReviewReclaimed(reclaimed);
 			}
 

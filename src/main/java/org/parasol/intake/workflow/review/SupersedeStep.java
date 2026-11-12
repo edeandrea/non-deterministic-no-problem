@@ -107,14 +107,13 @@ public class SupersedeStep {
 	// The flow's definition is shared by every run: it must not be closed
 	@SuppressWarnings("resource")
 	private void cancelWaitingRun(String oldRunId) {
-		this.flow.get()
-		    .definition()
-		    .activeInstance(oldRunId)
-		    .ifPresentOrElse(
-			    run -> Log.debugf("Canceled the run %s waiting for review: %s", oldRunId, run.cancel()),
-			    // Every run is hosted by the intake leader, so a miss means the run is already gone or this isn't the leader
-			    () -> Log.warnf("The run %s waiting for review isn't hosted here, so it wasn't canceled", oldRunId)
-		    );
+		var canceled = this.flow.get()
+			.definition()
+			.activeInstance(oldRunId)
+			.map(WorkflowInstance::cancel)
+			.orElse(false);
+
+		Log.debugf("Canceled the run %s waiting for review: %s", oldRunId, canceled);
 	}
 
 	sealed interface Result {

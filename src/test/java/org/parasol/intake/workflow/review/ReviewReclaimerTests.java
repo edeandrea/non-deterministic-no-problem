@@ -10,17 +10,14 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.IntakeFlowTestBase;
 import org.parasol.intake.IntakeScenario;
-import org.parasol.intake.review.ReviewDecided;
-import org.parasol.intake.review.ReviewDecision;
 import org.parasol.intake.review.ReviewOutcome;
-import org.parasol.intake.review.ReviewedFields;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.serverlessworkflow.impl.WorkflowInstance;
 import io.serverlessworkflow.impl.WorkflowStatus;
 
 /**
- * A new leader gives a review whose run is gone a new run. The run that's gone is simulated by canceling the real one: the claim still names it.
+ * The restarted application gives a review whose run is gone a new run. The run that's gone is simulated by canceling the real one: the claim still names it.
  */
 @QuarkusTest
 class ReviewReclaimerTests extends IntakeFlowTestBase {
@@ -49,22 +46,25 @@ class ReviewReclaimerTests extends IntakeFlowTestBase {
 	}
 
 	@Test
-	void aDecisionAlreadyMadeForTheRunThatIsGoneIsAppliedByTheNewRunWithNoSecondDecision() {
+	void aDecisionClaimedForTheRunThatIsGoneIsNotLeftStuckAndANewDecisionIsApplied() {
 		var claimId = createClaim(SENDER, COMPLETE_DETAILS).claim().id;
 		var deadRunId = goneRun(claimId);
 		this.scenario.claimReview(claimId);
-		this.scenario.queueDecisionFor(claimId, deadRunId, new ReviewDecided(claimId, deadRunId, new ReviewDecision(ReviewOutcome.READY, Set.of(), ReviewedFields.none())));
 
+		assertThat(this.scenario.intake(claimId).orElseThrow().decidingRunId).isEqualTo(deadRunId);
 		assertThat(this.reclaimer.reclaim()).isEqualTo(1);
-		assertThat(this.scenario.intake(claimId).orElseThrow().decidingRunId).isNotEqualTo(deadRunId).isNotNull();
+
+		var run = this.scenario.awaitWaitingRun(claimId);
+		var state = this.scenario.intake(claimId).orElseThrow();
+
+		assertThat(state.decidingRunId).isNull();
+		assertThat(state.reviewRunId).isEqualTo(run.id());
+
+		this.scenario.decide(claimId, ReviewOutcome.READY, Set.of());
 
 		await()
 			.atMost(IntakeScenario.WAIT)
 			.until(() -> this.scenario.claim(claimId).status.equals("In Process"));
-		await()
-			.atMost(IntakeScenario.WAIT)
-			.until(() -> this.scenario.signalCount() == 0);
-		assertThat(this.scenario.intake(claimId).orElseThrow().decidingRunId).isNull();
 	}
 
 	@Test

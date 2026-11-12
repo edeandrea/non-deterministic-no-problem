@@ -1,5 +1,7 @@
 # Spike Results: Multi-Replica Intake (task 01)
 
+> **Superseded in part (2026-11-12):** the plan was re-scoped to a single replica that survives restarts (see PLAN.md). The Lease and second-JVM findings no longer apply; the Flow-restore and Flyway findings still do.
+
 Throwaway spike for #284. All evidence comes from throwaway tests run against the real app (bare `%test` group, `-Pollama`,
 WireMock-stubbed models, Dev Services Postgres/GreenMail), a scratch Maven project, and the library sources at the versions
 below. Every piece of scratch code was deleted; nothing here is merged or pushed.

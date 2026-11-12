@@ -28,8 +28,9 @@ and the AI panels move to #277, and the app ends up with one custom dashboard ra
 **Related, not part of the numbered order:** #277 Add a Grafana dashboard for the email intake metrics (blocked by
 #218; it inherits cluster provisioning and the AI row from it) and #284 Make the email intake safe to run with more
 than one replica (unblocked, and independent of everything above). #284 was planned on 2026-11-10:
-[`08-gh284-multi-replica-intake/PLAN.md`](08-gh284-multi-replica-intake/PLAN.md) covers an active/passive intake behind a
-Kubernetes Lease, decisions through a database command table, and Flyway in place of `drop-and-create`.
+[`08-gh284-intake-restart-survival/PLAN.md`](08-gh284-intake-restart-survival/PLAN.md) (retitled *Make the email intake survive restarts (single replica)* on 2026-11-12) covers restart survival
+(Flyway in place of `drop-and-create`, review reclaim, Processing recovery); single replica stays the supported topology and the limitation is documented. A Kubernetes
+Lease and a database signal table were built and removed as too much for a demo.
 
 **Related, not part of the numbered order:** #290 Triage the unrecognized configuration keys reported at startup
 (planned 2026-11-03; body in `github-issues/issue-10-unrecognized-config-keys.md`, plan in

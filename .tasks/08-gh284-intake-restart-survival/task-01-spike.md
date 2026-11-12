@@ -65,7 +65,7 @@ the reply needs (template, missing items, claim number, threading) and whether t
 
 ## Files/Areas
 
-- `.tasks/08-gh284-multi-replica-intake/spike-results.md` (new): one section per question, with the evidence (file and
+- `.tasks/08-gh284-intake-restart-survival/spike-results.md` (new): one section per question, with the evidence (file and
   line in the 1.3.0 sources, test output, timings)
 - Scratch code only, deleted at the end. The Flow 1.3.0 sources are cloned at `~/qf`.
 

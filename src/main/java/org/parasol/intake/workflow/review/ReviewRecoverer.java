@@ -14,14 +14,10 @@ import org.parasol.claim.model.ClaimNotFoundException;
 import org.parasol.claim.model.CorrespondenceDirection;
 import org.parasol.claim.model.IntakeClaimStatus;
 import org.parasol.intake.model.ClaimIntakeState;
-import org.parasol.intake.model.IntakeRunSignal;
-import org.parasol.intake.review.ReviewDecided;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
 import org.parasol.intake.workflow.IntakeRun;
 
 import ai.scoring.conversation.ConversationContext;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.logging.Log;
 
 /**
@@ -38,12 +34,10 @@ import io.quarkus.logging.Log;
 public class ReviewRecoverer {
 	private final Instance<ClaimIntakeFlow> flow;
 	private final ConversationContext conversationContext;
-	private final ObjectMapper objectMapper;
 
-	ReviewRecoverer(Instance<ClaimIntakeFlow> flow, ConversationContext conversationContext, ObjectMapper objectMapper) {
+	ReviewRecoverer(Instance<ClaimIntakeFlow> flow, ConversationContext conversationContext) {
 		this.flow = flow;
 		this.conversationContext = conversationContext;
-		this.objectMapper = objectMapper;
 	}
 
 	/**
@@ -55,7 +49,7 @@ public class ReviewRecoverer {
 	 */
 	public ReviewHandover recover(String faultedRunId, IntakeRun faultedRun) {
 		return reviewOwnedBy(faultedRunId)
-			.map(review -> handOver(review, faultedRunId, review.conversationIdOr(faultedRun.conversationId()), (conversationId, claimId) -> IntakeRun.resumingReview(faultedRun, conversationId, claimId), false))
+			.map(review -> handOver(review, faultedRunId, review.conversationIdOr(faultedRun.conversationId()), (conversationId, claimId) -> IntakeRun.resumingReview(faultedRun, conversationId, claimId)))
 			.orElse(ReviewHandover.NOT_NEEDED);
 	}
 
@@ -69,7 +63,7 @@ public class ReviewRecoverer {
 	 */
 	public ReviewHandover reclaim(String orphanedRunId) {
 		return reviewOwnedBy(orphanedRunId)
-			.map(review -> handOver(review, orphanedRunId, review.conversationIdOr(null), this::reclaimingRun, true))
+			.map(review -> handOver(review, orphanedRunId, review.conversationIdOr(null), this::reclaimingRun))
 			.orElse(ReviewHandover.NOT_NEEDED);
 	}
 
@@ -97,7 +91,7 @@ public class ReviewRecoverer {
 
 	// The new run is registered as the claim's review run before it starts, so a decision published as soon as it waits
 	// matches it
-	private ReviewHandover handOver(OwnedReview review, String orphanedRunId, String conversationId, BiFunction<String, Long, IntakeRun> runFor, boolean keepDecision) {
+	private ReviewHandover handOver(OwnedReview review, String orphanedRunId, String conversationId, BiFunction<String, Long, IntakeRun> runFor) {
 		return this.conversationContext.callIn(conversationId, () -> {
 			var instance = this.flow.get().instance(runFor.apply(conversationId, review.claimId()));
 
@@ -106,7 +100,7 @@ public class ReviewRecoverer {
 			// activeInstances map: cancel() is a no-op on a PENDING instance and removeInstance isn't public
 			// (open-workflow-specification/sdk-java#1816). Harmless — the id was never persisted, so nothing looks it up —
 			// but it is a leaked map entry. Discard the instance here once that issue is resolved.
-			if (takeOver(review.claimId(), orphanedRunId, instance.id(), keepDecision)) {
+			if (takeOver(review.claimId(), orphanedRunId, instance.id())) {
 				instance.start();
 				Log.warnf("Run %s no longer owns the review of claim %d: run %s now waits for the decision", orphanedRunId, review.claimId(), instance.id());
 
@@ -119,35 +113,20 @@ public class ReviewRecoverer {
 		});
 	}
 
-	// Under the intake state's optimistic lock: only if the old run still owns the review. A reviewer's decision already claimed for it
-	// (decidingRunId) is kept when asked to and its signal can be re-addressed; otherwise the review goes back to open
+	// Under the intake state's optimistic lock: only if the old run still owns the review. A decision the reviewer already claimed for the
+	// old run (decidingRunId) isn't kept: it was only in that run's memory, so the review goes back to open for the new run
 	// Non-private and non-final, so the transaction interceptor applies to the call from this class
 	@Transactional(TxType.REQUIRES_NEW)
-	boolean takeOver(long claimId, String orphanedRunId, String newRunId, boolean keepDecision) {
+	boolean takeOver(long claimId, String orphanedRunId, String newRunId) {
 		return ClaimIntakeState.findForClaim(claimId)
 			.filter(state -> orphanedRunId.equals(state.reviewRunId) || orphanedRunId.equals(state.decidingRunId))
 			.map(state -> {
-				var keeps = keepDecision && orphanedRunId.equals(state.decidingRunId) && retarget(claimId, orphanedRunId, newRunId);
-
 				state.reviewRunId = newRunId;
-				state.decidingRunId = keeps ? newRunId : null;
+				state.decidingRunId = null;
 
 				return true;
 			})
 			.orElse(false);
-	}
-
-	private boolean retarget(long claimId, String orphanedRunId, String newRunId) {
-		return IntakeRunSignal.retarget(claimId, orphanedRunId, newRunId, payload -> {
-			try {
-				var decided = this.objectMapper.readValue(payload, ReviewDecided.class);
-
-				return this.objectMapper.writeValueAsString(new ReviewDecided(decided.claimId(), newRunId, decided.decision()));
-			}
-			catch (JsonProcessingException e) {
-				throw new IllegalStateException("Couldn't re-address the review decision of claim %d".formatted(claimId), e);
-			}
-		}) > 0;
 	}
 
 	record OwnedReview(long claimId, String conversationId) {
