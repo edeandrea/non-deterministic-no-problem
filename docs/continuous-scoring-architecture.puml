@@ -93,7 +93,7 @@ rectangle "<$quarkus>\nParasol Application (single Quarkus container)" as App <<
 ' EXTERNAL SYSTEMS
 ' =====================================================================
 together {
-	component "<$brain>\nOpenAI\n<i>gpt-5-mini + embeddings</i>" as OpenAI #FFFFFF
+	component "<$brain>\nOpenAI\n<i>gpt-6-luna + embeddings</i>" as OpenAI #FFFFFF
 	component "<$brain>\nCohere\n<i>command-r7b-12-2024 via</i>\n<i>api.cohere.ai/compatibility/v1</i>" as Cohere #FFFFFF
 }
 

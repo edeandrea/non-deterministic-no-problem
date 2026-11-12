@@ -600,23 +600,25 @@ Model names are configured in `src/main/resources/application.yml` and resolve p
 
 | Model name | Used by | Default (OpenAI profile) |
 |---|---|---|
-| `parasol-chat` | `ClaimService` | `gpt-5-mini` |
-| `generate-email` | `GenerateEmailService` | `gpt-5-mini` |
-| `politeness` | `PolitenessService` | `gpt-5-mini` |
+| `parasol-chat` | `ClaimService` | `gpt-6-luna` |
+| `generate-email` | `GenerateEmailService` | `gpt-6-luna` |
+| `politeness` | `PolitenessService` | `gpt-6-luna` |
 | `session-sentiment` | `SessionSentimentService` | Cohere `command-r7b-12-2024` via its OpenAI-compatible endpoint |
 | `judge` | `EvaluatorAgent` (drift detection) | Cohere `command-r7b-12-2024` via its OpenAI-compatible endpoint |
-| `claim-intake` | The email intake agents (#216): `ClaimSummaryAgent`, `ClaimSentimentAgent`, `IncidentDetailsAgent` | `gpt-5-mini` |
+| `claim-intake` | The email intake agents (#216): `ClaimSummaryAgent`, `ClaimSentimentAgent`, `IncidentDetailsAgent` | `gpt-6-luna` |
 
 Note the Cohere models are reached through the **OpenAI** extension pointed at
 `https://api.cohere.ai/compatibility/v1` with `COHERE_API_KEY` — there is no Cohere-specific
 extension in the build.
 
-Every base (non-profile) `quarkus.langchain4j.openai.<name>.chat-model` block sets `temperature` **and** `top-p`
-explicitly. That is deliberate. Since quarkus-langchain4j 1.14 the OpenAI extension leaves both
-out of the request unless they are configured, so the provider's own default applies. The
-explicit values keep the pre-1.14 wire behavior (temperature `1.0` unless overridden, top-p `1.0`).
-Don't delete the `top-p: 1` lines because they look redundant. The `%ollama-openai` overrides
-inherit these values, because they only repoint `base-url` and `model-name`.
+Since quarkus-langchain4j 1.14 the OpenAI extension leaves `temperature` and `top-p` out of the request
+unless they are configured, so the provider's own default applies. The four `gpt-6-luna` blocks
+(`parasol-chat`, `generate-email`, `politeness`, `claim-intake`) deliberately set neither: `gpt-6-luna`
+is a reasoning model (default effort `medium`) and OpenAI rejects both parameters with
+`Unsupported parameter: 'top_p' is not supported with this model` unless `reasoning.effort` is `none`.
+Don't add them back. The Cohere blocks (`session-sentiment`, `judge`) keep explicit values to preserve the
+pre-1.14 wire behavior (temperature `1.0` unless overridden, top-p `1.0`). The `%ollama-openai` profile
+sets `temperature: 1` and `top-p: 1` itself for the same reason, since Ollama has no such restriction.
 
 There are **two separate judges**, which is easy to confuse:
 - The in-app `judge` model above, driving `EvaluatorAgent` → `Evaluator` for tier-3 drift detection.
