@@ -14,6 +14,7 @@ import org.parasol.intake.model.MatchedClaim;
 
 import dev.langchain4j.agentic.agent.ErrorContext;
 import dev.langchain4j.agentic.agent.ErrorRecoveryResult;
+import dev.langchain4j.agentic.declarative.BeforeCall;
 import dev.langchain4j.agentic.declarative.ErrorHandler;
 import dev.langchain4j.agentic.declarative.Output;
 import dev.langchain4j.agentic.declarative.SequenceAgent;
@@ -49,17 +50,8 @@ public interface ClaimsMailboxAgent /* extends MonitoredAgent */ {
 	 * itself
 	 * @param requestedItems what we last asked the customer for, including reviewer-checked items; empty if nothing
 	 * @param sentDate the newest email's sent date as an ISO {@code yyyy-MM-dd} string
-	 * @param invocationParameters always {@link ClaimStatusTools#scopedTo ClaimStatusTools.scopedTo(matchedClaim)}: scopes
-	 * the follow-up agent's status tool to the matched claim, so the model can't pick another claim. It goes into the
-	 * scope's execution context, never into a prompt
 	 * @return the outcome, with the label the classifier gave the email
 	 */
-	// invocationParameters is a root argument only because quarkus-langchain4j 1.14.1's build-time check
-	// (AgenticProcessor#validateAgenticParameterTypes) skips AgenticScope and @MemoryId parameters but not
-	// InvocationParameters: ClaimFollowUpAgent's one fails the build ("No agent provides an output key named
-	// 'invocationParameters'") unless a caller-provided parameter has the same name. langchain4j-agentic itself fills it
-	// from the execution context at runtime (AgentUtil). quarkiverse/quarkus-langchain4j#2950: once fixed, a @BeforeCall
-	// can write the parameters into the scope instead, and this argument goes
 	@SequenceAgent(outputKey = "classifiedOutcome", subAgents = {
 		EmailClassifierAgent.class,
 		EmailRouter.class
@@ -69,8 +61,19 @@ public interface ClaimsMailboxAgent /* extends MonitoredAgent */ {
 		MatchedClaim matchedClaim,
 		IncidentDetails extractedSoFar,
 		Collection<MissingItem> requestedItems,
-		String sentDate,
-		InvocationParameters invocationParameters);
+		String sentDate);
+
+	/**
+	 * Scopes the follow-up agent's status tool to the matched claim, so the model can't pick another claim: the parameters go
+	 * into the scope's execution context, where langchain4j-agentic reads an agent's {@code InvocationParameters} from, never
+	 * into a prompt.
+	 *
+	 * @param agenticScope the root's scope, already holding the root's arguments
+	 */
+	@BeforeCall
+	static void scopeStatusToolToMatchedClaim(AgenticScope agenticScope) {
+		agenticScope.writeExecutionContext(InvocationParameters.class, ClaimStatusTools.scopedTo((MatchedClaim) agenticScope.readState("matchedClaim")));
+	}
 
 	/**
 	 * Pairs the router's outcome with the classifier's label. It reads the scope, whose keys are the sub-agents' output keys: the

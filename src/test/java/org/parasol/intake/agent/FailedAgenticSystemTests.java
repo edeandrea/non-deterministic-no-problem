@@ -16,7 +16,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.ChatStubs;
 import org.parasol.intake.IntakeScenario;
-import org.parasol.intake.agent.triage.ClaimStatusTools;
 import org.parasol.intake.model.EmailType;
 import org.parasol.intake.model.IncidentDetails;
 import org.parasol.intake.model.MatchedClaim;
@@ -91,8 +90,7 @@ class FailedAgenticSystemTests {
 				MatchedClaim.none(),
 				IncidentDetails.empty(),
 				Set.of(),
-				SENT_DATE,
-				ClaimStatusTools.scopedTo(MatchedClaim.none())));
+				SENT_DATE));
 
 		await()
 			.atMost(IntakeScenario.WAIT)

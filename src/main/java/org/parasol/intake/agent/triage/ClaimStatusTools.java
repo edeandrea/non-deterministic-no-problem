@@ -13,7 +13,7 @@ import dev.langchain4j.invocation.InvocationParameters;
  * {@link ClaimFollowUpAgent}'s read-only status tool, scoped to the claim the intake already matched.
  * <p>
  * The tool takes no argument from the model: the matched claim arrives as {@link InvocationParameters}, which
- * {@code ClaimsMailboxAgent} puts into the agentic scope before the agents run ({@link #scopedTo}). So a prompt
+ * {@code ClaimsMailboxAgent}'s {@code @BeforeCall} puts into the agentic scope's execution context before the agents run ({@link #scopedTo}). So a prompt
  * injection can't make it look up another claim. It reads nothing from the database either: the status is the one the
  * intake matched the claim with, so the tool can't change anything.
  */
