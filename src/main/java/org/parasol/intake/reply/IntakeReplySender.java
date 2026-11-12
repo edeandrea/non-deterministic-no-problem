@@ -85,7 +85,7 @@ public class IntakeReplySender {
 		var fullSubject = subjectPrefix(Optional.of(claimNumber)) + normalizeSubject(subject);
 
 		sendText(recipient, fullSubject, body, messageId, threadingHeaders);
-		record(claimNumber, new SentReply(messageId, fullSubject, body));
+		record(claimNumber, new SentReply(messageId, fullSubject, body, threadingHeaders.inReplyTo().orElse(null)));
 	}
 
 	/**
@@ -120,7 +120,7 @@ public class IntakeReplySender {
 		var mail = baseMail(messageId, threadingHeaders);
 
 		sendTemplate(template, mail, recipient, fullSubject);
-		record(claimNumber, new SentReply(messageId, fullSubject, mail.getText()));
+		record(claimNumber, new SentReply(messageId, fullSubject, mail.getText(), threadingHeaders.inReplyTo().orElse(null)));
 	}
 
 	/**

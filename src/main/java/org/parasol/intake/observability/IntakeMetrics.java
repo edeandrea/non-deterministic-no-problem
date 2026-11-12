@@ -28,6 +28,7 @@ import org.parasol.intake.observability.IntakeActivity.MailboxLockAcquired;
 import org.parasol.intake.observability.IntakeActivity.NewClaimExtracted;
 import org.parasol.intake.observability.IntakeActivity.ReplySent;
 import org.parasol.intake.observability.IntakeActivity.ReviewDecisionApplied;
+import org.parasol.intake.observability.IntakeActivity.ReviewReclaimed;
 import org.parasol.intake.observability.IntakeActivity.WatcherConnectionChanged;
 import org.parasol.intake.observability.IntakeActivity.WatcherReconnecting;
 
@@ -100,6 +101,13 @@ class IntakeMetrics {
 			.register(registry);
 
 		this.gauges = List.of(connected, pending, depth, oldest);
+	}
+
+	void onReviewReclaimed(@Observes ReviewReclaimed reclaimed) {
+		Counter.builder("claim.intake.reviews.reclaimed")
+			.description("Reviews whose run was gone and that the restarted application gave to a new run")
+			.register(this.registry)
+			.increment();
 	}
 
 	void onEmailHandled(@Observes EmailHandled handled) {

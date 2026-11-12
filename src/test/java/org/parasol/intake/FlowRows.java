@@ -11,7 +11,7 @@ import jakarta.transaction.Transactional.TxType;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
 
 /**
- * What quarkus-flow has persisted, read straight from its three tables: {@code workflow_instance_entity} (a run),
+ * What quarkus-flow has persisted, read straight from its tables (it has six; these are the three read here): {@code workflow_instance_entity} (a run),
  * {@code task_info_entity} (a run's tasks) and {@code cloud_event_entity} (the events a waiting run listens for).
  * <p>
  *   These are another extension's tables, so there's no entity of ours to go through and no Panache: a native count is the

@@ -81,6 +81,7 @@ final class IntakeMeterSchema {
 			meter("claim.intake.mail.client.duration", Map.of("protocol", Set.of("imap", "smtp"), "operation", Set.<String>of(), "outcome", Set.of("success", "error"))),
 			meter("claim.intake.mailbox.lock.wait", Map.of("mode", Arrays.stream(MailboxLockMode.values()).map(MailboxLockMode::tag).collect(Collectors.toSet()))),
 			meter("claim.intake.inbox.depth", Map.<String, Set<String>>of()),
-			meter("claim.intake.review.oldest.pending", Map.<String, Set<String>>of()));
+			meter("claim.intake.review.oldest.pending", Map.<String, Set<String>>of()),
+			meter("claim.intake.reviews.reclaimed", Map.<String, Set<String>>of()));
 	}
 }

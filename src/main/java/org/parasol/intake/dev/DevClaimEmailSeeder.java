@@ -5,6 +5,7 @@ import java.util.List;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 
+import org.parasol.claim.model.Claim;
 import org.parasol.intake.config.IntakeConfig;
 
 import io.quarkus.arc.properties.IfBuildProperty;
@@ -13,6 +14,7 @@ import io.quarkus.mailer.Mail;
 import io.quarkus.mailer.reactive.ReactiveMailer;
 import io.quarkus.runtime.LaunchMode;
 import io.quarkus.runtime.StartupEvent;
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 
@@ -20,7 +22,8 @@ import io.smallrye.mutiny.Uni;
  * Dev mode only: mails two claims to the claims address at startup so the review screens have something to show. The real
  * intake does the rest (the claims inbox watcher, the agents, the review wait), so this needs the same model as any other
  * intake email. The first email is complete and ends up {@code Pending Review}; the second says nothing about when or where,
- * so it ends up {@code Pending Information}. GreenMail keeps mail in memory, so they are sent again on every start.
+ * so it ends up {@code Pending Information}. The database survives a live reload, so they're sent only while no claim beyond the
+ * six seeded ones exists; a restart of dev mode starts from a fresh database and sends them again.
  * <p>
  *   The bean exists only when the build property {@code parasol.dev-seed.enabled} is {@code true} ({@code %dev} in
  *   {@code application.yml}, and the Ollama Maven profiles' {@code quarkus:dev} configuration, since they run dev under the
@@ -30,6 +33,8 @@ import io.smallrye.mutiny.Uni;
 @ApplicationScoped
 @IfBuildProperty(name = "parasol.dev-seed.enabled", stringValue = "true")
 class DevClaimEmailSeeder {
+	private static final long SEEDED_CLAIMS = 6;
+
 	private static final List<DevEmail> EMAILS = List.of(
 		new DevEmail(
 			"dev.pending-review@example.com",
@@ -68,7 +73,7 @@ class DevClaimEmailSeeder {
 	}
 
 	void onStart(@Observes StartupEvent event) {
-		if ((LaunchMode.current() == LaunchMode.DEVELOPMENT) && this.config.enabled()) {
+		if ((LaunchMode.current() == LaunchMode.DEVELOPMENT) && this.config.enabled() && !hasClaimsBeyondSeed()) {
 			// Sent one after the other, without blocking startup
 			Multi.createFrom().iterable(EMAILS)
 				.onItem().transformToUniAndConcatenate(this::send)
@@ -78,6 +83,10 @@ class DevClaimEmailSeeder {
 					sent -> Log.infof("Dev mode: sent %d sample claim emails to %s", sent.size(), this.config.address()),
 					e -> Log.warnf(e, "Dev mode: couldn't send the sample claim emails to %s", this.config.address()));
 		}
+	}
+
+	private static boolean hasClaimsBeyondSeed() {
+		return QuarkusTransaction.requiringNew().call(() -> Claim.count("id > ?1", SEEDED_CLAIMS) > 0);
 	}
 
 	private Uni<Void> send(DevEmail email) {

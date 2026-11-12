@@ -13,10 +13,10 @@ import io.cloudevents.core.builder.CloudEventBuilder;
 import io.serverlessworkflow.impl.WorkflowApplication;
 
 /**
- * Publishes a reviewer's decision as the CloudEvent the waiting intake run listens for.
+ * Publishes a reviewer's decision as the CloudEvent the waiting intake run listens for. It reaches only runs hosted in this instance (Flow's
+ * publisher is in memory), which is why the intake runs as a single replica.
  * <p>
- *   A run that hasn't reached its wait yet misses the event, so a caller that must be sure it was delivered republishes
- *   until the run leaves {@code WAITING}.
+ *   A run that hasn't reached its wait yet misses the event, so {@code ClaimReviewService} republishes until the run has taken it.
  * </p>
  */
 @ApplicationScoped

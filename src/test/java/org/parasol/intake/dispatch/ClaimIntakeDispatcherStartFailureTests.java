@@ -12,10 +12,10 @@ import static org.mockito.Mockito.when;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
 
 import jakarta.enterprise.inject.Instance;
 
-import org.eclipse.microprofile.context.ManagedExecutor;
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.config.IntakeConfig;
 import org.parasol.intake.failure.IntakeFailureHandler;
@@ -72,7 +72,7 @@ class ClaimIntakeDispatcherStartFailureTests {
 		var matcher = mock(ClaimMatcher.class);
 		var activities = mock(IntakeActivities.class);
 		var flowInstance = mock(Instance.class);
-		var executor = mock(ManagedExecutor.class);
+		var executor = mock(ExecutorService.class);
 
 		when(config.address()).thenReturn("claims@parasol.com");
 		when(mailbox.find(any(MailFolder.class), anyString())).thenAnswer(call -> Optional.of(email(call.getArgument(1))));
@@ -86,7 +86,7 @@ class ClaimIntakeDispatcherStartFailureTests {
 			return null;
 		}).when(executor).execute(any(Runnable.class));
 
-		return new ClaimIntakeDispatcher(config, mailbox, recorder, matcher, failureHandler, new ConversationContext(), activities, flowInstance, executor);
+		return new ClaimIntakeDispatcher(config, mailbox, recorder, matcher, failureHandler, new ConversationContext(), activities, flowInstance, executor, mock(ProcessingRecovery.class), mock(org.parasol.intake.workflow.review.ReviewReclaimer.class));
 	}
 
 	private static InboundEmail email(String messageId) {

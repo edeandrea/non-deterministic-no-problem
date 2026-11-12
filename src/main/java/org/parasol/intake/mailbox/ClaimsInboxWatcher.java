@@ -36,7 +36,7 @@ import io.smallrye.mutiny.subscription.Cancellable;
  * only when the intake is enabled, and never blocking startup: if the mailbox is unreachable it keeps retrying, doubling its delay
  * up to a limit.
  * <p>
- *   The pipeline loops: connect; on the first connection of this JVM, hand over what a previous JVM left in the processing
+ *   The pipeline loops: connect; on the first connection of this instance, hand over what a previous instance left in the processing
  *   folder (where it is, oldest first, since it arrived before anything in the INBOX); move each email in the INBOX to the
  *   processing folder, oldest first, and hand it over; then IDLE until the INBOX changes. Moving it out of the INBOX is what
  *   stops a second pickup. The observer records the {@code Message-ID} and skips duplicates, so the watcher doesn't look at
@@ -286,7 +286,7 @@ class ClaimsInboxWatcher {
 		}
 	}
 
-	// What a previous JVM left in the processing folder arrived before anything in the INBOX, so it goes first, where it is
+	// What a previous instance left in the processing folder arrived before anything in the INBOX, so it goes first, where it is
 	private void handOverProcessing() {
 		List<InboundEmail> leftOver = this.mailbox.list(MailFolder.PROCESSING);
 
@@ -294,21 +294,21 @@ class ClaimsInboxWatcher {
 			Log.infof("Handing over %d email(s) left in the processing folder", leftOver.size());
 		}
 
-		leftOver.forEach(this::handOver);
+		leftOver.forEach(email -> handOver(email, true));
 	}
 
 	private void handOverInbox() {
 		var next = this.mailbox.moveOldest(MailFolder.INBOX, MailFolder.PROCESSING);
 
 		while (next.isPresent() && !this.isStopping) {
-			handOver(next.get());
+			handOver(next.get(), false);
 			next = this.mailbox.moveOldest(MailFolder.INBOX, MailFolder.PROCESSING);
 		}
 	}
 
-	private void handOver(InboundEmail email) {
+	private void handOver(InboundEmail email, boolean isRecovery) {
 		try {
-			this.received.fire(new EmailReceived(email));
+			this.received.fire(new EmailReceived(email, isRecovery));
 		}
 		catch (RuntimeException e) {
 			Log.errorf(e, "Couldn't hand over the email %s", email.messageId().orElse("without a Message-ID"));

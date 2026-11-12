@@ -39,7 +39,10 @@ import io.quarkus.panache.common.Sort;
  * </p>
  */
 @Entity
-@Table(name = "claim_correspondence", indexes = @Index(name = "claim_correspondence_claim_id_idx", columnList = "claim_id"))
+@Table(name = "claim_correspondence", indexes = {
+	@Index(name = "claim_correspondence_claim_id_idx", columnList = "claim_id"),
+	@Index(name = "claim_correspondence_in_reply_to_idx", columnList = "in_reply_to")
+})
 public class ClaimCorrespondence extends PanacheEntity {
 	@Column(nullable = false, unique = true, updatable = false)
 	public String messageId;
@@ -78,6 +81,19 @@ public class ClaimCorrespondence extends PanacheEntity {
 	public String strippedText;
 
 	/**
+	 * For an outbound row, the {@code Message-ID} of the inbound email the reply answers; {@code null} for an inbound row. It tells a
+	 * recovering instance that an email was already answered.
+	 */
+	public String inReplyTo;
+
+	/**
+	 * Whether this inbound email's reply was merged into its claim (a pending claim's update). {@code false} for every other row, including
+	 * a status question, which changes nothing.
+	 */
+	@Column(nullable = false)
+	public boolean mergedIntoClaim;
+
+	/**
 	 * Records a reply the intake sent about a claim. The row is persisted in the current transaction.
 	 *
 	 * @param claim the claim the reply is about
@@ -88,6 +104,21 @@ public class ClaimCorrespondence extends PanacheEntity {
 	 * @return the persisted row
 	 */
 	public static ClaimCorrespondence recordReply(Claim claim, String messageId, String sender, String subject, String text) {
+		return recordReply(claim, messageId, sender, subject, text, null);
+	}
+
+	/**
+	 * Records a reply the intake sent about a claim, and which email it answers. The row is persisted in the current transaction.
+	 *
+	 * @param claim the claim the reply is about
+	 * @param messageId the {@code Message-ID} the reply was sent with
+	 * @param sender the address the reply was sent from
+	 * @param subject the subject as sent
+	 * @param text the text sent
+	 * @param inReplyTo the {@code Message-ID} of the email the reply answers, or {@code null}
+	 * @return the persisted row
+	 */
+	public static ClaimCorrespondence recordReply(Claim claim, String messageId, String sender, String subject, String text, String inReplyTo) {
 		// The column keeps microseconds; truncating returns the row as stored (a Linux clock ticks in nanoseconds)
 		var sentAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
 		var correspondence = new ClaimCorrespondence();
@@ -100,6 +131,7 @@ public class ClaimCorrespondence extends PanacheEntity {
 		correspondence.sender = sender;
 		correspondence.subject = subject;
 		correspondence.strippedText = text;
+		correspondence.inReplyTo = inReplyTo;
 		correspondence.persist();
 
 		return correspondence;
@@ -165,6 +197,16 @@ public class ClaimCorrespondence extends PanacheEntity {
 		return ClaimCorrespondence.<ClaimCorrespondence>find("claim = ?1 and direction = ?2 order by receivedAt", claim, CorrespondenceDirection.INBOUND)
 			.firstResultOptional()
 			.map(correspondence -> correspondence.receivedAt);
+	}
+
+	/**
+	 * Whether a reply was recorded for an inbound email.
+	 *
+	 * @param messageId the inbound email's {@code Message-ID}
+	 * @return {@code true} if an outbound row answers it
+	 */
+	public static boolean hasReplyTo(String messageId) {
+		return count("direction = ?1 and inReplyTo = ?2", CorrespondenceDirection.OUTBOUND, messageId) > 0;
 	}
 
 	/**

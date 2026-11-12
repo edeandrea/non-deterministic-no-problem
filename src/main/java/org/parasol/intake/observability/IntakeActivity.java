@@ -143,4 +143,10 @@ public sealed interface IntakeActivity {
 	 */
 	record WatcherReconnecting() implements IntakeActivity {
 	}
+
+	/**
+	 * The restarted application gave a review whose run was gone to a new run.
+	 */
+	record ReviewReclaimed() implements IntakeActivity {
+	}
 }

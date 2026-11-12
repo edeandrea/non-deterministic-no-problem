@@ -45,7 +45,7 @@ class IntakeJsonRoundTripTests {
 	@Test
 	void anIntakeRunWithoutAReceivedTimeRoundTrips() throws Exception {
 		// A run persisted before the received time was recorded has none
-		var legacy = new IntakeRun("<id@example.com>", "conversation", "jane@example.com", 7L, true, false, null);
+		var legacy = new IntakeRun("<id@example.com>", "conversation", "jane@example.com", 7L, true, false, false, null);
 
 		assertRoundTrips(legacy);
 		assertThat(this.objectMapper.readValue("""

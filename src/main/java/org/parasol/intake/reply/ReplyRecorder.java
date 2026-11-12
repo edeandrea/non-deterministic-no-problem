@@ -27,7 +27,7 @@ class ReplyRecorder {
 	void record(String claimNumber, SentReply reply) {
 		Claim.findByClaimNumber(claimNumber)
 			.ifPresentOrElse(
-				claim -> ClaimCorrespondence.recordReply(claim, reply.messageId(), this.sender, reply.subject(), reply.text()),
+				claim -> ClaimCorrespondence.recordReply(claim, reply.messageId(), this.sender, reply.subject(), reply.text(), reply.inReplyTo()),
 				() -> Log.warnf("Sent a reply about claim %s, but there's no such claim to record it against", claimNumber));
 	}
 }

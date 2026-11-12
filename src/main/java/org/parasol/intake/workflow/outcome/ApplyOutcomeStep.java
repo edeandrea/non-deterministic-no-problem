@@ -95,7 +95,7 @@ public class ApplyOutcomeStep {
 		intake.policyNumberGenerated = state.policyNumberGenerated();
 		setReviewState(intake, isComplete, missing, runId);
 
-		linkCorrespondenceAndStoreImages(email, claim, true);
+		linkCorrespondenceAndStoreImages(email, claim, true, false);
 
 		this.activities.publish(new ClaimStatusChanged(statusFor(isComplete)));
 		this.activities.publish(new NewClaimExtracted(ClaimExtractionRules.completeness(missing), missing));
@@ -120,7 +120,7 @@ public class ApplyOutcomeStep {
 
 		claim.status = statusFor(isComplete).label();
 		setReviewState(intake, isComplete, missing, runId);
-		linkCorrespondenceAndStoreImages(email, claim, false);
+		linkCorrespondenceAndStoreImages(email, claim, false, true);
 		Claim.flush();
 
 		this.activities.publish(new ClaimStatusChanged(statusFor(isComplete)));
@@ -149,12 +149,13 @@ public class ApplyOutcomeStep {
 	// The email's row is looked up once: it gets the claim, and the photos link to it so the transcript shows them with their
 	// message. A row is missing only for an email without a Message-ID, which the dispatcher filters out before this step, so
 	// the claim-only store is a fallback that keeps the photos on the claim
-	private static void linkCorrespondenceAndStoreImages(InboundEmail email, Claim claim, boolean createdClaim) {
+	private static void linkCorrespondenceAndStoreImages(InboundEmail email, Claim claim, boolean createdClaim, boolean mergedIntoClaim) {
 		var correspondence = email.messageId().flatMap(ClaimCorrespondence::findByMessageId);
 
 		correspondence.ifPresent(row -> {
 			row.claim = claim;
 			row.createdClaim = createdClaim;
+			row.mergedIntoClaim = mergedIntoClaim;
 		});
 
 		email.images()

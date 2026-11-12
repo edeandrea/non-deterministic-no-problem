@@ -16,8 +16,8 @@ import org.hibernate.generator.OnExecutionGenerator;
  * <ul>
  *   <li>The column's default ({@link #COLUMN_DEFAULT}) produces the value. This generator only tells Hibernate to leave the
  *   column out of the {@code INSERT} and read it back ({@code insert ... returning claim_number}).</li>
- *   <li>As an {@link ExportableProducer} it registers the sequence in Hibernate's relational model. Schema management
- *   therefore creates it before the tables and drops it on drop-and-create. A {@code @SequenceGenerator} can't be used:
+ *   <li>As an {@link ExportableProducer} it registers the sequence in Hibernate's relational model. The schema itself comes from
+ *   Flyway ({@code V1__baseline.sql}), but this is what makes {@code validate} check the sequence's increment. A {@code @SequenceGenerator} can't be used:
  *   on its own it takes over the entity's id generation, and an unused one is never created.</li>
  *   <li>The sequence has {@code maxvalue 99999999}. Past that, {@code lpad} would silently truncate to 8 digits and
  *   produce wrong, possibly colliding numbers; the maximum turns that into a clear {@code nextval} error instead.</li>

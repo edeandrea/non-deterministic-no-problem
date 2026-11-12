@@ -1,5 +1,6 @@
 package org.parasol.intake;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 import java.time.Duration;
@@ -37,6 +38,7 @@ import org.parasol.intake.mailbox.ClaimsMailbox;
 import org.parasol.intake.mailbox.InboundEmail;
 import org.parasol.intake.mailbox.MailFolder;
 import org.parasol.intake.model.ClaimIntakeState;
+import org.parasol.intake.review.ClaimReviewService;
 import org.parasol.intake.review.ReviewDecided;
 import org.parasol.intake.review.ReviewDecision;
 import org.parasol.intake.review.ReviewedFields;
@@ -377,6 +379,30 @@ public class IntakeScenario {
 			.orElse(false);
 	}
 
+	/**
+	 * Makes the claim's review look like its run hasn't reached its wait yet.
+	 */
+	@Transactional(TxType.REQUIRES_NEW)
+	public void forgetWaiting(long claimId) {
+		ClaimIntakeState.findForClaim(claimId).orElseThrow().reviewWaitingRunId = null;
+	}
+
+	/**
+	 * Whether a decision about the claim would be accepted right now, as {@code GET /review} says.
+	 */
+	@Transactional(TxType.REQUIRES_NEW)
+	public boolean isReadyForDecision(long claimId, ClaimReviewService service) {
+		return ClaimIntakeState.findForClaim(claimId).map(service::isReadyForDecision).orElse(false);
+	}
+
+	/**
+	 * Puts the claim's review back, as a decision step that faulted does: nobody is deciding it.
+	 */
+	@Transactional(TxType.REQUIRES_NEW)
+	public void releaseDecision(long claimId) {
+		ClaimIntakeState.findForClaim(claimId).orElseThrow().decidingRunId = null;
+	}
+
 	public void publish(ReviewDecided decided) {
 		this.publisher.publish(decided);
 	}
@@ -513,6 +539,54 @@ public class IntakeScenario {
 	@Transactional(TxType.REQUIRES_NEW)
 	public Optional<ClaimIntakeState> intake(long claimId) {
 		return ClaimIntakeState.findForClaim(claimId);
+	}
+
+	/**
+	 * Hands an email in the processing folder to the recovery, as the watcher does for what a dead instance left there.
+	 */
+	public void recover(InboundEmail email) {
+		this.starter.recover(email);
+	}
+
+	/**
+	 * Moves a filed email back to the processing folder, as it was when the run that was handling it died.
+	 */
+	public InboundEmail backToProcessing(String messageId) {
+		assertThat(this.mailbox.move(messageId, MailFolder.PROCESSED, MailFolder.PROCESSING)).isTrue();
+
+		return this.mailbox.find(MailFolder.PROCESSING, messageId).orElseThrow();
+	}
+
+	/**
+	 * Records an email as accepted, with no claim, as the dispatcher does before a run starts.
+	 */
+	@Transactional(TxType.REQUIRES_NEW)
+	public void recordAccepted(InboundEmail email) {
+		var row = new ClaimCorrespondence();
+		row.messageId = email.messageId().orElseThrow();
+		row.direction = CorrespondenceDirection.INBOUND;
+		row.sentDate = email.sentDate();
+		row.receivedAt = email.receivedDate();
+		row.sender = email.fromAddress().orElse(null);
+		row.subject = email.subject();
+		row.strippedText = email.strippedBody();
+		row.persist();
+	}
+
+	/**
+	 * Forgets the replies sent about a claim, as if the run that sent them died before recording them.
+	 */
+	@Transactional(TxType.REQUIRES_NEW)
+	public void forgetReplies(long claimId) {
+		ClaimCorrespondence.delete("claim.id = ?1 and direction = ?2", claimId, CorrespondenceDirection.OUTBOUND);
+	}
+
+	/**
+	 * How many recorded rows an inbound email has.
+	 */
+	@Transactional(TxType.REQUIRES_NEW)
+	public long recordedRows(String messageId) {
+		return ClaimCorrespondence.count("messageId", messageId);
 	}
 
 	/**

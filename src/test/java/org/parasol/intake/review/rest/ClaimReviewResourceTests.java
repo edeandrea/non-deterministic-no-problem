@@ -172,7 +172,7 @@ class ClaimReviewResourceTests extends IntakeFlowTestBase {
 	}
 
 	@Test
-	void aPendingReviewClaimWhoseRunIsGoneIsNotFoundAndTheReviewIsRestored() {
+	void aDecisionForARunThatIsNotHostedHereIsConflictAndLeavesTheReviewOpen() {
 		var created = createClaim(SENDER, COMPLETE_DETAILS);
 		var run = this.scenario.awaitWaitingRun(created.claim().id);
 		var review = getReview(created.claim().id);
@@ -182,16 +182,10 @@ class ClaimReviewResourceTests extends IntakeFlowTestBase {
 			.atMost(IntakeScenario.WAIT)
 			.until(() -> run.status() == WorkflowStatus.CANCELLED);
 
-		var problem = getProblem(
-			postDecision(created.claim().id, ready(review.version())),
-			Status.NOT_FOUND);
+		var problem = getProblem(postDecision(created.claim().id, ready(review.version())), Status.CONFLICT);
 
-		assertThat(problem.detail()).contains("no longer exists");
-
-		// The compensating transaction (a failed step-2 check) leaves the claim's reviewRunId exactly as it was
-		var state = this.scenario.intake(created.claim().id).orElseThrow();
-		assertThat(state.reviewRunId).isEqualTo(run.id());
-		assertThat(state.decidingRunId).isNull();
+		assertThat(problem.detail()).contains("isn't waiting for a decision");
+		assertThat(this.scenario.intake(created.claim().id).orElseThrow().decidingRunId).isNull();
 		assertThat(this.scenario.claim(created.claim().id).status).isEqualTo("Pending Review");
 	}
 

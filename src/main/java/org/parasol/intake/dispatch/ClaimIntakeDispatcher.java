@@ -7,7 +7,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 
@@ -15,7 +17,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.enterprise.inject.Instance;
 
-import org.eclipse.microprofile.context.ManagedExecutor;
 import org.parasol.intake.config.IntakeConfig;
 import org.parasol.intake.failure.IntakeFailureHandler;
 import org.parasol.intake.mailbox.ClaimsMailbox;
@@ -32,9 +33,11 @@ import org.parasol.intake.observability.IntakeActivity.EmailHandled;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
 import org.parasol.intake.workflow.EmailRequeued;
 import org.parasol.intake.workflow.IntakeRun;
+import org.parasol.intake.workflow.review.ReviewReclaimer;
 
 import ai.scoring.conversation.ConversationContext;
 import io.quarkus.logging.Log;
+import io.quarkus.virtual.threads.VirtualThreads;
 import io.serverlessworkflow.impl.WorkflowStatus;
 import io.serverlessworkflow.impl.lifecycle.TaskStartedEvent;
 import io.serverlessworkflow.impl.lifecycle.WorkflowExecutionListener;
@@ -46,7 +49,7 @@ import io.smallrye.mutiny.Uni;
  * sender's emails in order. It never waits for a run.
  * <p>
  *   {@link #submit} does the checks that need no claim (auto-replies and self-sent mail, a missing or repeated
- *   {@code Message-ID}) and queues the rest. When an email's turn comes, on the managed executor, it's re-read, matched to a
+ *   {@code Message-ID}) and queues the rest. When an email's turn comes, on a virtual thread, it's re-read, matched to a
  *   claim (so it sees what its predecessor created or changed), and the run is started inside the conversation context.
  * </p>
  * <p>
@@ -60,7 +63,7 @@ import io.smallrye.mutiny.Uni;
 public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 	private static final Set<WorkflowStatus> RELEASES = EnumSet.of(WorkflowStatus.WAITING, WorkflowStatus.COMPLETED, WorkflowStatus.CANCELLED, WorkflowStatus.FAULTED);
 	private static final Set<WorkflowStatus> ENDED = EnumSet.of(WorkflowStatus.COMPLETED, WorkflowStatus.CANCELLED, WorkflowStatus.FAULTED);
-	private static final String DECISION_TASK = "routeDecision";
+	private static final String DECISION_TASK = ClaimIntakeFlow.ROUTE_DECISION;
 	private static final Duration FIRST_RETRY_DELAY = Duration.ofMillis(250);
 	private static final int MAX_REQUEUES = 6;
 
@@ -72,11 +75,14 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 	private final ConversationContext conversationContext;
 	private final IntakeActivities activities;
 	private final Instance<ClaimIntakeFlow> flow;
-	private final ManagedExecutor executor;
+	private final ExecutorService executor;
+	private final ProcessingRecovery recovery;
+	private final ReviewReclaimer reclaimer;
 
 	private final Map<String, SenderState> senders = new ConcurrentHashMap<>();
 	private final Map<String, String> senderByInstance = new ConcurrentHashMap<>();
 	private final Map<String, Integer> requeues = new ConcurrentHashMap<>();
+	private final Map<String, ProcessingRecovery.Assessment> resumptions = new ConcurrentHashMap<>();
 
 	ClaimIntakeDispatcher(
 		IntakeConfig config,
@@ -87,7 +93,9 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 		ConversationContext conversationContext,
 		IntakeActivities activities,
 		Instance<ClaimIntakeFlow> flow,
-		ManagedExecutor executor) {
+		@VirtualThreads ExecutorService executor,
+		ProcessingRecovery recovery,
+		ReviewReclaimer reclaimer) {
 
 		this.config = config;
 		this.mailbox = mailbox;
@@ -98,6 +106,8 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 		this.activities = activities;
 		this.flow = flow;
 		this.executor = executor;
+		this.recovery = recovery;
+		this.reclaimer = reclaimer;
 	}
 
 	/**
@@ -107,7 +117,68 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 	 * @param received The event
 	 */
 	public void onEmailReceived(@Observes EmailReceived received) {
-		submit(received.email());
+		if (received.isRecovery()) {
+			recover(received.email());
+		}
+		else {
+			submit(received.email());
+		}
+	}
+
+	/**
+	 * Takes an email a previous instance left in the processing folder, and does what its progress calls for (see {@link ProcessingRecovery}):
+	 * <ul>
+	 *   <li>never accepted: the normal path, {@link #submit}</li>
+	 *   <li>accepted, nothing applied: run again from the start, without the duplicate check</li>
+	 *   <li>applied, no reply recorded: a run that resumes at the reply</li>
+	 *   <li>applied and answered: filed, counted once</li>
+	 * </ul>
+	 * The ones that run are queued in the order they were found, which is ahead of anything the INBOX brings.
+	 *
+	 * @param email The email
+	 */
+	public void recover(InboundEmail email) {
+		email.messageId()
+			.filter(_ -> email.fromAddress().isPresent() && !MailLoopGuard.shouldIgnore(email, this.config.address()))
+			.ifPresentOrElse(
+				id -> recoverIdentified(email, id),
+				() -> submit(email)
+			);
+	}
+
+	private void recoverIdentified(InboundEmail email, String messageId) {
+		var assessment = this.recovery.assess(messageId);
+
+		switch (assessment.stage()) {
+			case NEW -> submit(email);
+			case NOT_APPLIED -> enqueueRecovered(email, messageId, null);
+			case APPLIED_UNANSWERED -> enqueueRecovered(email, messageId, assessment);
+			case ANSWERED -> this.executor.execute(() -> fileAnswered(email, assessment));
+		}
+	}
+
+	private void enqueueRecovered(InboundEmail email, String messageId, ProcessingRecovery.Assessment resumption) {
+		Log.infof("Recovering %s, left in the processing folder%s", messageId, (resumption == null) ? "" : ": its reply is the only thing left");
+		Optional.ofNullable(resumption).ifPresent(found -> this.resumptions.put(messageId, found));
+		transition(sender(email.fromAddress().orElseThrow()), state -> state.enqueue(messageId));
+	}
+
+	// Applied and answered, so only filing was left. A claim that now waits for review lost its run too, and nothing else will hand it a new one
+	// while this email was in the processing folder
+	private void fileAnswered(InboundEmail email, ProcessingRecovery.Assessment assessment) {
+		try {
+			Log.infof("Filing %s: it was already answered", email.messageId().orElse(""));
+			this.failureHandler.fileWithoutRun(email);
+			this.activities.publish(new EmailHandled(outcomeOf(assessment), Optional.of(latencyOf(email))));
+			this.reclaimer.reclaim();
+		}
+		catch (RuntimeException e) {
+			Log.errorf(e, "Couldn't file the answered email %s", email.messageId().orElse(""));
+		}
+	}
+
+	private static EmailOutcome outcomeOf(ProcessingRecovery.Assessment assessment) {
+		return assessment.createdClaim() ? EmailOutcome.NEW_CLAIM : (assessment.mergedIntoClaim() ? EmailOutcome.CLAIM_UPDATE : EmailOutcome.STATUS_QUESTION);
 	}
 
 	/**
@@ -195,11 +266,18 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 		try {
 			var email = this.mailbox.find(MailFolder.PROCESSING, messageId)
 				.orElseThrow(() -> new ProcessingEmailMissingException(messageId));
-			var match = this.matcher.match(email);
-			var run = IntakeRun.forEmail(messageId, match.conversationId(), email.fromAddress().orElse(sender), match.claimId(), match.senderMatches(), email.receivedDate());
+			var resumption = this.resumptions.remove(messageId);
+			var run = Optional.ofNullable(resumption)
+				.filter(found -> found.claimId() != null)
+				.map(found -> IntakeRun.resumingReply(messageId, Optional.ofNullable(found.conversationId()).orElseGet(() -> UUID.randomUUID().toString()), email.fromAddress().orElse(sender), found.claimId(), email.receivedDate()))
+				.orElseGet(() -> runFor(email, messageId, sender));
 
-			this.conversationContext.runIn(match.conversationId(), () -> {
+			this.conversationContext.runIn(run.conversationId(), () -> {
 				var instance = this.flow.get().instance(run);
+
+				if (run.resumesReply()) {
+					this.recovery.adoptReview(run.claimId(), instance.id());
+				}
 
 				// Registered as working before it starts, so the status listener always finds it
 				this.senderByInstance.put(instance.id(), sender);
@@ -217,6 +295,12 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 			transition(sender, state -> state.release(holder.get()));
 			this.failureHandler.handle(messageId, e, FailureOutcome.FATAL);
 		}
+	}
+
+	private IntakeRun runFor(InboundEmail email, String messageId, String sender) {
+		var match = this.matcher.match(email);
+
+		return IntakeRun.forEmail(messageId, match.conversationId(), email.fromAddress().orElse(sender), match.claimId(), match.senderMatches(), email.receivedDate());
 	}
 
 	/**

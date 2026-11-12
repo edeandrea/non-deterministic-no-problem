@@ -47,7 +47,7 @@ public class FileEmailStep {
 			case WRONG_SENDER -> EmailOutcome.NO_MATCHING_CLAIM;
 			case WHICH_CLAIM -> EmailOutcome.NEEDS_CLARIFICATION;
 			case POLICY_REJECTED -> EmailOutcome.POLICY_REJECTED;
-			case CONTINUE, REQUEUE -> switch (state.outcome()) {
+			case CONTINUE, REQUEUE, RESUME_REPLY -> switch (state.outcome()) {
 				case IntakeOutcome.NewClaim _ -> EmailOutcome.NEW_CLAIM;
 				case IntakeOutcome.PendingClaimUpdate _ -> EmailOutcome.CLAIM_UPDATE;
 				case IntakeOutcome.StatusReply _ -> EmailOutcome.STATUS_QUESTION;

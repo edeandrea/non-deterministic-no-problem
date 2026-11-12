@@ -71,6 +71,10 @@ quarkus:
     name: parasol-app
 
   flow:
+    persistence:
+      # Flow's startup restore replays a persisted run from its first incomplete task (mail sent twice), and every application instance
+      # would do it, since they share the application id. ReviewReclaimer gives a review whose run is gone a new run instead, which only waits.
+      auto-restore: false
     validation:
       input:
         # quarkus-flow 1.3.0 turns this on by default (quarkiverse/quarkus-flow#1077). For a quarkus-flow-langchain4j
@@ -223,6 +227,22 @@ quarkus:
   # Hibernate
   hibernate-orm:
     physical-naming-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+    # Flyway owns the schema; Hibernate only checks the entities still match it
+    schema-management:
+      strategy: validate
+
+  # Flyway: the app's migrations (db/migration) on the default configuration, Flow's own (quarkus-flow-db-migration)
+  # on the named flow-runtime one. Both share schema public, so each baselines the other's tables away
+  flyway:
+    migrate-at-start: true
+    baseline-on-migrate: true
+    baseline-version: "0"
+    flow-runtime:
+      migrate-at-start: true
+      baseline-on-migrate: true
+      baseline-version: "0"
+      table: flyway_flow_runtime_history
+      locations: db/flow-migration/runtime/postgresql
 
   # Quinoa
   quinoa:
@@ -261,10 +281,20 @@ quarkus:
     metrics:
       enabled: true
   datasource:
+    # Explicit, because the flow-runtime datasource below stops the default one being implied
+    db-kind: postgresql
     metrics:
       enabled: true
     jdbc:
       telemetry: true
+    # Flyway only: Flow's migrations run on this named datasource, which points at the same database. Flow's entities
+    # stay in the default persistence unit
+    flow-runtime:
+      db-kind: "${quarkus.datasource.db-kind}"
+      jdbc:
+        url: "${quarkus.datasource.jdbc.url}"
+      username: "${quarkus.datasource.username}"
+      password: "${quarkus.datasource.password}"
 
   # REST Clients
   rest-client:
@@ -454,6 +484,13 @@ parasol:
           score-session: false
         initialize-on-startup: false
   quarkus:
+    # Every test boot starts from the seeded database. Both Flyway configurations share schema public and clean all of it, so
+    # only the one that migrates first may clean: flow-runtime does (Quarkus runs it before the default one), and the default
+    # one then finds an empty schema with its history gone
+    flyway:
+      flow-runtime:
+        clean-at-start: true
+        clean-disabled: false
     # GreenMail only in tests, no Roundcube. Covers IDE runs and continuous testing; Maven builds also force
     # quarkus.compose.devservices.profiles=none from surefire/failsafe, which covers config profiles without 'test'.
     # The Playwright tests' UiTestProfile overrides both and starts Roundcube on a random port
@@ -528,33 +565,21 @@ parasol:
       wiremock-base-url: "http://localhost:${quarkus.wiremock.devservices.port}/v1"
 
 # Prod mode config
-'%prod':
-  quarkus:
-    hibernate-orm:
-      sql-load-script: import.sql
-      schema-management:
-        strategy: drop-and-create
-
 '%openshift':
   quarkus:
     config:
       profile:
         parent: prod
-    hibernate-orm:
-      sql-load-script: import.sql
-      schema-management:
-        strategy: drop-and-create
     kubernetes:
       deployment-target: openshift
     container-image:
       builder: openshift
       registry: image-registry.openshift-image-registry.svc:5000
     openshift:
-      # The email intake only works correctly with one replica: ReviewDecisionPublisher's in-memory event
-      # publisher, SupersedeStep's in-JVM activeInstance() lookup, ClaimIntakeDispatcher's per-sender queues
-      # and ClaimsInboxWatcher's process-local lock all assume a single instance. This is the extension's
-      # own default, pinned here so it's documented rather than incidental. See
-      # https://github.com/edeandrea/non-deterministic-no-problem/issues/284 for the HA follow-up.
+      # The email intake only works correctly with one replica: the in-memory event publisher that wakes a waiting
+      # review run, SupersedeStep's in-JVM activeInstance() lookup, ClaimIntakeDispatcher's per-sender queues and
+      # ClaimsInboxWatcher's process-local lock all assume a single instance. This is the extension's own default,
+      # pinned here so it's documented rather than incidental. See README -> Single replica.
       replicas: 1
       part-of: parasol-insurance
       base-jvm-image: registry.access.redhat.com/ubi10/openjdk-25:1.24

@@ -56,6 +56,13 @@ public class ClaimIntakeState extends PanacheEntityBase {
 	public String reviewRunId;
 
 	/**
+	 * The id of the run that has reached its review wait, set by the run itself just before it waits. The review is ready for a decision
+	 * once it equals {@link #reviewRunId}; a different run id, or a cleared {@code reviewRunId}, makes the old value harmless, so nothing
+	 * clears it. The run may not have registered its event consumer yet, which is why a decision is queued and republished until it's taken.
+	 */
+	public String reviewWaitingRunId;
+
+	/**
 	 * When the claim went into {@code Pending Review}; empty otherwise. The review-wait timer and the oldest-pending-review gauge read it.
 	 */
 	public Instant reviewOpenedAt;
@@ -101,6 +108,15 @@ public class ClaimIntakeState extends PanacheEntityBase {
 		return IntakeClaimStatus.PENDING_REVIEW.label().equals(this.claim.status)
 			&& (this.reviewRunId != null)
 			&& (this.decidingRunId == null);
+	}
+
+	/**
+	 * Whether the run that owns the open review has reached its wait, so a decision would reach it.
+	 *
+	 * @return {@code true} if a review is open and its run has recorded that it's waiting
+	 */
+	public boolean isReadyForDecision() {
+		return isOpenForReview() && this.reviewRunId.equals(this.reviewWaitingRunId);
 	}
 
 	/**

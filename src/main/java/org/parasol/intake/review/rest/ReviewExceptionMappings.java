@@ -17,7 +17,6 @@ import jakarta.ws.rs.core.UriInfo;
 import org.jboss.resteasy.reactive.server.ServerExceptionMapper;
 import org.parasol.intake.review.ReviewLockLostException;
 import org.parasol.intake.review.ReviewNotOpenException;
-import org.parasol.intake.review.ReviewRunNotFoundException;
 import org.parasol.intake.review.ReviewRunNotWaitingException;
 import org.parasol.intake.review.ReviewedFieldsRejectedException;
 import org.parasol.intake.review.SentimentAssessmentFailedException;
@@ -61,11 +60,6 @@ class ReviewExceptionMappings {
 	@ServerExceptionMapper
 	Response mapReviewLockLost(ReviewLockLostException exception, UriInfo uriInfo) {
 		return problem(Status.CONFLICT, exception.getMessage(), uriInfo);
-	}
-
-	@ServerExceptionMapper
-	Response mapReviewRunNotFound(ReviewRunNotFoundException exception, UriInfo uriInfo) {
-		return problem(Status.NOT_FOUND, exception.getMessage(), uriInfo);
 	}
 
 	@ServerExceptionMapper

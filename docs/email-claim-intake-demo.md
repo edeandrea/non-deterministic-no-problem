@@ -39,7 +39,7 @@ McFly"). Any other address sends as a bare address and every reply greets "Custo
 - **Scenario 3 (the follow-up) actually requires it.** `ClaimMatcher` only matches a follow-up to an
   existing claim when the sender's address is that claim's own recorded `email_address` — a deliberate
   anti-spoofing check (anyone else gets the generic "no matching claim" reply, with no details). Only the
-  six seeded claimants have an existing claim in `import.sql` to follow up on at all, so the sender has to
+  six seeded claimants have an existing claim in `V2__seed_claims.sql` to follow up on at all, so the sender has to
   be one of them, and specifically the one whose claim you're asking about.
 - **Scenario 4 (the policy conflict) needs an email from someone who is *not* the real policy holder**,
   stating a policy number that *is* already on file for someone else. It doesn't have to be one of the six
@@ -79,9 +79,9 @@ these files are 15–150 KB.
 
 **Caveats that apply to every scenario:**
 
-- **GreenMail keeps mail in memory and dev mode's schema is drop-and-create**, so restarting dev mode
-  (or redeploying) resets the whole demo: every claim, every mailbox, and any review a claim was waiting
-  on. Plan a demo around one boot.
+- **GreenMail keeps mail in memory**, so restarting it empties every mailbox. Dev mode's database is Dev Services'
+  and goes with a dev mode restart (a live reload keeps both); on OpenShift the claims survive a redeploy, and so does a waiting review (the restarted application gives it a new run), but the mail doesn't.
+  Plan a demo around one boot.
 - **Dev mode already seeds two claims by email at startup** (`DevClaimEmailSeeder`, on when
   `parasol.dev-seed.enabled=true`, which `%dev` and the two Ollama `quarkus:dev` Maven profiles set):
   "Car hit a lamp post" from `dev.pending-review@example.com` (a complete claim) and "Someone damaged my
@@ -184,7 +184,7 @@ these files are 15–150 KB.
 
 1. Log in as `jane_doe@email.com` — not the holder of the policy number you're about to use — and send a
    **new** claim (a fresh incident, not a follow-up) that states Marty McFly's seeded policy number,
-   `AC-987654321` (claim 1, `src/main/resources/import.sql`):
+   `AC-987654321` (claim 1, `src/main/resources/db/migration/V2__seed_claims.sql`):
 
    > Subject: New claim - hail damage
    >
@@ -268,6 +268,5 @@ The same five scenarios run unchanged against an OpenShift deployment
   (the Dev UI is a dev-mode-only feature), so on the cluster, show the Langfuse session only; the Flow
   workflow diagram is a dev-mode-only demonstration.
 - The intake runs as a **single replica** on the cluster (`quarkus.openshift.replicas: 1`, pinned and
-  commented in `application.yml`) — see README → *Single replica* for why, and
-  [#284](https://github.com/edeandrea/non-deterministic-no-problem/issues/284) for the follow-up to lift
-  that constraint.
+  commented in `application.yml`) — see README → *Single replica* for why
+  ([#284](https://github.com/edeandrea/non-deterministic-no-problem/issues/284)).

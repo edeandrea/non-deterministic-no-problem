@@ -148,7 +148,7 @@ When the chat bot is explicitly asked to update a claim's status, the app emails
    authentication turned off). There's no server to pick.
 3. Open the Inbox, and refresh it if the email arrives after you've logged in.
 
-The seeded claims (`src/main/resources/import.sql`) belong to these claimants:
+The seeded claims (`src/main/resources/db/migration/V2__seed_claims.sql`) belong to these claimants:
 
 | Claim id | Claimant | Mailbox |
 |---|---|---|
@@ -171,7 +171,7 @@ For example, log in as `marty.mcfly@email.com`, then ask the chat bot to update 
 - **Seeded claimants have their names on their identity.** Logging in as one of the six addresses above sends mail
   as `Marty McFly <marty.mcfly@email.com>`; any other address sends as a bare address. A name you clear in Settings →
   Identities comes back at the next login, and one you change is kept. The names come from
-  `src/main/docker/roundcube/config/parasol-identities.php`, which has to follow the claimants in `import.sql`.
+  `src/main/docker/roundcube/config/parasol-identities.php`, which has to follow the claimants in `V2__seed_claims.sql`.
 - **Mail lives in memory only,** so restarting dev mode empties every mailbox.
 
 The claims REST API provides `GET /api/db/claims` and `GET /api/db/claims/{id}`. Claim images are stored in
@@ -184,8 +184,8 @@ The email intake adds four more endpoints: `GET /api/db/claims/{id}/corresponden
 transcript, oldest first, each message with the photos it carried; `404` for an unknown claim), `GET
 /api/db/claims/{id}/review` (the claim's review state — whether a review is open, its requested items, and the full
 missing-item checklist), `POST /api/db/claims/{id}/review-decision` (the claims processor's decision; it's
-**asynchronous** — it returns `202 Accepted` once the decision is published, not once the workflow has applied it;
-`400` for an invalid request body, `404` for an unknown claim or a vanished run, `409` for a claim not open for
+**asynchronous** — it returns `202 Accepted` once the decision is queued, not once the workflow has applied it;
+`400` for an invalid request body, `404` for an unknown claim, `409` for a claim not open for
 review or a stale version, `422` if the reviewed values don't fit the claim) and `POST
 /api/db/claims/{id}/sentiment` (re-runs the sentiment agent for a claim under review, `200 { "sentiment": … }`).
 None of them require authentication — this is a demo app.
@@ -193,7 +193,7 @@ None of them require authentication — this is a demo app.
 Each claim has a numeric `id` and a separate claim number (`CLM` + 8 digits, e.g. `CLM01000000`). PostgreSQL
 generates the number from its own sequence on insert. Claims also have a category (`Single vehicle`,
 `Multiple vehicle`, `Theft` or `Other`) and a typed incident date with an optional time.
-`src/main/resources/import.sql` seeds six sample claims. See [CLAUDE.md](CLAUDE.md) for how the claim number
+`src/main/resources/db/migration/V2__seed_claims.sql` seeds six sample claims. See [CLAUDE.md](CLAUDE.md) for how the claim number
 is generated and the rules around it.
 
 ## Email claim intake
@@ -241,16 +241,27 @@ The intake is configured under `parasol.intake.*` (`IntakeConfig`,
 | `watcher.idle-refresh` | `1m` (`10s` in `%dev`) | How often the IMAP IDLE is renewed |
 | `watcher.reconnect-delay` / `.max-reconnect-delay` | `1s` / `1m` | Reconnect backoff |
 | `metrics.inbox-depth-interval` | `30s` | How often `claim.intake.inbox.depth` is measured |
+| `review.publish-interval` | `250ms` | How long to wait between publishing a reviewer's decision again while the run hasn't taken it |
+| `review.max-publish-attempts` | `20` | How many publishes before the decision is given up on, the review goes back to open and the request is a `409` |
 
 ### Single replica
 
-The intake only works correctly with **one** replica, though nothing enforces that beyond the OpenShift
+The intake only works correctly with **one** replica, on purpose: nothing enforces it beyond the OpenShift
 extension's own default (`quarkus.openshift.replicas: 1`, pinned in `%openshift`). Four in-process mechanisms
-assume a single instance: `ReviewDecisionPublisher`'s in-memory event publisher (a decision POSTed to the "wrong"
-replica silently succeeds and is never applied), `SupersedeStep`'s in-JVM lookup of the run to cancel, the
+assume a single instance: `ReviewDecisionPublisher`'s in-memory event publisher (a decision POSTed to an instance that
+doesn't host the waiting run is a `409` and is never delivered), `SupersedeStep`'s in-JVM lookup of the run to cancel, the
 per-sender queues `ClaimIntakeDispatcher` keeps in memory, and `ClaimsInboxWatcher`'s process-local lock on the
-mailbox. See [#284](https://github.com/edeandrea/non-deterministic-no-problem/issues/284) for the follow-up to lift
-this constraint.
+mailbox. Lifting that would take a leader (a Kubernetes Lease) so one instance watches the inbox and hosts every run, plus a way to get a
+decision to it (a database outbox or a message broker): more than this demo needs
+([#284](https://github.com/edeandrea/non-deterministic-no-problem/issues/284)).
+
+### Surviving a restart
+
+The database survives a restart (Flyway migrations, not drop-and-create), so claims, correspondence and Flow's run state are kept. On startup the
+intake gives every `Pending Review` claim a new waiting run, and recovers an email left in the `Processing` folder: run again from the start, resumed at
+*reply → file*, or only filed, never dropped and never answered twice. Not kept: the mail itself on OpenShift if GreenMail restarts (it holds mail in
+memory), and a reviewer's decision in flight at the moment of the restart (the review is open again; decide once more). A local or cluster database that applied
+this branch's earlier migration numbers must be recreated once (delete the Dev Services container or the PVC).
 
 ### Observability
 

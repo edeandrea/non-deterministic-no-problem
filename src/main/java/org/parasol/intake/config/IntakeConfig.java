@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.Optional;
 
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 
@@ -70,6 +71,13 @@ public interface IntakeConfig {
 	 * @return the metrics settings
 	 */
 	Metrics metrics();
+
+	/**
+	 * How a reviewer's decision reaches the waiting run.
+	 *
+	 * @return the review settings
+	 */
+	Review review();
 
 	/**
 	 * The IMAP connection to the claims mailbox.
@@ -211,5 +219,28 @@ public interface IntakeConfig {
 		 */
 		@WithDefault("30s")
 		Duration inboxDepthInterval();
+	}
+
+	/**
+	 * Settings of how a reviewer's decision reaches the waiting run.
+	 */
+	interface Review {
+		/**
+		 * How long to wait between publishing a decision again while the run hasn't taken it.
+		 *
+		 * @return the interval
+		 */
+		@WithDefault("250ms")
+		Duration publishInterval();
+
+		/**
+		 * How many times a decision is published before it's given up on and the review goes back to open. A run that reads as waiting
+		 * registers its listener a moment later, so a first publish can miss it.
+		 *
+		 * @return the number of attempts
+		 */
+		@WithDefault("20")
+		@Min(1)
+		int maxPublishAttempts();
 	}
 }

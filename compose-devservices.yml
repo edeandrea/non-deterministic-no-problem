@@ -11,7 +11,7 @@
 #   On OpenShift, src/main/kubernetes/dependencies.yml runs the same image, environment and plugin files; the port
 #   mapping and labels here are Compose Dev Services only and have no counterpart there.
 #   The parasol_identities plugin (src/main/docker/roundcube/) gives the seeded claimants' identities their names; the
-#   address -> name map in config/parasol-identities.php must follow the claimants in import.sql.
+#   address -> name map in config/parasol-identities.php must follow the claimants in V2__seed_claims.sql.
 services:
   greenmail:
     image: docker.io/greenmail/standalone:2.1.15
