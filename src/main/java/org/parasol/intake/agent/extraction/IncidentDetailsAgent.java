@@ -68,7 +68,8 @@ public interface IncidentDetailsAgent {
 		- incidentDate: ISO date (yyyy-MM-dd), or null if unstated
 		- incidentTime: ISO time (HH:mm), or null if unstated
 		- location: where it happened, or null if unstated
-		- category: one of {extraction:claimCategories} ({extraction:otherCategory} if described but it fits no other category), or null
+		- category: one of these ({extraction:otherCategory} if described but it fits no other category), or null if unstated
+		{extraction:claimCategories}
 		- policyNumber: the policy number if stated, or null otherwise
 		- answeredItems: which of the items we asked for the newest reply actually answers; empty if we asked for none
 

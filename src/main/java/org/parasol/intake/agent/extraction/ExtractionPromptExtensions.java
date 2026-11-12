@@ -20,14 +20,14 @@ final class ExtractionPromptExtensions {
 	}
 
 	/**
-	 * Lists every claim category the model may answer with.
+	 * Lists every claim category the model may answer with, each with its description.
 	 *
-	 * @return the {@link ClaimCategory} constant names in declaration order, joined with {@code ", "}
+	 * @return one {@code "  - NAME: description"} line per {@link ClaimCategory}, in declaration order
 	 */
 	static String claimCategories() {
 		return Stream.of(ClaimCategory.values())
-			.map(ClaimCategory::name)
-			.collect(Collectors.joining(", "));
+			.map(category -> "  - %s: %s".formatted(category.name(), category.description()))
+			.collect(Collectors.joining("\n"));
 	}
 
 	/**

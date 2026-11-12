@@ -13,15 +13,32 @@ import com.fasterxml.jackson.annotation.JsonValue;
  * ({@code "Multiple vehicle"}), which is what the UI shows and filters on.
  */
 public enum ClaimCategory {
-	SINGLE_VEHICLE("Single vehicle"),
-	MULTIPLE_VEHICLE("Multiple vehicle"),
-	THEFT("Theft"),
-	OTHER("Other");
+	SINGLE_VEHICLE(
+		"Single vehicle",
+		"only the customer's own vehicle was involved, for example it hit a pole, a wall, a guardrail or an animal, or went off the road"
+	),
+	MULTIPLE_VEHICLE("Multiple vehicle", "the customer's vehicle collided with, or was hit by, one or more other vehicles"),
+	THEFT("Theft", "the vehicle, its parts or things inside it were stolen"),
+	OTHER(
+		"Other",
+		"damage from anything else, such as hail, a storm, a flood, a fire, a falling object, a thrown rock or vandalism"
+	);
 
 	private final String label;
+	private final String description;
 
-	ClaimCategory(String label) {
+	ClaimCategory(String label, String description) {
 		this.label = label;
+		this.description = description;
+	}
+
+	/**
+	 * What the category covers, in a sentence. The email intake's prompts give it to the model next to the constant name.
+	 *
+	 * @return the description, e.g. {@code "the vehicle, its parts or things inside it were stolen"}
+	 */
+	public String description() {
+		return this.description;
 	}
 
 	/**

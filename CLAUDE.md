@@ -1175,12 +1175,18 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
     stubs are hit under every CI profile, and an agent on the wrong model shows up;
   - parallelism is checked from WireMock's own timings (every request arrives before the first is answered), not from
     wall-clock time.
-  - the incident-details prompt's category list comes from `ClaimCategory` through `ExtractionPromptExtensions`
-    (`{extraction:claimCategories}`), a test checks the rendered list. Domain enums carry no Qute annotation; bind them
-    in the template's own package with a `@TemplateExtension(namespace = …)`.
-  - an agent that **returns** an enum (or a record holding one) needs no list in its prompt: Quarkus appends
-    LangChain4j's format instructions built from the return type. `EmailType`'s constants and `ClaimResolution`'s `kind`
-    field carry LangChain4j's `@Description` for the meanings, and tests assert the generated text in the request.
+  - the prompts' enum lists come from the enums through `@TemplateExtension`s in the prompt's own package: the
+    incident-details prompt's categories (`{extraction:claimCategories}`, `NAME: description` from
+    `ClaimCategory.description()`) and the classifier's types (`{triage:emailTypes}`, from `EmailType.description()`);
+    tests check the rendered list. Domain enums carry no Qute annotation.
+  - **Don't rely on LangChain4j appending an enum's `@Description`s, and don't read them by reflection (native).** Enum descriptions are plain fields (`ClaimCategory`, `EmailType`). Only the OpenAI-style `EnumOutputParser` does; the Ollama
+    provider sends the return type as a JSON schema with the constant names alone, so under `-Pollama` the classifier saw no
+    descriptions ([#302](https://github.com/edeandrea/non-deterministic-no-problem/issues/302)). An enum the model must choose
+    between is described in the prompt. `ClaimResolution`'s `kind` description (a record field) is still left to LangChain4j; whether
+    it reaches the Ollama schema is unverified.
+  - `IncidentDetails` treats a blank string or the literal `"null"` (any case) as absent for every string field, in its compact
+    constructor: `qwen3:4b` writes `"null"` for what the email doesn't say, which used to reprompt on the time and pass as a policy
+    number or location.
 - **Agentic gotchas (quarkus-langchain4j 1.14.2):**
   - `@ModelName` must sit on the `@Agent` **method**; on the interface it's silently ignored and the agent uses the
     default model. Also set `@RegisterAiService(modelName = ...)` to the same name: the core extension reads only that

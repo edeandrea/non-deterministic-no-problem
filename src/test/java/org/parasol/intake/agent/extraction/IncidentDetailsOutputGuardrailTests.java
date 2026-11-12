@@ -7,6 +7,8 @@ import java.util.Optional;
 import java.util.Set;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.parasol.claim.model.ClaimCategory;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.model.IncidentDetails;
@@ -146,6 +148,59 @@ class IncidentDetailsOutputGuardrailTests {
 
 		assertThat(this.guardrail.validate(requestFor(json, SENT_DATE)).isSuccess())
 			.isTrue();
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"null", "NULL", " Null "})
+	void aNullStringTimeIsAbsentNotInvalidSoThereIsNoReprompt(String nullString) {
+		var result = this.guardrail.validate(requestFor(VALID_JSON.replace("\"14:30\"", "\"%s\"".formatted(nullString)), SENT_DATE));
+
+		assertThat(result)
+			.returns(true, OutputGuardrailResult::isSuccess)
+			.extracting(r -> ((IncidentDetails) r.successfulResult()).incidentTime())
+			.isNull();
+	}
+
+	@Test
+	void aNullStringDateIsAbsentNotInvalid() {
+		var result = this.guardrail.validate(requestFor(VALID_JSON.replace("\"2026-10-07\"", "\"null\""), SENT_DATE));
+
+		assertThat(result)
+			.returns(true, OutputGuardrailResult::isSuccess)
+			.extracting(r -> ((IncidentDetails) r.successfulResult()).incidentDate())
+			.isNull();
+	}
+
+	@Test
+	void aNullStringLocationIsAbsent() {
+		var result = this.guardrail.validate(requestFor(VALID_JSON.replace("\"Elm Street\"", "\"null\""), SENT_DATE));
+
+		assertThat(result)
+			.returns(true, OutputGuardrailResult::isSuccess)
+			.extracting(r -> ((IncidentDetails) r.successfulResult()).location())
+			.isNull();
+	}
+
+	@Test
+	void aNullStringPolicyNumberIsAbsent() {
+		var result = this.guardrail.validate(requestFor(VALID_JSON.replace("\"policyNumber\":null", "\"policyNumber\":\"null\""), SENT_DATE));
+
+		assertThat(result)
+			.returns(true, OutputGuardrailResult::isSuccess)
+			.extracting(r -> ((IncidentDetails) r.successfulResult()).policyNumber())
+			.isNull();
+	}
+
+	@Test
+	void qwen3sAnswerWithNullStringsForEveryAbsentFieldPassesFirstTime() {
+		var json = """
+			{"incidentDescribed":true,"incidentDate":"2026-11-08","incidentTime":"null","location":"County Road 12","category":"SINGLE_VEHICLE","policyNumber":"null","answeredItems":[]}""";
+
+		var result = this.guardrail.validate(requestFor(json, "2026-11-09"));
+
+		assertThat(result)
+			.returns(true, OutputGuardrailResult::isSuccess)
+			.returns(new IncidentDetails(true, "2026-11-08", null, "County Road 12", ClaimCategory.SINGLE_VEHICLE, null, Set.of()), OutputGuardrailResult::successfulResult);
 	}
 
 	@Test

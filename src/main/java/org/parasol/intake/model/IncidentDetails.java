@@ -1,5 +1,8 @@
 package org.parasol.intake.model;
 
+import static java.util.function.Predicate.not;
+
+import java.util.Optional;
 import java.util.Set;
 
 import org.parasol.claim.model.ClaimCategory;
@@ -13,6 +16,10 @@ import org.parasol.intake.MissingItem;
  *
  * @param incidentDescribed Whether the correspondence says what happened in the incident itself (not the text: the claim's
  * summary holds that), or null if unjudged; anything but {@code true} counts as the description missing
+ * <p>
+ * A blank string, or the literal {@code "null"} in any case, counts as unstated for every string field and becomes null
+ * (the stripped value is kept otherwise).
+ *
  * @param incidentDate The incident date as an ISO string ({@code "yyyy-MM-dd"}), or null if unstated
  * @param incidentTime The incident time as an ISO string ({@code "HH:mm"}), if stated
  * @param location Where the incident took place, or null if unstated
@@ -30,7 +37,20 @@ public record IncidentDetails(
 	Set<MissingItem> answeredItems) {
 
 	public IncidentDetails {
+		incidentDate = absentIfBlank(incidentDate);
+		incidentTime = absentIfBlank(incidentTime);
+		location = absentIfBlank(location);
+		policyNumber = absentIfBlank(policyNumber);
 		answeredItems = (answeredItems == null) ? Set.of() : Set.copyOf(answeredItems);
+	}
+
+	// Small models such as qwen3:4b write the string "null" for a value the email doesn't state
+	private static String absentIfBlank(String value) {
+		return Optional.ofNullable(value)
+			.map(String::strip)
+			.filter(not(String::isEmpty))
+			.filter(not("null"::equalsIgnoreCase))
+			.orElse(null);
 	}
 
 	public static IncidentDetails empty() {
