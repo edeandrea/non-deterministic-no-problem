@@ -21,7 +21,9 @@ import java.util.Optional;
  * @param strippedBody The text body without quoted reply text (lines starting with {@code >} and their "On … wrote:" line)
  * @param images The image attachments that are kept, in the order they appear
  * @param skippedAttachments The attachments that aren't kept, in the order they appear
- * @param isAutoReply Whether the {@code Auto-Submitted} or {@code Precedence} header marks the email as automatic
+ * @param isAutomatic Whether the headers mark the email as sent automatically: an auto-reply ({@code Auto-Submitted},
+ *   {@code X-Autoreply}, {@code X-Autorespond}), list or bulk mail ({@code Precedence}), or a bounce (a {@code multipart/report}, or
+ *   {@code Return-Path: <>})
  */
 public record InboundEmail(
 	Optional<String> messageId,
@@ -36,7 +38,7 @@ public record InboundEmail(
 	String strippedBody,
 	List<ImageAttachment> images,
 	List<SkippedAttachment> skippedAttachments,
-	boolean isAutoReply) {
+	boolean isAutomatic) {
 
 	public InboundEmail {
 		Objects.requireNonNull(messageId, "messageId");

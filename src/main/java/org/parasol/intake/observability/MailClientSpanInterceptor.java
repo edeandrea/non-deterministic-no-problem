@@ -1,6 +1,7 @@
 package org.parasol.intake.observability;
 
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.stream.IntStream;
 
@@ -66,7 +67,7 @@ class MailClientSpanInterceptor {
 				.getDeclaringClass()
 				.getAnnotation(MailClientSpan.class));
 		var imap = binding.protocol() == MailClientSpan.Protocol.IMAP;
-		var protocol = binding.protocol().name().toLowerCase();
+		var protocol = binding.protocol().name().toLowerCase(Locale.ROOT);
 		var builder = this.tracer.spanBuilder(protocol + " " + binding.operation())
 			.setSpanKind(SpanKind.CLIENT)
 			.setAttribute(MESSAGING_SYSTEM, protocol)

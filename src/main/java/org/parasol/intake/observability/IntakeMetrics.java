@@ -204,7 +204,7 @@ class IntakeMetrics {
 	}
 
 	void onReviewDecisionApplied(@Observes(during = TransactionPhase.AFTER_SUCCESS) ReviewDecisionApplied applied) {
-		this.registry.counter("claim.intake.review.decisions", Tags.of("decision", applied.decision().name().toLowerCase())).increment();
+		this.registry.counter("claim.intake.review.decisions", Tags.of("decision", applied.decision().name().toLowerCase(Locale.ROOT))).increment();
 		this.registry.counter("claim.intake.review.overrides", Tags.of("agreement", applied.agreement().tag())).increment();
 		applied.waited()
 		       .ifPresent(waited -> Timer.builder("claim.intake.review.wait")

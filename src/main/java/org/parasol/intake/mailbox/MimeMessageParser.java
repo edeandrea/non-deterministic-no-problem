@@ -40,7 +40,9 @@ import org.parasol.intake.mailbox.SkippedAttachment.Reason;
 final class MimeMessageParser {
 	private static final Pattern MESSAGE_ID = Pattern.compile("<[^<>\\s]+>");
 	private static final Pattern LINE_BREAK = Pattern.compile("\\r\\n?");
-	private static final Set<String> AUTOMATIC_PRECEDENCE = Set.of("bulk", "auto_reply", "junk");
+	private static final Set<String> AUTOMATIC_PRECEDENCE = Set.of("bulk", "auto_reply", "junk", "list");
+	private static final String NULL_REVERSE_PATH = "<>";
+	private static final String REPORT = "multipart/report";
 	private static final String TEXT_PLAIN = "text/plain";
 	private static final String TEXT_HTML = "text/html";
 	private static final String ALTERNATIVE = "multipart/alternative";
@@ -81,7 +83,7 @@ final class MimeMessageParser {
 			QuotedText.strip(body),
 			attachments.images(),
 			attachments.skipped(),
-			isAutoReply(message)
+			isAutomatic(message)
 		);
 	}
 
@@ -219,8 +221,12 @@ final class MimeMessageParser {
 			.toList();
 	}
 
-	private static boolean isAutoReply(Message message) throws MessagingException {
-		var isAutoSubmitted = headers(message, "Auto-Submitted").stream()
+	// An auto-reply (RFC 3834's Auto-Submitted, or the older X-Autoreply/X-Autorespond and Precedence), list or bulk mail, or a
+	// bounce: a delivery or read report, or a message with the null reverse path a bounce is sent with (RFC 5321 4.5.5)
+	private static boolean isAutomatic(Message message) throws MessagingException {
+		// Any value but "no" marks the email as automatic ("auto-replied", "yes", ...)
+		var isAutoSubmitted = Stream.of(headers(message, "Auto-Submitted"), headers(message, "X-Autoreply"), headers(message, "X-Autorespond"))
+			.flatMap(List::stream)
 			.map(MimeMessageParser::headerToken)
 			.anyMatch(value -> !value.isEmpty() && !"no".equals(value));
 
@@ -228,7 +234,13 @@ final class MimeMessageParser {
 			.map(MimeMessageParser::headerToken)
 			.anyMatch(AUTOMATIC_PRECEDENCE::contains);
 
-		return isAutoSubmitted || hasAutomaticPrecedence;
+		var hasNullReturnPath = headers(message, "Return-Path").stream()
+			.map(String::strip)
+			.anyMatch(NULL_REVERSE_PATH::equals);
+
+		var isReport = REPORT.equals(baseType(message.getContentType()));
+
+		return isAutoSubmitted || hasAutomaticPrecedence || hasNullReturnPath || isReport;
 	}
 
 	// "auto-replied; owner-email=..." -> "auto-replied"

@@ -1,6 +1,7 @@
 package org.parasol.notification.service;
 
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.ForkJoinPool;
 
@@ -76,7 +77,7 @@ public class NotificationService {
 
 	private static Claim applyStatus(Claim claim, String status) {
 		// Capitalize the first letter
-		claim.status = status.strip().substring(0, 1).toUpperCase() + status.strip().substring(1);
+		claim.status = status.strip().substring(0, 1).toUpperCase(Locale.ROOT) + status.strip().substring(1);
 
 		// Save the claim with updated status
 		Claim.persist(claim);

@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -17,6 +18,7 @@ import jakarta.interceptor.InvocationContext;
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.config.IntakeConfig;
 
+import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.instrumentation.annotations.SpanAttribute;
 import io.opentelemetry.sdk.common.CompletableResultCode;
@@ -91,6 +93,25 @@ class MailClientSpanInterceptorTests {
 			.isNotNull()
 			.satisfies(timer -> assertThat(timer.count()).isEqualTo(1));
 		assertThat(this.registry.find("claim.intake.mail.client.duration").tag("outcome", "success").timer()).isNull();
+	}
+
+	// In Turkish, "IMAP".toLowerCase() is "ımap", with a dotless i
+	@Test
+	void theProtocolIsNamedTheSameWhateverTheDefaultLocale() throws Exception {
+		var defaultLocale = Locale.getDefault();
+
+		try {
+			Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+			this.interceptor.span(failing(null));
+		}
+		finally {
+			Locale.setDefault(defaultLocale);
+		}
+
+		assertThat(this.spans)
+			.singleElement()
+			.satisfies(span -> assertThat(span.getName()).isEqualTo("imap list"))
+			.satisfies(span -> assertThat(span.getAttributes().get(AttributeKey.stringKey("messaging.system"))).isEqualTo("imap"));
 	}
 
 	private static InvocationContext failing(Exception failure) throws Exception {

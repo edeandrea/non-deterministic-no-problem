@@ -22,11 +22,22 @@ class MailLoopGuardTests {
 	}
 
 	@Test
+	void mailFromTheMailSystemIsIgnored() {
+		assertThat(List.of("MAILER-DAEMON@mx.example.com", "postmaster@example.com"))
+			.allMatch(from -> MailLoopGuard.shouldIgnore(email(from, false), INTAKE_ADDRESS));
+	}
+
+	@Test
+	void anAddressThatOnlyLooksLikeTheMailSystemIsNotIgnored() {
+		assertThat(MailLoopGuard.shouldIgnore(email("postmaster.jane@example.com", false), INTAKE_ADDRESS)).isFalse();
+	}
+
+	@Test
 	void anOrdinaryEmailIsNotIgnored() {
 		assertThat(MailLoopGuard.shouldIgnore(email("jane@example.com", false), INTAKE_ADDRESS)).isFalse();
 	}
 
-	private static InboundEmail email(String from, boolean isAutoReply) {
+	private static InboundEmail email(String from, boolean isAutomatic) {
 		return new InboundEmail(
 			Optional.of("<id@example.com>"),
 			List.of(),
@@ -40,7 +51,7 @@ class MailLoopGuardTests {
 			"Body",
 			List.of(),
 			List.of(),
-			isAutoReply
+			isAutomatic
 		);
 	}
 }

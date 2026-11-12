@@ -84,7 +84,7 @@ class ClaimsMailboxTests {
 			.returns(List.of(), InboundEmail::referencedMessageIds)
 			.returns(List.of(), InboundEmail::images)
 			.returns(List.of(), InboundEmail::skippedAttachments)
-			.returns(false, InboundEmail::isAutoReply);
+			.returns(false, InboundEmail::isAutomatic);
 	}
 
 	@Test
@@ -208,10 +208,54 @@ class ClaimsMailboxTests {
 		send(explicitNo);
 
 		assertThat(awaitInbox(3))
-			.extracting(InboundEmail::subject, InboundEmail::isAutoReply)
+			.extracting(InboundEmail::subject, InboundEmail::isAutomatic)
 			.containsExactlyInAnyOrder(
 				tuple("Out of office", true),
 				tuple("Newsletter", true),
+				tuple("A person", false)
+			);
+	}
+
+	@Test
+	void bouncesAndListMailAreDetected() throws Exception {
+		var xAutoreply = newMessage("Away");
+		xAutoreply.setText("I'm away");
+		xAutoreply.setHeader("X-Autoreply", "yes");
+
+		var xAutorespond = newMessage("Thanks for writing");
+		xAutorespond.setText("We got it");
+		xAutorespond.setHeader("X-Autorespond", "Thanks for writing");
+
+		var list = newMessage("List post");
+		list.setText("To everyone on the list");
+		list.setHeader("Precedence", "list");
+
+		var nullReturnPath = newMessage("Undeliverable");
+		nullReturnPath.setText("Your message couldn't be delivered");
+		nullReturnPath.setHeader("Return-Path", "<>");
+
+		var report = newMessage("Delivery Status Notification (Failure)");
+		var reportParts = new MimeMultipart("report; report-type=delivery-status");
+		reportParts.addBodyPart(textPart("Your message couldn't be delivered", "plain"));
+		report.setContent(reportParts);
+
+		var person = newMessage("A person");
+		person.setText("Hello");
+		person.setHeader("Return-Path", "<jane.doe@example.com>");
+		person.setHeader("X-Autoreply", "no");
+
+		for (var message : List.of(xAutoreply, xAutorespond, list, nullReturnPath, report, person)) {
+			send(message);
+		}
+
+		assertThat(awaitInbox(6))
+			.extracting(InboundEmail::subject, InboundEmail::isAutomatic)
+			.containsExactlyInAnyOrder(
+				tuple("Away", true),
+				tuple("Thanks for writing", true),
+				tuple("List post", true),
+				tuple("Undeliverable", true),
+				tuple("Delivery Status Notification (Failure)", true),
 				tuple("A person", false)
 			);
 	}
