@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **"Non-Deterministic? No Problem!"** is a demo application (Parasol Insurance) that shows how to
 test and continuously evaluate non-deterministic AI systems.
 
-It is a **single Quarkus application** (`org.parasol:parasol-app`, Java 25, Quarkus 3.40.1.1) with a React/PatternFly
+It is a **single Quarkus application** (`org.parasol:parasol-app`, Java 25, Quarkus 3.40.1.2) with a React/PatternFly
 frontend served via Quinoa. There are **no sub-modules** — one `pom.xml` at the root.
 
 The Java source is split into two top-level packages representing two distinct concerns:
@@ -177,9 +177,9 @@ the console.
 
 `.github/workflows/simple-build-test.yml` runs `./mvnw -B clean verify` on Java 25 across the
 `ollama` and `ollama-openai` profiles. CI has no real OpenAI/Cohere/Gemini credentials, so **any new
-test must pass under the Ollama profiles**. It runs on pushes to `main` and on pull requests into `main` or into
-`gh216-email-intake`, the feature branch the #216 task PRs merge into. Remove that branch from the trigger once it
-merges.
+test must pass under the Ollama profiles**. It runs on pushes to `main` and on pull requests into `main`. A
+long-running feature branch whose PRs should run CI too (as `gh216-email-intake` was for #216) has to be added to the
+`pull_request` trigger, and removed again once it merges.
 
 **CI supplies Ollama as a GitHub service container,** `ollama/ollama` on `localhost:11434`, with
 `granite4:micro` and `snowflake-arctic-embed` pulled in a step before the build. Both profiles reach

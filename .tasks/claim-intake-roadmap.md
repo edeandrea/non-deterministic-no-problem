@@ -8,6 +8,11 @@ its own task directory and `PLAN.md`.
 Filed on GitHub as **#212–#216**, plus **#237** (step 4a) and **#218** (step 6); bodies in `github-issues/`, numbers
 in `github-issues/created.md`.
 
+**Status (2026-11-12): complete.** Every step is done, and the tracking issue #217 is closed. #221 (the decision-model
+spike) is now a standalone issue rather than a sub-issue of #217. What's left lives in #286 (upstream-gated
+workarounds, deferred review findings, manual checks), #221, #232 (ArchUnit) and #281 (chat bot emails in the
+correspondence).
+
 | # | Issue (GitHub title) | Plan | Depends on |
 |---|---|---|---|
 | 1 | Upgrade quarkus-langchain4j and other dependencies to the latest stable versions | [`01-gh212-dependency-upgrades/PLAN.md`](01-gh212-dependency-upgrades/PLAN.md) | — |
@@ -45,7 +50,9 @@ merged; touches `IntakeMetrics` (histogram buckets) but no intake behavior.
 
 **Related, not part of the five-step order:** #221 Spike: compare a LangChain4j decision model (Jev)
 with the LLM email classifier (body in `github-issues/issue-07-decision-model-spike.md`; a follow-up
-to step 5, blocked by step 5 and by a quarkus-langchain4j release that ships `quarkus-langchain4j-typesafe`).
+to step 5, blocked by step 5 and by a quarkus-langchain4j release that ships `quarkus-langchain4j-typesafe`; both
+cleared — 1.15.0 ships decision models for TypeSafe, Ollama and OpenAI, plus decision agents — and the issue was rescoped
+on 2026-11-12).
 
 **Related, not part of the five-step order:** #222 Repackage `org.parasol` by domain, with layer
 sub-packages (body in `github-issues/issue-08-repackage-by-domain.md`). Housekeeping done before steps 2 and 4,
