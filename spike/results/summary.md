@@ -16,6 +16,7 @@
 | ollamaopenai | llm | 0.889 | 0.636 | 1 | 120/143 | 0.698 | 0.623 | 0.849 | 0.830 | 0.906 | 1 (0) | 774/1840 | 2654 | 719/53 | 0.000 |
 | ollamaopenai | llmdesc | 0.938 | 0.909 | 0 | 120/149 | 0.717 | 0.604 | 0.849 | 0.792 | 0.943 | 0 (0) | 797/1126 | 1592 | 770/52 | 0.000 |
 | ollamaopenai | nimble | 0.988 | 0.909 | 0 | 285/335 | 0.943 | 0.981 | 0.981 | 0.962 | 0.943 | 0 (0) | 782/2500 | 2750 | 2491/0 | 0.000 |
+| ollamaq8 | tev1-4b-q8_0 | 0.988 | 1.000 | 0 | 179/200 | 0.906 | 0.981 | 0.962 | 0.962 | 0.943 | 0 (0) | 507/1590 | 1809 | 1398/0 | 0.000 |
 | openai | gpt-6-luna | 1.000 | 1.000 | 0 | 229/387 | 0.925 | 0.962 | 0.962 | 0.962 | 0.962 | 0 (0) | 233/421 | 676 | 1002/0 | 0.100 |
 | openai | llm | 1.000 | 1.000 | 0 | 2060/3035 | 0.849 | 0.906 | 0.962 | 0.962 | 0.887 | 0 (0) | 5939/10513 | 12852 | 668/485 | 1.138 |
 | openai | llmdesc | 1.000 | 1.000 | 0 | 1651/2670 | 0.830 | 0.830 | 0.981 | 0.962 | 0.906 | 0 (0) | 6243/11050 | 12410 | 736/467 | 1.119 |
@@ -47,6 +48,9 @@
 - **ollamaopenai/nimble calibration**: classification ECE 0.006, AUROC(margin) 0.863, wrong-answer margins [0.96]; yes/no Brier 0.038, ECE 0.026, AUROC 0.712; category AUROC(margin) 0.558
   - classification selective (margin ≥ t): t=0.5: cov 0.99 acc 0.988, t=0.8: cov 0.99 acc 0.988, t=0.9: cov 0.98 acc 0.987, t=0.95: cov 0.88 acc 0.986
   - yes/no selective (max(p,1-p) ≥ t): t=0.6: cov 0.98 acc 0.968, t=0.8: cov 0.96 acc 0.967, t=0.9: cov 0.91 acc 0.972, t=0.95: cov 0.85 acc 0.970
+- **ollamaq8/tev1-4b-q8_0 calibration**: classification ECE 0.083, AUROC(margin) 1.000, wrong-answer margins [0.122]; yes/no Brier 0.047, ECE 0.027, AUROC 0.633; category AUROC(margin) 0.692
+  - classification selective (margin ≥ t): t=0.5: cov 0.94 acc 1, t=0.8: cov 0.74 acc 1, t=0.9: cov 0.38 acc 1, t=0.95: cov 0.12 acc 1
+  - yes/no selective (max(p,1-p) ≥ t): t=0.6: cov 0.99 acc 0.955, t=0.8: cov 0.94 acc 0.960, t=0.9: cov 0.83 acc 0.962, t=0.95: cov 0.61 acc 0.959
 - **openai/gpt-6-luna calibration**: classification ECE 0.025, AUROC(margin) –, wrong-answer margins []; yes/no Brier 0.038, ECE 0.040, AUROC 0.643; category AUROC(margin) 0.838
   - classification selective (margin ≥ t): t=0.5: cov 0.99 acc 1, t=0.8: cov 0.95 acc 1, t=0.9: cov 0.88 acc 1, t=0.95: cov 0.84 acc 1
   - yes/no selective (max(p,1-p) ≥ t): t=0.6: cov 1.00 acc 0.962, t=0.8: cov 0.99 acc 0.962, t=0.9: cov 0.98 acc 0.962, t=0.95: cov 0.97 acc 0.961
@@ -92,6 +96,8 @@
   - wrong assessment: ['lg-01:,cat=SINGLE_VEHICLE', 'lg-02:described', 'lg-04:,cat=None', 'lg-05:described,dated,cat=SINGLE_VEHICLE', 'nc-mv-02:,cat=SINGLE_VEHICLE', 'nc-mv-04:,cat=SINGLE_VEHICLE', 'nc-mv-06:,cat=SINGLE_VEHICLE', 'nc-ot-01:,cat=SINGLE_VEHICLE', 'nc-ot-02:,cat=SINGLE_VEHICLE', 'nc-ot-03:,cat=SINGLE_VEHICLE', 'nc-ot-04:,cat=SINGLE_VEHICLE', 'nc-ot-05:,cat=SINGLE_VEHICLE', 'nc-ot-06:,cat=SINGLE_VEHICLE', 'ni-03:dated', 'ni-05:dated', 'ni-06:,cat=SINGLE_VEHICLE', 'ni-07:described,dated,cat=SINGLE_VEHICLE', 'ni-08:described,dated', 'ni-10:described,cat=SINGLE_VEHICLE', 'ni-11:dated', 'ni-12:dated,located,cat=SINGLE_VEHICLE', 'ni-13:described,cat=OTHER', 'ni-15:,cat=SINGLE_VEHICLE', 'ni-16:described,dated,cat=SINGLE_VEHICLE', 'pi-03:dated', 'pi-05:described,dated,located,cat=THEFT', 'pi-08:,cat=MULTIPLE_VEHICLE', 'pi-09:dated,located']; errors: []
 - **ollamaopenai/nimble** wrong class.: ['pi-02->NOT_A_CLAIM']
   - wrong assessment: ['ni-14:located', 'pi-03:dated,located', 'pi-05:described,dated,located,cat=THEFT']; errors: []
+- **ollamaq8/tev1-4b-q8_0** wrong class.: ['ni-06->CLAIM_FOLLOW_UP']
+  - wrong assessment: ['lg-07:described', 'nc-mv-03:dated', 'ni-03:located', 'ni-14:located', 'pi-05:described,dated,located,cat=THEFT']; errors: []
 - **openai/gpt-6-luna** wrong class.: []
   - wrong assessment: ['lg-07:described,cat=None', 'nc-mv-03:dated', 'ni-14:located', 'pi-05:described,dated,located,cat=THEFT']; errors: []
 - **openai/llm** wrong class.: []
@@ -127,6 +133,7 @@
 - ollamaopenai/llm: warm-up 2686 ms
 - ollamaopenai/llmdesc: warm-up 177 ms
 - ollamaopenai/nimble: warm-up 2477 ms
+- ollamaq8/tev1-4b-q8_0: warm-up 3627 ms
 - openai/gpt-6-luna: warm-up 710 ms
 - openai/llm: warm-up 1971 ms
 - openai/llmdesc: warm-up 1581 ms

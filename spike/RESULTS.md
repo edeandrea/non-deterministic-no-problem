@@ -59,8 +59,9 @@ margin (hardware and the time it's busy aren't counted).
 | LLM granite4:micro (`-Pollama-openai` today) | 0.889 | 0.636 | 0.698 | 0.623 | 0.8 s / 2.7 s | 719 + 53 | 0 |
 | LLM granite4:micro + descriptions | 0.938 | 0.909 | 0.717 | 0.604 | 0.8 s / 1.6 s | 770 + 52 | 0 |
 | LLM qwen3:30b-a3b + descriptions | 0.975 | 0.818 | 0.585 | 0.604 | 0.8 s / 1.9 s | 644 + 51 | 0 |
-| **Ollama `tev1`** (4.2B, num_ctx 2048) | 0.988 | **1.000** | 0.887 | 0.943 | 0.56 s / 1.3 s | 1,040 | 0 |
-| Ollama `tev1` with num_ctx 8192 | 0.988 | 1.000 | 0.906 | 0.981 | 0.57 s / 1.6 s | 1,398 | 0 |
+| **Ollama `tev1`** (4.2B; the Apple Silicon MLX build, num_ctx 2048) | 0.988 | **1.000** | 0.887 | 0.943 | 0.56 s / 1.3 s | 1,040 | 0 |
+| Ollama `tev1` MLX build with num_ctx 8192 | 0.988 | 1.000 | 0.906 | 0.981 | 0.57 s / 1.6 s | 1,398 | 0 |
+| **Ollama `tev1:4b-q8_0`** (the GGUF build, num_ctx 8192) | 0.988 | 1.000 | 0.906 | 0.981 | 0.64 s / 1.8 s | 1,398 | 0 |
 | **Ollama `nimble`** (9B, default) | 0.988 | 0.909 | **0.943** | 0.981 | 1.1 s / 2.9 s | 2,491 | 0 |
 | Ollama `clef` (27.5B) | 0.988 | 1.000 | 0.925 | 0.943 | 3.5 s / 9.0 s | 937 | 0 |
 | **Hosted Jev `jev-1.14.0`** | **1.000** | **1.000** | **0.943** | **1.000** | **0.16 s / 0.20 s** | 1,102 | **0.05** |
@@ -147,13 +148,20 @@ OpenAI provider the descriptions already reach it (F1 is Ollama-only).
 - **Local Ollama:** works today on both Maven profiles. Use the TypeSafe provider (or the Ollama provider under `-Pollama`)
   with base URL `http://localhost:11434`.
 - **Context limits (the issue's "2,048-token limit"):**
-  - The 2,048 limit applies to **`tev1`'s default `num_ctx` only**.
+  - The 2,048 limit applies to **one build of `tev1` only**. `tev1` (= `tev1:latest` = `tev1:4b`) is one multi-platform entry
+    with two builds: on Apple Silicon, Ollama 0.40 pulls the MLX `mxfp8` build, whose `num_ctx` is 2,048; elsewhere (Linux, so
+    CI and OpenShift) it pulls the llama.cpp `Q8_0` build, whose `num_ctx` is 8,192. The CPU-only container in this spike loaded
+    the `Q8_0` blob with an 8,192 context.
+  - **`tev1:4b-q8_0` pins the `Q8_0` build on every platform**, with no Modelfile. Measured on a Mac, it gave the same answers
+    as the MLX build with `num_ctx` raised on all 85 classifications and 53 assessments, at 0.64 s / 1.8 s per email (vs
+    0.57 s / 1.6 s).
   - Hosted Jev allows 64k tokens per request and 32k per question (262k with the `TypeSafe-Danger-Zone-Long-Context` header).
   - `nimble` defaults to 8,192 and `clef` to 16,384, so both fit the intake's 20,000-character cap (~4–5k tokens).
 - **Overflow:** Ollama **never truncates**. `tev1` answered 400 `prompt 0 has 3621 tokens; expected 1–2048 (input is never truncated)`,
   which surfaces as `InvalidRequestException` and would fault the run (the failure path, with a "processing problem" reply).
   - A request option doesn't lift the limit; neither `options.num_ctx` nor `num_ctx` in the body worked.
-  - A derived model does (`FROM tev1` + `PARAMETER num_ctx 8192`), and its accuracy was unchanged.
+  - A derived model does (`FROM tev1` + `PARAMETER num_ctx 8192`), and its accuracy was unchanged. So does pulling
+    `tev1:4b-q8_0`, which needs no setup beyond the pull.
 - **Hosted Jev:** same wire protocol, so the code path is identical; only the base URL, the key and the model change, all
   config (`quarkus.langchain4j.typesafe.claim-decisions.*`). It was the best backend on every measure: accuracy, injection,
   calibration, latency and cost. The longest input (the capped 20k-character thread, 4,069 tokens) fit within the default limits,
@@ -242,8 +250,8 @@ OpenAI provider the descriptions already reach it (F1 is Ollama-only).
   `{"answers":{"<method>":{"type":"choice","choice":…,"probabilities":…}}}`. No Ollama decision model is needed in CI for stubbed tests.
 - **`%ollama-openai`:** the **OpenAI** decision provider can't reach Ollama (`POST /v1/decisions` → 404). The TypeSafe provider
   pointed at Ollama works on both legs, with identical answers (`ollamaopenai-nimble` = `ollama-nimble`).
-- **Live decision models in CI:** would mean `ollama pull tev1` (4.4 GB) or `nimble` (9.3 GB) in the service container, on CPU
-  with unmeasured latency.
+- **Live decision models in CI:** would mean `ollama pull tev1:4b-q8_0` (4.6 GB) or `nimble` (9.3 GB) in the service container,
+  on CPU with unmeasured latency. Not needed: every test can stub `/v1/systemone`, the way `claim-intake` is stubbed today.
 
 ### 9. Config
 
@@ -288,8 +296,8 @@ of experimental/beta status: the OpenAI Decisions API in production, a local Sys
   - **Production: `gpt-6-luna`.** Hosted Jev measured best on every axis, but `gpt-6-luna` is close behind and keeps the
     claim emails with the processor that already has them. Jev would first need the data-processing review the issue calls
     out (zero data retention is enterprise-only).
-  - **Demo/CI (`-Pollama`, `-Pollama-openai`):** `tev1` (with `num_ctx` raised) or `nimble` through the TypeSafe provider
-    pointed at Ollama. They clearly beat the local LLMs the demo runs on today (0.99 vs ≤ 0.94 classification; 0.89–0.94 vs
+  - **Demo (`-Pollama`, `-Pollama-openai`):** `tev1:4b-q8_0` (the same build and 8k context on every platform), or `nimble`,
+    on Ollama. CI stubs the decision model instead of running one. They clearly beat the local LLMs the demo runs on today (0.99 vs ≤ 0.94 classification; 0.89–0.94 vs
     ≤ 0.72 missing-set).
 - **Not yet, because:**
   1. LangChain4j's decision API is experimental, and the OpenAI Decisions API is in public beta.
@@ -305,7 +313,7 @@ of experimental/beta status: the OpenAI Decisions API in production, a local Sys
   - the LangChain4j API leaves experimental status and the OpenAI Decisions API leaves beta;
   - quarkus-langchain4j ships decision-model tracing.
 - **Adopt path:**
-  - classifier → `@Decide` agent (`gpt-6-luna` in production, `tev1`/`nimble` locally);
+  - classifier → `@Decide` agent (`gpt-6-luna` in production, `tev1:4b-q8_0` locally, a WireMock stub on CI);
   - completeness/category → one `@Decide` record alongside an LLM for the field values, with `extractedSoFar` as an input;
   - a `DecisionModelListener` for spans;
   - a margin threshold as a review-priority hint, never a gate.

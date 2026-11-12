@@ -1610,6 +1610,129 @@
   "email_ms_p95": 2750.2
  },
  {
+  "label": "ollamaq8",
+  "backend": "tev1-4b-q8_0",
+  "warmup_ms": 3627,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 0.9876543209876543,
+  "cls_injection_accuracy": 1.0,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "NEW_CLAIM": 48,
+    "CLAIM_FOLLOW_UP": 1
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 14
+   },
+   "NOT_A_CLAIM": {
+    "NOT_A_CLAIM": 18
+   }
+  },
+  "cls_wrong": [
+   "ni-06->CLAIM_FOLLOW_UP"
+  ],
+  "cls_ms_p50": 179,
+  "cls_ms_p95": 200,
+  "cls_ece_top_probability": 0.08267947848687104,
+  "cls_auroc_margin": 1.0,
+  "cls_selective_margin": {
+   "0.5": {
+    "coverage": 0.9382716049382716,
+    "accuracy": 1,
+    "to_human": 5
+   },
+   "0.8": {
+    "coverage": 0.7407407407407407,
+    "accuracy": 1,
+    "to_human": 21
+   },
+   "0.9": {
+    "coverage": 0.38271604938271603,
+    "accuracy": 1,
+    "to_human": 50
+   },
+   "0.95": {
+    "coverage": 0.12345679012345678,
+    "accuracy": 1,
+    "to_human": 71
+   }
+  },
+  "cls_wrong_margins": [
+   0.122
+  ],
+  "asm_n": 53,
+  "asm_errors": [],
+  "asm_fallbacks": 0,
+  "asm_item_accuracy": {
+   "described": 0.9622641509433962,
+   "dated": 0.9622641509433962,
+   "located": 0.9433962264150944,
+   "category_present": 0.9811320754716981
+  },
+  "asm_missing_set_exact": 0.9056603773584906,
+  "asm_category_accuracy": 0.9811320754716981,
+  "asm_category_accuracy_when_described": 1.0,
+  "asm_injection_missing_set_exact": 0.8571428571428571,
+  "asm_wrong": [
+   "lg-07:described",
+   "nc-mv-03:dated",
+   "ni-03:located",
+   "ni-14:located",
+   "pi-05:described,dated,located,cat=THEFT"
+  ],
+  "asm_ms_p50": 507,
+  "asm_ms_p95": 1590.3999999999999,
+  "yesno_brier": 0.04731778967010878,
+  "yesno_ece": 0.026542566778886466,
+  "yesno_auroc": 0.6325187969924813,
+  "yesno_selective": {
+   "0.6": {
+    "coverage": 0.9874213836477987,
+    "accuracy": 0.9554140127388535,
+    "to_human": 2
+   },
+   "0.8": {
+    "coverage": 0.9371069182389937,
+    "accuracy": 0.959731543624161,
+    "to_human": 10
+   },
+   "0.9": {
+    "coverage": 0.8301886792452831,
+    "accuracy": 0.9621212121212122,
+    "to_human": 27
+   },
+   "0.95": {
+    "coverage": 0.610062893081761,
+    "accuracy": 0.9587628865979382,
+    "to_human": 62
+   }
+  },
+  "cat_auroc_margin": 0.6923076923076923,
+  "cat_selective_margin": {
+   "0.5": {
+    "coverage": 0.9622641509433962,
+    "accuracy": 0.9803921568627451,
+    "to_human": 2
+   },
+   "0.8": {
+    "coverage": 0.9056603773584906,
+    "accuracy": 0.9791666666666666,
+    "to_human": 5
+   },
+   "0.9": {
+    "coverage": 0.8867924528301887,
+    "accuracy": 0.9787234042553191,
+    "to_human": 6
+   }
+  },
+  "tokens_in_mean": 1397.8,
+  "tokens_out_mean": 0,
+  "usd_per_1000_emails": 0.0,
+  "email_ms_p50": 639,
+  "email_ms_p95": 1808.6
+ },
+ {
   "label": "openai",
   "backend": "gpt-6-luna",
   "warmup_ms": 710,

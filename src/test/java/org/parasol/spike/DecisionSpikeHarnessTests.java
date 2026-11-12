@@ -90,7 +90,7 @@ class DecisionSpikeHarnessTests {
 		Files.createDirectories(RESULTS);
 
 		for (var backend : backends) {
-			var out = RESULTS.resolve("%s-%s.jsonl".formatted(label, backend));
+			var out = RESULTS.resolve("%s-%s.jsonl".formatted(label, backend.replace(':', '-')));
 			Log.infof("#221 spike: %s -> %s", backend, out);
 			try (var writer = Files.newBufferedWriter(out)) {
 				var runner = runnerFor(backend);
