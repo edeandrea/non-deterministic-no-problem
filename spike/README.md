@@ -45,4 +45,17 @@ export TYPESAFE_API_KEY=...
   -Dparasol.models.decision-base-url=https://api.typesafe.ai -Dparasol.models.decision-model-id=jev-1.14.0
 ```
 
-The OpenAI Decisions API (not measured) would need an `OpenAiDecisionModel` runner in `DecisionSpikeHarnessTests`.
+### OpenAI (`gpt-5-mini` and the Decisions API)
+
+A backend named `gpt-*` (e.g. `gpt-6-luna`) is the OpenAI Decisions API, with the key from `OPENAI_API_KEY`. The LLM backends
+(`llm`, `llmdesc`) run on `gpt-5-mini`, the production `claim-intake` model, with `-Dparasol.spike.llm-model=gpt-5-mini` on the
+default Maven profile (no `-P`); `SpikeHarnessProfile` passes the key on when the variable is set.
+
+```bash
+export OPENAI_API_KEY=...
+./mvnw test -Dtest=DecisionSpikeHarnessTests -Dsurefire.failIfNoSpecifiedTests=false -Dspike=true \
+  -Dspike.label=openai -Dspike.backends=gpt-6-luna,llm,llmdesc -Dparasol.spike.llm-model=gpt-5-mini
+```
+
+`analyze.py` prices a run by its label and backend: `jev-*` and `gpt-6-luna` on input tokens, `llm`/`llmdesc` under an `openai*`
+label as `gpt-5-mini`, everything else as local ($0). Update `PRICES` there when list prices change.

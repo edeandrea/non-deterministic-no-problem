@@ -28,7 +28,9 @@ import org.parasol.intake.workflow.CorrespondenceText;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import dev.langchain4j.model.decision.DecisionModel;
 import dev.langchain4j.model.decision.response.DecisionResponse;
+import dev.langchain4j.model.openai.OpenAiDecisionModel;
 import dev.langchain4j.model.typesafe.TypeSafeDecisionModel;
 import dev.langchain4j.service.decision.DecisionServices;
 import io.quarkus.logging.Log;
@@ -40,7 +42,8 @@ import io.quarkus.test.junit.TestProfile;
  * backend, into {@code spike/results/<label>-<backend>.jsonl}. {@code spike/analyze.py} scores them.
  * <p>
  * {@code -Dspike=true -Dspike.label=ollama -Dspike.backends=llm,agent,nimble,tev1,clef}; a {@code jev-*} backend (e.g.
- * {@code jev-1.14.0}) is hosted Jev and needs {@code TYPESAFE_API_KEY}
+ * {@code jev-1.14.0}) is hosted Jev and needs {@code TYPESAFE_API_KEY}; a {@code gpt-*} backend (e.g. {@code gpt-6-luna}) is the
+ * OpenAI Decisions API and needs {@code OPENAI_API_KEY}
  */
 @QuarkusTest
 @TestProfile(SpikeHarnessProfile.class)
@@ -301,15 +304,23 @@ class DecisionSpikeHarnessTests {
 		private final SpikeDecisions decisions;
 
 		DecisionRunner(String model) {
-			// jev-* is hosted Jev (TYPESAFE_API_KEY); anything else is a decision model on the configured System One server (Ollama)
+			// gpt-* is the OpenAI Decisions API (OPENAI_API_KEY); jev-* is hosted Jev (TYPESAFE_API_KEY); anything else is a
+			// decision model on the configured System One server (Ollama)
 			var hosted = model.startsWith("jev-");
-			var decisionModel = TypeSafeDecisionModel.builder()
-				.baseUrl(hosted ? HOSTED_JEV : decisionBaseUrl)
-				.apiKey(hosted ? requiredEnv("TYPESAFE_API_KEY") : null)
-				.modelName(model)
-				.timeout(Duration.ofMinutes(10))
-				.maxRetries(0)
-				.build();
+			DecisionModel decisionModel = model.startsWith("gpt-") ?
+				OpenAiDecisionModel.builder()
+					.apiKey(requiredEnv("OPENAI_API_KEY"))
+					.modelName(model)
+					.timeout(Duration.ofMinutes(10))
+					.maxRetries(0)
+					.build() :
+				TypeSafeDecisionModel.builder()
+					.baseUrl(hosted ? HOSTED_JEV : decisionBaseUrl)
+					.apiKey(hosted ? requiredEnv("TYPESAFE_API_KEY") : null)
+					.modelName(model)
+					.timeout(Duration.ofMinutes(10))
+					.maxRetries(0)
+					.build();
 			this.decisions = DecisionServices.builder(SpikeDecisions.class).decisionModel(decisionModel).build();
 		}
 

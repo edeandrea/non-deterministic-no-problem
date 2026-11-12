@@ -16,9 +16,20 @@ RESULTS = ROOT / "results"
 TYPES = ["NEW_CLAIM", "CLAIM_FOLLOW_UP", "NOT_A_CLAIM"]
 ITEMS = [("described", "described"), ("dated", "dated"), ("located", "located")]
 
-# USD per million tokens (input, output). gpt-5-mini is the production claim-intake model (OpenAI list price);
-# Jev from docs.typesafe.ai/models; the OpenAI Decisions API (gpt-6-luna) from third-party price trackers.
-PRICES = {"gpt-5-mini": (0.25, 2.00), "jev-1.14.0": (0.042, 0.0), "gpt-6-luna decisions": (0.10, 0.0)}
+# USD per million tokens (input, output), list prices checked 2026-11-12: gpt-5-mini and gpt-6-luna from
+# developers.openai.com/api/docs/pricing (the Decisions API reports 0 output tokens), Jev from docs.typesafe.ai/models (output
+# not billed). Ollama runs locally: 0, marginal cost only.
+PRICES = {"gpt-5-mini": (0.25, 2.00), "gpt-6-luna": (0.10, 0.0), "jev": (0.042, 0.0), "local": (0.0, 0.0)}
+
+
+def price_of(label, backend):
+	if backend.startswith("jev-"):
+		return PRICES["jev"]
+	if backend.startswith("gpt-6-luna"):
+		return PRICES["gpt-6-luna"]
+	if label.startswith("openai") and backend in ("llm", "llmdesc"):
+		return PRICES["gpt-5-mini"]
+	return PRICES["local"]
 
 
 def load(path):
@@ -140,6 +151,8 @@ def score(label, backend, warmup, rows):
 		totals_ms.append(c["ms"] + a.get("ms", 0))
 	r["tokens_in_mean"] = statistics.mean(per_email_in)
 	r["tokens_out_mean"] = statistics.mean(per_email_out)
+	pin, pout = price_of(label, backend)
+	r["usd_per_1000_emails"] = 1000 * (r["tokens_in_mean"] * pin + r["tokens_out_mean"] * pout) / 1e6
 	r["email_ms_p50"] = pct(totals_ms, 50)
 	r["email_ms_p95"] = pct(totals_ms, 95)
 	return r
@@ -160,13 +173,13 @@ def main():
 	def f(v, d=3):
 		return "–" if v is None else (f"{v:.{d}f}" if isinstance(v, float) else str(v))
 
-	print("| run | backend | class. acc | injection acc | errors | cls p50/p95 ms | missing-set exact | category acc | described | dated | located | asm errors (fallbacks) | asm p50/p95 ms | email p95 ms | tokens in/out per email |")
-	print("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+	print("| run | backend | class. acc | injection acc | errors | cls p50/p95 ms | missing-set exact | category acc | described | dated | located | asm errors (fallbacks) | asm p50/p95 ms | email p95 ms | tokens in/out per email | $ per 1,000 emails |")
+	print("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
 	for s in scores:
 		ia = s["asm_item_accuracy"]
 		print(f"| {s['label']} | {s['backend']} | {f(s['cls_accuracy'])} | {f(s['cls_injection_accuracy'])} | {s['cls_errors']} | {f(s['cls_ms_p50'],0)}/{f(s['cls_ms_p95'],0)} | "
 			f"{f(s['asm_missing_set_exact'])} | {f(s['asm_category_accuracy'])} | {f(ia['described'])} | {f(ia['dated'])} | {f(ia['located'])} | {len(s['asm_errors'])} ({s['asm_fallbacks']}) | "
-			f"{f(s['asm_ms_p50'],0)}/{f(s['asm_ms_p95'],0)} | {f(s['email_ms_p95'],0)} | {f(s['tokens_in_mean'],0)}/{f(s['tokens_out_mean'],0)} |")
+			f"{f(s['asm_ms_p50'],0)}/{f(s['asm_ms_p95'],0)} | {f(s['email_ms_p95'],0)} | {f(s['tokens_in_mean'],0)}/{f(s['tokens_out_mean'],0)} | {f(s['usd_per_1000_emails'],3)} |")
 	print()
 	for s in scores:
 		if "cls_auroc_margin" in s:
@@ -182,8 +195,7 @@ def main():
 		print(f"  - wrong assessment: {s['asm_wrong']}; errors: {s['asm_errors']}")
 	print()
 	for s in scores:
-		cost = {name: (s["tokens_in_mean"] * pin + s["tokens_out_mean"] * pout) / 1e6 for name, (pin, pout) in PRICES.items()}
-		print(f"- {s['label']}/{s['backend']}: warm-up {s['warmup_ms']} ms; cost per email at list prices: " + ", ".join(f"{k} ${v:.6f}" for k, v in cost.items()))
+		print(f"- {s['label']}/{s['backend']}: warm-up {s['warmup_ms']} ms")
 
 
 if __name__ == "__main__":

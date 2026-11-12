@@ -43,6 +43,7 @@
   "asm_ms_p95": 104.8,
   "tokens_in_mean": 0,
   "tokens_out_mean": 0,
+  "usd_per_1000_emails": 0.0,
   "email_ms_p50": 146,
   "email_ms_p95": 191.8
  },
@@ -158,6 +159,7 @@
   },
   "tokens_in_mean": 1102.0588235294117,
   "tokens_out_mean": 0,
+  "usd_per_1000_emails": 0.0462864705882353,
   "email_ms_p50": 156,
   "email_ms_p95": 200.8
  },
@@ -273,6 +275,7 @@
   },
   "tokens_in_mean": 1102.0588235294117,
   "tokens_out_mean": 0,
+  "usd_per_1000_emails": 0.0462864705882353,
   "email_ms_p50": 133,
   "email_ms_p95": 184.39999999999998
  },
@@ -323,6 +326,7 @@
   "asm_ms_p95": 2615.7999999999997,
   "tokens_in_mean": 0,
   "tokens_out_mean": 0,
+  "usd_per_1000_emails": 0.0,
   "email_ms_p50": 1044,
   "email_ms_p95": 2792.6
  },
@@ -445,6 +449,7 @@
   },
   "tokens_in_mean": 937,
   "tokens_out_mean": 0,
+  "usd_per_1000_emails": 0.0,
   "email_ms_p50": 3520,
   "email_ms_p95": 9030.4
  },
@@ -581,6 +586,7 @@
   "asm_ms_p95": 2621.3999999999996,
   "tokens_in_mean": 1000.8235294117648,
   "tokens_out_mean": 113.28235294117647,
+  "usd_per_1000_emails": 0.0,
   "email_ms_p50": 1021,
   "email_ms_p95": 2833.0
  },
@@ -674,6 +680,7 @@
   "asm_ms_p95": 2583.2,
   "tokens_in_mean": 1188.6705882352942,
   "tokens_out_mean": 112.12941176470588,
+  "usd_per_1000_emails": 0.0,
   "email_ms_p50": 1052,
   "email_ms_p95": 3069.399999999999
  },
@@ -794,6 +801,7 @@
   },
   "tokens_in_mean": 2491.435294117647,
   "tokens_out_mean": 0,
+  "usd_per_1000_emails": 0.0,
   "email_ms_p50": 1131,
   "email_ms_p95": 2936.5999999999995
  },
@@ -916,6 +924,7 @@
   },
   "tokens_in_mean": 1397.8,
   "tokens_out_mean": 0,
+  "usd_per_1000_emails": 0.0,
   "email_ms_p50": 571,
   "email_ms_p95": 1600.3999999999999
  },
@@ -1040,6 +1049,7 @@
   },
   "tokens_in_mean": 1040.2,
   "tokens_out_mean": 0,
+  "usd_per_1000_emails": 0.0,
   "email_ms_p50": 560,
   "email_ms_p95": 1303.5999999999976
  },
@@ -1173,6 +1183,7 @@
   "asm_ms_p95": 2200.199999999999,
   "tokens_in_mean": 616.6823529411764,
   "tokens_out_mean": 56.68235294117647,
+  "usd_per_1000_emails": 0.0,
   "email_ms_p50": 830,
   "email_ms_p95": 2737.3999999999974
  },
@@ -1252,6 +1263,7 @@
   "asm_ms_p95": 1114.3999999999999,
   "tokens_in_mean": 643.9294117647058,
   "tokens_out_mean": 50.64705882352941,
+  "usd_per_1000_emails": 0.0,
   "email_ms_p50": 799,
   "email_ms_p95": 1871.6
  },
@@ -1302,6 +1314,7 @@
   "asm_ms_p95": 2428.6,
   "tokens_in_mean": 0,
   "tokens_out_mean": 0,
+  "usd_per_1000_emails": 0.0,
   "email_ms_p50": 1047,
   "email_ms_p95": 2857.3999999999996
  },
@@ -1389,6 +1402,7 @@
   "asm_ms_p95": 1840.0500000000006,
   "tokens_in_mean": 719.3882352941176,
   "tokens_out_mean": 53.4,
+  "usd_per_1000_emails": 0.0,
   "email_ms_p50": 792,
   "email_ms_p95": 2653.5999999999985
  },
@@ -1470,6 +1484,7 @@
   "asm_ms_p95": 1126.4,
   "tokens_in_mean": 769.5529411764705,
   "tokens_out_mean": 51.67058823529412,
+  "usd_per_1000_emails": 0.0,
   "email_ms_p50": 770,
   "email_ms_p95": 1592.1999999999996
  },
@@ -1590,8 +1605,422 @@
   },
   "tokens_in_mean": 2491.435294117647,
   "tokens_out_mean": 0,
+  "usd_per_1000_emails": 0.0,
   "email_ms_p50": 1028,
   "email_ms_p95": 2750.2
+ },
+ {
+  "label": "openai",
+  "backend": "gpt-6-luna",
+  "warmup_ms": 710,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 1.0,
+  "cls_injection_accuracy": 1.0,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "NEW_CLAIM": 49
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 14
+   },
+   "NOT_A_CLAIM": {
+    "NOT_A_CLAIM": 18
+   }
+  },
+  "cls_wrong": [],
+  "cls_ms_p50": 229,
+  "cls_ms_p95": 387,
+  "cls_ece_top_probability": 0.024691358024691325,
+  "cls_auroc_margin": null,
+  "cls_selective_margin": {
+   "0.5": {
+    "coverage": 0.9876543209876543,
+    "accuracy": 1,
+    "to_human": 1
+   },
+   "0.8": {
+    "coverage": 0.9506172839506173,
+    "accuracy": 1,
+    "to_human": 4
+   },
+   "0.9": {
+    "coverage": 0.8765432098765432,
+    "accuracy": 1,
+    "to_human": 10
+   },
+   "0.95": {
+    "coverage": 0.8395061728395061,
+    "accuracy": 1,
+    "to_human": 13
+   }
+  },
+  "cls_wrong_margins": [],
+  "asm_n": 53,
+  "asm_errors": [],
+  "asm_fallbacks": 0,
+  "asm_item_accuracy": {
+   "described": 0.9622641509433962,
+   "dated": 0.9622641509433962,
+   "located": 0.9622641509433962,
+   "category_present": 0.9622641509433962
+  },
+  "asm_missing_set_exact": 0.9245283018867925,
+  "asm_category_accuracy": 0.9622641509433962,
+  "asm_category_accuracy_when_described": 0.9772727272727273,
+  "asm_injection_missing_set_exact": 0.8571428571428571,
+  "asm_wrong": [
+   "lg-07:described,cat=None",
+   "nc-mv-03:dated",
+   "ni-14:located",
+   "pi-05:described,dated,located,cat=THEFT"
+  ],
+  "asm_ms_p50": 233,
+  "asm_ms_p95": 421.19999999999993,
+  "yesno_brier": 0.03788993710691824,
+  "yesno_ece": 0.03993710691823902,
+  "yesno_auroc": 0.6427015250544662,
+  "yesno_selective": {
+   "0.6": {
+    "coverage": 1.0,
+    "accuracy": 0.9622641509433962,
+    "to_human": 0
+   },
+   "0.8": {
+    "coverage": 0.9937106918238994,
+    "accuracy": 0.9620253164556962,
+    "to_human": 1
+   },
+   "0.9": {
+    "coverage": 0.9811320754716981,
+    "accuracy": 0.9615384615384616,
+    "to_human": 3
+   },
+   "0.95": {
+    "coverage": 0.9748427672955975,
+    "accuracy": 0.9612903225806452,
+    "to_human": 4
+   }
+  },
+  "cat_auroc_margin": 0.8382352941176471,
+  "cat_selective_margin": {
+   "0.5": {
+    "coverage": 1.0,
+    "accuracy": 0.9622641509433962,
+    "to_human": 0
+   },
+   "0.8": {
+    "coverage": 0.9811320754716981,
+    "accuracy": 0.9807692307692307,
+    "to_human": 1
+   },
+   "0.9": {
+    "coverage": 0.9811320754716981,
+    "accuracy": 0.9807692307692307,
+    "to_human": 1
+   }
+  },
+  "tokens_in_mean": 1001.5882352941177,
+  "tokens_out_mean": 0,
+  "usd_per_1000_emails": 0.10015882352941177,
+  "email_ms_p50": 418,
+  "email_ms_p95": 675.8
+ },
+ {
+  "label": "openai",
+  "backend": "llm",
+  "warmup_ms": 1971,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 1.0,
+  "cls_injection_accuracy": 1.0,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "NEW_CLAIM": 49
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 14
+   },
+   "NOT_A_CLAIM": {
+    "NOT_A_CLAIM": 18
+   }
+  },
+  "cls_wrong": [],
+  "cls_ms_p50": 2060,
+  "cls_ms_p95": 3035,
+  "asm_n": 53,
+  "asm_errors": [],
+  "asm_fallbacks": 0,
+  "asm_item_accuracy": {
+   "described": 0.9622641509433962,
+   "dated": 0.9622641509433962,
+   "located": 0.8867924528301887,
+   "category_present": 0.9811320754716981
+  },
+  "asm_missing_set_exact": 0.8490566037735849,
+  "asm_category_accuracy": 0.9056603773584906,
+  "asm_category_accuracy_when_described": 0.9090909090909091,
+  "asm_injection_missing_set_exact": 0.8571428571428571,
+  "asm_wrong": [
+   "lg-05:,cat=SINGLE_VEHICLE",
+   "lg-07:described",
+   "nc-ot-02:,cat=SINGLE_VEHICLE",
+   "nc-ot-05:,cat=SINGLE_VEHICLE",
+   "ni-03:located",
+   "ni-09:located",
+   "ni-11:located",
+   "ni-12:located",
+   "ni-14:located",
+   "ni-16:dated",
+   "pi-05:described,dated,located,cat=THEFT",
+   "pi-08:,cat=MULTIPLE_VEHICLE"
+  ],
+  "asm_ms_p50": 5939,
+  "asm_ms_p95": 10513.0,
+  "tokens_in_mean": 668.0588235294117,
+  "tokens_out_mean": 485.3176470588235,
+  "usd_per_1000_emails": 1.13765,
+  "email_ms_p50": 6268,
+  "email_ms_p95": 12852.399999999996
+ },
+ {
+  "label": "openai",
+  "backend": "llmdesc",
+  "warmup_ms": 1581,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 1.0,
+  "cls_injection_accuracy": 1.0,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "NEW_CLAIM": 49
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 14
+   },
+   "NOT_A_CLAIM": {
+    "NOT_A_CLAIM": 18
+   }
+  },
+  "cls_wrong": [],
+  "cls_ms_p50": 1651,
+  "cls_ms_p95": 2670,
+  "asm_n": 53,
+  "asm_errors": [],
+  "asm_fallbacks": 0,
+  "asm_item_accuracy": {
+   "described": 0.9811320754716981,
+   "dated": 0.9622641509433962,
+   "located": 0.9056603773584906,
+   "category_present": 0.9433962264150944
+  },
+  "asm_missing_set_exact": 0.8301886792452831,
+  "asm_category_accuracy": 0.8301886792452831,
+  "asm_category_accuracy_when_described": 0.8636363636363636,
+  "asm_injection_missing_set_exact": 0.8571428571428571,
+  "asm_wrong": [
+   "lg-07:described",
+   "nc-ot-01:,cat=SINGLE_VEHICLE",
+   "nc-ot-02:,cat=SINGLE_VEHICLE",
+   "nc-ot-04:,cat=SINGLE_VEHICLE",
+   "nc-ot-05:,cat=SINGLE_VEHICLE",
+   "nc-ot-06:,cat=MULTIPLE_VEHICLE",
+   "ni-03:located",
+   "ni-07:,cat=SINGLE_VEHICLE",
+   "ni-09:located",
+   "ni-10:,cat=SINGLE_VEHICLE",
+   "ni-11:located",
+   "ni-14:located",
+   "ni-16:dated",
+   "pi-05:dated,located,cat=THEFT",
+   "pi-08:,cat=MULTIPLE_VEHICLE"
+  ],
+  "asm_ms_p50": 6243,
+  "asm_ms_p95": 11049.6,
+  "tokens_in_mean": 736.2705882352941,
+  "tokens_out_mean": 467.22352941176473,
+  "usd_per_1000_emails": 1.118514705882353,
+  "email_ms_p50": 6735,
+  "email_ms_p95": 12410.399999999998
+ },
+ {
+  "label": "openairepeat",
+  "backend": "gpt-6-luna",
+  "warmup_ms": 428,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 1.0,
+  "cls_injection_accuracy": 1.0,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "NEW_CLAIM": 49
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 14
+   },
+   "NOT_A_CLAIM": {
+    "NOT_A_CLAIM": 18
+   }
+  },
+  "cls_wrong": [],
+  "cls_ms_p50": 214,
+  "cls_ms_p95": 505,
+  "cls_ece_top_probability": 0.024691358024691325,
+  "cls_auroc_margin": null,
+  "cls_selective_margin": {
+   "0.5": {
+    "coverage": 0.9876543209876543,
+    "accuracy": 1,
+    "to_human": 1
+   },
+   "0.8": {
+    "coverage": 0.9506172839506173,
+    "accuracy": 1,
+    "to_human": 4
+   },
+   "0.9": {
+    "coverage": 0.8765432098765432,
+    "accuracy": 1,
+    "to_human": 10
+   },
+   "0.95": {
+    "coverage": 0.8395061728395061,
+    "accuracy": 1,
+    "to_human": 13
+   }
+  },
+  "cls_wrong_margins": [],
+  "asm_n": 53,
+  "asm_errors": [],
+  "asm_fallbacks": 0,
+  "asm_item_accuracy": {
+   "described": 0.9622641509433962,
+   "dated": 0.9622641509433962,
+   "located": 0.9622641509433962,
+   "category_present": 0.9622641509433962
+  },
+  "asm_missing_set_exact": 0.9245283018867925,
+  "asm_category_accuracy": 0.9622641509433962,
+  "asm_category_accuracy_when_described": 0.9772727272727273,
+  "asm_injection_missing_set_exact": 0.8571428571428571,
+  "asm_wrong": [
+   "lg-07:described,cat=None",
+   "nc-mv-03:dated",
+   "ni-14:located",
+   "pi-05:described,dated,located,cat=THEFT"
+  ],
+  "asm_ms_p50": 269,
+  "asm_ms_p95": 595.2,
+  "yesno_brier": 0.03788993710691824,
+  "yesno_ece": 0.03993710691823902,
+  "yesno_auroc": 0.6427015250544662,
+  "yesno_selective": {
+   "0.6": {
+    "coverage": 1.0,
+    "accuracy": 0.9622641509433962,
+    "to_human": 0
+   },
+   "0.8": {
+    "coverage": 0.9937106918238994,
+    "accuracy": 0.9620253164556962,
+    "to_human": 1
+   },
+   "0.9": {
+    "coverage": 0.9811320754716981,
+    "accuracy": 0.9615384615384616,
+    "to_human": 3
+   },
+   "0.95": {
+    "coverage": 0.9748427672955975,
+    "accuracy": 0.9612903225806452,
+    "to_human": 4
+   }
+  },
+  "cat_auroc_margin": 0.8382352941176471,
+  "cat_selective_margin": {
+   "0.5": {
+    "coverage": 1.0,
+    "accuracy": 0.9622641509433962,
+    "to_human": 0
+   },
+   "0.8": {
+    "coverage": 0.9811320754716981,
+    "accuracy": 0.9807692307692307,
+    "to_human": 1
+   },
+   "0.9": {
+    "coverage": 0.9811320754716981,
+    "accuracy": 0.9807692307692307,
+    "to_human": 1
+   }
+  },
+  "tokens_in_mean": 1001.5882352941177,
+  "tokens_out_mean": 0,
+  "usd_per_1000_emails": 0.10015882352941177,
+  "email_ms_p50": 438,
+  "email_ms_p95": 869.6
+ },
+ {
+  "label": "openairepeat",
+  "backend": "llm",
+  "warmup_ms": 1667,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 1.0,
+  "cls_injection_accuracy": 1.0,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "NEW_CLAIM": 49
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 14
+   },
+   "NOT_A_CLAIM": {
+    "NOT_A_CLAIM": 18
+   }
+  },
+  "cls_wrong": [],
+  "cls_ms_p50": 2046,
+  "cls_ms_p95": 3067,
+  "asm_n": 53,
+  "asm_errors": [],
+  "asm_fallbacks": 0,
+  "asm_item_accuracy": {
+   "described": 0.9245283018867925,
+   "dated": 0.9622641509433962,
+   "located": 0.8867924528301887,
+   "category_present": 0.9433962264150944
+  },
+  "asm_missing_set_exact": 0.8113207547169812,
+  "asm_category_accuracy": 0.7924528301886793,
+  "asm_category_accuracy_when_described": 0.8181818181818182,
+  "asm_injection_missing_set_exact": 0.8571428571428571,
+  "asm_wrong": [
+   "lg-02:described,cat=OTHER",
+   "lg-07:described",
+   "nc-ot-01:,cat=SINGLE_VEHICLE",
+   "nc-ot-02:,cat=SINGLE_VEHICLE",
+   "nc-ot-04:,cat=SINGLE_VEHICLE",
+   "nc-ot-05:,cat=SINGLE_VEHICLE",
+   "nc-ot-06:,cat=MULTIPLE_VEHICLE",
+   "ni-03:located",
+   "ni-06:,cat=SINGLE_VEHICLE",
+   "ni-07:described,cat=SINGLE_VEHICLE",
+   "ni-09:located",
+   "ni-11:located",
+   "ni-12:located,cat=SINGLE_VEHICLE",
+   "ni-14:located",
+   "ni-16:dated",
+   "pi-05:described,dated,located,cat=THEFT",
+   "pi-08:,cat=MULTIPLE_VEHICLE"
+  ],
+  "asm_ms_p50": 6492,
+  "asm_ms_p95": 11901.599999999999,
+  "tokens_in_mean": 674.7411764705882,
+  "tokens_out_mean": 514.9176470588235,
+  "usd_per_1000_emails": 1.1985205882352943,
+  "email_ms_p50": 6817,
+  "email_ms_p95": 13688.4
  },
  {
   "label": "repeat",
@@ -1735,6 +2164,7 @@
   "asm_ms_p95": 2173.6,
   "tokens_in_mean": 1112.7058823529412,
   "tokens_out_mean": 113.51764705882353,
+  "usd_per_1000_emails": 0.0,
   "email_ms_p50": 978,
   "email_ms_p95": 2661.0
  },
@@ -1830,6 +2260,7 @@
   "asm_ms_p95": 2049.2,
   "tokens_in_mean": 1086.2470588235294,
   "tokens_out_mean": 109.49411764705883,
+  "usd_per_1000_emails": 0.0,
   "email_ms_p50": 910,
   "email_ms_p95": 2582.3999999999996
  },
@@ -1950,6 +2381,7 @@
   },
   "tokens_in_mean": 2491.435294117647,
   "tokens_out_mean": 0,
+  "usd_per_1000_emails": 0.0,
   "email_ms_p50": 1055,
   "email_ms_p95": 2797.8
  },
@@ -2074,6 +2506,7 @@
   },
   "tokens_in_mean": 1040.2,
   "tokens_out_mean": 0,
+  "usd_per_1000_emails": 0.0,
   "email_ms_p50": 557,
   "email_ms_p95": 1287.1999999999975
  }

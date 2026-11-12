@@ -17,13 +17,18 @@ public class SpikeHarnessProfile implements QuarkusTestProfile {
 		java.util.Optional.ofNullable(System.getenv("TYPESAFE_API_KEY"))
 			.filter(key -> !key.isBlank())
 			.ifPresent(_ -> overrides.put("quarkus.langchain4j.typesafe.claim-decisions.api-key", "${TYPESAFE_API_KEY}"));
+		// gpt-5-mini (production) for the LLM agents: -Pollama-openai is wrong here, so run on the default Maven profile with
+		// -Dparasol.spike.llm-model=gpt-5-mini and the key in OPENAI_API_KEY (%test stubs it as changeme otherwise)
+		java.util.Optional.ofNullable(System.getenv("OPENAI_API_KEY"))
+			.filter(key -> !key.isBlank())
+			.ifPresent(_ -> overrides.put("quarkus.langchain4j.openai.claim-intake.api-key", "${OPENAI_API_KEY}"));
 		return overrides;
 	}
 
 	private static final Map<String, String> OVERRIDES = Map.ofEntries(
 		Map.entry("quarkus.langchain4j.claim-intake.chat-model.provider", "${parasol.models.provider}"),
 		Map.entry("quarkus.langchain4j.openai.claim-intake.base-url", "${parasol.models.base-url}"),
-		Map.entry("quarkus.langchain4j.openai.claim-intake.chat-model.model-name", "${parasol.models.ollama.chat-model-id}"),
+		Map.entry("quarkus.langchain4j.openai.claim-intake.chat-model.model-name", "${parasol.spike.llm-model:${parasol.models.ollama.chat-model-id}}"),
 		Map.entry("quarkus.langchain4j.openai.claim-intake.timeout", "600s"),
 		Map.entry("quarkus.langchain4j.typesafe.claim-decisions.base-url", "${parasol.models.decision-base-url}"),
 		Map.entry("quarkus.langchain4j.typesafe.claim-decisions.decision-model.model-name", "${parasol.models.decision-model-id}"),
