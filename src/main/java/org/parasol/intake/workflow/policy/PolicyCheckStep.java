@@ -10,7 +10,10 @@ import jakarta.transaction.Transactional;
 import org.parasol.claim.model.Claim;
 import org.parasol.intake.model.ClaimIntakeState;
 import org.parasol.intake.model.IntakeOutcome.NewClaim;
+import org.parasol.intake.model.IntakeOutcome.NoMatchingClaim;
+import org.parasol.intake.model.IntakeOutcome.NotAClaim;
 import org.parasol.intake.model.IntakeOutcome.PendingClaimUpdate;
+import org.parasol.intake.model.IntakeOutcome.StatusReply;
 import org.parasol.intake.workflow.IntakeState;
 import org.parasol.intake.workflow.IntakeState.Disposition;
 import org.parasol.intake.workflow.mail.IntakeEmailReader;
@@ -40,7 +43,9 @@ public class PolicyCheckStep {
 		return switch (state.outcome()) {
 			case NewClaim newClaim -> checkNewClaim(state, newClaim);
 			case PendingClaimUpdate update -> checkUpdate(state, update);
-			default -> state;
+			case StatusReply _ -> state;
+			case NotAClaim _ -> state;
+			case NoMatchingClaim _ -> state;
 		};
 	}
 

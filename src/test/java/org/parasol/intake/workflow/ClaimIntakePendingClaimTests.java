@@ -2,8 +2,11 @@ package org.parasol.intake.workflow;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+
+import jakarta.inject.Inject;
 
 import org.junit.jupiter.api.Test;
 import org.parasol.claim.model.CorrespondenceDirection;
@@ -23,6 +26,21 @@ class ClaimIntakePendingClaimTests extends IntakeFlowTestBase {
 	private static final String NO_LOCATION = details(true, "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());
 	// A reply has to say which of the requested items it answers, as the agent does from its prompt
 	private static final String LOCATION_ANSWERED = details(true, "2026-10-07", "Elm Street", "SINGLE_VEHICLE", null, List.of("LOCATION"));
+	private static final long NO_SUCH_CLAIM = 999_999_999L;
+
+	@Inject
+	ClaimMatchingSteps matchingSteps;
+
+	// The starter matched a claim that was deleted before the run began: the email matches nothing, rather than failing the run
+	@Test
+	void aMatchedClaimThatNoLongerExistsIsNoMatch() {
+		var run = IntakeRun.forEmail("<vanished@example.com>", "conversation", "nobody@example.com", NO_SUCH_CLAIM, true, Instant.now());
+
+		assertThat(this.matchingSteps.initialize(run))
+			.returns(null, IntakeState::claimId)
+			.returns(false, IntakeState::wasPendingReview)
+			.returns(IntakeState.Disposition.CONTINUE, IntakeState::disposition);
+	}
 
 	@Test
 	void aReplyThatCompletesAPendingClaimMovesItToReviewAndKeepsTheConversation() {

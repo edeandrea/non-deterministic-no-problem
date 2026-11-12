@@ -79,12 +79,14 @@ public class SupersedeStep {
 	// Its own transaction: losing the claim's lock to a reviewer's decision fails it (OptimisticLockException at the flush),
 	// which tryClearReview turns into a requeue
 	// Non-private and non-final, so the transaction interceptor applies to the call from this class
+	// A claim deleted meanwhile has no review left to supersede: nothing changes here, and applying the reply fails the run
 	@Transactional(TxType.REQUIRES_NEW)
 	Result clearReviewUnlessDecided(long claimId) {
-		var claim = Claim.<Claim>findById(claimId);
+		var isOpen = Claim.<Claim>findByIdOptional(claimId)
+			.map(claim -> IntakeClaimStatus.isIntakeOpen(claim.status))
+			.orElse(true);
 		var state = ClaimIntakeState.findForClaim(claimId);
-		var isDecided = state.filter(intake -> intake.decidingRunId != null).isPresent()
-			|| !IntakeClaimStatus.isIntakeOpen(claim.status);
+		var isDecided = state.filter(intake -> intake.decidingRunId != null).isPresent() || !isOpen;
 
 		return isDecided ? new Result.Requeue() : clear(state);
 	}

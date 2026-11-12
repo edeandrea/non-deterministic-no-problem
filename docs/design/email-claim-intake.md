@@ -68,7 +68,7 @@ workflow run**, and the steps below are that run's steps.
     decision makes no LLM call.
 
 Every submission gets a reply (fixed templates, except the AI-written status answer), apart from
-auto-replies, self-sent mail and duplicates — and apart from one case: a reviewer's decision that commits but whose
+automatic mail (auto-replies, bounces and delivery reports, list or bulk mail), self-sent mail and duplicates — and apart from one case: a reviewer's decision that commits but whose
 notification email can't then be sent. That isn't retried (the send has no idempotency key, so a retry would answer twice);
 it's logged at ERROR and counted as `claim.intake.failures{stage=reply,outcome=recovered}`, and the customer gets nothing.
 The same holds when a decision faults before its commit and the claim goes back into review. Replies about a claim carry an app-generated `Message-ID` and are recorded next to the

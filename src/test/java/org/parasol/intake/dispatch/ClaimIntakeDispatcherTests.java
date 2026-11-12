@@ -5,6 +5,7 @@ import static org.awaitility.Awaitility.await;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import jakarta.enterprise.event.Event;
@@ -12,10 +13,15 @@ import jakarta.inject.Inject;
 
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.IntakeFlowTestBase;
+import org.parasol.intake.IntakeScenario;
 import org.parasol.intake.IntakeScenario.Mail;
 import org.parasol.intake.mailbox.EmailReceived;
 import org.parasol.intake.mailbox.MailFolder;
 import org.parasol.intake.model.EmailType;
+import org.parasol.intake.review.ReviewDecided;
+import org.parasol.intake.review.ReviewDecision;
+import org.parasol.intake.review.ReviewOutcome;
+import org.parasol.intake.review.ReviewedFields;
 
 import io.quarkus.test.junit.QuarkusTest;
 
@@ -109,5 +115,26 @@ class ClaimIntakeDispatcherTests extends IntakeFlowTestBase {
 		assertThat(this.scenario.replies(SENDER)).isEmpty();
 		assertThat(this.scenario.replies("claims@parasol.com")).isEmpty();
 		assertThat(this.scenario.instanceRows()).isZero();
+	}
+
+	@Test
+	void anEmailHandedBackIsForgottenOnceItsLastRunEnds() {
+		var created = createClaim(SENDER, COMPLETE_DETAILS);
+		var run = this.scenario.awaitWaitingRun(created.claim().id);
+		var runId = this.scenario.claimReview(created.claim().id);
+		var marker = marker();
+		stubFollowUp(marker, COMPLETE_DETAILS);
+
+		var id = this.scenario.submit(Mail.from(SENDER).inReplyTo(created.messageId()).body("One more thing. " + marker));
+		// Its first run found the claim being decided and handed it back
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.starter.requeuesOf(id) > 0);
+		this.scenario.publishUntilWoken(run, new ReviewDecided(created.claim().id, runId, new ReviewDecision(ReviewOutcome.READY, Set.of(), ReviewedFields.none())));
+
+		this.scenario.awaitFiled(id);
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.starter.requeuesOf(id) == 0);
 	}
 }

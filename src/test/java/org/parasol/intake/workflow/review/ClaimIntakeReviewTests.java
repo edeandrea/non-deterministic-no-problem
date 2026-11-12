@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import jakarta.inject.Inject;
+
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.IntakeFlowTestBase;
 import org.parasol.intake.IntakeScenario;
@@ -36,6 +38,14 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 
 	@InjectSpy
 	ReviewDecisionSteps decisionSteps;
+
+	@Inject
+	SupersedeStep supersedeStep;
+
+	@Test
+	void aReplyToAClaimThatNoLongerExistsSupersedesNothing() {
+		assertThat(this.supersedeStep.clearReviewUnlessDecided(999_999_999L)).isEqualTo(new SupersedeStep.Result.Superseded(Optional.empty()));
+	}
 
 	@Test
 	void readyMovesTheClaimInProcessWithOneThankYouAndNoModelCall() {
