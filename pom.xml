@@ -80,6 +80,11 @@
 			<groupId>io.quarkiverse.langchain4j</groupId>
 			<artifactId>quarkus-langchain4j-agentic</artifactId>
 		</dependency>
+		<!-- #221 spike: System One decision models (hosted Jev, or Ollama's /v1/systemone) on every Maven profile -->
+		<dependency>
+			<groupId>io.quarkiverse.langchain4j</groupId>
+			<artifactId>quarkus-langchain4j-typesafe</artifactId>
+		</dependency>
 		<dependency>
 			<groupId>io.quarkiverse.flow</groupId>
 			<artifactId>quarkus-flow</artifactId>

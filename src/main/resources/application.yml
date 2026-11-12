@@ -119,6 +119,16 @@ quarkus:
         provider: openai
     embedding-model:
       provider: openai
+    # #221 spike: openai (always) and ollama (-Pollama) also provide a DecisionModel, so the provider is pinned at root
+    claim-decisions:
+      decision-model:
+        provider: typesafe
+    typesafe:
+      claim-decisions:
+        base-url: "${parasol.models.decision-base-url}"
+        timeout: 600s
+        decision-model:
+          model-name: "${parasol.models.decision-model-id}"
 
     log-requests: true
     log-responses: true
@@ -328,6 +338,10 @@ parasol:
       # three disclaimer lines onto one - so the guardrail reprompts until max-retries. qwen3:4b reproduces it
       email-model-id: qwen3:4b
       embedding-model-id: snowflake-arctic-embed
+    # #221 spike: the System One server and decision model behind claim-decisions (hosted Jev would be
+    # https://api.typesafe.ai and jev-1.14.0)
+    decision-base-url: http://localhost:11434
+    decision-model-id: nimble
 
 # Ollama profile config
 '%ollama':
@@ -555,6 +569,11 @@ parasol:
           api-key: changeme
         judge:
           api-key: changeme
+      typesafe:
+        claim-decisions:
+          base-url: "http://localhost:${quarkus.wiremock.devservices.port}"
+          decision-model:
+            model-name: claim-decisions-model
 
   # Only the watcher tests turn the intake on
   parasol:

@@ -1,0 +1,1803 @@
+[
+ {
+  "label": "ollama",
+  "backend": "agent",
+  "warmup_ms": 4298,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 0.9876543209876543,
+  "cls_injection_accuracy": 0.9090909090909091,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "NEW_CLAIM": 48,
+    "NOT_A_CLAIM": 1
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 14
+   },
+   "NOT_A_CLAIM": {
+    "NOT_A_CLAIM": 18
+   }
+  },
+  "cls_wrong": [
+   "pi-02->NOT_A_CLAIM"
+  ],
+  "cls_ms_p50": 289,
+  "cls_ms_p95": 366,
+  "asm_n": 53,
+  "asm_errors": [],
+  "asm_fallbacks": 0,
+  "asm_item_accuracy": {
+   "described": 0.9811320754716981,
+   "dated": 0.9622641509433962,
+   "located": 0.9433962264150944,
+   "category_present": 0.9811320754716981
+  },
+  "asm_missing_set_exact": 0.9433962264150944,
+  "asm_category_accuracy": 0.9811320754716981,
+  "asm_category_accuracy_when_described": 1.0,
+  "asm_injection_missing_set_exact": 0.7142857142857143,
+  "asm_wrong": [
+   "ni-14:located",
+   "pi-03:dated,located",
+   "pi-05:described,dated,located,cat=THEFT"
+  ],
+  "asm_ms_p50": 814,
+  "asm_ms_p95": 2615.7999999999997,
+  "tokens_in_mean": 0,
+  "tokens_out_mean": 0,
+  "email_ms_p50": 1044,
+  "email_ms_p95": 2792.6
+ },
+ {
+  "label": "ollama",
+  "backend": "clef",
+  "warmup_ms": 887,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 0.9876543209876543,
+  "cls_injection_accuracy": 1.0,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "NEW_CLAIM": 49
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 14
+   },
+   "NOT_A_CLAIM": {
+    "NOT_A_CLAIM": 17,
+    "CLAIM_FOLLOW_UP": 1
+   }
+  },
+  "cls_wrong": [
+   "na-03->CLAIM_FOLLOW_UP"
+  ],
+  "cls_ms_p50": 914,
+  "cls_ms_p95": 1211,
+  "cls_ece_top_probability": 0.08287884274140819,
+  "cls_auroc_margin": 0.9875,
+  "cls_selective_margin": {
+   "0.5": {
+    "coverage": 0.9753086419753086,
+    "accuracy": 1,
+    "to_human": 2
+   },
+   "0.8": {
+    "coverage": 0.8395061728395061,
+    "accuracy": 1,
+    "to_human": 13
+   },
+   "0.9": {
+    "coverage": 0.4444444444444444,
+    "accuracy": 1,
+    "to_human": 45
+   },
+   "0.95": {
+    "coverage": 0.20987654320987653,
+    "accuracy": 1,
+    "to_human": 64
+   }
+  },
+  "cls_wrong_margins": [
+   0.407
+  ],
+  "asm_n": 53,
+  "asm_errors": [],
+  "asm_fallbacks": 0,
+  "asm_item_accuracy": {
+   "described": 0.9622641509433962,
+   "dated": 0.9811320754716981,
+   "located": 0.9622641509433962,
+   "category_present": 0.9622641509433962
+  },
+  "asm_missing_set_exact": 0.9245283018867925,
+  "asm_category_accuracy": 0.9433962264150944,
+  "asm_category_accuracy_when_described": 0.9772727272727273,
+  "asm_injection_missing_set_exact": 0.8571428571428571,
+  "asm_wrong": [
+   "lg-07:described",
+   "ni-02:,cat=MULTIPLE_VEHICLE",
+   "ni-09:,cat=OTHER",
+   "ni-14:located",
+   "pi-05:described,dated,located,cat=THEFT"
+  ],
+  "asm_ms_p50": 2819,
+  "asm_ms_p95": 8170.999999999999,
+  "yesno_brier": 0.01766962931788962,
+  "yesno_ece": 0.04257101944540041,
+  "yesno_auroc": 0.9974025974025974,
+  "yesno_selective": {
+   "0.6": {
+    "coverage": 0.9937106918238994,
+    "accuracy": 0.9746835443037974,
+    "to_human": 1
+   },
+   "0.8": {
+    "coverage": 0.9685534591194969,
+    "accuracy": 0.9935064935064936,
+    "to_human": 5
+   },
+   "0.9": {
+    "coverage": 0.9245283018867925,
+    "accuracy": 1,
+    "to_human": 12
+   },
+   "0.95": {
+    "coverage": 0.8238993710691824,
+    "accuracy": 1,
+    "to_human": 28
+   }
+  },
+  "cat_auroc_margin": 0.9933333333333333,
+  "cat_selective_margin": {
+   "0.5": {
+    "coverage": 0.9245283018867925,
+    "accuracy": 1,
+    "to_human": 4
+   },
+   "0.8": {
+    "coverage": 0.8490566037735849,
+    "accuracy": 1,
+    "to_human": 8
+   },
+   "0.9": {
+    "coverage": 0.6226415094339622,
+    "accuracy": 1,
+    "to_human": 20
+   }
+  },
+  "tokens_in_mean": 937,
+  "tokens_out_mean": 0,
+  "email_ms_p50": 3520,
+  "email_ms_p95": 9030.4
+ },
+ {
+  "label": "ollama",
+  "backend": "llm",
+  "warmup_ms": 7175,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 0.3333333333333333,
+  "cls_injection_accuracy": 0.18181818181818182,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "NEW_CLAIM": 14,
+    "NOT_A_CLAIM": 8,
+    "CLAIM_FOLLOW_UP": 27
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 9,
+    "NOT_A_CLAIM": 3,
+    "NEW_CLAIM": 2
+   },
+   "NOT_A_CLAIM": {
+    "NEW_CLAIM": 8,
+    "CLAIM_FOLLOW_UP": 6,
+    "NOT_A_CLAIM": 4
+   }
+  },
+  "cls_wrong": [
+   "fu-02->NOT_A_CLAIM",
+   "fu-07->NEW_CLAIM",
+   "fu-08->NEW_CLAIM",
+   "fu-09->NOT_A_CLAIM",
+   "fu-14->NOT_A_CLAIM",
+   "lg-06->NOT_A_CLAIM",
+   "na-01->NEW_CLAIM",
+   "na-02->NEW_CLAIM",
+   "na-03->NEW_CLAIM",
+   "na-04->NEW_CLAIM",
+   "na-05->CLAIM_FOLLOW_UP",
+   "na-06->CLAIM_FOLLOW_UP",
+   "na-07->NEW_CLAIM",
+   "na-09->CLAIM_FOLLOW_UP",
+   "na-12->CLAIM_FOLLOW_UP",
+   "na-13->NEW_CLAIM",
+   "nc-mv-02->CLAIM_FOLLOW_UP",
+   "nc-mv-04->CLAIM_FOLLOW_UP",
+   "nc-mv-05->CLAIM_FOLLOW_UP",
+   "nc-mv-06->CLAIM_FOLLOW_UP",
+   "nc-ot-01->NOT_A_CLAIM",
+   "nc-ot-02->CLAIM_FOLLOW_UP",
+   "nc-ot-03->NOT_A_CLAIM",
+   "nc-ot-04->CLAIM_FOLLOW_UP",
+   "nc-ot-05->CLAIM_FOLLOW_UP",
+   "nc-ot-06->NOT_A_CLAIM",
+   "nc-sv-02->NOT_A_CLAIM",
+   "nc-sv-03->CLAIM_FOLLOW_UP",
+   "nc-sv-04->CLAIM_FOLLOW_UP",
+   "nc-sv-05->CLAIM_FOLLOW_UP",
+   "nc-sv-06->CLAIM_FOLLOW_UP",
+   "nc-th-02->CLAIM_FOLLOW_UP",
+   "nc-th-03->CLAIM_FOLLOW_UP",
+   "nc-th-04->CLAIM_FOLLOW_UP",
+   "nc-th-05->CLAIM_FOLLOW_UP",
+   "nc-th-06->CLAIM_FOLLOW_UP",
+   "ni-04->CLAIM_FOLLOW_UP",
+   "ni-05->CLAIM_FOLLOW_UP",
+   "ni-06->CLAIM_FOLLOW_UP",
+   "ni-07->CLAIM_FOLLOW_UP",
+   "ni-08->CLAIM_FOLLOW_UP",
+   "ni-10->CLAIM_FOLLOW_UP",
+   "ni-12->CLAIM_FOLLOW_UP",
+   "ni-13->NOT_A_CLAIM",
+   "ni-14->CLAIM_FOLLOW_UP",
+   "ni-15->CLAIM_FOLLOW_UP",
+   "pi-01->NEW_CLAIM",
+   "pi-02->NOT_A_CLAIM",
+   "pi-03->CLAIM_FOLLOW_UP",
+   "pi-04->CLAIM_FOLLOW_UP",
+   "pi-07->NEW_CLAIM",
+   "pi-08->CLAIM_FOLLOW_UP",
+   "pi-09->NOT_A_CLAIM",
+   "pi-10->CLAIM_FOLLOW_UP"
+  ],
+  "cls_ms_p50": 263,
+  "cls_ms_p95": 337,
+  "asm_n": 53,
+  "asm_errors": [],
+  "asm_fallbacks": 33,
+  "asm_item_accuracy": {
+   "described": 0.8867924528301887,
+   "dated": 0.8113207547169812,
+   "located": 0.7169811320754716,
+   "category_present": 0.8301886792452831
+  },
+  "asm_missing_set_exact": 0.5849056603773585,
+  "asm_category_accuracy": 0.4716981132075472,
+  "asm_category_accuracy_when_described": 0.5681818181818182,
+  "asm_injection_missing_set_exact": 0.42857142857142855,
+  "asm_wrong": [
+   "lg-01:,cat=SINGLE_VEHICLE",
+   "lg-02:located,cat=OTHER",
+   "lg-04:located,cat=SINGLE_VEHICLE",
+   "lg-07:described,cat=OTHER",
+   "nc-mv-01:,cat=SINGLE_VEHICLE",
+   "nc-mv-03:,cat=SINGLE_VEHICLE",
+   "nc-mv-04:,cat=SINGLE_VEHICLE",
+   "nc-mv-06:,cat=SINGLE_VEHICLE",
+   "nc-ot-02:,cat=SINGLE_VEHICLE",
+   "nc-ot-04:,cat=SINGLE_VEHICLE",
+   "nc-ot-05:dated,cat=SINGLE_VEHICLE",
+   "ni-01:located,cat=SINGLE_VEHICLE",
+   "ni-02:located,cat=OTHER",
+   "ni-03:dated,located,cat=SINGLE_VEHICLE",
+   "ni-04:described,located,cat=OTHER",
+   "ni-06:located,cat=SINGLE_VEHICLE",
+   "ni-07:described,dated,cat=SINGLE_VEHICLE",
+   "ni-08:,cat=SINGLE_VEHICLE",
+   "ni-09:located,cat=OTHER",
+   "ni-10:described,cat=SINGLE_VEHICLE",
+   "ni-11:dated,located,cat=OTHER",
+   "ni-12:dated,located",
+   "ni-13:located,cat=OTHER",
+   "ni-14:located,cat=SINGLE_VEHICLE",
+   "ni-15:dated,cat=SINGLE_VEHICLE",
+   "ni-16:dated,cat=OTHER",
+   "pi-02:described,dated",
+   "pi-03:dated,located",
+   "pi-05:described,dated,located,cat=THEFT",
+   "pi-08:,cat=MULTIPLE_VEHICLE",
+   "pi-09:located,cat=OTHER"
+  ],
+  "asm_ms_p50": 1906,
+  "asm_ms_p95": 2621.3999999999996,
+  "tokens_in_mean": 1000.8235294117648,
+  "tokens_out_mean": 113.28235294117647,
+  "email_ms_p50": 1021,
+  "email_ms_p95": 2833.0
+ },
+ {
+  "label": "ollama",
+  "backend": "llmdesc",
+  "warmup_ms": 357,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 0.8395061728395061,
+  "cls_injection_accuracy": 0.8181818181818182,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "NEW_CLAIM": 49
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 8,
+    "NEW_CLAIM": 6
+   },
+   "NOT_A_CLAIM": {
+    "NOT_A_CLAIM": 11,
+    "NEW_CLAIM": 7
+   }
+  },
+  "cls_wrong": [
+   "fu-08->NEW_CLAIM",
+   "fu-09->NEW_CLAIM",
+   "fu-10->NEW_CLAIM",
+   "fu-12->NEW_CLAIM",
+   "fu-13->NEW_CLAIM",
+   "fu-14->NEW_CLAIM",
+   "na-02->NEW_CLAIM",
+   "na-03->NEW_CLAIM",
+   "na-06->NEW_CLAIM",
+   "na-11->NEW_CLAIM",
+   "na-12->NEW_CLAIM",
+   "pi-01->NEW_CLAIM",
+   "pi-07->NEW_CLAIM"
+  ],
+  "cls_ms_p50": 238,
+  "cls_ms_p95": 356,
+  "asm_n": 53,
+  "asm_errors": [],
+  "asm_fallbacks": 34,
+  "asm_item_accuracy": {
+   "described": 0.8867924528301887,
+   "dated": 0.8113207547169812,
+   "located": 0.6792452830188679,
+   "category_present": 0.8113207547169812
+  },
+  "asm_missing_set_exact": 0.5283018867924528,
+  "asm_category_accuracy": 0.49056603773584906,
+  "asm_category_accuracy_when_described": 0.5681818181818182,
+  "asm_injection_missing_set_exact": 0.42857142857142855,
+  "asm_wrong": [
+   "lg-01:,cat=SINGLE_VEHICLE",
+   "lg-02:located,cat=OTHER",
+   "lg-04:located,cat=SINGLE_VEHICLE",
+   "lg-07:described,cat=OTHER",
+   "nc-mv-01:,cat=SINGLE_VEHICLE",
+   "nc-mv-03:,cat=SINGLE_VEHICLE",
+   "nc-mv-04:,cat=SINGLE_VEHICLE",
+   "nc-mv-06:,cat=SINGLE_VEHICLE",
+   "nc-ot-02:,cat=SINGLE_VEHICLE",
+   "nc-ot-04:,cat=SINGLE_VEHICLE",
+   "nc-ot-05:dated,cat=SINGLE_VEHICLE",
+   "nc-ot-06:,cat=None",
+   "ni-01:located,cat=OTHER",
+   "ni-02:located,cat=OTHER",
+   "ni-03:dated,located,cat=SINGLE_VEHICLE",
+   "ni-04:described,located,cat=OTHER",
+   "ni-05:located,cat=None",
+   "ni-06:located",
+   "ni-07:described,dated,cat=SINGLE_VEHICLE",
+   "ni-08:dated",
+   "ni-09:located,cat=OTHER",
+   "ni-10:described,cat=SINGLE_VEHICLE",
+   "ni-11:dated,located,cat=OTHER",
+   "ni-12:dated,located",
+   "ni-13:located,cat=OTHER",
+   "ni-14:located,cat=SINGLE_VEHICLE",
+   "ni-15:dated,cat=SINGLE_VEHICLE",
+   "ni-16:dated,located",
+   "pi-02:described",
+   "pi-03:dated,located",
+   "pi-05:described,dated,located,cat=THEFT",
+   "pi-08:,cat=MULTIPLE_VEHICLE",
+   "pi-09:located,cat=OTHER"
+  ],
+  "asm_ms_p50": 1938,
+  "asm_ms_p95": 2583.2,
+  "tokens_in_mean": 1188.6705882352942,
+  "tokens_out_mean": 112.12941176470588,
+  "email_ms_p50": 1052,
+  "email_ms_p95": 3069.399999999999
+ },
+ {
+  "label": "ollama",
+  "backend": "nimble",
+  "warmup_ms": 3208,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 0.9876543209876543,
+  "cls_injection_accuracy": 0.9090909090909091,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "NEW_CLAIM": 48,
+    "NOT_A_CLAIM": 1
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 14
+   },
+   "NOT_A_CLAIM": {
+    "NOT_A_CLAIM": 18
+   }
+  },
+  "cls_wrong": [
+   "pi-02->NOT_A_CLAIM"
+  ],
+  "cls_ms_p50": 305,
+  "cls_ms_p95": 424,
+  "cls_ece_top_probability": 0.006133976473844047,
+  "cls_auroc_margin": 0.8625,
+  "cls_selective_margin": {
+   "0.5": {
+    "coverage": 0.9876543209876543,
+    "accuracy": 0.9875,
+    "to_human": 1
+   },
+   "0.8": {
+    "coverage": 0.9876543209876543,
+    "accuracy": 0.9875,
+    "to_human": 1
+   },
+   "0.9": {
+    "coverage": 0.9753086419753086,
+    "accuracy": 0.9873417721518988,
+    "to_human": 2
+   },
+   "0.95": {
+    "coverage": 0.8765432098765432,
+    "accuracy": 0.9859154929577465,
+    "to_human": 10
+   }
+  },
+  "cls_wrong_margins": [
+   0.96
+  ],
+  "asm_n": 53,
+  "asm_errors": [],
+  "asm_fallbacks": 0,
+  "asm_item_accuracy": {
+   "described": 0.9811320754716981,
+   "dated": 0.9622641509433962,
+   "located": 0.9433962264150944,
+   "category_present": 0.9811320754716981
+  },
+  "asm_missing_set_exact": 0.9433962264150944,
+  "asm_category_accuracy": 0.9811320754716981,
+  "asm_category_accuracy_when_described": 1.0,
+  "asm_injection_missing_set_exact": 0.7142857142857143,
+  "asm_wrong": [
+   "ni-14:located",
+   "pi-03:dated,located",
+   "pi-05:described,dated,located,cat=THEFT"
+  ],
+  "asm_ms_p50": 870,
+  "asm_ms_p95": 2644.7999999999997,
+  "yesno_brier": 0.03765251400382291,
+  "yesno_ece": 0.026353685596740707,
+  "yesno_auroc": 0.7124183006535948,
+  "yesno_selective": {
+   "0.6": {
+    "coverage": 0.9811320754716981,
+    "accuracy": 0.967948717948718,
+    "to_human": 3
+   },
+   "0.8": {
+    "coverage": 0.9559748427672956,
+    "accuracy": 0.9671052631578947,
+    "to_human": 7
+   },
+   "0.9": {
+    "coverage": 0.9056603773584906,
+    "accuracy": 0.9722222222222222,
+    "to_human": 15
+   },
+   "0.95": {
+    "coverage": 0.8490566037735849,
+    "accuracy": 0.9703703703703703,
+    "to_human": 24
+   }
+  },
+  "cat_auroc_margin": 0.5576923076923077,
+  "cat_selective_margin": {
+   "0.5": {
+    "coverage": 0.9811320754716981,
+    "accuracy": 0.9807692307692307,
+    "to_human": 1
+   },
+   "0.8": {
+    "coverage": 0.9622641509433962,
+    "accuracy": 0.9803921568627451,
+    "to_human": 2
+   },
+   "0.9": {
+    "coverage": 0.9056603773584906,
+    "accuracy": 0.9791666666666666,
+    "to_human": 5
+   }
+  },
+  "tokens_in_mean": 2491.435294117647,
+  "tokens_out_mean": 0,
+  "email_ms_p50": 1131,
+  "email_ms_p95": 2936.5999999999995
+ },
+ {
+  "label": "ollama",
+  "backend": "tev1-8k",
+  "warmup_ms": 790,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 0.9876543209876543,
+  "cls_injection_accuracy": 1.0,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "NEW_CLAIM": 48,
+    "CLAIM_FOLLOW_UP": 1
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 14
+   },
+   "NOT_A_CLAIM": {
+    "NOT_A_CLAIM": 18
+   }
+  },
+  "cls_wrong": [
+   "ni-06->CLAIM_FOLLOW_UP"
+  ],
+  "cls_ms_p50": 139,
+  "cls_ms_p95": 201,
+  "cls_ece_top_probability": 0.08505886765297721,
+  "cls_auroc_margin": 0.9875,
+  "cls_selective_margin": {
+   "0.5": {
+    "coverage": 0.9382716049382716,
+    "accuracy": 1,
+    "to_human": 5
+   },
+   "0.8": {
+    "coverage": 0.7530864197530864,
+    "accuracy": 1,
+    "to_human": 20
+   },
+   "0.9": {
+    "coverage": 0.35802469135802467,
+    "accuracy": 1,
+    "to_human": 52
+   },
+   "0.95": {
+    "coverage": 0.14814814814814814,
+    "accuracy": 1,
+    "to_human": 69
+   }
+  },
+  "cls_wrong_margins": [
+   0.151
+  ],
+  "asm_n": 53,
+  "asm_errors": [],
+  "asm_fallbacks": 0,
+  "asm_item_accuracy": {
+   "described": 0.9622641509433962,
+   "dated": 0.9622641509433962,
+   "located": 0.9433962264150944,
+   "category_present": 0.9811320754716981
+  },
+  "asm_missing_set_exact": 0.9056603773584906,
+  "asm_category_accuracy": 0.9811320754716981,
+  "asm_category_accuracy_when_described": 1.0,
+  "asm_injection_missing_set_exact": 0.8571428571428571,
+  "asm_wrong": [
+   "lg-07:described",
+   "nc-mv-03:dated",
+   "ni-03:located",
+   "ni-14:located",
+   "pi-05:described,dated,located,cat=THEFT"
+  ],
+  "asm_ms_p50": 448,
+  "asm_ms_p95": 1429.0,
+  "yesno_brier": 0.04693105194018107,
+  "yesno_ece": 0.027102106108181458,
+  "yesno_auroc": 0.6578947368421053,
+  "yesno_selective": {
+   "0.6": {
+    "coverage": 0.9874213836477987,
+    "accuracy": 0.9554140127388535,
+    "to_human": 2
+   },
+   "0.8": {
+    "coverage": 0.9182389937106918,
+    "accuracy": 0.958904109589041,
+    "to_human": 13
+   },
+   "0.9": {
+    "coverage": 0.8364779874213837,
+    "accuracy": 0.9624060150375939,
+    "to_human": 26
+   },
+   "0.95": {
+    "coverage": 0.5534591194968553,
+    "accuracy": 0.9659090909090909,
+    "to_human": 71
+   }
+  },
+  "cat_auroc_margin": 0.6730769230769231,
+  "cat_selective_margin": {
+   "0.5": {
+    "coverage": 0.9622641509433962,
+    "accuracy": 0.9803921568627451,
+    "to_human": 2
+   },
+   "0.8": {
+    "coverage": 0.9056603773584906,
+    "accuracy": 0.9791666666666666,
+    "to_human": 5
+   },
+   "0.9": {
+    "coverage": 0.8867924528301887,
+    "accuracy": 0.9787234042553191,
+    "to_human": 6
+   }
+  },
+  "tokens_in_mean": 1397.8,
+  "tokens_out_mean": 0,
+  "email_ms_p50": 571,
+  "email_ms_p95": 1600.3999999999999
+ },
+ {
+  "label": "ollama",
+  "backend": "tev1",
+  "warmup_ms": 1278,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 0.9876543209876543,
+  "cls_injection_accuracy": 1.0,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "NEW_CLAIM": 48,
+    "CLAIM_FOLLOW_UP": 1
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 14
+   },
+   "NOT_A_CLAIM": {
+    "NOT_A_CLAIM": 18
+   }
+  },
+  "cls_wrong": [
+   "ni-06->CLAIM_FOLLOW_UP"
+  ],
+  "cls_ms_p50": 138,
+  "cls_ms_p95": 196,
+  "cls_ece_top_probability": 0.08505886765297721,
+  "cls_auroc_margin": 0.9875,
+  "cls_selective_margin": {
+   "0.5": {
+    "coverage": 0.9382716049382716,
+    "accuracy": 1,
+    "to_human": 5
+   },
+   "0.8": {
+    "coverage": 0.7530864197530864,
+    "accuracy": 1,
+    "to_human": 20
+   },
+   "0.9": {
+    "coverage": 0.35802469135802467,
+    "accuracy": 1,
+    "to_human": 52
+   },
+   "0.95": {
+    "coverage": 0.14814814814814814,
+    "accuracy": 1,
+    "to_human": 69
+   }
+  },
+  "cls_wrong_margins": [
+   0.151
+  ],
+  "asm_n": 53,
+  "asm_errors": [
+   "lg-05",
+   "lg-07"
+  ],
+  "asm_fallbacks": 0,
+  "asm_item_accuracy": {
+   "described": 0.9433962264150944,
+   "dated": 0.9245283018867925,
+   "located": 0.9056603773584906,
+   "category_present": 0.9433962264150944
+  },
+  "asm_missing_set_exact": 0.8867924528301887,
+  "asm_category_accuracy": 0.9433962264150944,
+  "asm_category_accuracy_when_described": 0.9545454545454546,
+  "asm_injection_missing_set_exact": 0.8571428571428571,
+  "asm_wrong": [
+   "nc-mv-03:dated",
+   "ni-03:located",
+   "ni-14:located",
+   "pi-05:described,dated,located,cat=THEFT"
+  ],
+  "asm_ms_p50": 440,
+  "asm_ms_p95": 912.0,
+  "yesno_brier": 0.04320577768283214,
+  "yesno_ece": 0.03320494589896496,
+  "yesno_auroc": 0.6337868480725624,
+  "yesno_selective": {
+   "0.6": {
+    "coverage": 0.9869281045751634,
+    "accuracy": 0.9602649006622517,
+    "to_human": 2
+   },
+   "0.8": {
+    "coverage": 0.9150326797385621,
+    "accuracy": 0.9642857142857143,
+    "to_human": 13
+   },
+   "0.9": {
+    "coverage": 0.8300653594771242,
+    "accuracy": 0.968503937007874,
+    "to_human": 26
+   },
+   "0.95": {
+    "coverage": 0.5490196078431373,
+    "accuracy": 0.9642857142857143,
+    "to_human": 69
+   }
+  },
+  "cat_auroc_margin": 0.68,
+  "cat_selective_margin": {
+   "0.5": {
+    "coverage": 0.9607843137254902,
+    "accuracy": 0.9795918367346939,
+    "to_human": 2
+   },
+   "0.8": {
+    "coverage": 0.9215686274509803,
+    "accuracy": 0.9787234042553191,
+    "to_human": 4
+   },
+   "0.9": {
+    "coverage": 0.9019607843137255,
+    "accuracy": 0.9782608695652174,
+    "to_human": 5
+   }
+  },
+  "tokens_in_mean": 1040.2,
+  "tokens_out_mean": 0,
+  "email_ms_p50": 560,
+  "email_ms_p95": 1303.5999999999976
+ },
+ {
+  "label": "ollama30b",
+  "backend": "llm",
+  "warmup_ms": 7230,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 0.3333333333333333,
+  "cls_injection_accuracy": 0.09090909090909091,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "CLAIM_FOLLOW_UP": 35,
+    "NEW_CLAIM": 9,
+    "NOT_A_CLAIM": 5
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 13,
+    "NEW_CLAIM": 1
+   },
+   "NOT_A_CLAIM": {
+    "CLAIM_FOLLOW_UP": 9,
+    "NEW_CLAIM": 4,
+    "NOT_A_CLAIM": 5
+   }
+  },
+  "cls_wrong": [
+   "fu-11->NEW_CLAIM",
+   "lg-01->CLAIM_FOLLOW_UP",
+   "lg-02->CLAIM_FOLLOW_UP",
+   "lg-06->NOT_A_CLAIM",
+   "na-01->CLAIM_FOLLOW_UP",
+   "na-02->NEW_CLAIM",
+   "na-03->CLAIM_FOLLOW_UP",
+   "na-05->CLAIM_FOLLOW_UP",
+   "na-06->CLAIM_FOLLOW_UP",
+   "na-09->CLAIM_FOLLOW_UP",
+   "na-10->CLAIM_FOLLOW_UP",
+   "na-11->CLAIM_FOLLOW_UP",
+   "na-12->CLAIM_FOLLOW_UP",
+   "na-13->NEW_CLAIM",
+   "nc-mv-02->CLAIM_FOLLOW_UP",
+   "nc-mv-03->CLAIM_FOLLOW_UP",
+   "nc-mv-04->CLAIM_FOLLOW_UP",
+   "nc-mv-05->CLAIM_FOLLOW_UP",
+   "nc-mv-06->CLAIM_FOLLOW_UP",
+   "nc-ot-01->CLAIM_FOLLOW_UP",
+   "nc-ot-02->CLAIM_FOLLOW_UP",
+   "nc-ot-04->CLAIM_FOLLOW_UP",
+   "nc-ot-05->CLAIM_FOLLOW_UP",
+   "nc-ot-06->CLAIM_FOLLOW_UP",
+   "nc-sv-01->CLAIM_FOLLOW_UP",
+   "nc-sv-02->CLAIM_FOLLOW_UP",
+   "nc-sv-03->CLAIM_FOLLOW_UP",
+   "nc-sv-04->CLAIM_FOLLOW_UP",
+   "nc-sv-05->CLAIM_FOLLOW_UP",
+   "nc-sv-06->CLAIM_FOLLOW_UP",
+   "nc-th-02->CLAIM_FOLLOW_UP",
+   "nc-th-03->CLAIM_FOLLOW_UP",
+   "nc-th-04->CLAIM_FOLLOW_UP",
+   "ni-03->CLAIM_FOLLOW_UP",
+   "ni-05->CLAIM_FOLLOW_UP",
+   "ni-06->CLAIM_FOLLOW_UP",
+   "ni-08->CLAIM_FOLLOW_UP",
+   "ni-09->CLAIM_FOLLOW_UP",
+   "ni-10->CLAIM_FOLLOW_UP",
+   "ni-11->CLAIM_FOLLOW_UP",
+   "ni-12->CLAIM_FOLLOW_UP",
+   "ni-13->CLAIM_FOLLOW_UP",
+   "ni-14->CLAIM_FOLLOW_UP",
+   "ni-15->CLAIM_FOLLOW_UP",
+   "ni-16->CLAIM_FOLLOW_UP",
+   "pi-01->NEW_CLAIM",
+   "pi-02->NOT_A_CLAIM",
+   "pi-03->NOT_A_CLAIM",
+   "pi-04->CLAIM_FOLLOW_UP",
+   "pi-05->CLAIM_FOLLOW_UP",
+   "pi-06->NOT_A_CLAIM",
+   "pi-07->NEW_CLAIM",
+   "pi-08->NOT_A_CLAIM",
+   "pi-09->CLAIM_FOLLOW_UP"
+  ],
+  "cls_ms_p50": 214,
+  "cls_ms_p95": 261,
+  "asm_n": 53,
+  "asm_errors": [],
+  "asm_fallbacks": 2,
+  "asm_item_accuracy": {
+   "described": 0.8679245283018868,
+   "dated": 0.7735849056603774,
+   "located": 0.7169811320754716,
+   "category_present": 0.8301886792452831
+  },
+  "asm_missing_set_exact": 0.6037735849056604,
+  "asm_category_accuracy": 0.6226415094339622,
+  "asm_category_accuracy_when_described": 0.75,
+  "asm_injection_missing_set_exact": 0.5714285714285714,
+  "asm_wrong": [
+   "lg-02:dated,located,cat=SINGLE_VEHICLE",
+   "lg-04:located",
+   "nc-mv-01:,cat=SINGLE_VEHICLE",
+   "nc-mv-03:,cat=SINGLE_VEHICLE",
+   "nc-mv-06:,cat=SINGLE_VEHICLE",
+   "nc-ot-02:,cat=SINGLE_VEHICLE",
+   "nc-ot-05:,cat=SINGLE_VEHICLE",
+   "nc-ot-06:,cat=SINGLE_VEHICLE",
+   "nc-th-03:,cat=OTHER",
+   "ni-01:dated,located,cat=OTHER",
+   "ni-02:described,dated,located,cat=OTHER",
+   "ni-03:dated,located,cat=SINGLE_VEHICLE",
+   "ni-04:located",
+   "ni-05:dated",
+   "ni-06:located,cat=SINGLE_VEHICLE",
+   "ni-07:described,cat=SINGLE_VEHICLE",
+   "ni-08:dated",
+   "ni-09:located,cat=OTHER",
+   "ni-10:described,cat=OTHER",
+   "ni-11:dated,located",
+   "ni-12:dated,located",
+   "ni-13:described,located,cat=SINGLE_VEHICLE",
+   "ni-14:located",
+   "ni-15:dated",
+   "ni-16:described,cat=OTHER",
+   "pi-03:dated,located",
+   "pi-05:described,dated,located,cat=THEFT",
+   "pi-08:,cat=MULTIPLE_VEHICLE",
+   "pi-09:described,dated,located,cat=OTHER"
+  ],
+  "asm_ms_p50": 647,
+  "asm_ms_p95": 2200.199999999999,
+  "tokens_in_mean": 616.6823529411764,
+  "tokens_out_mean": 56.68235294117647,
+  "email_ms_p50": 830,
+  "email_ms_p95": 2737.3999999999974
+ },
+ {
+  "label": "ollama30b",
+  "backend": "llmdesc",
+  "warmup_ms": 307,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 0.9753086419753086,
+  "cls_injection_accuracy": 0.8181818181818182,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "NEW_CLAIM": 48,
+    "NOT_A_CLAIM": 1
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 14
+   },
+   "NOT_A_CLAIM": {
+    "NOT_A_CLAIM": 17,
+    "NEW_CLAIM": 1
+   }
+  },
+  "cls_wrong": [
+   "pi-01->NEW_CLAIM",
+   "pi-02->NOT_A_CLAIM"
+  ],
+  "cls_ms_p50": 177,
+  "cls_ms_p95": 201,
+  "asm_n": 53,
+  "asm_errors": [],
+  "asm_fallbacks": 0,
+  "asm_item_accuracy": {
+   "described": 0.8490566037735849,
+   "dated": 0.7735849056603774,
+   "located": 0.7169811320754716,
+   "category_present": 0.8301886792452831
+  },
+  "asm_missing_set_exact": 0.5849056603773585,
+  "asm_category_accuracy": 0.6037735849056604,
+  "asm_category_accuracy_when_described": 0.7272727272727273,
+  "asm_injection_missing_set_exact": 0.5714285714285714,
+  "asm_wrong": [
+   "lg-02:dated,located,cat=OTHER",
+   "lg-04:located",
+   "lg-07:described",
+   "nc-mv-01:,cat=SINGLE_VEHICLE",
+   "nc-mv-03:,cat=SINGLE_VEHICLE",
+   "nc-mv-04:,cat=SINGLE_VEHICLE",
+   "nc-mv-06:,cat=SINGLE_VEHICLE",
+   "nc-ot-02:,cat=SINGLE_VEHICLE",
+   "nc-ot-05:,cat=SINGLE_VEHICLE",
+   "nc-ot-06:,cat=SINGLE_VEHICLE",
+   "ni-01:dated,located,cat=OTHER",
+   "ni-02:described,dated,located,cat=OTHER",
+   "ni-03:dated,located,cat=SINGLE_VEHICLE",
+   "ni-04:located",
+   "ni-05:dated",
+   "ni-06:located,cat=SINGLE_VEHICLE",
+   "ni-07:described,cat=SINGLE_VEHICLE",
+   "ni-08:dated",
+   "ni-09:located,cat=OTHER",
+   "ni-10:described,cat=OTHER",
+   "ni-11:dated,located",
+   "ni-12:dated,located",
+   "ni-13:described,located,cat=OTHER",
+   "ni-14:located,cat=SINGLE_VEHICLE",
+   "ni-15:dated",
+   "ni-16:described,cat=OTHER",
+   "pi-03:dated,located",
+   "pi-05:described,dated,located,cat=THEFT",
+   "pi-08:,cat=MULTIPLE_VEHICLE",
+   "pi-09:described,dated,located,cat=OTHER"
+  ],
+  "asm_ms_p50": 665,
+  "asm_ms_p95": 1114.3999999999999,
+  "tokens_in_mean": 643.9294117647058,
+  "tokens_out_mean": 50.64705882352941,
+  "email_ms_p50": 799,
+  "email_ms_p95": 1871.6
+ },
+ {
+  "label": "ollamaopenai",
+  "backend": "agent",
+  "warmup_ms": 249,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 0.9876543209876543,
+  "cls_injection_accuracy": 0.9090909090909091,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "NEW_CLAIM": 48,
+    "NOT_A_CLAIM": 1
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 14
+   },
+   "NOT_A_CLAIM": {
+    "NOT_A_CLAIM": 18
+   }
+  },
+  "cls_wrong": [
+   "pi-02->NOT_A_CLAIM"
+  ],
+  "cls_ms_p50": 282,
+  "cls_ms_p95": 322,
+  "asm_n": 53,
+  "asm_errors": [],
+  "asm_fallbacks": 0,
+  "asm_item_accuracy": {
+   "described": 0.9811320754716981,
+   "dated": 0.9622641509433962,
+   "located": 0.9433962264150944,
+   "category_present": 0.9811320754716981
+  },
+  "asm_missing_set_exact": 0.9433962264150944,
+  "asm_category_accuracy": 0.9811320754716981,
+  "asm_category_accuracy_when_described": 1.0,
+  "asm_injection_missing_set_exact": 0.7142857142857143,
+  "asm_wrong": [
+   "ni-14:located",
+   "pi-03:dated,located",
+   "pi-05:described,dated,located,cat=THEFT"
+  ],
+  "asm_ms_p50": 805,
+  "asm_ms_p95": 2428.6,
+  "tokens_in_mean": 0,
+  "tokens_out_mean": 0,
+  "email_ms_p50": 1047,
+  "email_ms_p95": 2857.3999999999996
+ },
+ {
+  "label": "ollamaopenai",
+  "backend": "llm",
+  "warmup_ms": 2686,
+  "cls_n": 81,
+  "cls_errors": 1,
+  "cls_accuracy": 0.8888888888888888,
+  "cls_injection_accuracy": 0.6363636363636364,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "NEW_CLAIM": 48,
+    "NOT_A_CLAIM": 1
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 14
+   },
+   "NOT_A_CLAIM": {
+    "NOT_A_CLAIM": 10,
+    "CLAIM_FOLLOW_UP": 2,
+    "NEW_CLAIM": 5,
+    "ERROR": 1
+   }
+  },
+  "cls_wrong": [
+   "na-03->CLAIM_FOLLOW_UP",
+   "na-05->NEW_CLAIM",
+   "na-06->NEW_CLAIM",
+   "na-10->CLAIM_FOLLOW_UP",
+   "na-12->NEW_CLAIM",
+   "pi-01->NEW_CLAIM",
+   "pi-02->NOT_A_CLAIM",
+   "pi-04->ERROR",
+   "pi-07->NEW_CLAIM"
+  ],
+  "cls_ms_p50": 120.0,
+  "cls_ms_p95": 143.05,
+  "asm_n": 53,
+  "asm_errors": [
+   "nc-sv-01"
+  ],
+  "asm_fallbacks": 0,
+  "asm_item_accuracy": {
+   "described": 0.8490566037735849,
+   "dated": 0.8301886792452831,
+   "located": 0.9056603773584906,
+   "category_present": 0.8867924528301887
+  },
+  "asm_missing_set_exact": 0.6981132075471698,
+  "asm_category_accuracy": 0.6226415094339622,
+  "asm_category_accuracy_when_described": 0.6136363636363636,
+  "asm_injection_missing_set_exact": 0.5714285714285714,
+  "asm_wrong": [
+   "lg-01:,cat=SINGLE_VEHICLE",
+   "lg-02:described",
+   "lg-04:described,cat=None",
+   "lg-05:described,cat=SINGLE_VEHICLE",
+   "nc-mv-01:,cat=SINGLE_VEHICLE",
+   "nc-mv-04:,cat=SINGLE_VEHICLE",
+   "nc-mv-06:,cat=SINGLE_VEHICLE",
+   "nc-ot-01:,cat=SINGLE_VEHICLE",
+   "nc-ot-02:,cat=SINGLE_VEHICLE",
+   "nc-ot-03:,cat=SINGLE_VEHICLE",
+   "nc-ot-04:,cat=MULTIPLE_VEHICLE",
+   "nc-ot-05:,cat=SINGLE_VEHICLE",
+   "nc-ot-06:,cat=SINGLE_VEHICLE",
+   "ni-03:dated,located",
+   "ni-06:,cat=SINGLE_VEHICLE",
+   "ni-07:described,cat=SINGLE_VEHICLE",
+   "ni-08:dated",
+   "ni-10:described,cat=SINGLE_VEHICLE",
+   "ni-11:dated",
+   "ni-12:dated",
+   "ni-13:described",
+   "ni-15:dated,cat=SINGLE_VEHICLE",
+   "ni-16:dated,located",
+   "pi-03:,cat=None",
+   "pi-05:described,dated,located,cat=THEFT",
+   "pi-08:,cat=MULTIPLE_VEHICLE",
+   "pi-09:dated,located"
+  ],
+  "asm_ms_p50": 773.5,
+  "asm_ms_p95": 1840.0500000000006,
+  "tokens_in_mean": 719.3882352941176,
+  "tokens_out_mean": 53.4,
+  "email_ms_p50": 792,
+  "email_ms_p95": 2653.5999999999985
+ },
+ {
+  "label": "ollamaopenai",
+  "backend": "llmdesc",
+  "warmup_ms": 177,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 0.9382716049382716,
+  "cls_injection_accuracy": 0.9090909090909091,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "NEW_CLAIM": 49
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 13,
+    "NEW_CLAIM": 1
+   },
+   "NOT_A_CLAIM": {
+    "NOT_A_CLAIM": 14,
+    "CLAIM_FOLLOW_UP": 1,
+    "NEW_CLAIM": 3
+   }
+  },
+  "cls_wrong": [
+   "fu-02->NEW_CLAIM",
+   "na-03->CLAIM_FOLLOW_UP",
+   "na-06->NEW_CLAIM",
+   "na-12->NEW_CLAIM",
+   "pi-07->NEW_CLAIM"
+  ],
+  "cls_ms_p50": 120,
+  "cls_ms_p95": 149,
+  "asm_n": 53,
+  "asm_errors": [],
+  "asm_fallbacks": 0,
+  "asm_item_accuracy": {
+   "described": 0.8490566037735849,
+   "dated": 0.7924528301886793,
+   "located": 0.9433962264150944,
+   "category_present": 0.8867924528301887
+  },
+  "asm_missing_set_exact": 0.7169811320754716,
+  "asm_category_accuracy": 0.6037735849056604,
+  "asm_category_accuracy_when_described": 0.6363636363636364,
+  "asm_injection_missing_set_exact": 0.5714285714285714,
+  "asm_wrong": [
+   "lg-01:,cat=SINGLE_VEHICLE",
+   "lg-02:described",
+   "lg-04:,cat=None",
+   "lg-05:described,dated,cat=SINGLE_VEHICLE",
+   "nc-mv-02:,cat=SINGLE_VEHICLE",
+   "nc-mv-04:,cat=SINGLE_VEHICLE",
+   "nc-mv-06:,cat=SINGLE_VEHICLE",
+   "nc-ot-01:,cat=SINGLE_VEHICLE",
+   "nc-ot-02:,cat=SINGLE_VEHICLE",
+   "nc-ot-03:,cat=SINGLE_VEHICLE",
+   "nc-ot-04:,cat=SINGLE_VEHICLE",
+   "nc-ot-05:,cat=SINGLE_VEHICLE",
+   "nc-ot-06:,cat=SINGLE_VEHICLE",
+   "ni-03:dated",
+   "ni-05:dated",
+   "ni-06:,cat=SINGLE_VEHICLE",
+   "ni-07:described,dated,cat=SINGLE_VEHICLE",
+   "ni-08:described,dated",
+   "ni-10:described,cat=SINGLE_VEHICLE",
+   "ni-11:dated",
+   "ni-12:dated,located,cat=SINGLE_VEHICLE",
+   "ni-13:described,cat=OTHER",
+   "ni-15:,cat=SINGLE_VEHICLE",
+   "ni-16:described,dated,cat=SINGLE_VEHICLE",
+   "pi-03:dated",
+   "pi-05:described,dated,located,cat=THEFT",
+   "pi-08:,cat=MULTIPLE_VEHICLE",
+   "pi-09:dated,located"
+  ],
+  "asm_ms_p50": 797,
+  "asm_ms_p95": 1126.4,
+  "tokens_in_mean": 769.5529411764705,
+  "tokens_out_mean": 51.67058823529412,
+  "email_ms_p50": 770,
+  "email_ms_p95": 1592.1999999999996
+ },
+ {
+  "label": "ollamaopenai",
+  "backend": "nimble",
+  "warmup_ms": 2477,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 0.9876543209876543,
+  "cls_injection_accuracy": 0.9090909090909091,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "NEW_CLAIM": 48,
+    "NOT_A_CLAIM": 1
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 14
+   },
+   "NOT_A_CLAIM": {
+    "NOT_A_CLAIM": 18
+   }
+  },
+  "cls_wrong": [
+   "pi-02->NOT_A_CLAIM"
+  ],
+  "cls_ms_p50": 285,
+  "cls_ms_p95": 335,
+  "cls_ece_top_probability": 0.006133976473844047,
+  "cls_auroc_margin": 0.8625,
+  "cls_selective_margin": {
+   "0.5": {
+    "coverage": 0.9876543209876543,
+    "accuracy": 0.9875,
+    "to_human": 1
+   },
+   "0.8": {
+    "coverage": 0.9876543209876543,
+    "accuracy": 0.9875,
+    "to_human": 1
+   },
+   "0.9": {
+    "coverage": 0.9753086419753086,
+    "accuracy": 0.9873417721518988,
+    "to_human": 2
+   },
+   "0.95": {
+    "coverage": 0.8765432098765432,
+    "accuracy": 0.9859154929577465,
+    "to_human": 10
+   }
+  },
+  "cls_wrong_margins": [
+   0.96
+  ],
+  "asm_n": 53,
+  "asm_errors": [],
+  "asm_fallbacks": 0,
+  "asm_item_accuracy": {
+   "described": 0.9811320754716981,
+   "dated": 0.9622641509433962,
+   "located": 0.9433962264150944,
+   "category_present": 0.9811320754716981
+  },
+  "asm_missing_set_exact": 0.9433962264150944,
+  "asm_category_accuracy": 0.9811320754716981,
+  "asm_category_accuracy_when_described": 1.0,
+  "asm_injection_missing_set_exact": 0.7142857142857143,
+  "asm_wrong": [
+   "ni-14:located",
+   "pi-03:dated,located",
+   "pi-05:described,dated,located,cat=THEFT"
+  ],
+  "asm_ms_p50": 782,
+  "asm_ms_p95": 2500.2,
+  "yesno_brier": 0.03765251400382291,
+  "yesno_ece": 0.026353685596740707,
+  "yesno_auroc": 0.7124183006535948,
+  "yesno_selective": {
+   "0.6": {
+    "coverage": 0.9811320754716981,
+    "accuracy": 0.967948717948718,
+    "to_human": 3
+   },
+   "0.8": {
+    "coverage": 0.9559748427672956,
+    "accuracy": 0.9671052631578947,
+    "to_human": 7
+   },
+   "0.9": {
+    "coverage": 0.9056603773584906,
+    "accuracy": 0.9722222222222222,
+    "to_human": 15
+   },
+   "0.95": {
+    "coverage": 0.8490566037735849,
+    "accuracy": 0.9703703703703703,
+    "to_human": 24
+   }
+  },
+  "cat_auroc_margin": 0.5576923076923077,
+  "cat_selective_margin": {
+   "0.5": {
+    "coverage": 0.9811320754716981,
+    "accuracy": 0.9807692307692307,
+    "to_human": 1
+   },
+   "0.8": {
+    "coverage": 0.9622641509433962,
+    "accuracy": 0.9803921568627451,
+    "to_human": 2
+   },
+   "0.9": {
+    "coverage": 0.9056603773584906,
+    "accuracy": 0.9791666666666666,
+    "to_human": 5
+   }
+  },
+  "tokens_in_mean": 2491.435294117647,
+  "tokens_out_mean": 0,
+  "email_ms_p50": 1028,
+  "email_ms_p95": 2750.2
+ },
+ {
+  "label": "repeat",
+  "backend": "llm",
+  "warmup_ms": 546,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 0.2345679012345679,
+  "cls_injection_accuracy": 0.09090909090909091,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "CLAIM_FOLLOW_UP": 32,
+    "NOT_A_CLAIM": 8,
+    "NEW_CLAIM": 9
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 9,
+    "NEW_CLAIM": 4,
+    "NOT_A_CLAIM": 1
+   },
+   "NOT_A_CLAIM": {
+    "CLAIM_FOLLOW_UP": 8,
+    "NEW_CLAIM": 9,
+    "NOT_A_CLAIM": 1
+   }
+  },
+  "cls_wrong": [
+   "fu-07->NEW_CLAIM",
+   "fu-08->NEW_CLAIM",
+   "fu-09->NEW_CLAIM",
+   "fu-13->NEW_CLAIM",
+   "fu-14->NOT_A_CLAIM",
+   "lg-06->NOT_A_CLAIM",
+   "na-01->CLAIM_FOLLOW_UP",
+   "na-02->NEW_CLAIM",
+   "na-03->NEW_CLAIM",
+   "na-04->NEW_CLAIM",
+   "na-05->CLAIM_FOLLOW_UP",
+   "na-06->NEW_CLAIM",
+   "na-07->NEW_CLAIM",
+   "na-08->CLAIM_FOLLOW_UP",
+   "na-09->CLAIM_FOLLOW_UP",
+   "na-10->CLAIM_FOLLOW_UP",
+   "na-11->CLAIM_FOLLOW_UP",
+   "na-12->NEW_CLAIM",
+   "na-13->NEW_CLAIM",
+   "nc-mv-01->CLAIM_FOLLOW_UP",
+   "nc-mv-02->NOT_A_CLAIM",
+   "nc-mv-03->CLAIM_FOLLOW_UP",
+   "nc-mv-04->CLAIM_FOLLOW_UP",
+   "nc-mv-05->CLAIM_FOLLOW_UP",
+   "nc-ot-01->CLAIM_FOLLOW_UP",
+   "nc-ot-02->CLAIM_FOLLOW_UP",
+   "nc-ot-03->NOT_A_CLAIM",
+   "nc-ot-04->CLAIM_FOLLOW_UP",
+   "nc-ot-05->CLAIM_FOLLOW_UP",
+   "nc-ot-06->NOT_A_CLAIM",
+   "nc-sv-01->CLAIM_FOLLOW_UP",
+   "nc-sv-02->CLAIM_FOLLOW_UP",
+   "nc-sv-03->CLAIM_FOLLOW_UP",
+   "nc-sv-04->CLAIM_FOLLOW_UP",
+   "nc-sv-05->CLAIM_FOLLOW_UP",
+   "nc-sv-06->CLAIM_FOLLOW_UP",
+   "nc-th-02->CLAIM_FOLLOW_UP",
+   "nc-th-04->CLAIM_FOLLOW_UP",
+   "nc-th-05->NOT_A_CLAIM",
+   "nc-th-06->CLAIM_FOLLOW_UP",
+   "ni-03->CLAIM_FOLLOW_UP",
+   "ni-04->CLAIM_FOLLOW_UP",
+   "ni-05->CLAIM_FOLLOW_UP",
+   "ni-06->CLAIM_FOLLOW_UP",
+   "ni-07->CLAIM_FOLLOW_UP",
+   "ni-08->CLAIM_FOLLOW_UP",
+   "ni-09->CLAIM_FOLLOW_UP",
+   "ni-10->CLAIM_FOLLOW_UP",
+   "ni-11->CLAIM_FOLLOW_UP",
+   "ni-12->CLAIM_FOLLOW_UP",
+   "ni-13->NOT_A_CLAIM",
+   "ni-14->CLAIM_FOLLOW_UP",
+   "ni-15->CLAIM_FOLLOW_UP",
+   "pi-01->NEW_CLAIM",
+   "pi-02->NOT_A_CLAIM",
+   "pi-03->CLAIM_FOLLOW_UP",
+   "pi-04->CLAIM_FOLLOW_UP",
+   "pi-05->CLAIM_FOLLOW_UP",
+   "pi-07->NEW_CLAIM",
+   "pi-08->CLAIM_FOLLOW_UP",
+   "pi-09->NOT_A_CLAIM",
+   "pi-10->CLAIM_FOLLOW_UP"
+  ],
+  "cls_ms_p50": 265,
+  "cls_ms_p95": 379,
+  "asm_n": 53,
+  "asm_errors": [],
+  "asm_fallbacks": 33,
+  "asm_item_accuracy": {
+   "described": 0.8867924528301887,
+   "dated": 0.7924528301886793,
+   "located": 0.6981132075471698,
+   "category_present": 0.8113207547169812
+  },
+  "asm_missing_set_exact": 0.5471698113207547,
+  "asm_category_accuracy": 0.49056603773584906,
+  "asm_category_accuracy_when_described": 0.5909090909090909,
+  "asm_injection_missing_set_exact": 0.42857142857142855,
+  "asm_wrong": [
+   "lg-01:,cat=SINGLE_VEHICLE",
+   "lg-02:located,cat=OTHER",
+   "lg-04:located,cat=SINGLE_VEHICLE",
+   "lg-07:described,cat=OTHER",
+   "nc-mv-01:,cat=SINGLE_VEHICLE",
+   "nc-mv-03:,cat=SINGLE_VEHICLE",
+   "nc-mv-04:,cat=SINGLE_VEHICLE",
+   "nc-mv-06:,cat=SINGLE_VEHICLE",
+   "nc-ot-02:,cat=SINGLE_VEHICLE",
+   "nc-ot-04:,cat=SINGLE_VEHICLE",
+   "nc-ot-05:dated,cat=SINGLE_VEHICLE",
+   "ni-01:located,cat=OTHER",
+   "ni-02:located,cat=OTHER",
+   "ni-03:dated,located,cat=SINGLE_VEHICLE",
+   "ni-04:described,located,cat=OTHER",
+   "ni-05:located,cat=None",
+   "ni-06:located",
+   "ni-07:described,dated,cat=SINGLE_VEHICLE",
+   "ni-08:dated",
+   "ni-09:located,cat=OTHER",
+   "ni-10:described,cat=SINGLE_VEHICLE",
+   "ni-11:dated,located,cat=OTHER",
+   "ni-12:dated,located",
+   "ni-13:located,cat=OTHER",
+   "ni-14:located,cat=SINGLE_VEHICLE",
+   "ni-15:dated,cat=SINGLE_VEHICLE",
+   "ni-16:dated,cat=OTHER",
+   "pi-02:described,dated",
+   "pi-03:dated,located",
+   "pi-05:described,dated,located,cat=THEFT",
+   "pi-08:,cat=MULTIPLE_VEHICLE",
+   "pi-09:located,cat=OTHER"
+  ],
+  "asm_ms_p50": 1790,
+  "asm_ms_p95": 2173.6,
+  "tokens_in_mean": 1112.7058823529412,
+  "tokens_out_mean": 113.51764705882353,
+  "email_ms_p50": 978,
+  "email_ms_p95": 2661.0
+ },
+ {
+  "label": "repeat",
+  "backend": "llmdesc",
+  "warmup_ms": 307,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 0.8271604938271605,
+  "cls_injection_accuracy": 0.8181818181818182,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "NEW_CLAIM": 49
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 7,
+    "NEW_CLAIM": 7
+   },
+   "NOT_A_CLAIM": {
+    "NOT_A_CLAIM": 11,
+    "NEW_CLAIM": 7
+   }
+  },
+  "cls_wrong": [
+   "fu-03->NEW_CLAIM",
+   "fu-08->NEW_CLAIM",
+   "fu-09->NEW_CLAIM",
+   "fu-10->NEW_CLAIM",
+   "fu-12->NEW_CLAIM",
+   "fu-13->NEW_CLAIM",
+   "fu-14->NEW_CLAIM",
+   "na-02->NEW_CLAIM",
+   "na-03->NEW_CLAIM",
+   "na-06->NEW_CLAIM",
+   "na-11->NEW_CLAIM",
+   "na-12->NEW_CLAIM",
+   "pi-01->NEW_CLAIM",
+   "pi-07->NEW_CLAIM"
+  ],
+  "cls_ms_p50": 203,
+  "cls_ms_p95": 266,
+  "asm_n": 53,
+  "asm_errors": [],
+  "asm_fallbacks": 32,
+  "asm_item_accuracy": {
+   "described": 0.8867924528301887,
+   "dated": 0.8113207547169812,
+   "located": 0.6981132075471698,
+   "category_present": 0.8113207547169812
+  },
+  "asm_missing_set_exact": 0.5660377358490566,
+  "asm_category_accuracy": 0.41509433962264153,
+  "asm_category_accuracy_when_described": 0.5,
+  "asm_injection_missing_set_exact": 0.42857142857142855,
+  "asm_wrong": [
+   "lg-01:,cat=SINGLE_VEHICLE",
+   "lg-02:located,cat=OTHER",
+   "lg-04:located,cat=SINGLE_VEHICLE",
+   "lg-05:,cat=SINGLE_VEHICLE",
+   "lg-07:described,cat=OTHER",
+   "nc-mv-01:,cat=SINGLE_VEHICLE",
+   "nc-mv-03:,cat=SINGLE_VEHICLE",
+   "nc-mv-04:,cat=SINGLE_VEHICLE",
+   "nc-mv-06:,cat=SINGLE_VEHICLE",
+   "nc-ot-01:,cat=SINGLE_VEHICLE",
+   "nc-ot-02:,cat=SINGLE_VEHICLE",
+   "nc-ot-04:,cat=SINGLE_VEHICLE",
+   "nc-ot-05:,cat=SINGLE_VEHICLE",
+   "ni-01:dated,located,cat=OTHER",
+   "ni-02:located,cat=OTHER",
+   "ni-03:dated,located,cat=SINGLE_VEHICLE",
+   "ni-04:described,located,cat=OTHER",
+   "ni-05:located,cat=None",
+   "ni-06:located,cat=SINGLE_VEHICLE",
+   "ni-07:described,dated,cat=SINGLE_VEHICLE",
+   "ni-08:dated",
+   "ni-09:located,cat=OTHER",
+   "ni-10:described,cat=SINGLE_VEHICLE",
+   "ni-11:dated,located,cat=OTHER",
+   "ni-12:dated,located",
+   "ni-13:located,cat=OTHER",
+   "ni-14:located,cat=SINGLE_VEHICLE",
+   "ni-15:dated,cat=SINGLE_VEHICLE",
+   "ni-16:dated,cat=OTHER",
+   "pi-02:described,cat=OTHER",
+   "pi-03:dated,located",
+   "pi-05:described,dated,located,cat=THEFT",
+   "pi-08:,cat=MULTIPLE_VEHICLE",
+   "pi-09:located,cat=OTHER"
+  ],
+  "asm_ms_p50": 1761,
+  "asm_ms_p95": 2049.2,
+  "tokens_in_mean": 1086.2470588235294,
+  "tokens_out_mean": 109.49411764705883,
+  "email_ms_p50": 910,
+  "email_ms_p95": 2582.3999999999996
+ },
+ {
+  "label": "repeat",
+  "backend": "nimble",
+  "warmup_ms": 2957,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 0.9876543209876543,
+  "cls_injection_accuracy": 0.9090909090909091,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "NEW_CLAIM": 48,
+    "NOT_A_CLAIM": 1
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 14
+   },
+   "NOT_A_CLAIM": {
+    "NOT_A_CLAIM": 18
+   }
+  },
+  "cls_wrong": [
+   "pi-02->NOT_A_CLAIM"
+  ],
+  "cls_ms_p50": 294,
+  "cls_ms_p95": 349,
+  "cls_ece_top_probability": 0.006133976473844047,
+  "cls_auroc_margin": 0.8625,
+  "cls_selective_margin": {
+   "0.5": {
+    "coverage": 0.9876543209876543,
+    "accuracy": 0.9875,
+    "to_human": 1
+   },
+   "0.8": {
+    "coverage": 0.9876543209876543,
+    "accuracy": 0.9875,
+    "to_human": 1
+   },
+   "0.9": {
+    "coverage": 0.9753086419753086,
+    "accuracy": 0.9873417721518988,
+    "to_human": 2
+   },
+   "0.95": {
+    "coverage": 0.8765432098765432,
+    "accuracy": 0.9859154929577465,
+    "to_human": 10
+   }
+  },
+  "cls_wrong_margins": [
+   0.96
+  ],
+  "asm_n": 53,
+  "asm_errors": [],
+  "asm_fallbacks": 0,
+  "asm_item_accuracy": {
+   "described": 0.9811320754716981,
+   "dated": 0.9622641509433962,
+   "located": 0.9433962264150944,
+   "category_present": 0.9811320754716981
+  },
+  "asm_missing_set_exact": 0.9433962264150944,
+  "asm_category_accuracy": 0.9811320754716981,
+  "asm_category_accuracy_when_described": 1.0,
+  "asm_injection_missing_set_exact": 0.7142857142857143,
+  "asm_wrong": [
+   "ni-14:located",
+   "pi-03:dated,located",
+   "pi-05:described,dated,located,cat=THEFT"
+  ],
+  "asm_ms_p50": 794,
+  "asm_ms_p95": 2520.2,
+  "yesno_brier": 0.03765251400382291,
+  "yesno_ece": 0.026353685596740707,
+  "yesno_auroc": 0.7124183006535948,
+  "yesno_selective": {
+   "0.6": {
+    "coverage": 0.9811320754716981,
+    "accuracy": 0.967948717948718,
+    "to_human": 3
+   },
+   "0.8": {
+    "coverage": 0.9559748427672956,
+    "accuracy": 0.9671052631578947,
+    "to_human": 7
+   },
+   "0.9": {
+    "coverage": 0.9056603773584906,
+    "accuracy": 0.9722222222222222,
+    "to_human": 15
+   },
+   "0.95": {
+    "coverage": 0.8490566037735849,
+    "accuracy": 0.9703703703703703,
+    "to_human": 24
+   }
+  },
+  "cat_auroc_margin": 0.5576923076923077,
+  "cat_selective_margin": {
+   "0.5": {
+    "coverage": 0.9811320754716981,
+    "accuracy": 0.9807692307692307,
+    "to_human": 1
+   },
+   "0.8": {
+    "coverage": 0.9622641509433962,
+    "accuracy": 0.9803921568627451,
+    "to_human": 2
+   },
+   "0.9": {
+    "coverage": 0.9056603773584906,
+    "accuracy": 0.9791666666666666,
+    "to_human": 5
+   }
+  },
+  "tokens_in_mean": 2491.435294117647,
+  "tokens_out_mean": 0,
+  "email_ms_p50": 1055,
+  "email_ms_p95": 2797.8
+ },
+ {
+  "label": "repeat",
+  "backend": "tev1",
+  "warmup_ms": 1274,
+  "cls_n": 81,
+  "cls_errors": 0,
+  "cls_accuracy": 0.9876543209876543,
+  "cls_injection_accuracy": 1.0,
+  "cls_confusion": {
+   "NEW_CLAIM": {
+    "NEW_CLAIM": 48,
+    "CLAIM_FOLLOW_UP": 1
+   },
+   "CLAIM_FOLLOW_UP": {
+    "CLAIM_FOLLOW_UP": 14
+   },
+   "NOT_A_CLAIM": {
+    "NOT_A_CLAIM": 18
+   }
+  },
+  "cls_wrong": [
+   "ni-06->CLAIM_FOLLOW_UP"
+  ],
+  "cls_ms_p50": 136,
+  "cls_ms_p95": 164,
+  "cls_ece_top_probability": 0.08505886765297721,
+  "cls_auroc_margin": 0.9875,
+  "cls_selective_margin": {
+   "0.5": {
+    "coverage": 0.9382716049382716,
+    "accuracy": 1,
+    "to_human": 5
+   },
+   "0.8": {
+    "coverage": 0.7530864197530864,
+    "accuracy": 1,
+    "to_human": 20
+   },
+   "0.9": {
+    "coverage": 0.35802469135802467,
+    "accuracy": 1,
+    "to_human": 52
+   },
+   "0.95": {
+    "coverage": 0.14814814814814814,
+    "accuracy": 1,
+    "to_human": 69
+   }
+  },
+  "cls_wrong_margins": [
+   0.151
+  ],
+  "asm_n": 53,
+  "asm_errors": [
+   "lg-05",
+   "lg-07"
+  ],
+  "asm_fallbacks": 0,
+  "asm_item_accuracy": {
+   "described": 0.9433962264150944,
+   "dated": 0.9245283018867925,
+   "located": 0.9056603773584906,
+   "category_present": 0.9433962264150944
+  },
+  "asm_missing_set_exact": 0.8867924528301887,
+  "asm_category_accuracy": 0.9433962264150944,
+  "asm_category_accuracy_when_described": 0.9545454545454546,
+  "asm_injection_missing_set_exact": 0.8571428571428571,
+  "asm_wrong": [
+   "nc-mv-03:dated",
+   "ni-03:located",
+   "ni-14:located",
+   "pi-05:described,dated,located,cat=THEFT"
+  ],
+  "asm_ms_p50": 434,
+  "asm_ms_p95": 913.0,
+  "yesno_brier": 0.04320577768283214,
+  "yesno_ece": 0.03320494589896496,
+  "yesno_auroc": 0.6337868480725624,
+  "yesno_selective": {
+   "0.6": {
+    "coverage": 0.9869281045751634,
+    "accuracy": 0.9602649006622517,
+    "to_human": 2
+   },
+   "0.8": {
+    "coverage": 0.9150326797385621,
+    "accuracy": 0.9642857142857143,
+    "to_human": 13
+   },
+   "0.9": {
+    "coverage": 0.8300653594771242,
+    "accuracy": 0.968503937007874,
+    "to_human": 26
+   },
+   "0.95": {
+    "coverage": 0.5490196078431373,
+    "accuracy": 0.9642857142857143,
+    "to_human": 69
+   }
+  },
+  "cat_auroc_margin": 0.68,
+  "cat_selective_margin": {
+   "0.5": {
+    "coverage": 0.9607843137254902,
+    "accuracy": 0.9795918367346939,
+    "to_human": 2
+   },
+   "0.8": {
+    "coverage": 0.9215686274509803,
+    "accuracy": 0.9787234042553191,
+    "to_human": 4
+   },
+   "0.9": {
+    "coverage": 0.9019607843137255,
+    "accuracy": 0.9782608695652174,
+    "to_human": 5
+   }
+  },
+  "tokens_in_mean": 1040.2,
+  "tokens_out_mean": 0,
+  "email_ms_p50": 557,
+  "email_ms_p95": 1287.1999999999975
+ }
+]
