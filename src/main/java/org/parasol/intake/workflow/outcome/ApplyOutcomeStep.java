@@ -17,6 +17,7 @@ import org.parasol.claim.model.Claim;
 import org.parasol.claim.model.ClaimCorrespondence;
 import org.parasol.claim.model.ClaimImage;
 import org.parasol.claim.model.ClaimImageKind;
+import org.parasol.claim.model.ClaimNotFoundException;
 import org.parasol.claim.model.IntakeClaimStatus;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.agent.extraction.ClaimExtractionRules;
@@ -104,7 +105,7 @@ public class ApplyOutcomeStep {
 	}
 
 	private IntakeState applyUpdate(IntakeState state, InboundEmail email, ClaimExtraction extraction, String runId) {
-		var claim = Claim.<Claim>findById(state.claimId());
+		var claim = Claim.<Claim>findByIdOptional(state.claimId()).orElseThrow(() -> new ClaimNotFoundException(state.claimId()));
 		var replyIsBlank = email.strippedBody().isBlank();
 		var intake = ClaimIntakeState.forClaim(claim);
 		var missing = ClaimExtractionRules.findMissingItems(extraction, intake.requestedItems, replyIsBlank);

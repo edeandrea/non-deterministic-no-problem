@@ -1,6 +1,7 @@
 package org.parasol.intake.workflow;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -87,9 +88,9 @@ class ClaimMatchingSteps {
 
 	private IntakeState initializeForEmail(IntakeRun run) {
 		var state = IntakeState.start(run.messageId(), run.sender(), run.receivedAt());
-		var claim = Stream.ofNullable(run.claimId())
-			.map(id -> Claim.<Claim>findById(id))
-			.findFirst();
+		// A claim deleted since the starter matched it is no match
+		var claim = Optional.ofNullable(run.claimId())
+			.flatMap(id -> Claim.<Claim>findByIdOptional(id));
 		var isWrongSender = claim.isPresent() && !run.senderMatches();
 		var pending = claim.isPresent() ? List.<Claim>of() : Claim.findByEmailAddressAndStatus(run.sender(), PENDING_STATUSES);
 		var numbers = pending.stream()

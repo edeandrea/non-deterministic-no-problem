@@ -80,7 +80,7 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 	private final ReviewReclaimer reclaimer;
 
 	private final Map<String, SenderState> senders = new ConcurrentHashMap<>();
-	private final Map<String, String> senderByInstance = new ConcurrentHashMap<>();
+	private final Map<String, DispatchedRun> runs = new ConcurrentHashMap<>();
 	private final Map<String, Integer> requeues = new ConcurrentHashMap<>();
 	private final Map<String, ProcessingRecovery.Assessment> resumptions = new ConcurrentHashMap<>();
 
@@ -280,7 +280,7 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 				}
 
 				// Registered as working before it starts, so the status listener always finds it
-				this.senderByInstance.put(instance.id(), sender);
+				this.runs.put(instance.id(), new DispatchedRun(sender, messageId));
 				transition(sender, state -> state.working(instance.id()));
 				holder.set(instance.id());
 				instance.start();
@@ -291,7 +291,8 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 			// If it threw from start(), the instance also stays in Flow's in-memory activeInstances map — cancel() is a
 			// no-op on a PENDING instance and removeInstance isn't public (open-workflow-specification/sdk-java#1816).
 			// Harmless, since its id was never persisted and nothing looks it up, but it is a leaked map entry.
-			this.senderByInstance.remove(holder.get());
+			this.runs.remove(holder.get());
+			this.requeues.remove(messageId);
 			transition(sender, state -> state.release(holder.get()));
 			this.failureHandler.handle(messageId, e, FailureOutcome.FATAL);
 		}
@@ -341,15 +342,40 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 	}
 
 	private void markWorking(String instanceId) {
-		Optional.ofNullable(this.senderByInstance.get(instanceId))
-			.ifPresent(sender -> transition(sender, state -> state.markWorking(instanceId)));
+		Optional.ofNullable(this.runs.get(instanceId))
+			.ifPresent(run -> transition(run.sender(), state -> state.markWorking(instanceId)));
 	}
 
 	private void releaseRun(String instanceId, WorkflowStatus status) {
-		var sender = ENDED.contains(status) ? this.senderByInstance.remove(instanceId) : this.senderByInstance.get(instanceId);
+		var hasEnded = ENDED.contains(status);
+		var run = hasEnded ? this.runs.remove(instanceId) : this.runs.get(instanceId);
 
-		Optional.ofNullable(sender)
-			.ifPresent(found -> transition(found, state -> state.release(instanceId)));
+		Optional.ofNullable(run)
+			.ifPresent(found -> {
+				if (hasEnded) {
+					forgetRequeuesUnlessHandedBack(found);
+				}
+
+				transition(found.sender(), state -> state.release(instanceId));
+			});
+	}
+
+	// A run that handed its email back put it at the front of the sender's queue before it ended, and the email's count must
+	// survive until its next run. Any other end is the email's last, so its count goes. Checked before the release, which
+	// takes the email off the queue
+	private void forgetRequeuesUnlessHandedBack(DispatchedRun run) {
+		var isHandedBack = Optional.ofNullable(this.senders.get(run.sender()))
+			.filter(state -> state.queue().contains(run.messageId()))
+			.isPresent();
+
+		if (!isHandedBack) {
+			this.requeues.remove(run.messageId());
+		}
+	}
+
+	// How many times the email was handed back and is still to be started again; 0 when it isn't tracked
+	int requeuesOf(String messageId) {
+		return this.requeues.getOrDefault(messageId, 0);
 	}
 
 	private static Duration latencyOf(InboundEmail email) {
@@ -358,5 +384,8 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 
 	private static String sender(String address) {
 		return address.toLowerCase(Locale.ROOT);
+	}
+
+	private record DispatchedRun(String sender, String messageId) {
 	}
 }
