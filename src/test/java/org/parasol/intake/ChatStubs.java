@@ -30,6 +30,10 @@ public final class ChatStubs {
 
 	private static final String CHAT_PATH = "/v1/chat/completions";
 
+	// #221 spike: the classifier is a decision agent, so its stubs go to the System One endpoint instead
+	private static final String CLASSIFY = "Classify the following email";
+	private static final String DECIDE_PATH = "/v1/systemone";
+
 	private final WireMock wiremock;
 	private final ObjectMapper objectMapper;
 
@@ -48,6 +52,10 @@ public final class ChatStubs {
 	}
 
 	public void answer(String lastMessageContains, String answer, int delayMs) {
+		if (CLASSIFY.equals(lastMessageContains)) {
+			decide(List.of(), answer, delayMs);
+			return;
+		}
 		this.wiremock.register(post(urlPathEqualTo(CHAT_PATH))
 			.withRequestBody(matchingJsonPath("$.messages[-1:].content", containing(lastMessageContains)))
 			.willReturn(okJson(completion(Map.of("role", "assistant", "content", answer), "stop")).withFixedDelay(delayMs)));
@@ -62,6 +70,10 @@ public final class ChatStubs {
 	}
 
 	public void answerWhenAll(List<String> lastMessageContains, String answer, int delayMs) {
+		if (lastMessageContains.contains(CLASSIFY)) {
+			decide(lastMessageContains.stream().filter(text -> !CLASSIFY.equals(text)).toList(), answer, delayMs);
+			return;
+		}
 		var mapping = post(urlPathEqualTo(CHAT_PATH));
 
 		for (var text : lastMessageContains) {
@@ -75,6 +87,14 @@ public final class ChatStubs {
 	 * Fails requests whose last message contains <b>all</b> the given texts, as a provider outage would.
 	 */
 	public void failWhenAll(List<String> lastMessageContains) {
+		if (lastMessageContains.contains(CLASSIFY)) {
+			var decision = post(urlPathEqualTo(DECIDE_PATH));
+			for (var text : lastMessageContains.stream().filter(text -> !CLASSIFY.equals(text)).toList()) {
+				decision = decision.withRequestBody(matchingJsonPath("$.state.correspondence", containing(text)));
+			}
+			this.wiremock.register(decision.willReturn(com.github.tomakehurst.wiremock.client.WireMock.serverError()));
+			return;
+		}
 		var mapping = post(urlPathEqualTo(CHAT_PATH));
 
 		for (var text : lastMessageContains) {
@@ -82,6 +102,27 @@ public final class ChatStubs {
 		}
 
 		this.wiremock.register(mapping.willReturn(com.github.tomakehurst.wiremock.client.WireMock.serverError()));
+	}
+
+	private void decide(List<String> stateContains, String choice, int delayMs) {
+		var mapping = post(urlPathEqualTo(DECIDE_PATH)).withRequestBody(matchingJsonPath("$.questions.classifyEmail"));
+		for (var text : stateContains) {
+			mapping = mapping.withRequestBody(matchingJsonPath("$.state.correspondence", containing(text)));
+		}
+		var probabilities = new java.util.LinkedHashMap<String, Object>();
+		for (var type : org.parasol.intake.model.EmailType.values()) {
+			probabilities.put(type.name(), type.name().equals(choice) ? 0.9 : 0.05);
+		}
+		try {
+			var body = this.objectMapper.writeValueAsString(Map.of(
+				"model", "claim-decisions-model",
+				"answers", Map.of("classifyEmail", Map.of("type", "choice", "choice", choice, "probabilities", probabilities, "confidence", 0.8)),
+				"usage", Map.of("input_tokens", 1, "output_tokens", 0)));
+			this.wiremock.register(mapping.willReturn(okJson(body).withFixedDelay(delayMs)));
+		}
+		catch (Exception e) {
+			throw new AssertionError(e);
+		}
 	}
 
 	public void callTool(String lastMessageContains, String toolName, String argumentsJson) {

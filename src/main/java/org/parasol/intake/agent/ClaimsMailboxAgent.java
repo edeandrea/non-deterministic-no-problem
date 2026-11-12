@@ -5,7 +5,7 @@ import java.util.Collection;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.agent.extraction.ClaimExtractionWorkflow;
 import org.parasol.intake.agent.triage.ClaimStatusTools;
-import org.parasol.intake.agent.triage.EmailClassifierAgent;
+import org.parasol.intake.agent.triage.EmailClassifierDecisionAgent;
 import org.parasol.intake.model.ClassifiedOutcome;
 import org.parasol.intake.model.EmailType;
 import org.parasol.intake.model.IncidentDetails;
@@ -53,7 +53,7 @@ public interface ClaimsMailboxAgent /* extends MonitoredAgent */ {
 	 * @return the outcome, with the label the classifier gave the email
 	 */
 	@SequenceAgent(outputKey = "classifiedOutcome", subAgents = {
-		EmailClassifierAgent.class,
+		EmailClassifierDecisionAgent.class,
 		EmailRouter.class
 	})
 	ClassifiedOutcome process(
