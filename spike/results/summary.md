@@ -1,5 +1,8 @@
 | run | backend | class. acc | injection acc | errors | cls p50/p95 ms | missing-set exact | category acc | described | dated | located | asm errors (fallbacks) | asm p50/p95 ms | email p95 ms | tokens in/out per email |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| jev | agent | 1.000 | 1.000 | 0 | 78/103 | 0.943 | 1.000 | 0.981 | 1.000 | 0.962 | 0 (0) | 84/105 | 192 | 0/0 |
+| jev | jev-1.14.0 | 1.000 | 1.000 | 0 | 83/104 | 0.943 | 1.000 | 0.981 | 0.981 | 0.962 | 0 (0) | 88/113 | 201 | 1102/0 |
+| jevrepeat | jev-1.14.0 | 1.000 | 1.000 | 0 | 76/104 | 0.943 | 1.000 | 0.981 | 1.000 | 0.962 | 0 (0) | 77/101 | 184 | 1102/0 |
 | ollama | agent | 0.988 | 0.909 | 0 | 289/366 | 0.943 | 0.981 | 0.981 | 0.962 | 0.943 | 0 (0) | 814/2616 | 2793 | 0/0 |
 | ollama | clef | 0.988 | 1.000 | 0 | 914/1211 | 0.925 | 0.943 | 0.962 | 0.981 | 0.962 | 0 (0) | 2819/8171 | 9030 | 937/0 |
 | ollama | llm | 0.333 | 0.182 | 0 | 263/337 | 0.585 | 0.472 | 0.887 | 0.811 | 0.717 | 0 (33) | 1906/2621 | 2833 | 1001/113 |
@@ -18,6 +21,12 @@
 | repeat | nimble | 0.988 | 0.909 | 0 | 294/349 | 0.943 | 0.981 | 0.981 | 0.962 | 0.943 | 0 (0) | 794/2520 | 2798 | 2491/0 |
 | repeat | tev1 | 0.988 | 1.000 | 0 | 136/164 | 0.887 | 0.943 | 0.943 | 0.925 | 0.906 | 2 (0) | 434/913 | 1287 | 1040/0 |
 
+- **jev/jev-1.14.0 calibration**: classification ECE 0.021, AUROC(margin) –, wrong-answer margins []; yes/no Brier 0.017, ECE 0.022, AUROC 0.968; category AUROC(margin) –
+  - classification selective (margin ≥ t): t=0.5: cov 0.99 acc 1, t=0.8: cov 0.98 acc 1, t=0.9: cov 0.90 acc 1, t=0.95: cov 0.85 acc 1
+  - yes/no selective (max(p,1-p) ≥ t): t=0.6: cov 0.99 acc 0.981, t=0.8: cov 0.97 acc 0.987, t=0.9: cov 0.91 acc 0.993, t=0.95: cov 0.87 acc 1
+- **jevrepeat/jev-1.14.0 calibration**: classification ECE 0.021, AUROC(margin) –, wrong-answer margins []; yes/no Brier 0.017, ECE 0.025, AUROC 0.952; category AUROC(margin) –
+  - classification selective (margin ≥ t): t=0.5: cov 0.99 acc 1, t=0.8: cov 0.98 acc 1, t=0.9: cov 0.89 acc 1, t=0.95: cov 0.83 acc 1
+  - yes/no selective (max(p,1-p) ≥ t): t=0.6: cov 0.99 acc 0.981, t=0.8: cov 0.97 acc 0.987, t=0.9: cov 0.92 acc 0.993, t=0.95: cov 0.87 acc 1
 - **ollama/clef calibration**: classification ECE 0.083, AUROC(margin) 0.988, wrong-answer margins [0.407]; yes/no Brier 0.018, ECE 0.043, AUROC 0.997; category AUROC(margin) 0.993
   - classification selective (margin ≥ t): t=0.5: cov 0.98 acc 1, t=0.8: cov 0.84 acc 1, t=0.9: cov 0.44 acc 1, t=0.95: cov 0.21 acc 1
   - yes/no selective (max(p,1-p) ≥ t): t=0.6: cov 0.99 acc 0.975, t=0.8: cov 0.97 acc 0.994, t=0.9: cov 0.92 acc 1, t=0.95: cov 0.82 acc 1
@@ -40,6 +49,12 @@
   - classification selective (margin ≥ t): t=0.5: cov 0.94 acc 1, t=0.8: cov 0.75 acc 1, t=0.9: cov 0.36 acc 1, t=0.95: cov 0.15 acc 1
   - yes/no selective (max(p,1-p) ≥ t): t=0.6: cov 0.99 acc 0.960, t=0.8: cov 0.92 acc 0.964, t=0.9: cov 0.83 acc 0.969, t=0.95: cov 0.55 acc 0.964
 
+- **jev/agent** wrong class.: []
+  - wrong assessment: ['lg-07:described', 'ni-14:located', 'pi-05:located']; errors: []
+- **jev/jev-1.14.0** wrong class.: []
+  - wrong assessment: ['lg-07:described', 'ni-14:located', 'pi-05:dated,located']; errors: []
+- **jevrepeat/jev-1.14.0** wrong class.: []
+  - wrong assessment: ['lg-07:described', 'ni-14:located', 'pi-05:located']; errors: []
 - **ollama/agent** wrong class.: ['pi-02->NOT_A_CLAIM']
   - wrong assessment: ['ni-14:located', 'pi-03:dated,located', 'pi-05:described,dated,located,cat=THEFT']; errors: []
 - **ollama/clef** wrong class.: ['na-03->CLAIM_FOLLOW_UP']
@@ -75,6 +90,9 @@
 - **repeat/tev1** wrong class.: ['ni-06->CLAIM_FOLLOW_UP']
   - wrong assessment: ['nc-mv-03:dated', 'ni-03:located', 'ni-14:located', 'pi-05:described,dated,located,cat=THEFT']; errors: ['lg-05', 'lg-07']
 
+- jev/agent: warm-up 177 ms; cost per email at list prices: gpt-5-mini $0.000000, jev-1.14.0 $0.000000, gpt-6-luna decisions $0.000000
+- jev/jev-1.14.0: warm-up 286 ms; cost per email at list prices: gpt-5-mini $0.000276, jev-1.14.0 $0.000046, gpt-6-luna decisions $0.000110
+- jevrepeat/jev-1.14.0: warm-up 247 ms; cost per email at list prices: gpt-5-mini $0.000276, jev-1.14.0 $0.000046, gpt-6-luna decisions $0.000110
 - ollama/agent: warm-up 4298 ms; cost per email at list prices: gpt-5-mini $0.000000, jev-1.14.0 $0.000000, gpt-6-luna decisions $0.000000
 - ollama/clef: warm-up 887 ms; cost per email at list prices: gpt-5-mini $0.000234, jev-1.14.0 $0.000039, gpt-6-luna decisions $0.000094
 - ollama/llm: warm-up 7175 ms; cost per email at list prices: gpt-5-mini $0.000477, jev-1.14.0 $0.000042, gpt-6-luna decisions $0.000100

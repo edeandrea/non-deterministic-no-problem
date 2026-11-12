@@ -32,8 +32,17 @@ python3 spike/analyze.py ollama     # one label
 Options: `-Dspike.only=<regex>` limits the emails by id; `-Dparasol.models.ollama.email-model-id=qwen3:30b-a3b` swaps the
 `-Pollama` LLM.
 
-### Hosted backends (not measured yet)
+### Hosted Jev
 
-`DecisionRunner` builds a `TypeSafeDecisionModel` from `parasol.models.decision-base-url`. Hosted Jev speaks the same
-System One protocol, so pointing it at `https://api.typesafe.ai` with model `jev-1.14.0` only needs the API key added to the
-builder (`.apiKey(System.getenv("TYPESAFE_API_KEY"))`). The OpenAI Decisions API needs an `OpenAiDecisionModel` runner instead.
+A backend named `jev-*` (e.g. `jev-1.14.0`) goes to `https://api.typesafe.ai` with the key from `TYPESAFE_API_KEY`. To run the
+configured Quarkus agents (`agent`) on Jev too, point `claim-decisions` at it; `SpikeHarnessProfile` passes the key on when the
+variable is set. Keep the key in the environment, never in a file in the repo.
+
+```bash
+export TYPESAFE_API_KEY=...
+./mvnw -Pollama test -Dtest=DecisionSpikeHarnessTests -Dsurefire.failIfNoSpecifiedTests=false -Dspike=true \
+  -Dspike.label=jev -Dspike.backends=jev-1.14.0,agent \
+  -Dparasol.models.decision-base-url=https://api.typesafe.ai -Dparasol.models.decision-model-id=jev-1.14.0
+```
+
+The OpenAI Decisions API (not measured) would need an `OpenAiDecisionModel` runner in `DecisionSpikeHarnessTests`.
