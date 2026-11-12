@@ -1193,10 +1193,11 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   - **An `@Output` method on a router reads the scope** (`AgenticScope` parameter): one parameter per branch output
     would throw for the branches that didn't run.
   - **The status tool is scoped through `InvocationParameters`**, not a tool argument, so the model can't pick another
-    claim. 1.14.2's build check doesn't skip an agent's `InvocationParameters` parameter, so the root takes one too
-    (callers pass `ClaimStatusTools.scopedTo(matchedClaim)`); it's an execution context, never a prompt variable.
-    Upstream: quarkiverse/quarkus-langchain4j#2950, fixed by #2951, which shipped in 1.15.0, so a root `@BeforeCall` could
-    now fill it instead (not done yet).
+    claim. The root's `@BeforeCall` (`ClaimsMailboxAgent.scopeStatusToolToMatchedClaim`) writes
+    `ClaimStatusTools.scopedTo(matchedClaim)` into the scope's execution context, where langchain4j-agentic fills
+    `ClaimFollowUpAgent`'s `InvocationParameters` parameter from; it's never a prompt variable, and callers don't pass it.
+    Before quarkus-langchain4j 1.15.0 the build check rejected that parameter unless the root took one too
+    (quarkiverse/quarkus-langchain4j#2950, fixed by #2951).
   - **An agent that throws used to leave its Flow-generated agentic run unended (quarkus-flow 1.2.0), fixed upstream in
     1.3.0.** LangChain4j never told `FlowPlanner` that an agent failed, so the continuation the generated workflow's
     task joined on (`AgenticFlow.executeAgent`) never completed: the run stayed active, **a worker thread stayed

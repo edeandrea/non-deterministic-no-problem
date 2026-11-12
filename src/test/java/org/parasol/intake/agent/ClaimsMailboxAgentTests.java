@@ -14,7 +14,6 @@ import org.junit.jupiter.api.Test;
 import org.parasol.claim.model.ClaimCategory;
 import org.parasol.intake.ChatStubs;
 import org.parasol.intake.MissingItem;
-import org.parasol.intake.agent.triage.ClaimStatusTools;
 import org.parasol.intake.model.ClassifiedOutcome;
 import org.parasol.intake.model.EmailType;
 import org.parasol.intake.model.IncidentDetails;
@@ -204,7 +203,7 @@ class ClaimsMailboxAgentTests {
 		this.stubs.answer(CLASSIFY, EmailType.CLAIM_FOLLOW_UP.name());
 		var soFar = new IncidentDetails(true, "2026-10-07", null, null, ClaimCategory.SINGLE_VEHICLE, null, Set.of());
 
-		this.agent.process("It was on Elm Street.", PENDING_INFORMATION, soFar, Set.of(MissingItem.LOCATION), "2026-10-09", ClaimStatusTools.scopedTo(PENDING_INFORMATION));
+		this.agent.process("It was on Elm Street.", PENDING_INFORMATION, soFar, Set.of(MissingItem.LOCATION), "2026-10-09");
 
 		assertThat(this.stubs.userMessage(this.stubs.requestFor(DETAILS)))
 			.contains("- incidentDate: 2026-10-07")
@@ -218,7 +217,7 @@ class ClaimsMailboxAgentTests {
 	}
 
 	private ClassifiedOutcome processClassified(String correspondence, MatchedClaim matchedClaim) {
-		return this.agent.process(correspondence, matchedClaim, NOTHING_YET, Set.of(), SENT_DATE, ClaimStatusTools.scopedTo(matchedClaim));
+		return this.agent.process(correspondence, matchedClaim, NOTHING_YET, Set.of(), SENT_DATE);
 	}
 
 	private static String description(EmailType type) {

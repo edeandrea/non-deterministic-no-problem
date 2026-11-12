@@ -12,7 +12,6 @@ import org.parasol.claim.model.Claim;
 import org.parasol.intake.config.IntakeConfig;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.agent.ClaimsMailboxAgent;
-import org.parasol.intake.agent.triage.ClaimStatusTools;
 import org.parasol.intake.mailbox.InboundEmail;
 import org.parasol.intake.model.ClaimIntakeState;
 import org.parasol.intake.model.IncidentDetails;
@@ -51,8 +50,7 @@ class AgentStep {
 			matched,
 			history.extractedSoFar(),
 			history.requestedItems(),
-			email.sentDate().atZone(ZoneOffset.UTC).toLocalDate().toString(),
-			ClaimStatusTools.scopedTo(matched));
+			email.sentDate().atZone(ZoneOffset.UTC).toLocalDate().toString());
 
 		this.activities.publish(new EmailClassified(classified.emailType(), MatchedClaimKind.of(matched)));
 
