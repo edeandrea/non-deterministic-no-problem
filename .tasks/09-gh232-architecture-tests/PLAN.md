@@ -57,7 +57,7 @@ Edit or create task files and update `## Task Plan`.
 
 - [x] [task-01-conversation-id-spike.md](task-01-conversation-id-spike.md): Spike: can an `ai.scoring` Flow adapter attach the conversation id with no intake code?
 - [x] [task-02-conversation-id-adapter.md](task-02-conversation-id-adapter.md): Build the Flow adapter and take `ConversationContext` out of the intake
-- [ ] [task-03-archunit-and-scoring-rules.md](task-03-archunit-and-scoring-rules.md): Add `archunit-junit6`, rule 1, and rewrite `ConversationLayeringTests`
+- [x] [task-03-archunit-and-scoring-rules.md](task-03-archunit-and-scoring-rules.md): Add `archunit-junit6`, rule 1, and rewrite `ConversationLayeringArchTests`
 - [ ] [task-04-domain-boundaries.md](task-04-domain-boundaries.md): Rules 2 and 3, the baggage rule and the boundary hardening
 - [ ] [task-05-intake-package-cycles.md](task-05-intake-package-cycles.md): Break the intake's package tangle by moving classes, then enforce it
 - [ ] [task-06-intake-and-interceptor-rules.md](task-06-intake-and-interceptor-rules.md): Rules 4 (app-wide) and 5, the intake AI service opt-outs and the run-creation rule
@@ -185,7 +185,15 @@ All six intake `@RegisterAiService`s set both `retrievalAugmentor = NoRetrievalA
   - Its `archunit-junit6-engine-api` depends on `junit-platform-engine` **6.1.3**, the version the Quarkus BOM manages,
     so there's no platform conflict. (The older `archunit-junit5` engine depends on Platform 1.14.4; the BOM would
     override that, but the engine was built against JUnit 5.)
-  - Rules are `@ArchTest static final ArchRule` fields in package-private `*Tests` classes carrying `@AnalyzeClasses`.
+  - Rules are `@ArchTest static final ArchRule` fields in package-private `*ArchTests` classes carrying
+    `@AnalyzeClasses`.
+  - **Every ArchUnit class is named `*ArchTests`, and nothing else is (user, 2026-11-13).** The rules can't share a
+    package (the `ai.scoring` ones travel with the library), so the suffix is the one handle for all of them:
+    `./mvnw test -Dtest='*ArchTests'` runs every rule in seconds with no application boot. It still ends in `Tests`, so
+    the repo convention holds. Task 03's two classes were renamed (`ScoringBoundaryArchTests`,
+    `ConversationLayeringArchTests`, the latter `ConversationLayeringTests` in anything written before today), the planned
+    classes in tasks 04–08 follow, and task 08 enforces it. The intake's class is `IntakeArchTests`, not
+    `IntakeArchitectureArchTests`.
   - **The AssertJ convention doesn't apply to them:** they are declarative rules that fail with ArchUnit's own
     `AssertionError`, not hand-written assertions. Record that exception in `CLAUDE.md` → Testing.
 - **Rule 2 means "the app uses only `ai.scoring`'s published API".** That is an explicit allow-list; today it holds
@@ -194,7 +202,7 @@ All six intake `@RegisterAiService`s set both `retrievalAugmentor = NoRetrievalA
   Spike it first (task 01). If only an internal-API route works, or none does, bring it back to the user rather than
   quietly allow-listing `ConversationContext`.
 - **Rules 1–3 cover main code only.** `ClaimRetrievalHasNoIntakeBookkeepingTests` moves into an intake test package.
-- **`ConversationLayeringTests` is rewritten with ArchUnit**, so the repo has one mechanism.
+- **`ConversationLayeringArchTests` is rewritten with ArchUnit**, so the repo has one mechanism.
 - **Extra rules are all in.**
   - First batch:
     - boundary hardening;
@@ -253,14 +261,43 @@ All six intake `@RegisterAiService`s set both `retrievalAugmentor = NoRetrievalA
   - `FlowConversationAdapterTests` fails without the services entry (3 tests) and without the processor's stamping (2).
     The `ServiceLoader` entry is picked up in dev mode too (checked with a class histogram of the running dev JVM).
 
+- **Task 03 (ArchUnit and the `ai.scoring` rules, 2026-11-13):** `archunit-junit6` 1.5.1 is a test dependency (it brings
+  only its own four `com.tngtech.archunit` jars; the tree still has one `junit-platform-engine`, 6.1.3, so nothing is
+  excluded). `ai.scoring.ScoringBoundaryArchTests` holds rule 1 and `ConversationLayeringArchTests` is five ArchUnit rules.
+  Facts later tasks need:
+  - **How a failure reads.** Surefire reports each `@ArchTest` field as a test case named after the field, and a broken
+    rule fails the build with:
+    ```
+    [ERROR] ai.scoring.ScoringBoundaryArchTests.SCORING_DEPENDS_ON_NOTHING_IN_THE_APPLICATION <<< FAILURE!
+    java.lang.AssertionError:
+    Architecture Violation [Priority: MEDIUM] - Rule 'no classes that reside in a package 'ai.scoring..' should depend on
+    classes that reside in a package 'org.parasol..', because ai.scoring is a reusable AI-quality layer …' was violated (1 times):
+    Method <ai.scoring.conversation.ConversationEndedEvent.mutation()> gets field <org.parasol.claim.model.ClaimCategory.OTHER> in (ConversationEndedEvent.java:11)
+    ```
+    So the `because(…)` text is the first thing a reader sees: keep it one sentence.
+  - **All six rules were shown to fail**, not only rule 1: one scratch method in a core class referencing an
+    `org.parasol` enum, an adapter, `ScoringConfig` and `io.quarkus.runtime.LaunchMode`, plus a chat-adapter reference to
+    the flow adapter, failed every rule with the right reference named. Reverted. Task 09's mutation check can skip them.
+  - **`noClasses()…should().x().andShould().y()` is "never x, and never y"**, not "never (x and y)". The core's "no other
+    `ai.scoring` package" rule needs both conditions on one class, so it passes a combined `DescribedPredicate` to
+    `dependOnClassesThat(…)`. Later rules with an allow-list (task 04's rule 2) need the same form.
+  - Rule fields are `UPPER_SNAKE_CASE` (they are constants) and read as the rule; the import is main code only
+    (`ImportOption.DoNotIncludeTests`). A class referenced but not imported (a framework type) still matches by package
+    name, so `@AnalyzeClasses` only needs the packages the rule's `that()` side lives in.
+  - **Verification:** `./mvnw -B clean verify -Pollama` is green with ArchUnit's engine on the classpath (688 tests, 0
+    failures, 2 skipped; the six rules take under a second). `-Pollama-openai` was left to CI (user): nothing here is
+    profile-specific.
+  - `CLAUDE.md` already records the AssertJ exception, `archunit.properties` and the `andShould` trap (Testing), and the
+    rewritten layering test (Conversation core). Task 09 only has to add what tasks 04–08 bring.
+
 ### Caveats & Problems
 - **A stale `META-INF/services` file survives in `target/classes`.** `./mvnw test` without `clean` doesn't remove a
   resource deleted from `src/main/resources`, so a mutation check that deletes a services entry needs `clean` (task 09).
 
 - **`archRule.failOnEmptyShould` must stay `true`** (ArchUnit's default). A rule whose `that()` matches nothing, after a
   package rename say, should fail rather than pass vacuously.
-- **ArchUnit doesn't see string constants.** The current `ConversationLayeringTests` scans the whole constant pool, so it
-  also catches a string such as `"org/parasol/…"`; the ArchUnit rewrite won't. It also won't see Javadoc, which is
+- **ArchUnit doesn't see string constants.** The old `ConversationLayeringTests` scanned the whole constant pool, so it
+  also caught a string such as `"org/parasol/…"`; the ArchUnit rewrite doesn't. It also won't see Javadoc, which is
   correct.
 - **Runtime coupling that no static rule sees:**
   - `FlowSpanTypingProcessor` reflects on Flow's naming to find an agentic interface.

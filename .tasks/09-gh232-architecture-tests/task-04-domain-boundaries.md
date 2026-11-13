@@ -11,7 +11,7 @@ The application's top-level boundaries are enforced:
 
 ## What to Do
 
-New test-only package `org.parasol.architecture`, class `DomainBoundaryTests`, with
+New test-only package `org.parasol.architecture`, class `DomainBoundaryArchTests`, with
 `@AnalyzeClasses(packages = {"org.parasol", "ai.scoring"}, importOptions = ImportOption.DoNotIncludeTests.class)`.
 
 ### Rule 2: `ai.scoring`'s published API
@@ -59,7 +59,7 @@ Move `src/test/java/org/parasol/claim/rest/ClaimRetrievalHasNoIntakeBookkeepingT
 
 ## Files/Areas
 
-- `src/test/java/org/parasol/architecture/DomainBoundaryTests.java` (new; new test-only package)
+- `src/test/java/org/parasol/architecture/DomainBoundaryArchTests.java` (new; new test-only package)
 - `src/test/java/org/parasol/claim/rest/ClaimRetrievalHasNoIntakeBookkeepingTests.java` → `…/intake/model/`
 - `CLAUDE.md`: the package-structure paragraph that lists the test-only packages (`org.parasol.ui`, `org.parasol.testing`,
   `org.parasol.testing.mail`) gains `org.parasol.architecture`, and the *Testing* entry for
@@ -72,6 +72,10 @@ Move `src/test/java/org/parasol/claim/rest/ClaimRetrievalHasNoIntakeBookkeepingT
 - **`ClaimService`'s `@OutputGuardrails(DriftDetectionOutputGuardrail.class)` is an annotation-parameter dependency.**
   Confirm ArchUnit counts it: temporarily drop the allow-list entry and watch the rule fail. That guards against a rule
   that's too blind to have caught anything.
+- **A rule with an exception needs one combined predicate, not `andShould()`** (task 03's finding; see `PLAN.md` → Task
+  Outcomes). `noClasses()…should().x().andShould().y()` means "never x, and never y", not "never both together". Rule 2's
+  allow-list is that shape: pass one `DescribedPredicate` to `dependOnClassesThat(…)`, as
+  `ConversationLayeringArchTests.THE_CORE_REFERENCES_NOTHING_ELSE_IN_SCORING` does.
 - **Each rule gets a `.because(…)`** that names the reason: an extractable library, a separate intake app, or a
   deliberate new domain.
 - Rule descriptions should read well in a failure message. Prefer ArchUnit's fluent API over custom
@@ -79,7 +83,7 @@ Move `src/test/java/org/parasol/claim/rest/ClaimRetrievalHasNoIntakeBookkeepingT
 
 ## Done When
 
-- [ ] `DomainBoundaryTests` holds rule 2 (with its allow-list), the baggage rule, rule 3 as a layered architecture, the
+- [ ] `DomainBoundaryArchTests` holds rule 2 (with its allow-list), the baggage rule, rule 3 as a layered architecture, the
       `claim.rest`/`claim.seed` rule, the `problem` rule, both cycle rules and the known-domains rule, all green.
 - [ ] Removing the allow-list entry makes rule 2 fail (shown once, reverted).
 - [ ] `ClaimRetrievalHasNoIntakeBookkeepingTests` lives in `org.parasol.intake.model` and is green.

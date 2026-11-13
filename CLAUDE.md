@@ -611,8 +611,10 @@ imports `ai.scoring`.
     measurement) and `.review.oldest.pending` (seconds, from `ClaimIntakeState.oldestPendingReviewOpenedAt`; `0` when no review is pending). `ApplyOutcomeStep` and `ReviewDecisionSteps` publish their status, extraction,
     decision and completion activities **inside** their transaction, observed `AFTER_SUCCESS`, so a rollback counts nothing. Not built, on purpose: token usage per run (Langfuse and quarkus-langchain4j already have it), a
     separate AI-reply counter (`replies{template=status_answer}`) and loop-guard skips (`emails{outcome=skipped_auto_reply}`).
-- **Layering is enforced** by `ConversationLayeringTests` (reads the compiled classes' constant pools with
-  `java.lang.classfile`): the core references no adapter or framework, adapters never reference each other.
+- **Layering is enforced** by `ConversationLayeringArchTests` (ArchUnit, main classes only): the core references no adapter,
+  no other `ai.scoring` package, no framework and nothing in `org.parasol`, and adapters never reference each other.
+  `ai.scoring.ScoringBoundaryArchTests` holds the wider rule: nothing in `ai.scoring` depends on `org.parasol`. ArchUnit sees
+  class references in signatures, bodies and annotations, not a class named only in a string constant or in Javadoc.
 
 ### Models
 
@@ -1107,6 +1109,21 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   `api().scoresV3()`) — that is test-fixture code that predates the operations layer covering those
   domains, not a gap in the layer.
 - AssertJ + Awaitility; Mockito is attached as a `-javaagent` in the surefire/failsafe config.
+- **Architecture rules are ArchUnit** (`com.tngtech.archunit:archunit-junit6`, [#232](https://github.com/edeandrea/non-deterministic-no-problem/issues/232)):
+  `@ArchTest static final ArchRule` fields in package-private `*ArchTests` classes carrying `@AnalyzeClasses`, each with a
+  `.because("…")` so a failure explains itself.
+  - **An ArchUnit class is named `*ArchTests`, and no other class is.** The rules can't share a package (the `ai.scoring`
+    ones stay there so they go with the library), so the suffix is the one handle for all of them:
+    `./mvnw test -Dtest='*ArchTests'` runs every rule in seconds, with no application boot.
+  - **They are the one exception to the AssertJ convention:** declarative rules that fail with ArchUnit's own
+    `AssertionError` (`Architecture Violation … Rule '…, because …' was violated`, then one line per offending reference
+    with its source line), not hand-written assertions.
+  - They are plain classes, never `@QuarkusTest`, so they add no application boot. ArchUnit's own JUnit engine runs
+    them under surefire next to Jupiter; each rule is a test case named after its field.
+  - `src/test/resources/archunit.properties` keeps `archRule.failOnEmptyShould=true`: a rule whose `that()` matches no
+    class (after a package rename, say) fails instead of passing with nothing checked. Don't turn it off.
+  - **`noClasses()…should().x().andShould().y()` forbids `x` and forbids `y` separately**, it is not "x and y together".
+    For a combined condition pass one predicate: `dependOnClassesThat(resideInAPackage("a..").and(resideOutsideOfPackage("a.b..")))`.
 - **Mail tests read the real GreenMail** from `compose-devservices.yml` (every test run starts it) through the
   injectable `org.parasol.testing.mail.GreenMailMailbox` bean. There is no mail mock.
   - **Reading is IMAP** (Angus Mail, version from the Quarkus BOM; compile scope since `ClaimsMailbox` uses it too):

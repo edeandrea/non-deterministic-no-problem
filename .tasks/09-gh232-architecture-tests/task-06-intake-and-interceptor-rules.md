@@ -12,7 +12,7 @@ Four invariants that today live only in comments and `CLAUDE.md` become build fa
 
 ## What to Do
 
-### Rule 4, widened app-wide: `org.parasol.architecture.InterceptedMethodTests`
+### Rule 4, widened app-wide: `org.parasol.architecture.InterceptedMethodArchTests`
 
 `@AnalyzeClasses(packages = {"org.parasol", "ai.scoring"}, importOptions = DoNotIncludeTests)`.
 
@@ -33,7 +33,7 @@ Four invariants that today live only in comments and `CLAUDE.md` become build fa
 Keep the "Non-private and non-final…" comments in the code: they explain *why* at the point where someone is tempted.
 Don't add the four missing ones either. The rule is the guard now; record that in `CLAUDE.md`.
 
-### Rule 5 and the opt-outs: `org.parasol.intake.IntakeArchitectureTests`
+### Rule 5 and the opt-outs: `org.parasol.intake.IntakeArchTests`
 
 This class imports test classes too, so use no `DoNotIncludeTests` for these rules. Scope the rule-5 rules to test
 classes, for example with `ImportOption.OnlyIncludeTests` on a second `@AnalyzeClasses` class, or by a
@@ -60,7 +60,7 @@ classes, for example with `ImportOption.OnlyIncludeTests` on a second `@AnalyzeC
   annotation's attributes through ArchUnit's `JavaAnnotation.get(...)`. The `because(…)` names the hazard: a seventh
   agent without them silently gets the shared `"default"` chat memory and the policy-PDF retriever.
 
-### Run creation: `org.parasol.intake.IntakeArchitectureTests` (main code only)
+### Run creation: `org.parasol.intake.IntakeArchTests` (main code only)
 
 Added after task 02 (user, 2026-11-13). `ClaimIntakeFlow.newRun(IntakeRun)` creates the instance and sets its
 `gen_ai.conversation.id` metadata, which is what the `ai.scoring.conversation.flow` adapter reads. A run created any
@@ -83,8 +83,8 @@ start paths that exist today.
 
 ## Files/Areas
 
-- `src/test/java/org/parasol/architecture/InterceptedMethodTests.java` (new)
-- `src/test/java/org/parasol/intake/IntakeArchitectureTests.java` (created in task 05; add here, or split into a
+- `src/test/java/org/parasol/architecture/InterceptedMethodArchTests.java` (new)
+- `src/test/java/org/parasol/intake/IntakeArchTests.java` (created in task 05; add here, or split into a
   test-code class if one import can't serve both)
 - `CLAUDE.md`:
   - *Conversation core*, "A run created with `instance(…)` directly silently has no id on its spans": enforced now.
@@ -104,7 +104,7 @@ start paths that exist today.
 
 ## Done When
 
-- [ ] `InterceptedMethodTests` covers interceptor-binding methods app-wide, `@WithSpan`, and whatever `@Scheduled`
+- [ ] `InterceptedMethodArchTests` covers interceptor-binding methods app-wide, `@WithSpan`, and whatever `@Scheduled`
       check Quarkus doesn't already make. All green.
 - [ ] Rule 5, the `QuarkusMock` ban and the opt-out rule are green, and the agent predicate's matched set equals the
       Shared Context table.
