@@ -9,7 +9,7 @@ guarded only by a comment, into a build failure.
 
 ## What to Do
 
-### REST and persistence: `org.parasol.architecture.RestAndPersistenceTests` (main code)
+### REST and persistence: `org.parasol.architecture.RestAndPersistenceArchTests` (main code)
 
 - `@jakarta.persistence.Entity` classes reside only in a `..model..` package.
 - **No JAX-RS endpoint method** (HTTP-method annotation, as in task 07) has an `@Entity` type as its return type, as a
@@ -18,7 +18,7 @@ guarded only by a comment, into a build failure.
   (`JavaParameterizedType.getActualTypeArguments()`), recursing into nested arguments.
 - `@Path` classes are named `*Resource` and reside in a `..rest..` package.
 
-### Panache method references: `org.parasol.architecture.PanacheMethodReferenceTests` (main **and** test code)
+### Panache method references: `org.parasol.architecture.PanacheMethodReferenceArchTests` (main **and** test code)
 
 - **No method reference whose target resolves to a static method declared in
   `io.quarkus.hibernate.orm.panache.PanacheEntityBase` (or `PanacheEntity`).** For example `Claim::listAll` or
@@ -33,7 +33,7 @@ guarded only by a comment, into a build failure.
   not ClaimImage::flush…") can stay and also name the rule.
 - This class imports test classes, so its `@AnalyzeClasses` has no `DoNotIncludeTests`.
 
-### JSON-safe run data, in `org.parasol.intake.IntakeArchitectureTests` (main code)
+### JSON-safe run data, in `org.parasol.intake.IntakeArchTests` (main code)
 
 - "Pass ids through workflow/task data, not payloads" (`CLAUDE.md` → Gotchas, quarkus-flow). Flow persists every step's
   data to PostgreSQL.
@@ -45,7 +45,7 @@ guarded only by a comment, into a build failure.
   `ClaimExtraction` is documented as "JSON-safe: … no `Optional`".
 - **Check the current state before fixing the list.** A legitimate exception becomes a named, commented exemption.
 
-### Config, transactions, exceptions, in `org.parasol.architecture.CodingConventionTests` (main code)
+### Config, transactions, exceptions, in `org.parasol.architecture.CodingConventionArchTests` (main code)
 
 - **`@ConfigMapping` prefixes:** `parasol.` in `org.parasol`, `aiscoring` in `ai.scoring` (equal to it or starting
   with `aiscoring.`), and never `quarkus.`. That's the #290 zero-unrecognized-keys invariant (`CLAUDE.md` → *The
@@ -59,19 +59,24 @@ guarded only by a comment, into a build failure.
 - **Main code declares no checked exception type:** every class assignable to `Throwable` is assignable to
   `RuntimeException` (or `Error`). Domain exceptions are unchecked by convention.
 
-### Test naming: `org.parasol.architecture.TestNamingTests` (test code of both roots)
+### Test naming: `org.parasol.architecture.TestNamingArchTests` (test code of both roots)
 
 - **Every class declaring a method annotated `@org.junit.jupiter.api.Test`, `@ParameterizedTest`, `@RepeatedTest` or
   `@TestFactory`, or an `@ArchTest` field or method, has a simple name ending in `Tests`.** A misnamed class (`FooSpec`,
   `FooIT`) falls outside surefire's default includes and silently never runs.
 - Nested `@Nested` classes, if any appear, are judged by their enclosing class.
+- **A class is named `*ArchTests` if and only if it is an ArchUnit class** (user, 2026-11-13; see `PLAN.md` → Key
+  Decisions). An ArchUnit class is one carrying `@AnalyzeClasses` or declaring an `@ArchTest` field or method. Two
+  rules, so each failure says which way it broke:
+  - every ArchUnit class has a simple name ending in `ArchTests`;
+  - no other class has one, so `-Dtest='*ArchTests'` selects exactly the rules.
 
 ## Files/Areas
 
-- `src/test/java/org/parasol/architecture/RestAndPersistenceTests.java`, `PanacheMethodReferenceTests.java`,
-  `TestNamingTests.java` (new)
-- `src/test/java/org/parasol/architecture/CodingConventionTests.java` (from task 07)
-- `src/test/java/org/parasol/intake/IntakeArchitectureTests.java` (from tasks 05–06)
+- `src/test/java/org/parasol/architecture/RestAndPersistenceArchTests.java`, `PanacheMethodReferenceArchTests.java`,
+  `TestNamingArchTests.java` (new)
+- `src/test/java/org/parasol/architecture/CodingConventionArchTests.java` (from task 07)
+- `src/test/java/org/parasol/intake/IntakeArchTests.java` (from tasks 05–06)
 - `src/test/java/org/parasol/intake/reply/IntakeTemplatesTests.java`,
   `src/test/java/org/parasol/claim/model/ClaimImageTests.java` (comments only)
 - `CLAUDE.md`: the Panache gotchas (two places), the quarkus-flow "pass ids" gotcha, the #290 invariant section, REST,
@@ -87,7 +92,7 @@ guarded only by a comment, into a build failure.
 
 ## Done When
 
-- [ ] `RestAndPersistenceTests`, `PanacheMethodReferenceTests` and `TestNamingTests` exist and are green. The
+- [ ] `RestAndPersistenceArchTests`, `PanacheMethodReferenceArchTests` and `TestNamingArchTests` exist and are green. The
       JSON-safe rule and the config/transaction/exception rules are in their classes and green.
 - [ ] Each rule was shown failing once:
   - an endpoint returning `Claim`;
@@ -97,6 +102,7 @@ guarded only by a comment, into a build failure.
   - a `@ConfigMapping(prefix = "quarkus.parasol")`;
   - a `@ConfigProperty(name = "parasol.intake.address")`;
   - a checked exception class;
-  - a test class named `FooSpec`.
+  - a test class named `FooSpec`;
+  - an ArchUnit class named `FooTests`, and a plain test class named `FooArchTests`.
 - [ ] `CLAUDE.md`'s matching entries name their rules.
 - [ ] `./mvnw -B clean verify -Pollama` is green.

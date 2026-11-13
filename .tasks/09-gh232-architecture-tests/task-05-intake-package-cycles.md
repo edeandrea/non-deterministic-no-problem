@@ -44,7 +44,7 @@ After the moves, re-run the analysis and confirm no strongly connected group is 
 
 ### 3. The rules
 
-Add them to `src/test/java/org/parasol/intake/IntakeArchitectureTests.java`, created here. Tasks 06 and 08 add to it.
+Add them to `src/test/java/org/parasol/intake/IntakeArchTests.java`, created here. Tasks 06 and 08 add to it.
 - **No cycles:** `slices().matching("org.parasol.intake.(**)").should().beFreeOfCycles()`. Check that `(**)` slices
   nested packages separately (`workflow` vs `workflow.review`); if it doesn't, use the form that does.
 - **Leaves:** `intake.model..` depends on no other `org.parasol.intake` package except the root package itself.
@@ -70,7 +70,7 @@ Add them to `src/test/java/org/parasol/intake/IntakeArchitectureTests.java`, cre
 - `src/main/java/org/parasol/intake/observability/IntakeActivity.java`, `IntakeMetrics.java` (+ the new tag enum)
 - `src/main/java/org/parasol/intake/mailbox/SkippedAttachment.java` (unchanged, unless the design says otherwise)
 - Every importer of the above, and their tests
-- `src/test/java/org/parasol/intake/IntakeArchitectureTests.java` (new)
+- `src/test/java/org/parasol/intake/IntakeArchTests.java` (new)
 - `CLAUDE.md`, `docs/design/email-claim-intake.md`, the intake `.puml` diagrams and PNGs
 
 ## Key Points
@@ -92,7 +92,7 @@ Add them to `src/test/java/org/parasol/intake/IntakeArchitectureTests.java`, cre
 
 - [ ] The design (layout, every affected file, visibility changes, test moves) was presented and approved.
 - [ ] No strongly connected group remains in `org.parasol.intake..` (analysis output recorded in `PLAN.md`).
-- [ ] `IntakeArchitectureTests` holds the no-cycles, leaf and step rules, all green, and each was shown failing once on a
+- [ ] `IntakeArchTests` holds the no-cycles, leaf and step rules, all green, and each was shown failing once on a
       deliberate back-edge.
 - [ ] No production behavior changed: intake, UI, metrics, dashboard and round-trip tests are green with untouched
       assertions.

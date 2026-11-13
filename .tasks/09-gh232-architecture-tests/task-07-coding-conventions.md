@@ -9,7 +9,7 @@ roots. Each known exception is a named, commented constant in the test, not a si
 
 ## What to Do
 
-New `src/test/java/org/parasol/architecture/CodingConventionTests.java`,
+New `src/test/java/org/parasol/architecture/CodingConventionArchTests.java`,
 `@AnalyzeClasses(packages = {"org.parasol", "ai.scoring"}, importOptions = DoNotIncludeTests)`.
 
 ### JAX-RS resources
@@ -35,7 +35,7 @@ New `src/test/java/org/parasol/architecture/CodingConventionTests.java`,
 - **A class that isn't a bean** logs through a `private static final org.jboss.logging.Logger` field and never calls
   `io.quarkus.logging.Log`.
 - **Exemption:** `ai.scoring.conversation.ConversationEvents`, a bean that keeps a JBoss `Logger` field because the
-  conversation core may not reference `io.quarkus` (`ConversationLayeringTests`).
+  conversation core may not reference `io.quarkus` (`ConversationLayeringArchTests`).
 - **Fix today's violator first:** `org.parasol.intake.mailbox.InboxIdle` is a `final` class built with `new` that calls
   `Log`. Give it a `private static final Logger LOG = Logger.getLogger(InboxIdle.class)` and switch its calls to that.
 - **Settle `ai.scoring.drift.DriftDetectionChatRouteExceptionHandler`.** It has no scope annotation, only a
@@ -54,11 +54,11 @@ New `src/test/java/org/parasol/architecture/CodingConventionTests.java`,
 
 ## Files/Areas
 
-- `src/test/java/org/parasol/architecture/CodingConventionTests.java` (new; task 08 adds to it)
+- `src/test/java/org/parasol/architecture/CodingConventionArchTests.java` (new; task 08 adds to it)
 - `src/main/java/org/parasol/intake/mailbox/InboxIdle.java` (logging fix)
 - `src/main/java/ai/scoring/drift/DriftDetectionChatRouteExceptionHandler.java` (only if it turns out not to be a bean)
 - `CLAUDE.md` → Conventions: state the logging rule as the user put it (bean → `Log`; non-bean → `Logger` field), and
-  note that these conventions are enforced by `CodingConventionTests`.
+  note that these conventions are enforced by `CodingConventionArchTests`.
 
 ## Key Points
 
@@ -73,7 +73,7 @@ New `src/test/java/org/parasol/architecture/CodingConventionTests.java`,
 
 ## Done When
 
-- [ ] `CodingConventionTests` covers resources, field injection, `ManagedExecutor`, the bean/non-bean logging rule,
+- [ ] `CodingConventionArchTests` covers resources, field injection, `ManagedExecutor`, the bean/non-bean logging rule,
       console/JUL/SLF4J, legacy date types and Lombok, all green.
 - [ ] `InboxIdle` logs through a JBoss `Logger` field, and `DriftDetectionChatRouteExceptionHandler`'s bean status is
       settled and recorded in `PLAN.md`.

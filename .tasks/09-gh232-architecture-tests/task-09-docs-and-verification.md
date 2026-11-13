@@ -23,7 +23,7 @@ Earlier tasks updated what they touched. This task checks the whole set for cons
     - main code vs test code scope;
     - `failOnEmptyShould`;
     - that they're plain tests with no boot.
-  - *Conventions*: "Dependencies point one way" now names `DomainBoundaryTests`.
+  - *Conventions*: "Dependencies point one way" now names `DomainBoundaryArchTests`.
   - *Gotchas*: every entry a rule now enforces points at it, without deleting the explanation.
 - **`docs/`:** `docs/design/email-claim-intake.md`, `docs/claim-intake-flow.puml`, `docs/design/claim-intake-*.puml`,
   `docs/continuous-scoring-architecture.puml` and `docs/continuous-scoring-sequence.puml`. Find every mention of

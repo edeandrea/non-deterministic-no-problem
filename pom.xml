@@ -5,6 +5,7 @@
 	<artifactId>parasol-app</artifactId>
 	<version>1.0</version>
 	<properties>
+		<archunit.version>1.5.1</archunit.version>
 		<assertj.version>3.27.7</assertj.version>
 		<compiler-plugin.version>3.16.0</compiler-plugin.version>
 		<dependency-plugin.version>3.11.0</dependency-plugin.version>
@@ -265,6 +266,12 @@
 			<groupId>io.quarkiverse.playwright</groupId>
 			<artifactId>quarkus-playwright</artifactId>
 			<version>${quarkus.playwright.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.tngtech.archunit</groupId>
+			<artifactId>archunit-junit6</artifactId>
+			<version>${archunit.version}</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
