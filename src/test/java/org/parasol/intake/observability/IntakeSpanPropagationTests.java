@@ -40,8 +40,8 @@ import io.quarkus.test.junit.mockito.InjectSpy;
 import io.serverlessworkflow.impl.WorkflowStatus;
 
 /**
- * Does the conversation id the starter enters ({@code ConversationContext.runIn}) reach every span of a run, with no
- * adapter, on quarkus-flow 1.3.0? The run's Flow spans, the AI calls from its steps and under the agent sub-workflows Flow
+ * Does the conversation id a run is created with ({@code ClaimIntakeFlow.newRun}, as instance metadata) reach every span
+ * of the run, with no conversation code in the intake, on quarkus-flow 1.3.0? The run's Flow spans, the AI calls from its steps and under the agent sub-workflows Flow
  * generates, and the JDBC statements that have a parent; with several runs at once, and after a review run wakes up.
  * <p>
  *   Each test prints a {@link SpanCensus} (counts by span kind and id status) before it asserts. A run's expected id comes

@@ -58,11 +58,11 @@ class ConversationalBaggageHandlerTests {
 
 	@Test
 	void aChatScopeStartedInsideAnotherConversationKeepsThatConversation() {
-		this.conversationContext.runIn("outer", () -> {
+		try (var _ = this.conversationContext.enter("outer")) {
 			this.handler.conversationStarted(new ChatScopeStarted(this.scope));
 			this.handler.conversationActivated(new ChatScopeActivated(this.scope));
 
 			assertThat(this.conversationContext.currentId()).contains("outer");
-		});
+		}
 	}
 }

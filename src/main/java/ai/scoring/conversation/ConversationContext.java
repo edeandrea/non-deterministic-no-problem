@@ -12,8 +12,9 @@ import io.opentelemetry.semconv.incubating.GenAiIncubatingAttributes;
 
 /**
  * The conversation id of the current work, carried as OpenTelemetry baggage under {@code gen_ai.conversation.id}, the
- * same key the chat conversations use. Enter it once around the code that starts a unit of work (e.g. an intake run) and
- * everything that inherits the OTel context sees it.
+ * same key the chat conversations use. Everything that inherits the OTel context of the code that entered it sees it. The
+ * adapters in the sub-packages enter it for the frameworks they know (a chat scope, a Flow task); {@link #callIn} is for
+ * a caller that has none.
  */
 @ApplicationScoped
 public class ConversationContext {
@@ -63,18 +64,6 @@ public class ConversationContext {
 		}
 		catch (Exception e) {
 			throw new IllegalStateException("Failed in conversation " + conversationId, e);
-		}
-	}
-
-	/**
-	 * Runs a runnable with the conversation id current.
-	 *
-	 * @param conversationId the conversation id
-	 * @param runnable what to run
-	 */
-	public void runIn(String conversationId, Runnable runnable) {
-		try (var _ = enter(conversationId)) {
-			runnable.run();
 		}
 	}
 }

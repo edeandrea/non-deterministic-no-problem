@@ -8,7 +8,8 @@ import java.util.Objects;
  * text or attachment bytes.
  *
  * @param messageId The {@code Message-ID} of the email in the processing folder
- * @param conversationId The conversation id the run was started in
+ * @param conversationId The claim's conversation id. It's the run's own data (a replacement run copies it); what puts the id on the run's
+ *   spans is the instance metadata {@link ClaimIntakeFlow#newRun} sets from it
  * @param sender The sender's address, as it was written
  * @param claimId The claim the starter matched the email to, or {@code null} if it matched none. For a run that resumes a reply, the claim
  *   the email's outcome was applied to

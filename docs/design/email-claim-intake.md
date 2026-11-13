@@ -148,13 +148,16 @@ reviewer saw and the values fit the claim (400/409/422). The run sets them along
 **Observability.** The goal is that every span of a claim's runs carries the same
 `gen_ai.conversation.id`, so Langfuse groups each claim into one session. One run is still several
 traces — Flow's persistence alone emits roughly 58 root traces per run — and the shared id is what
-ties them together. The id is OTel baggage, entered once when a run starts. The code that carries it across
+ties them together. The id is OTel baggage inside a step and a span attribute everywhere. The code that carries it across
 the chat, Flow and the agents is our own framework-neutral package, `ai.scoring.conversation`, kept
 separate so it can later become its own library. It has a small core (the conversation context, a span
 processor that stamps the id, and a "conversation ended" event), one adapter per framework, and no intake
-code. The intake needs no Flow or agent adapter: quarkus-flow 1.3.0 carries the OpenTelemetry context into its task
-threads and the generated agent sub-workflows, and `IntakeSpanPropagationTests` pins that. What the intake adds is typing
-and visibility, not propagation:
+code. The intake itself touches neither that package nor OTel baggage: it only creates each run with the claim's
+conversation id as Flow instance metadata, under `gen_ai.conversation.id` (`ClaimIntakeFlow.newRun`, the one place a run
+is created). The package's Flow adapter does the rest by observing Flow: a listener records which run has which id, a span
+processor stamps Flow's own spans, and a task proxy puts the id in baggage around each step, so the AI, database and mail
+spans and the generated agent sub-workflows started inside it carry it too. `IntakeSpanPropagationTests` pins that. What
+the intake adds is typing and visibility, not propagation:
 - Flow's `workflow.execute` spans of generated agentic workflows are typed `invoke_agent` and its `task.execute` spans
   `chain` for Langfuse (a stand-in until [quarkus-flow#1122](https://github.com/quarkiverse/quarkus-flow/issues/1122)),
   IMAP and SMTP calls get `CLIENT` spans without addresses, and `claim.intake.*` meters count emails, replies, review

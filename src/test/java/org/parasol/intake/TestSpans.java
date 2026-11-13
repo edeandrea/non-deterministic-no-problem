@@ -1,7 +1,5 @@
 package org.parasol.intake;
 
-import static ai.scoring.conversation.ConversationContext.CONVERSATION_ID_KEY;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -13,6 +11,7 @@ import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.sdk.common.CompletableResultCode;
 import io.opentelemetry.sdk.trace.data.SpanData;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
+import io.opentelemetry.semconv.incubating.GenAiIncubatingAttributes;
 
 /**
  * Keeps finished spans only while a test explicitly captures them, so tests can check what a run's spans carry (its conversation id, its trace)
@@ -25,7 +24,7 @@ import io.opentelemetry.sdk.trace.export.SpanExporter;
  */
 @ApplicationScoped
 public class TestSpans implements SpanExporter {
-	public static final AttributeKey<String> CONVERSATION_ID = AttributeKey.stringKey(CONVERSATION_ID_KEY);
+	public static final AttributeKey<String> CONVERSATION_ID = GenAiIncubatingAttributes.GEN_AI_CONVERSATION_ID;
 	public static final AttributeKey<String> INSTANCE_ID = AttributeKey.stringKey("flow.workflow.instance.id");
 	public static final AttributeKey<String> WORKFLOW_NAME = AttributeKey.stringKey("flow.workflow.name");
 	public static final AttributeKey<String> MESSAGING_SYSTEM = AttributeKey.stringKey("messaging.system");

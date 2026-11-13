@@ -10,7 +10,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -35,7 +34,6 @@ import org.parasol.intake.workflow.EmailRequeued;
 import org.parasol.intake.workflow.IntakeRun;
 import org.parasol.intake.workflow.review.ReviewReclaimer;
 
-import ai.scoring.conversation.ConversationContext;
 import io.quarkus.logging.Log;
 import io.quarkus.virtual.threads.VirtualThreads;
 import io.serverlessworkflow.impl.WorkflowStatus;
@@ -50,7 +48,8 @@ import io.smallrye.mutiny.Uni;
  * <p>
  *   {@link #submit} does the checks that need no claim (auto-replies and self-sent mail, a missing or repeated
  *   {@code Message-ID}) and queues the rest. When an email's turn comes, on a virtual thread, it's re-read, matched to a
- *   claim (so it sees what its predecessor created or changed), and the run is started inside the conversation context.
+ *   claim (so it sees what its predecessor created or changed), and the run is created with its conversation id
+ *   ({@link ClaimIntakeFlow#newRun}) and started.
  * </p>
  * <p>
  *   A sender has at most one run that's working. The next email starts when that run waits for review or ends. A review run
@@ -72,7 +71,6 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 	private final CorrespondenceRecorder recorder;
 	private final ClaimMatcher matcher;
 	private final IntakeFailureHandler failureHandler;
-	private final ConversationContext conversationContext;
 	private final IntakeActivities activities;
 	private final Instance<ClaimIntakeFlow> flow;
 	private final ExecutorService executor;
@@ -90,7 +88,6 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 		CorrespondenceRecorder recorder,
 		ClaimMatcher matcher,
 		IntakeFailureHandler failureHandler,
-		ConversationContext conversationContext,
 		IntakeActivities activities,
 		Instance<ClaimIntakeFlow> flow,
 		@VirtualThreads ExecutorService executor,
@@ -102,7 +99,6 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 		this.recorder = recorder;
 		this.matcher = matcher;
 		this.failureHandler = failureHandler;
-		this.conversationContext = conversationContext;
 		this.activities = activities;
 		this.flow = flow;
 		this.executor = executor;
@@ -261,7 +257,7 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 	private void startRun(String sender, String messageId) {
 		// What holds the sender's slot right now: STARTING until the run exists, then the run's id. A failure has to release
 		// the holder the state actually has, or SenderState.release no-ops and the sender's queue never moves again
-		var holder = new AtomicReference<>(SenderState.STARTING);
+		var holder = SenderState.STARTING;
 
 		try {
 			var email = this.mailbox.find(MailFolder.PROCESSING, messageId)
@@ -272,28 +268,28 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 				.map(found -> IntakeRun.resumingReply(messageId, Optional.ofNullable(found.conversationId()).orElseGet(() -> UUID.randomUUID().toString()), email.fromAddress().orElse(sender), found.claimId(), email.receivedDate()))
 				.orElseGet(() -> runFor(email, messageId, sender));
 
-			this.conversationContext.runIn(run.conversationId(), () -> {
-				var instance = this.flow.get().instance(run);
+			var instance = this.flow.get().newRun(run);
 
-				if (run.resumesReply()) {
-					this.recovery.adoptReview(run.claimId(), instance.id());
-				}
+			if (run.resumesReply()) {
+				this.recovery.adoptReview(run.claimId(), instance.id());
+			}
 
-				// Registered as working before it starts, so the status listener always finds it
-				this.runs.put(instance.id(), new DispatchedRun(sender, messageId));
-				transition(sender, state -> state.working(instance.id()));
-				holder.set(instance.id());
-				instance.start();
-			});
+			// Registered as working before it starts, so the status listener always finds it
+			this.runs.put(instance.id(), new DispatchedRun(sender, messageId));
+			transition(sender, state -> state.working(instance.id()));
+			holder = instance.id();
+			instance.start();
 		}
 		catch (RuntimeException e) {
 			// A run that threw on the way up never reaches a WorkflowStatus, so the status listener will never release it.
 			// If it threw from start(), the instance also stays in Flow's in-memory activeInstances map — cancel() is a
 			// no-op on a PENDING instance and removeInstance isn't public (open-workflow-specification/sdk-java#1816).
 			// Harmless, since its id was never persisted and nothing looks it up, but it is a leaked map entry.
-			this.runs.remove(holder.get());
+			var failedHolder = holder;
+
+			this.runs.remove(failedHolder);
 			this.requeues.remove(messageId);
-			transition(sender, state -> state.release(holder.get()));
+			transition(sender, state -> state.release(failedHolder));
 			this.failureHandler.handle(messageId, e, FailureOutcome.FATAL);
 		}
 	}

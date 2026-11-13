@@ -56,11 +56,11 @@ Edit or create task files and update `## Task Plan`.
 ## Task Plan
 
 - [x] [task-01-conversation-id-spike.md](task-01-conversation-id-spike.md): Spike: can an `ai.scoring` Flow adapter attach the conversation id with no intake code?
-- [ ] [task-02-conversation-id-adapter.md](task-02-conversation-id-adapter.md): Build the Flow adapter and take `ConversationContext` out of the intake
+- [x] [task-02-conversation-id-adapter.md](task-02-conversation-id-adapter.md): Build the Flow adapter and take `ConversationContext` out of the intake
 - [ ] [task-03-archunit-and-scoring-rules.md](task-03-archunit-and-scoring-rules.md): Add `archunit-junit6`, rule 1, and rewrite `ConversationLayeringTests`
 - [ ] [task-04-domain-boundaries.md](task-04-domain-boundaries.md): Rules 2 and 3, the baggage rule and the boundary hardening
 - [ ] [task-05-intake-package-cycles.md](task-05-intake-package-cycles.md): Break the intake's package tangle by moving classes, then enforce it
-- [ ] [task-06-intake-and-interceptor-rules.md](task-06-intake-and-interceptor-rules.md): Rules 4 (app-wide) and 5, and the intake AI service opt-outs
+- [ ] [task-06-intake-and-interceptor-rules.md](task-06-intake-and-interceptor-rules.md): Rules 4 (app-wide) and 5, the intake AI service opt-outs and the run-creation rule
 - [ ] [task-07-coding-conventions.md](task-07-coding-conventions.md): Coding-convention rules (resources, injection, executors, logging, dates)
 - [ ] [task-08-gotchas-rest-config-rules.md](task-08-gotchas-rest-config-rules.md): REST and persistence, Panache method references, JSON-safe run data, config/transactions/exceptions, test naming
 - [ ] [task-09-docs-and-verification.md](task-09-docs-and-verification.md): Documentation, mutation check, verification and the PR
@@ -235,7 +235,27 @@ All six intake `@RegisterAiService`s set both `retrievalAugmentor = NoRetrievalA
   `IntakeSpanPropagationTests`, `IntakeTracingTests` and `IntakeLangfuseDeliveryTests` passed unchanged, and failed with
   either half of the mechanism switched off. Task 02 still has to put the intake's metadata call in one place and check the `ServiceLoader` registration in dev mode. The scratch branch is deleted.
 
+- **Task 02 (adapter, 2026-11-13):** `ai.scoring.conversation.flow` now has `FlowConversationListener` (the contract's
+  Javadoc), `FlowConversationSpanProcessor` and `FlowConversationTaskProxy`, and the intake has no `ai.scoring` or
+  `io.opentelemetry.api.baggage` reference. Decisions and facts later tasks need:
+  - **`ClaimIntakeFlow.newRun(IntakeRun)` is the one place an intake run is created** (instance + metadata). Task 06 now
+    has a rule for it (user, 2026-11-13): nothing else in the intake calls `instance(…)`/`startInstance(…)` on a `Flow`
+    or `WorkflowDefinition.instance(…)`.
+  - **The proxy looks `ConversationContext` up with `CDI.current()`** when a task of a run with an id is called (user:
+    no `new ConversationContext()`). It is not a bean, so task 07's logging rule treats it as a non-bean; it doesn't log.
+  - **`ConversationContext.runIn` is removed, `callIn` kept** (user). `callIn` has a main-code caller, the proxy; the
+    tests that used `runIn` use `enter` in a try-with-resources.
+  - **Rule 2's remaining edge is only `ClaimService` → `DriftDetectionOutputGuardrail`.** `TestSpans` now uses
+    `GenAiIncubatingAttributes.GEN_AI_CONVERSATION_ID`; the one `ai.scoring` import left in the intake's tests is
+    `IntakeSpanPropagationTests` → `LangfuseFlowSpanTypingProcessor` (test code, outside rules 1–3).
+  - `handOver` is single-exit and `startRun`'s holder a plain variable (user asked for the cleanup rather than keeping
+    the blocks verbatim).
+  - `FlowConversationAdapterTests` fails without the services entry (3 tests) and without the processor's stamping (2).
+    The `ServiceLoader` entry is picked up in dev mode too (checked with a class histogram of the running dev JVM).
+
 ### Caveats & Problems
+- **A stale `META-INF/services` file survives in `target/classes`.** `./mvnw test` without `clean` doesn't remove a
+  resource deleted from `src/main/resources`, so a mutation check that deletes a services entry needs `clean` (task 09).
 
 - **`archRule.failOnEmptyShould` must stay `true`** (ArchUnit's default). A rule whose `that()` matches nothing, after a
   package rename say, should fail rather than pass vacuously.

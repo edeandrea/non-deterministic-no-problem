@@ -37,7 +37,7 @@ The Java source is split into two top-level packages representing two distinct c
 | `org.parasol.intake.failure` | The failure path: `IntakeFailureHandler` (**where the email is decides what its sender hears** — see Gotchas), the `IntakeFailureListener` (`onWorkflowFailed`) and `ProcessingProblemReplySender` |
 | `org.parasol.intake.reply` | The intake's replies: `IntakeTemplates` (the fixed Qute mail templates, under `templates/IntakeTemplates/`), `IntakeReplySender` (blocking; subject prefix, `ThreadingHeaders` headers and `Auto-Submitted`; overloads with and without a claim number, no `Optional` parameters) `ReplyRecorder` (records a claim reply as an `OUTBOUND` `ClaimCorrespondence` row after it's sent) and `CustomerName` (who a reply greets) |
 | `org.parasol.intake.model` | The intake's records that Flow persists and later steps read: `IncidentDetails`, `ClaimExtraction` (JSON-safe: ISO date/time strings, no `Optional`), the sealed `IntakeOutcome`, `MatchedClaim` (`none()` rather than `null`), `EmailType`, `ClassifiedOutcome` (the root agent's return: the outcome plus the classifier's label), `ClaimResolver`'s `PendingClaim` / `ClaimResolution`, and the `ClaimIntakeState` entity (the intake's bookkeeping about a claim, kept off `Claim`) |
-| `org.parasol.intake.workflow` | `ClaimIntakeFlow` (the whole intake as one quarkus-flow workflow, `claim-intake`; the only place with side effects), the JSON-safe `IntakeRun` (input: ids only) and `IntakeState` (threaded through every step), the `EmailRequeued` event, the `AgentStep` and `ClaimMatchingSteps` steps and `CorrespondenceText` |
+| `org.parasol.intake.workflow` | `ClaimIntakeFlow` (the whole intake as one quarkus-flow workflow, `claim-intake`; the only place with side effects; `newRun(IntakeRun)` is the one place a run is created, with its conversation id as instance metadata), the JSON-safe `IntakeRun` (input: ids only) and `IntakeState` (threaded through every step), the `EmailRequeued` event, the `AgentStep` and `ClaimMatchingSteps` steps and `CorrespondenceText` |
 | `org.parasol.intake.workflow.policy` | `PolicyCheckStep` and its package-private `SameCustomerRule` (same customer) and `PolicyNumbers` (generated `AC-` numbers) |
 | `org.parasol.intake.workflow.outcome` | `ApplyOutcomeStep` (persists a new claim or a merged reply) and its helpers `ClaimFields` and the package-private `InceptionDates` |
 | `org.parasol.intake.workflow.review` | `SupersedeStep`, `ReviewReclaimer` (hands every review whose run is gone to a new run on startup), `ReviewDecisionSteps` (the review wait's decision steps and its match check), `AfterDecision` (what the run does next: `END` or `WAIT_AGAIN`), and `ReviewRecoverer` (hands a faulted run's review to a new run) |
@@ -536,23 +536,43 @@ Which work belongs to which conversation, and what happens when one ends. Generi
 be extracted: the core depends only on the OTel API/SDK, CDI and JBoss Logging (MicroProfile Context Propagation is the
 `quarkus` sub-package's own dependency; no Quarkus,
 LangChain4j, chat-scope or Flow types). Frameworks feed it through adapters in sub-packages; consumers observe its
-events and never call an adapter.
+events and never call an adapter. The intake's only link to it is an instance metadata key on its Flow runs (below): no intake class
+imports `ai.scoring`.
 
-- **Core:** `ConversationContext` (`currentId`, `enter`, `callIn`, `runIn`; the id is OTel baggage under
+- **Core:** `ConversationContext` (`currentId`, `enter`, `callIn`; the id is OTel baggage under
   `CONVERSATION_ID_KEY` = `gen_ai.conversation.id`), `ConversationIdSpanProcessor` (copies the baggage entry onto every
   span at `onStart`, read from the parent context; the same value quarkus-langfuse's processor writes, so Tempo and the
   tests see it with Langfuse export off), `ConversationEndedEvent` and `ConversationEvents` (`fireAsync`, logging any
   observer failure).
-- **Adapters:** `chat` (`ConversationalBaggageHandler`, chat scopes). Task 11 of #216 needed no Flow or agentic one (below).
+- **Adapters:** `chat` (`ConversationalBaggageHandler`, chat scopes) and `flow` (below). The agentic sub-workflows need none.
 - **`quarkus.OtelContextLeakGuard`** — a **temporary** `ThreadContextProvider` (registered in
   `META-INF/services/org.eclipse.microprofile.context.spi.ThreadContextProvider`) working around quarkusio/quarkus#54354:
   Quarkus's OTel context-propagation provider leaves a task's context, and its conversation id, on a pool thread.
   **Delete it, and its services entry, once a Quarkus we're on ships quarkusio/quarkus#56805** (4.0, or the 3.40
   backport quarkusio/quarkus#57879); `OtelContextLeakGuardTests` passing without it is the signal. It's the one class
   touching a Quarkus type, which is why it has its own package.
-- **Task 11 needed no adapter.** Flow 1.3.0 carries the OTel context across its task threads and the agentic sub-workflows keep it
-  too (`IntakeSpanPropagationTests` pins it, including two concurrent runs), so every intake span carries its claim's
-  conversation id with no code in a step. What the intake adds:
+- **The `flow` adapter gives a Flow run its conversation id; the intake has no `ai.scoring` or OTel baggage code** (#232, task 02).
+  - **The contract is instance metadata:** a run belongs to a conversation when its instance carries the id under
+    `gen_ai.conversation.id`, set between `instance(…)` and `start()`. `ClaimIntakeFlow.newRun(IntakeRun)` is the one place the intake
+    does that (the key is the intake's own constant, since it can't import `ai.scoring`'s), and both start paths
+    (`ClaimIntakeDispatcher.startRun`, `ReviewRecoverer.handOver`) create their run through it. **A run created with `instance(…)`
+    directly silently has no id on its spans.** `IntakeRun.conversationId` stays the run's own data; the adapter doesn't read the input.
+  - **Three parts, public SPIs only** (documented on `FlowConversationListener`): the listener (an `@ApplicationScoped`
+    `WorkflowExecutionListener`, priority 0, so it runs before Flow's OTel listener at the default 1000) records instance id →
+    conversation id in `onWorkflowStarted` and forgets it on completed, failed and canceled; `FlowConversationSpanProcessor` stamps
+    Flow's own spans (`workflow.create`, `workflow.execute`, `task.execute`) by their `flow.workflow.instance.id`;
+    `FlowConversationTaskProxy` (a `CallableTaskProxyBuilder`, loaded by `ServiceLoader` from `META-INF/services`, not a bean) puts
+    the id in baggage around each call task's body, so the AI, JDBC and mail spans and the agentic sub-workflows started inside a step
+    carry it. **Both halves are needed:** without the proxy the spans inside a step lose the id, without the processor Flow's own do.
+  - **The proxy's priority (50) must stay below `OTelTaskSpanProxy`'s 100** (package-private in quarkus-flow-opentelemetry): the lower
+    priority is the inner proxy, and above 100 the OTel proxy's context would replace the baggage.
+    `FlowConversationAdapterTests.flowLoadsTheTaskProxyInsideItsOwnOpenTelemetryProxy` compares the two as Flow loaded them.
+  - A run without the metadata (any other workflow, the generated agentic ones) is left alone. Spans started outside a task body and
+    without Flow's instance attribute (what a listener does after a run faults) get no id, as before.
+  - `IntakeSpanPropagationTests` (two and eight concurrent runs, a woken review run, a replacement run), `IntakeTracingTests` and
+    `IntakeLangfuseDeliveryTests` are the guards on the intake side, `FlowConversationAdapterTests` on the adapter's, with a workflow of
+    its own.
+- **What else the intake's observability adds** (task 11 of #216):
   - `ai.scoring.conversation.flow.FlowSpanTypingProcessor` types the `workflow.execute` span of a workflow Flow generated for an agentic interface (named after the interface in kebab case, `flow.workflow.namespace`/`name`; the interface is looked up and must have a `@SequenceAgent`/`@ParallelAgent`/… method; the run's own `claim-intake` workflow isn't one; a stand-in for quarkiverse/quarkus-flow#1122, relying on Flow's naming) as the standard `gen_ai.operation.name=invoke_agent` plus `gen_ai.agent.name` (**a documented workaround, reflection on Flow's naming, no good for native; delete with #1122**); the Langfuse-specific part is `ai.scoring.langfuse.otel.LangfuseFlowSpanTypingProcessor`: `task.execute` (a step, usually plain Java) is a `chain` (`langfuse.observation.type` only; quarkus-langfuse 0.9.1 retains it under `AI_ONLY` without a synthetic GenAI operation name).
   - `@MailClientSpan` (an interceptor binding in `org.parasol.intake.observability`, handled by the package-private `MailClientSpanInterceptor`; a parameter marked
     `@SpanAttribute` becomes a span attribute, as the folder does) wraps `ClaimsMailbox`'s IMAP operations (`imap list|find|move|moveOldest|moveWithoutMessageId`) and `IntakeReplySender`'s `deliver`
@@ -1141,6 +1161,10 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
     (`IntakeRun`, `IntakeState`, `ReviewDecided` through the Quarkus `ObjectMapper`) and the helper unit tests
     (`CorrespondenceText`, `SameCustomerRule`, `PolicyNumbers`, `InceptionDates`, `ClaimReference`, `MailLoopGuard`,
     `ConversationContext`) need no LLM.
+  - `FlowConversationAdapterTests` (`ai.scoring.conversation.flow`, bare `%test` group) builds a one-task workflow through the injected
+    `WorkflowApplication` and uses no intake type. **Its observations are static:** Flow keeps the first definition of a workflow, and
+    with it the task body of the JUnit instance that built it. Checking a change to a `META-INF/services` file with `./mvnw test` needs
+    a `clean` (or deleting the copy under `target/classes`): the resources plugin never removes a stale one.
   - `TestSpans` (`org.parasol.intake`, test) is a `SpanExporter` CDI bean (Quarkus registers it on its own) with capture off by default, with
     lookups by run, trace and conversation id. `IntakeFlowTestBase` starts a fresh capture before each test and stops/clears it in teardown,
     even if cleanup fails; standalone consumers manage that lifecycle too. Appends and lifecycle changes share a monitor, without copy-on-write
