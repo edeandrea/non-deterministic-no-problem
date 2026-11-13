@@ -104,8 +104,8 @@ candidate. Then:
 
 ## Done When
 
-- [ ] `spike-results.md` answers sections 1–4, each with evidence (class/method, or a scratch-test result).
-- [ ] It recommends one mechanism, with the contract (input field or metadata) and its known limits.
-- [ ] If the recommendation relies on an `internal` API, it includes a draft upstream issue.
-- [ ] The scratch branch is deleted; nothing lands on the feature branch.
-- [ ] The user has chosen how task 02 proceeds; record the decision under Key Decisions in `PLAN.md`.
+- [x] `spike-results.md` answers sections 1–4, each with evidence (class/method, or a scratch-test result).
+- [x] It recommends one mechanism, with the contract (input field or metadata) and its known limits.
+- [x] If the recommendation relies on an `internal` API, it includes a draft upstream issue.
+- [x] The scratch branch is deleted; nothing lands on the feature branch.
+- [x] The user has chosen how task 02 proceeds; record the decision under Key Decisions in `PLAN.md`.

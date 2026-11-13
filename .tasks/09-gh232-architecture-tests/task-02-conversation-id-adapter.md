@@ -11,31 +11,48 @@ adapter chosen in task 01 attaches it. The intake has **no** reference to `ai.sc
 ## What to Do
 
 1. **Design first.** Present the adapter class(es) and every changed intake file in full, and wait for approval.
-2. **The adapter** goes in `ai.scoring.conversation.flow`, next to `FlowSpanTypingProcessor`.
-   - It uses the mechanism and contract task 01 settled.
-   - Its Javadoc states the contract (for example "a run whose input has a string `conversationId`"), the Flow
-     behavior it relies on, and what happens to runs without one: nothing.
-   - If it relies on an `internal` Flow API, follow the `FlowSpanTypingProcessor` precedent: a documented workaround, a
-     linked upstream issue, and a "delete when" note.
+2. **The adapter** goes in `ai.scoring.conversation.flow`, next to `FlowSpanTypingProcessor`. It is mechanism A from
+   [spike-results.md](spike-results.md), on public SPIs only, in three parts:
+   - **A task proxy** (`io.serverlessworkflow.impl.executors.CallableTaskProxyBuilder`, registered in
+     `META-INF/services`, not a CDI bean): for a run that has a conversation id, it wraps the call task's body in a
+     scope whose context is `Context.current()` plus the baggage entry. Its priority must stay below
+     `OTelTaskSpanProxy`'s 100 so it is the innermost proxy; say so in its Javadoc.
+   - **A listener** (an `@ApplicationScoped` `WorkflowExecutionListener` with a priority below the default 1000, so it
+     runs before Flow's OTel listener): records instance id → conversation id in `onWorkflowStarted`, and removes it on
+     completed, failed and canceled.
+   - **A span processor:** stamps `gen_ai.conversation.id` on a span whose `flow.workflow.instance.id` is a recorded
+     instance. That covers `workflow.create`, `workflow.execute` and `task.execute`, which never see the proxy's
+     baggage.
+   - **The contract is instance metadata.** The adapter reads
+     `instanceData().findMetadata("gen_ai.conversation.id", String.class)`. No reflection, and nothing read from the
+     run's input. Its Javadoc states the key, that the app sets it between `instance(…)` and `start()`, the Flow
+     behavior it relies on, and what happens to runs without it: nothing.
+   - Check once in dev mode that the `META-INF/services` entry is picked up (sdk-java loads it with the thread context
+     class loader; the spike proved it in tests only).
 3. **The intake:**
    - remove `ConversationContext` from `ClaimIntakeDispatcher` (constructor, field, the `runIn` around the run start)
      and from `ReviewRecoverer` (`callIn` in `handOver`);
-   - keep the code inside those blocks unchanged;
-   - keep `conversationId` on `IntakeRun`, since it's the contract now. Say so where `IntakeRun` documents it.
+   - both start paths call `instance.addMetadataIfAbsent("gen_ai.conversation.id", …)` between `flow.instance(run)` and
+     `instance.start()`. Put the call and the key in **one place** in the intake (the key is the intake's own constant;
+     it can't import `ai.scoring`'s), since a run started without it silently gets no id;
+   - keep the rest of the code inside those blocks unchanged;
+   - `IntakeRun.conversationId` stays as the run's own data. It is no longer what the adapter reads; say so where
+     `IntakeRun` documents it.
 4. **Tests:**
    - `ClaimIntakeDispatcherStartFailureTests` builds `new ConversationContext()`, so drop it.
    - `TestSpans` statically imports `ConversationContext.CONVERSATION_ID_KEY`. Test code isn't held to rules 1–3, but
      prefer `GenAiIncubatingAttributes.GEN_AI_CONVERSATION_ID` there, so the intake's tests don't depend on
      `ai.scoring` either.
    - Add adapter tests in `src/test/java/ai/scoring/conversation/flow/`, following `FlowSpanTypingProcessorTests`.
-     Cover a run with a conversation id, a run without one, and two concurrent runs that don't mix.
+     Cover a run with the metadata, a run without it, and two concurrent runs that don't mix.
 5. **`ConversationContext`'s API.** The chat adapter still uses `currentId`/`enter`. Decide whether `runIn`/`callIn`
    are still used anywhere. If not, remove them, or keep them as public API with a reason, and record the call in
    `PLAN.md`.
 
 ## Files/Areas
 
-- `src/main/java/ai/scoring/conversation/flow/` (new adapter)
+- `src/main/java/ai/scoring/conversation/flow/` (new adapter) and
+  `src/main/resources/META-INF/services/io.serverlessworkflow.impl.executors.CallableTaskProxyBuilder`
 - `src/main/java/org/parasol/intake/dispatch/ClaimIntakeDispatcher.java`
 - `src/main/java/org/parasol/intake/workflow/review/ReviewRecoverer.java`
 - `src/main/java/org/parasol/intake/workflow/IntakeRun.java` (Javadoc only)
@@ -51,6 +68,8 @@ adapter chosen in task 01 attaches it. The intake has **no** reference to `ai.sc
 - **The guards are the existing tests, unchanged.** `IntakeSpanPropagationTests` (two concurrent runs included),
   `IntakeTracingTests` and `IntakeLangfuseDeliveryTests` must pass without edits to their assertions. Editing an
   assertion to make it pass is a finding to raise, not a fix.
+- **The spike's two controls are worth keeping in mind:** without the proxy the AI, JDBC and mail spans lose the id;
+  without the processor Flow's own spans do. Both halves are needed.
 - **`ConversationLayeringTests` must still pass.** The adapter may reference Flow; the core may not, and adapters may
   not reference each other.
 - **No new `@TestProfile`.** The adapter tests either fit the bare `%test` group or are plain unit tests.
@@ -64,5 +83,5 @@ adapter chosen in task 01 attaches it. The intake has **no** reference to `ai.sc
       assertions untouched.
 - [ ] The adapter has its own tests, including concurrent runs.
 - [ ] `ConversationLayeringTests` is green.
-- [ ] `CLAUDE.md` and the intake design doc describe the adapter and the `conversationId` contract.
+- [ ] `CLAUDE.md` and the intake design doc describe the adapter and the instance-metadata contract.
 - [ ] `./mvnw -B clean verify -Pollama` is green.
