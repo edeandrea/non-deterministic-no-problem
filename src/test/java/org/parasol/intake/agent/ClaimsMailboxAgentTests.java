@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.InstanceOfAssertFactories.type;
 
 import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import jakarta.inject.Inject;
@@ -22,7 +21,6 @@ import org.parasol.intake.model.MatchedClaim;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.client.WireMock;
-import dev.langchain4j.model.output.structured.Description;
 import io.quarkus.test.junit.QuarkusTest;
 
 /**
@@ -97,17 +95,18 @@ class ClaimsMailboxAgentTests {
 	}
 
 	@Test
-	void theClassifierRequestListsEveryEmailTypeWithItsDescriptionFromTheEnum() {
+	void theClassifierPromptListsEveryEmailTypeWithItsDescriptionFromTheEnum() {
 		this.stubs.answer(CLASSIFY, EmailType.NOT_A_CLAIM.name());
 
 		process("Please unsubscribe me.", MatchedClaim.none());
 
 		var expected = Stream.of(EmailType.values())
-			.map(type -> "%s - %s".formatted(type.name(), description(type)))
-			.collect(Collectors.joining("\n", "You must answer strictly with one of these enums:\n", ""));
+			.map(type -> "  - %s: %s".formatted(type.name(), type.description()))
+			.toList();
 		assertThat(this.stubs.userMessage(this.stubs.requestFor(CLASSIFY)))
-			.as("LangChain4j's format instructions, built from EmailType and its @Descriptions")
-			.endsWith(expected);
+			.as("the prompt itself names every type with its description, so it doesn't depend on the provider appending them")
+			.contains(expected)
+			.contains("Please unsubscribe me.");
 	}
 
 	@Test
@@ -218,14 +217,5 @@ class ClaimsMailboxAgentTests {
 
 	private ClassifiedOutcome processClassified(String correspondence, MatchedClaim matchedClaim) {
 		return this.agent.process(correspondence, matchedClaim, NOTHING_YET, Set.of(), SENT_DATE);
-	}
-
-	private static String description(EmailType type) {
-		try {
-			return EmailType.class.getField(type.name()).getAnnotation(Description.class).value()[0];
-		}
-		catch (NoSuchFieldException e) {
-			throw new AssertionError(e);
-		}
 	}
 }

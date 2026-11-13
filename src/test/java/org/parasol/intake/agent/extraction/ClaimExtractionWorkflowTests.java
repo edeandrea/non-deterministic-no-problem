@@ -187,16 +187,16 @@ class ClaimExtractionWorkflowTests {
 	}
 
 	@Test
-	void theDetailsPromptListsEveryClaimCategoryFromTheEnum() {
+	void theDetailsPromptListsEveryClaimCategoryWithItsDescriptionFromTheEnum() {
 		stub(DETAILS_PROMPT, detailsJson("2026-10-07", null, "Elm Street", "SINGLE_VEHICLE", "[]"));
 
 		this.workflow.extractClaim(NEW_CLAIM, NOTHING_YET, Set.of(), SENT_DATE);
 
 		var categories = Stream.of(ClaimCategory.values())
-			.map(ClaimCategory::name)
-			.collect(Collectors.joining(", "));
+			.map(category -> "  - %s: %s".formatted(category.name(), category.description()))
+			.collect(Collectors.joining("\n"));
 		assertThat(userMessage(requestFor(DETAILS_PROMPT)))
-			.contains("- category: one of %s (OTHER if described but it fits no other category), or null".formatted(categories));
+			.contains("- category: one of these (OTHER if described but it fits no other category), or null if unstated\n%s\n".formatted(categories));
 	}
 
 	@Test

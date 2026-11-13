@@ -62,6 +62,14 @@ class ClaimIntakePolicyTests extends IntakeFlowTestBase {
 	}
 
 	@Test
+	void aNullStringPolicyNumberIsNotStatedSoOneIsGenerated() {
+		var created = createClaim(SENDER, withPolicy("null"));
+
+		assertThat(created.claim().policyNumber).matches("AC-\\d{9}");
+		assertThat(this.scenario.intake(created.claim().id).orElseThrow().policyNumberGenerated).isTrue();
+	}
+
+	@Test
 	void aGeneratedPolicyIsUniqueAndMarkedGenerated() {
 		var created = createClaim(SENDER, COMPLETE_DETAILS);
 
