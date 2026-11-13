@@ -78,10 +78,10 @@ adapter chosen in task 01 attaches it. The intake has **no** reference to `ai.sc
 
 ## Done When
 
-- [ ] `grep -rn "ai.scoring\|io.opentelemetry.api.baggage" src/main/java/org/parasol/intake` finds nothing.
-- [ ] `IntakeSpanPropagationTests`, `IntakeTracingTests` and `IntakeLangfuseDeliveryTests` are green with their
+- [x] `grep -rn "ai.scoring\|io.opentelemetry.api.baggage" src/main/java/org/parasol/intake` finds nothing.
+- [x] `IntakeSpanPropagationTests`, `IntakeTracingTests` and `IntakeLangfuseDeliveryTests` are green with their
       assertions untouched.
-- [ ] The adapter has its own tests, including concurrent runs.
-- [ ] `ConversationLayeringTests` is green.
-- [ ] `CLAUDE.md` and the intake design doc describe the adapter and the instance-metadata contract.
-- [ ] `./mvnw -B clean verify -Pollama` is green.
+- [x] The adapter has its own tests, including concurrent runs.
+- [x] `ConversationLayeringTests` is green.
+- [x] `CLAUDE.md` and the intake design doc describe the adapter and the instance-metadata contract.
+- [x] `./mvnw -B clean verify -Pollama` is green.

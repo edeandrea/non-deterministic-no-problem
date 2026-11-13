@@ -31,12 +31,14 @@ class ConversationContextTests {
 	}
 
 	@Test
-	void runInSeesTheIdAndNestedConversationsRestoreTheOuterOne() {
-		this.context.runIn("outer", () -> {
-			this.context.runIn("inner", () -> assertThat(this.context.currentId()).contains("inner"));
+	void nestedConversationsRestoreTheOuterOne() {
+		try (var _ = this.context.enter("outer")) {
+			try (var _ = this.context.enter("inner")) {
+				assertThat(this.context.currentId()).contains("inner");
+			}
 
 			assertThat(this.context.currentId()).contains("outer");
-		});
+		}
 	}
 
 	@Test

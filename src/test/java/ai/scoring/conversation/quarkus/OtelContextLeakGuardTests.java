@@ -73,11 +73,9 @@ class OtelContextLeakGuardTests {
 		var thread = Thread.ofPlatform().start(() -> {
 			var span = this.tracer.spanBuilder("leak-guard-test.own").startSpan();
 
-			try (var _ = span.makeCurrent()) {
-				this.conversationContext.runIn("own", () -> {
-					task.run();
-					afterTask.set(List.of(this.conversationContext.currentId(), Span.current().getSpanContext().equals(span.getSpanContext())));
-				});
+			try (var _ = span.makeCurrent(); var _ = this.conversationContext.enter("own")) {
+				task.run();
+				afterTask.set(List.of(this.conversationContext.currentId(), Span.current().getSpanContext().equals(span.getSpanContext())));
 			}
 			finally {
 				span.end();

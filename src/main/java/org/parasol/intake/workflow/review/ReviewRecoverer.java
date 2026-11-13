@@ -17,7 +17,6 @@ import org.parasol.intake.model.ClaimIntakeState;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
 import org.parasol.intake.workflow.IntakeRun;
 
-import ai.scoring.conversation.ConversationContext;
 import io.quarkus.logging.Log;
 
 /**
@@ -33,11 +32,9 @@ import io.quarkus.logging.Log;
 @ApplicationScoped
 public class ReviewRecoverer {
 	private final Instance<ClaimIntakeFlow> flow;
-	private final ConversationContext conversationContext;
 
-	ReviewRecoverer(Instance<ClaimIntakeFlow> flow, ConversationContext conversationContext) {
+	ReviewRecoverer(Instance<ClaimIntakeFlow> flow) {
 		this.flow = flow;
-		this.conversationContext = conversationContext;
 	}
 
 	/**
@@ -92,25 +89,24 @@ public class ReviewRecoverer {
 	// The new run is registered as the claim's review run before it starts, so a decision published as soon as it waits
 	// matches it
 	private ReviewHandover handOver(OwnedReview review, String orphanedRunId, String conversationId, BiFunction<String, Long, IntakeRun> runFor) {
-		return this.conversationContext.callIn(conversationId, () -> {
-			var instance = this.flow.get().instance(runFor.apply(conversationId, review.claimId()));
+		var instance = this.flow.get().newRun(runFor.apply(conversationId, review.claimId()));
 
-			// The instance has to exist before the claim can be taken over, because its id is what's written as the new
-			// reviewRunId. If the take-over then loses, the instance is never started and stays in Flow's in-memory
-			// activeInstances map: cancel() is a no-op on a PENDING instance and removeInstance isn't public
-			// (open-workflow-specification/sdk-java#1816). Harmless — the id was never persisted, so nothing looks it up —
-			// but it is a leaked map entry. Discard the instance here once that issue is resolved.
-			if (takeOver(review.claimId(), orphanedRunId, instance.id())) {
-				instance.start();
-				Log.warnf("Run %s no longer owns the review of claim %d: run %s now waits for the decision", orphanedRunId, review.claimId(), instance.id());
+		// The instance has to exist before the claim can be taken over, because its id is what's written as the new
+		// reviewRunId. If the take-over then loses, the instance is never started and stays in Flow's in-memory
+		// activeInstances map: cancel() is a no-op on a PENDING instance and removeInstance isn't public
+		// (open-workflow-specification/sdk-java#1816). Harmless — the id was never persisted, so nothing looks it up —
+		// but it is a leaked map entry. Discard the instance here once that issue is resolved.
+		var hasTakenOver = takeOver(review.claimId(), orphanedRunId, instance.id());
 
-				return ReviewHandover.DONE;
-			}
-
+		if (hasTakenOver) {
+			instance.start();
+			Log.warnf("Run %s no longer owns the review of claim %d: run %s now waits for the decision", orphanedRunId, review.claimId(), instance.id());
+		}
+		else {
 			Log.warnf("Run %s no longer owns the review of claim %d, but another run already holds it", orphanedRunId, review.claimId());
+		}
 
-			return ReviewHandover.ALREADY_ELSEWHERE;
-		});
+		return hasTakenOver ? ReviewHandover.DONE : ReviewHandover.ALREADY_ELSEWHERE;
 	}
 
 	// Under the intake state's optimistic lock: only if the old run still owns the review. A decision the reviewer already claimed for the

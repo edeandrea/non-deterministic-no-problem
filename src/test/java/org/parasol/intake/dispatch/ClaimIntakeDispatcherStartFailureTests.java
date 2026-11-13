@@ -26,7 +26,6 @@ import org.parasol.intake.observability.FailureOutcome;
 import org.parasol.intake.observability.IntakeActivities;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
 
-import ai.scoring.conversation.ConversationContext;
 import io.serverlessworkflow.impl.WorkflowInstance;
 
 /**
@@ -50,7 +49,7 @@ class ClaimIntakeDispatcherStartFailureTests {
 		doAnswer(_ -> {
 			throw new IllegalStateException("the run could not be started");
 		}).when(failing).start();
-		when(flow.instance(any())).thenReturn(failing, second);
+		when(flow.newRun(any())).thenReturn(failing, second);
 
 		var failureHandler = mock(IntakeFailureHandler.class);
 		var dispatcher = dispatcher(flow, failureHandler);
@@ -60,7 +59,7 @@ class ClaimIntakeDispatcherStartFailureTests {
 
 		verify(failureHandler).handle(anyString(), any(IllegalStateException.class), eq(FailureOutcome.FATAL));
 		// The second email started a run of its own: the failed one released the sender rather than holding it forever
-		verify(flow, times(2)).instance(any());
+		verify(flow, times(2)).newRun(any());
 		verify(second).start();
 	}
 
@@ -86,7 +85,7 @@ class ClaimIntakeDispatcherStartFailureTests {
 			return null;
 		}).when(executor).execute(any(Runnable.class));
 
-		return new ClaimIntakeDispatcher(config, mailbox, recorder, matcher, failureHandler, new ConversationContext(), activities, flowInstance, executor, mock(ProcessingRecovery.class), mock(org.parasol.intake.workflow.review.ReviewReclaimer.class));
+		return new ClaimIntakeDispatcher(config, mailbox, recorder, matcher, failureHandler, activities, flowInstance, executor, mock(ProcessingRecovery.class), mock(org.parasol.intake.workflow.review.ReviewReclaimer.class));
 	}
 
 	private static InboundEmail email(String messageId) {

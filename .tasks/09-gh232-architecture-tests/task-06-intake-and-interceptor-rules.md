@@ -1,13 +1,14 @@
-# Task 06: Rules 4 (App-Wide) and 5, and the Intake AI Service Opt-Outs
+# Task 06: Rules 4 (App-Wide) and 5, the Intake AI Service Opt-Outs and the Run-Creation Rule
 
 **Type:** Test Addition
 
 ## Goal
 
-Three invariants that today live only in comments and `CLAUDE.md` become build failures:
+Four invariants that today live only in comments and `CLAUDE.md` become build failures:
 - interceptor-bound methods stay interceptable;
 - no test mocks an intake agent;
-- every intake AI service stays stateless.
+- every intake AI service stays stateless;
+- every intake run is created by `ClaimIntakeFlow.newRun`.
 
 ## What to Do
 
@@ -59,12 +60,34 @@ classes, for example with `ImportOption.OnlyIncludeTests` on a second `@AnalyzeC
   annotation's attributes through ArchUnit's `JavaAnnotation.get(...)`. The `because(…)` names the hazard: a seventh
   agent without them silently gets the shared `"default"` chat memory and the policy-PDF retriever.
 
+### Run creation: `org.parasol.intake.IntakeArchitectureTests` (main code only)
+
+Added after task 02 (user, 2026-11-13). `ClaimIntakeFlow.newRun(IntakeRun)` creates the instance and sets its
+`gen_ai.conversation.id` metadata, which is what the `ai.scoring.conversation.flow` adapter reads. A run created any
+other way works, but its spans silently carry no conversation id, and `IntakeSpanPropagationTests` only covers the
+start paths that exist today.
+
+- **No class in `org.parasol.intake..` other than `ClaimIntakeFlow` calls:**
+  - `instance(…)` or `startInstance(…)` (every overload) on a type assignable to `io.quarkiverse.flow.Flow`;
+  - `instance(…)` on `io.serverlessworkflow.impl.WorkflowDefinition`, so `flow.definition().instance(run)` doesn't get
+    around it.
+
+  Match the call's target owner with `assignableTo`, not by name: javac records the receiver's static type, so
+  `this.flow.get().instance(run)` is a call on `ClaimIntakeFlow`, not on `Flow`.
+- **Still allowed:** `WorkflowDefinition.activeInstance(…)` (`SupersedeStep`, `ClaimReviewService`, `ReviewReclaimer`: a lookup, not a
+  creation) and `newRun` itself.
+- **Not covered, on purpose:** a run started through `WorkflowApplication` directly, or by reflection. Nothing in the
+  intake does either; say so in a comment on the rule rather than widening it.
+- The `because(…)` names the hazard: the run's spans get no conversation id, so its claim's Langfuse session is missing
+  a run, with no failing test.
+
 ## Files/Areas
 
 - `src/test/java/org/parasol/architecture/InterceptedMethodTests.java` (new)
 - `src/test/java/org/parasol/intake/IntakeArchitectureTests.java` (created in task 05; add here, or split into a
   test-code class if one import can't serve both)
 - `CLAUDE.md`:
+  - *Conversation core*, "A run created with `instance(…)` directly silently has no id on its spans": enforced now.
   - *Gotchas*, "The six intake agents' statelessness opt-outs are load-bearing": say it's now enforced.
   - *Testing*: the "No test in this group may `@InjectMock` an intake agent" paragraph, enforced now.
   - *Gotchas*, "Prefer `@Transactional` to `QuarkusTransaction`": the self-invocation note, enforced now.
@@ -85,11 +108,13 @@ classes, for example with `ImportOption.OnlyIncludeTests` on a second `@AnalyzeC
       check Quarkus doesn't already make. All green.
 - [ ] Rule 5, the `QuarkusMock` ban and the opt-out rule are green, and the agent predicate's matched set equals the
       Shared Context table.
+- [ ] The run-creation rule is green, and the three `activeInstance` callers don't trip it.
 - [ ] Each rule was shown failing once:
   - a private `@Transactional` method;
   - a final `@MailClientSpan` method;
   - an `@InjectMock ClaimSummaryAgent` field;
   - a `QuarkusMock.installMockForType` call;
-  - an intake `@RegisterAiService` without `chatMemoryProviderSupplier`.
-- [ ] `CLAUDE.md`'s three entries point at their rules.
+  - an intake `@RegisterAiService` without `chatMemoryProviderSupplier`;
+  - `ReviewRecoverer.handOver` calling `this.flow.get().instance(…)`, and once more through `definition().instance(…)`.
+- [ ] `CLAUDE.md`'s four entries point at their rules.
 - [ ] `./mvnw -B clean verify -Pollama` is green.
