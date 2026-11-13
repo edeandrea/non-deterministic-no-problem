@@ -55,7 +55,7 @@ Edit or create task files and update `## Task Plan`.
 
 ## Task Plan
 
-- [ ] [task-01-conversation-id-spike.md](task-01-conversation-id-spike.md): Spike: can an `ai.scoring` Flow adapter attach the conversation id with no intake code?
+- [x] [task-01-conversation-id-spike.md](task-01-conversation-id-spike.md): Spike: can an `ai.scoring` Flow adapter attach the conversation id with no intake code?
 - [ ] [task-02-conversation-id-adapter.md](task-02-conversation-id-adapter.md): Build the Flow adapter and take `ConversationContext` out of the intake
 - [ ] [task-03-archunit-and-scoring-rules.md](task-03-archunit-and-scoring-rules.md): Add `archunit-junit6`, rule 1, and rewrite `ConversationLayeringTests`
 - [ ] [task-04-domain-boundaries.md](task-04-domain-boundaries.md): Rules 2 and 3, the baggage rule and the boundary hardening
@@ -102,8 +102,8 @@ plus a grep of the sources. Line numbers drift; re-read before relying on one.
   in OTel baggage, so every span of the run carries it. The user decided the intake may touch **neither `ai.scoring` nor
   OTel baggage**, because `ai.scoring` may become a separate library. Instead, an `ai.scoring.conversation.flow` adapter
   attaches the conversation id by observing Flow, the way `ConversationalBaggageHandler` observes chat scopes. The only
-  contract left with the app is a documented convention: the run's input carries a `conversationId`, which `IntakeRun`
-  already does.
+  contract left with the app is a documented convention: the run's instance metadata carries the id under
+  `gen_ai.conversation.id` (task 01 replaced the planned input-field convention; see Key Decisions).
 - **The wire contract underneath** is the GenAI semconv baggage key `gen_ai.conversation.id`. There are two readers:
   `ai.scoring`'s `ConversationIdSpanProcessor`, and quarkus-langfuse 0.9.1's own `LangfuseSpanProcessor.onStart`, which
   reads `Baggage.fromContext(...).getEntryValue(...)` itself (checked in its bytecode). The intake gets nothing else
@@ -213,6 +213,28 @@ All six intake `@RegisterAiService`s set both `retrievalAugmentor = NoRetrievalA
 - **Existing data doesn't matter.** The demo always starts and seeds its database from scratch, so moving a type that
   Flow persists needs no migration.
 
+- **Task 02 builds mechanism A from the spike (user, 2026-11-13).** See [spike-results.md](spike-results.md). Public SPIs
+  only, so there is no `internal` API and no upstream issue:
+  - a `CallableTaskProxyBuilder` (`ServiceLoader`, priority below `OTelTaskSpanProxy`'s 100) puts the run's id in OTel
+    baggage around each call task's body;
+  - a `WorkflowExecutionListener` bean records instance id → conversation id in `onWorkflowStarted`, ahead of Flow's
+    OTel listener;
+  - a span processor stamps Flow's own spans (`workflow.create`, `workflow.execute`, `task.execute`) by
+    `flow.workflow.instance.id`.
+
+  **The contract is instance metadata, not the run's input (user, 2026-11-13): no reflection.** The intake calls
+  `instance.addMetadataIfAbsent("gen_ai.conversation.id", …)` between `flow.instance(run)` and `start()` (a public
+  `WorkflowInstance` method, no cast), and the adapter reads `findMetadata("gen_ai.conversation.id", String.class)`.
+  Verified on a second scratch branch with the same test classes. Stamping by trace with no baggage (mechanism B) also
+  passed and was turned down: it's only right while a run owns its trace.
+
+### Task Outcomes
+
+- **Task 01 (spike, 2026-11-13):** an `ai.scoring.conversation.flow` adapter can attach the conversation id with no
+  intake code. With `ConversationContext` removed from `ClaimIntakeDispatcher` and `ReviewRecoverer`,
+  `IntakeSpanPropagationTests`, `IntakeTracingTests` and `IntakeLangfuseDeliveryTests` passed unchanged, and failed with
+  either half of the mechanism switched off. Task 02 still has to put the intake's metadata call in one place and check the `ServiceLoader` registration in dev mode. The scratch branch is deleted.
+
 ### Caveats & Problems
 
 - **`archRule.failOnEmptyShould` must stay `true`** (ArchUnit's default). A rule whose `that()` matches nothing, after a
@@ -222,7 +244,7 @@ All six intake `@RegisterAiService`s set both `retrievalAugmentor = NoRetrievalA
   correct.
 - **Runtime coupling that no static rule sees:**
   - `FlowSpanTypingProcessor` reflects on Flow's naming to find an agentic interface.
-  - The new Flow adapter reads `conversationId` from a run's input.
+  - The new Flow adapter reads the conversation id from a run's instance metadata, which the intake sets by key.
   - Both are conventions; document them where they live.
 - **Every new rule must be shown to fail at least once** (task 09's mutation check). A rule that has never failed may be
   matching nothing.
