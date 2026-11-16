@@ -24,6 +24,12 @@ task's merged PR.
 
 ![Email claim intake workflow](claim-intake-workflow.png)
 
+The diagram has four lanes: the customer, the intake system, the AI agents and the claims processor. The
+shaded **AI Agents (100% LangChain4j)** lane holds only the steps a model runs: picking which pending claim an email is
+about, classifying it, writing a status answer and extracting the details. Everything else, including the
+routing between those steps, every check, every status change and every reply sent, is code in the intake
+system's lane.
+
 A claim is **pending** while it is `Pending Information` or `Pending Review`. Each email gets **one
 workflow run**, and the steps below are that run's steps.
 

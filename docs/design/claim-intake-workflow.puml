@@ -9,6 +9,13 @@ skinparam NoteBackgroundColor #FFFDE7
 
 title Email claim intake workflow
 
+' Lanes are declared up front so they keep this order. The AI lane holds the LLM calls only:
+' routing, checks, status changes and every send are code, in the intake system's lane.
+|Customer|
+|Intake system|
+|#E3F2FD|AI Agents (100% LangChain4j)|
+|Claims processor|
+
 |Customer|
 start
 :Emails claims@parasol.com;
@@ -25,12 +32,22 @@ else (no)
     Everything below, apart from the claims
     processor's look-over, is that run's steps
     (including the wait and the decision).
+    The steps in the AI lane are LLM calls with no
+    side effects: the run's own steps do those.
   end note
   if (Claim matched, but the sender isn't\nthe claim's email address?) then (yes)
     :Reply: no matching claim\n(no details; write from the claim's\naddress or include the claim number);
-  elseif (No claim matched, and the sender\nhas pending claims: does the LLM say\nwhich one it's about?) then (can't tell)
+  else (no)
+  if (No claim matched, and the\nsender has pending claims?) then (yes)
+    |AI Agents (100% LangChain4j)|
+    :Which of the sender's pending claims\nis this about? One of them,\na new incident, or can't tell;
+    |Intake system|
+  else (no)
+  endif
+  if (Asked, and the LLM can't tell?) then (yes)
     :Reply: which claim?\n(lists the sender's pending claim\nnumbers; nothing created or changed);
-  else (one of them → handled as matched;\nnew incident or no pending claims → unmatched)
+  else (no: one of them → handled as matched;\nnew incident or no pending claims → unmatched)
+    |AI Agents (100% LangChain4j)|
     :Agents classify: new claim / follow-up / not a claim;
     note right
       The matched claim wins: an email matched to
@@ -38,14 +55,21 @@ else (no)
       whatever the classification says.
       Pending = Pending Information or Pending Review.
     end note
+    |Intake system|
     if (Claim matched, in any other status\n(e.g. New, In Process, Processed, Denied)?) then (yes)
+      |AI Agents (100% LangChain4j)|
+      :Write the status answer\n(read-only status tool);
+      -[#1565C0]-> status answer;
+      |Intake system|
       :Reply: status answer\n(claim never updated);
     elseif (No claim matched,\nclassified not a claim?) then (yes)
       :Reply: not a claim;
-    elseif (No claim matched,\nclassified follow-up?) then (yes)
-      :Reply: no matching claim\n(no details; write from the claim's\naddress or include the claim number;\nnothing created or changed);
-    else (claim matched and pending, or\nno claim matched, classified new claim)
+    elseif (Claim matched and pending, or no claim\nmatched, classified new claim?) then (yes)
+      ' An elseif branch, not the else: PlantUML draws no arrow into an else branch that starts in another lane.
+      |AI Agents (100% LangChain4j)|
       :Agents extract the details\n(over the whole correspondence);
+      -[#2E7D32]-> extracted details;
+      |Intake system|
       if (In code, before any claim is created or changed:\nnew claim whose policy number belongs to another customer?) then (yes)
         :Reply: policy inconsistency\n(no claim);
       else (no)
@@ -58,7 +82,10 @@ else (no)
           :Reply: received, in final review;
         endif
       endif
+    else (no claim matched,\nclassified follow-up)
+      :Reply: no matching claim\n(no details; write from the claim's\naddress or include the claim number;\nnothing created or changed);
     endif
+  endif
   endif
 endif
 :File the email (processed folder);
