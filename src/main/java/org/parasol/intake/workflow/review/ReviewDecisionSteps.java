@@ -27,9 +27,9 @@ import org.parasol.intake.observability.ReviewAgreement;
 import org.parasol.intake.reply.IntakeReplySender;
 import org.parasol.intake.reply.IntakeTemplates;
 import org.parasol.intake.reply.ThreadingHeaders;
-import org.parasol.intake.review.ReviewDecided;
-import org.parasol.intake.review.ReviewOutcome;
-import org.parasol.intake.workflow.IntakeRun;
+import org.parasol.intake.model.ReviewDecided;
+import org.parasol.intake.model.ReviewOutcome;
+import org.parasol.intake.model.IntakeRun;
 
 import io.quarkus.logging.Log;
 import io.quarkus.mailer.MailTemplate.MailTemplateInstance;

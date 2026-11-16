@@ -21,7 +21,7 @@ import org.parasol.intake.IntakeScenario.Mail;
 import org.parasol.testing.LangfuseExportTestProfile;
 import org.parasol.intake.StartedRuns;
 import org.parasol.intake.TestSpans;
-import org.parasol.intake.review.ReviewOutcome;
+import org.parasol.intake.model.ReviewOutcome;
 
 import io.quarkus.logging.Log;
 import io.quarkus.test.junit.QuarkusTest;

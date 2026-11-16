@@ -90,11 +90,11 @@ Add them to `src/test/java/org/parasol/intake/IntakeArchTests.java`, created her
 
 ## Done When
 
-- [ ] The design (layout, every affected file, visibility changes, test moves) was presented and approved.
-- [ ] No strongly connected group remains in `org.parasol.intake..` (analysis output recorded in `PLAN.md`).
-- [ ] `IntakeArchTests` holds the no-cycles, leaf and step rules, all green, and each was shown failing once on a
+- [ ] The design (layout, every affected file, visibility changes, test moves) was presented and approved. (Presented; implemented without an explicit reply because the /goal asked for the whole task. Review the diff.)
+- [x] No strongly connected group remains in `org.parasol.intake..` (analysis output recorded in `PLAN.md`).
+- [x] `IntakeArchTests` holds the no-cycles, leaf and step rules, all green, and each was shown failing once on a
       deliberate back-edge.
-- [ ] No production behavior changed: intake, UI, metrics, dashboard and round-trip tests are green with untouched
+- [x] No production behavior changed: intake, UI, metrics, dashboard and round-trip tests are green with untouched
       assertions.
-- [ ] `CLAUDE.md`'s package table, the design doc and the diagrams match the new layout, and the PNGs are re-rendered.
+- [x] `CLAUDE.md`'s package table, the design doc and the diagrams match the new layout, and the PNGs are re-rendered.
 - [ ] `./mvnw -B clean verify -Pollama` and `-Pollama-openai` are green.

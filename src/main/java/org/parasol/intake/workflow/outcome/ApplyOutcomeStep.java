@@ -33,8 +33,8 @@ import org.parasol.intake.model.IntakeOutcome.StatusReply;
 import org.parasol.intake.observability.IntakeActivities;
 import org.parasol.intake.observability.IntakeActivity.ClaimStatusChanged;
 import org.parasol.intake.observability.IntakeActivity.NewClaimExtracted;
-import org.parasol.intake.workflow.CorrespondenceText;
-import org.parasol.intake.workflow.IntakeState;
+import org.parasol.intake.model.CorrespondenceText;
+import org.parasol.intake.model.IntakeState;
 import org.parasol.intake.workflow.mail.IntakeEmailReader;
 
 

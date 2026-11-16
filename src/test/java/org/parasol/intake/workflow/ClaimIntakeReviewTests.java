@@ -1,4 +1,4 @@
-package org.parasol.intake.workflow.review;
+package org.parasol.intake.workflow;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -20,10 +20,11 @@ import org.parasol.intake.IntakeScenario.Mail;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.mailbox.MailFolder;
 import org.parasol.intake.model.EmailType;
-import org.parasol.intake.review.ReviewDecided;
-import org.parasol.intake.review.ReviewDecision;
-import org.parasol.intake.review.ReviewOutcome;
-import org.parasol.intake.review.ReviewedFields;
+import org.parasol.intake.model.ReviewDecided;
+import org.parasol.intake.model.ReviewDecision;
+import org.parasol.intake.model.ReviewOutcome;
+import org.parasol.intake.model.ReviewedFields;
+import org.parasol.intake.workflow.review.ReviewDecisionSteps;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.mockito.InjectSpy;

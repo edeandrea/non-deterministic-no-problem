@@ -59,7 +59,7 @@ Edit or create task files and update `## Task Plan`.
 - [x] [task-02-conversation-id-adapter.md](task-02-conversation-id-adapter.md): Build the Flow adapter and take `ConversationContext` out of the intake
 - [x] [task-03-archunit-and-scoring-rules.md](task-03-archunit-and-scoring-rules.md): Add `archunit-junit6`, rule 1, and rewrite `ConversationLayeringArchTests`
 - [x] [task-04-domain-boundaries.md](task-04-domain-boundaries.md): Rules 2 and 3, the baggage rule and the boundary hardening
-- [ ] [task-05-intake-package-cycles.md](task-05-intake-package-cycles.md): Break the intake's package tangle by moving classes, then enforce it
+- [x] [task-05-intake-package-cycles.md](task-05-intake-package-cycles.md): Break the intake's package tangle by moving classes, then enforce it
 - [ ] [task-06-intake-and-interceptor-rules.md](task-06-intake-and-interceptor-rules.md): Rules 4 (app-wide) and 5, the intake AI service opt-outs and the run-creation rule
 - [ ] [task-07-coding-conventions.md](task-07-coding-conventions.md): Coding-convention rules (resources, injection, executors, logging, dates)
 - [ ] [task-08-gotchas-rest-config-rules.md](task-08-gotchas-rest-config-rules.md): REST and persistence, Panache method references, JSON-safe run data, config/transactions/exceptions, test naming
@@ -194,6 +194,13 @@ All six intake `@RegisterAiService`s set both `retrievalAugmentor = NoRetrievalA
     `ConversationLayeringArchTests`, the latter `ConversationLayeringTests` in anything written before today), the planned
     classes in tasks 04–08 follow, and task 08 enforces it. The intake's class is `IntakeArchTests`, not
     `IntakeArchitectureArchTests`.
+  - **A rule lives in the package it would travel with (user, 2026-11-16).** Not one central package: `ai.scoring` and the intake
+    may each be extracted, and their rules must go with them. So `ai.scoring`'s own rules stay in `ai.scoring`, rules about the
+    intake's internals (`IntakeArchTests`: package shape, the agent opt-outs, run creation, JSON-safe run data) in
+    `org.parasol.intake`, and rules that cut across domains (`DomainBoundaryArchTests`, `InterceptedMethodArchTests`,
+    `CodingConventionArchTests`, `RestAndPersistenceArchTests`, `PanacheMethodReferenceArchTests`, `TestNamingArchTests`) in
+    `org.parasol.architecture`. Pick the package by asking where the rule's `that()` side lives: a rule that would still apply
+    after the intake is gone belongs in `org.parasol.architecture`.
   - **The AssertJ convention doesn't apply to them:** they are declarative rules that fail with ArchUnit's own
     `AssertionError`, not hand-written assertions. Record that exception in `CLAUDE.md` → Testing.
 - **Rule 2 means "the app uses only `ai.scoring`'s published API".** That is an explicit allow-list; today it holds
@@ -295,6 +302,19 @@ All six intake `@RegisterAiService`s set both `retrievalAugmentor = NoRetrievalA
   reachable only from `claim`, `problem` a leaf, both top-level cycle rules, known domains), all green. Removing the allow-list entry fails rule 2 on
   `ClaimService`'s `@OutputGuardrails` annotation member, so annotation-parameter edges are seen. `ClaimRetrievalHasNoIntakeBookkeepingTests` moved to
   `org.parasol.intake.model` (package line and one now-redundant import only). `./mvnw -B clean verify -Pollama` is green (2026-11-16).
+
+- **Task 05 (intake package cycles, 2026-11-16):** `IntakeRun`, `IntakeState`, `EmailRequeued`, `CorrespondenceText`, `ReviewDecided` (now
+  holding `REVIEW_DECIDED`), `ReviewDecision`, `ReviewOutcome` and `ReviewedFields` moved to `intake.model`; `SupersedeStep`, `ReviewReclaimer` and
+  `ReviewRecoverer` moved to the `workflow` root; `observability.SkippedAttachmentReason` replaces `SkippedAttachment.Reason` in `EmailAccepted`
+  (the dispatcher maps it). `org.parasol.intake.IntakeArchTests` holds the no-cycles, two leaf rules and the step rule; each was shown failing on a
+  scratch back-edge. Facts later tasks need:
+  - **No `jdeps` strongly connected group remains in `org.parasol.intake..`**; the `workflow` → `workflow.review` → `review` → `workflow` worry
+    didn't materialize, since `ReviewDecisionSteps` depends only on `model` once the decision records moved.
+  - **One visibility change:** `IntakeState.start` is now `public` (`ClaimMatchingSteps` calls it). `ClaimIntakeReviewTests` moved to `workflow`
+    (it uses `SupersedeStep`'s package-private members); `IntakeJsonRoundTripTests`, `CorrespondenceTextTests` and `ReviewedFieldsTests` moved to
+    `model`, `ReviewReclaimerTests` to `workflow`.
+  - The diagrams and design doc name classes, never packages, so only `CLAUDE.md` needed changes; no PNG re-render was needed.
+  - **BSD `sed` has no `\b`:** a scripted FQN rewrite silently did nothing until redone with `perl`.
 
 ### Caveats & Problems
 - **A stale `META-INF/services` file survives in `target/classes`.** `./mvnw test` without `clean` doesn't remove a

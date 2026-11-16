@@ -12,9 +12,9 @@ import jakarta.validation.constraints.Size;
 
 import org.parasol.claim.model.ClaimCategory;
 import org.parasol.intake.MissingItem;
-import org.parasol.intake.review.ReviewDecision;
-import org.parasol.intake.review.ReviewOutcome;
-import org.parasol.intake.review.ReviewedFields;
+import org.parasol.intake.model.ReviewDecision;
+import org.parasol.intake.model.ReviewOutcome;
+import org.parasol.intake.model.ReviewedFields;
 
 import com.fasterxml.jackson.databind.PropertyNamingStrategies.SnakeCaseStrategy;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;

@@ -22,7 +22,9 @@ Earlier tasks updated what they touched. This task checks the whole set for cons
     - the AssertJ exception for declarative rules;
     - main code vs test code scope;
     - `failOnEmptyShould`;
-    - that they're plain tests with no boot.
+    - that they're plain tests with no boot;
+    - where a rule goes: the package it would travel with (`ai.scoring`, `org.parasol.intake`, or `org.parasol.architecture`
+      for rules that cut across domains), per `PLAN.md` → Key Decisions.
   - *Conventions*: "Dependencies point one way" now names `DomainBoundaryArchTests`.
   - *Gotchas*: every entry a rule now enforces points at it, without deleting the explanation.
 - **`docs/`:** `docs/design/email-claim-intake.md`, `docs/claim-intake-flow.puml`, `docs/design/claim-intake-*.puml`,

@@ -29,10 +29,11 @@ import org.parasol.intake.observability.EmailOutcome;
 import org.parasol.intake.observability.FailureOutcome;
 import org.parasol.intake.observability.IntakeActivity.EmailAccepted;
 import org.parasol.intake.observability.IntakeActivity.EmailHandled;
+import org.parasol.intake.observability.SkippedAttachmentReason;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
-import org.parasol.intake.workflow.EmailRequeued;
-import org.parasol.intake.workflow.IntakeRun;
-import org.parasol.intake.workflow.review.ReviewReclaimer;
+import org.parasol.intake.model.EmailRequeued;
+import org.parasol.intake.model.IntakeRun;
+import org.parasol.intake.workflow.ReviewReclaimer;
 
 import io.quarkus.logging.Log;
 import io.quarkus.virtual.threads.VirtualThreads;
@@ -199,6 +200,15 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 		}
 	}
 
+	private static SkippedAttachmentReason reasonOf(SkippedAttachment.Reason reason) {
+		return switch (reason) {
+			case NOT_AN_IMAGE -> SkippedAttachmentReason.NOT_AN_IMAGE;
+			case TOO_LARGE -> SkippedAttachmentReason.TOO_LARGE;
+			case TOO_MANY -> SkippedAttachmentReason.TOO_MANY;
+			case EMPTY -> SkippedAttachmentReason.EMPTY;
+		};
+	}
+
 	private void submitIdentified(InboundEmail email, String messageId) {
 		email.fromAddress()
 		     .ifPresentOrElse(address -> {
@@ -206,7 +216,7 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 						 this.activities.publish(new EmailAccepted(
 							 email.sizeBytes(),
 							 email.images().size(),
-							 email.skippedAttachments().stream().map(SkippedAttachment::reason).toList()));
+							 email.skippedAttachments().stream().map(skipped -> reasonOf(skipped.reason())).toList()));
 						 transition(sender(address), state -> state.enqueue(messageId));
 					 }
 					 else {

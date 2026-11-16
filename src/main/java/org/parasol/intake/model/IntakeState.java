@@ -1,11 +1,11 @@
-package org.parasol.intake.workflow;
+package org.parasol.intake.model;
 
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
 import org.parasol.intake.MissingItem;
-import org.parasol.intake.model.IntakeOutcome;
+import org.parasol.intake.workflow.ClaimIntakeFlow;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
@@ -86,7 +86,7 @@ public record IntakeState(
 		missingItems = (missingItems == null) ? Set.of() : Set.copyOf(missingItems);
 	}
 
-	static IntakeState start(String messageId, String sender, String receivedAt) {
+	public static IntakeState start(String messageId, String sender, String receivedAt) {
 		return new IntakeState(messageId, sender, null, Disposition.CONTINUE, false, List.of(), null, null, false, Set.of(), false, false, receivedAt);
 	}
 

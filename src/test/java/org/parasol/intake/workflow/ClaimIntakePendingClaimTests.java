@@ -15,6 +15,8 @@ import org.parasol.intake.IntakeScenario;
 import org.parasol.intake.IntakeScenario.Mail;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.model.EmailType;
+import org.parasol.intake.model.IntakeRun;
+import org.parasol.intake.model.IntakeState;
 
 import io.quarkus.test.junit.QuarkusTest;
 

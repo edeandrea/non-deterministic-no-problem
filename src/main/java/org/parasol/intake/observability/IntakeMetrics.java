@@ -131,7 +131,7 @@ class IntakeMetrics {
 
 		this.registry.counter("claim.intake.attachments", Tags.of("result", "kept", "reason", "none")).increment(accepted.keptImages());
 		accepted.skippedReasons()
-		        .forEach(reason -> this.registry.counter("claim.intake.attachments", Tags.of("result", "skipped", "reason", reason.name().toLowerCase(Locale.ROOT))).increment());
+		        .forEach(reason -> this.registry.counter("claim.intake.attachments", Tags.of("result", "skipped", "reason", reason.tag())).increment());
 	}
 
 	void onEmailMatched(@Observes EmailMatched matched) {

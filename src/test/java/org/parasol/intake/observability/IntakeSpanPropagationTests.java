@@ -25,7 +25,7 @@ import org.parasol.intake.StartedRuns.StartedRun;
 import org.parasol.intake.TestSpans;
 import org.parasol.intake.model.EmailType;
 import org.parasol.intake.observability.SpanCensus.Kind;
-import org.parasol.intake.review.ReviewOutcome;
+import org.parasol.intake.model.ReviewOutcome;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
 import org.parasol.intake.workflow.review.ReviewDecisionSteps;
 

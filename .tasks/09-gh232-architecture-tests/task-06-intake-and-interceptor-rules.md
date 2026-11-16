@@ -81,6 +81,12 @@ start paths that exist today.
 - The `because(…)` names the hazard: the run's spans get no conversation id, so its claim's Langfuse session is missing
   a run, with no failing test.
 
+## Where the rules go
+
+A rule lives in the package it would travel with (`PLAN.md` → Key Decisions, 2026-11-16). Rule 4 is app-wide
+(`ClaimImageSeeder.seed` is outside the intake), so it is `org.parasol.architecture.InterceptedMethodArchTests`. Rule 5, the
+opt-outs and the run-creation rule are about the intake, so they go in `org.parasol.intake.IntakeArchTests`.
+
 ## Files/Areas
 
 - `src/test/java/org/parasol/architecture/InterceptedMethodArchTests.java` (new)

@@ -10,7 +10,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.parasol.claim.model.ClaimCategory;
 import org.parasol.intake.MissingItem;
-import org.parasol.intake.review.ReviewOutcome;
+import org.parasol.intake.model.ReviewOutcome;
 import org.parasol.intake.review.rest.ReviewDecisionRequest.Fields;
 
 class ValidReviewDecisionTests {

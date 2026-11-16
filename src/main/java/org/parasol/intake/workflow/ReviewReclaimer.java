@@ -1,4 +1,4 @@
-package org.parasol.intake.workflow.review;
+package org.parasol.intake.workflow;
 
 import static java.util.function.Predicate.not;
 
@@ -19,7 +19,7 @@ import org.parasol.intake.mailbox.MailFolder;
 import org.parasol.intake.model.ClaimIntakeState;
 import org.parasol.intake.observability.IntakeActivities;
 import org.parasol.intake.observability.IntakeActivity.ReviewReclaimed;
-import org.parasol.intake.workflow.ClaimIntakeFlow;
+import org.parasol.intake.workflow.review.ReviewHandover;
 
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.StartupEvent;

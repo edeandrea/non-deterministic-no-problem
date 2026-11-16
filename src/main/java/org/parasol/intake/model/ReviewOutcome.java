@@ -1,4 +1,4 @@
-package org.parasol.intake.review;
+package org.parasol.intake.model;
 
 /**
  * What a reviewer decided about a claim in {@code Pending Review}.

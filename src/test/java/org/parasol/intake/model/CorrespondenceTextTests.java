@@ -1,4 +1,4 @@
-package org.parasol.intake.workflow;
+package org.parasol.intake.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

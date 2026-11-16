@@ -85,7 +85,7 @@ class ClaimIntakeDispatcherStartFailureTests {
 			return null;
 		}).when(executor).execute(any(Runnable.class));
 
-		return new ClaimIntakeDispatcher(config, mailbox, recorder, matcher, failureHandler, activities, flowInstance, executor, mock(ProcessingRecovery.class), mock(org.parasol.intake.workflow.review.ReviewReclaimer.class));
+		return new ClaimIntakeDispatcher(config, mailbox, recorder, matcher, failureHandler, activities, flowInstance, executor, mock(ProcessingRecovery.class), mock(org.parasol.intake.workflow.ReviewReclaimer.class));
 	}
 
 	private static InboundEmail email(String messageId) {

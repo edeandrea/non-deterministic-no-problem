@@ -1,4 +1,4 @@
-package org.parasol.intake.workflow;
+package org.parasol.intake.model;
 
 /**
  * Fired when a run finds its claim being decided and hands the email back: the starter puts it at the front of the

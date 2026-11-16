@@ -18,10 +18,10 @@ import org.parasol.intake.IntakeScenario.Mail;
 import org.parasol.intake.mailbox.EmailReceived;
 import org.parasol.intake.mailbox.MailFolder;
 import org.parasol.intake.model.EmailType;
-import org.parasol.intake.review.ReviewDecided;
-import org.parasol.intake.review.ReviewDecision;
-import org.parasol.intake.review.ReviewOutcome;
-import org.parasol.intake.review.ReviewedFields;
+import org.parasol.intake.model.ReviewDecided;
+import org.parasol.intake.model.ReviewDecision;
+import org.parasol.intake.model.ReviewOutcome;
+import org.parasol.intake.model.ReviewedFields;
 
 import io.quarkus.test.junit.QuarkusTest;
 

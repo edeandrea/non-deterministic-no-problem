@@ -14,8 +14,8 @@ import jakarta.validation.ConstraintValidatorContext;
 import jakarta.validation.Payload;
 
 import org.parasol.intake.MissingItem;
-import org.parasol.intake.review.ReviewOutcome;
-import org.parasol.intake.review.ReviewedFields;
+import org.parasol.intake.model.ReviewOutcome;
+import org.parasol.intake.model.ReviewedFields;
 
 /**
  * Enforces how {@link ReviewDecisionRequest}'s parts fit together:

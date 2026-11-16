@@ -1,4 +1,4 @@
-package org.parasol.intake.review;
+package org.parasol.intake.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

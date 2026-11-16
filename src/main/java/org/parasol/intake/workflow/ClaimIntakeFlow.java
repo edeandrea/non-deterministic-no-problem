@@ -18,16 +18,16 @@ import java.util.function.UnaryOperator;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
-import org.parasol.intake.review.ReviewDecided;
-import org.parasol.intake.review.ReviewDecisionPublisher;
-import org.parasol.intake.review.ReviewOutcome;
+import org.parasol.intake.model.IntakeRun;
+import org.parasol.intake.model.IntakeState;
+import org.parasol.intake.model.ReviewDecided;
+import org.parasol.intake.model.ReviewOutcome;
 import org.parasol.intake.workflow.mail.FileEmailStep;
 import org.parasol.intake.workflow.mail.ReplySteps;
 import org.parasol.intake.workflow.outcome.ApplyOutcomeStep;
 import org.parasol.intake.workflow.policy.PolicyCheckStep;
 import org.parasol.intake.workflow.review.AfterDecision;
 import org.parasol.intake.workflow.review.ReviewDecisionSteps;
-import org.parasol.intake.workflow.review.SupersedeStep;
 
 import io.quarkiverse.flow.Flow;
 import io.quarkiverse.flow.dsl.FuncCallStep;
@@ -179,7 +179,7 @@ public class ClaimIntakeFlow extends Flow {
 				// Wait for the reviewer's decision, and apply it
 				// Records that this run is about to wait, for any application instance to read: Flow's own status isn't visible outside the application instance that hosts the run
 				withContext(AWAIT_REVIEW, this::awaitReview, Object.class, Object.class),
-				listen(WAIT_REVIEW, toOne(consumed(ReviewDecisionPublisher.REVIEW_DECIDED).dataAs(ReviewDecided.class, this::isForThisRun)).first()),
+				listen(WAIT_REVIEW, toOne(consumed(ReviewDecided.REVIEW_DECIDED).dataAs(ReviewDecided.class, this::isForThisRun)).first()),
 				switchWhenOrElse(ROUTE_DECISION, ReviewDecided::isReviewReady, MARK_IN_PROCESS, MARK_PENDING_INFORMATION, ReviewDecided.class),
 
 				// A fault in the decision step puts the claim back in review, and afterDecision sends the same run back to its wait

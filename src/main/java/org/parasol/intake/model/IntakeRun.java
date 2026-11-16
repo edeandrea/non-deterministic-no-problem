@@ -1,7 +1,9 @@
-package org.parasol.intake.workflow;
+package org.parasol.intake.model;
 
 import java.time.Instant;
 import java.util.Objects;
+
+import org.parasol.intake.workflow.ClaimIntakeFlow;
 
 /**
  * The input of a {@link ClaimIntakeFlow} run: ids only, never the email, so Flow's persisted run data holds no email

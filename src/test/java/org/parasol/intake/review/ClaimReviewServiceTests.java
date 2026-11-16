@@ -16,6 +16,9 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.IntakeFlowTestBase;
 import org.parasol.intake.IntakeScenario;
+import org.parasol.intake.model.ReviewDecision;
+import org.parasol.intake.model.ReviewOutcome;
+import org.parasol.intake.model.ReviewedFields;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.mockito.InjectSpy;

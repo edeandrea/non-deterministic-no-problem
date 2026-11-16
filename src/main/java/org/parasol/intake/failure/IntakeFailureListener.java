@@ -6,8 +6,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 
 import org.parasol.intake.observability.FailureOutcome;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
-import org.parasol.intake.workflow.IntakeRun;
-import org.parasol.intake.workflow.review.ReviewRecoverer;
+import org.parasol.intake.model.IntakeRun;
+import org.parasol.intake.workflow.ReviewRecoverer;
 import org.parasol.intake.workflow.review.ReviewHandover;
 
 import io.quarkus.logging.Log;

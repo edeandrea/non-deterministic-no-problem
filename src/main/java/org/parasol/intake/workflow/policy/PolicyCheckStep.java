@@ -14,8 +14,8 @@ import org.parasol.intake.model.IntakeOutcome.NoMatchingClaim;
 import org.parasol.intake.model.IntakeOutcome.NotAClaim;
 import org.parasol.intake.model.IntakeOutcome.PendingClaimUpdate;
 import org.parasol.intake.model.IntakeOutcome.StatusReply;
-import org.parasol.intake.workflow.IntakeState;
-import org.parasol.intake.workflow.IntakeState.Disposition;
+import org.parasol.intake.model.IntakeState;
+import org.parasol.intake.model.IntakeState.Disposition;
 import org.parasol.intake.workflow.mail.IntakeEmailReader;
 
 import io.quarkus.logging.Log;

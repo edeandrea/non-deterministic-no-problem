@@ -8,8 +8,8 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.model.IntakeOutcome;
 import org.parasol.intake.observability.EmailOutcome;
-import org.parasol.intake.workflow.IntakeState;
-import org.parasol.intake.workflow.IntakeState.Disposition;
+import org.parasol.intake.model.IntakeState;
+import org.parasol.intake.model.IntakeState.Disposition;
 
 class FileEmailStepTests {
 	@Test

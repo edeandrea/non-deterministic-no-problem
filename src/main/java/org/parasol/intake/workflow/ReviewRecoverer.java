@@ -1,4 +1,4 @@
-package org.parasol.intake.workflow.review;
+package org.parasol.intake.workflow;
 
 import java.util.Optional;
 import java.util.function.BiFunction;
@@ -14,8 +14,8 @@ import org.parasol.claim.model.ClaimNotFoundException;
 import org.parasol.claim.model.CorrespondenceDirection;
 import org.parasol.claim.model.IntakeClaimStatus;
 import org.parasol.intake.model.ClaimIntakeState;
-import org.parasol.intake.workflow.ClaimIntakeFlow;
-import org.parasol.intake.workflow.IntakeRun;
+import org.parasol.intake.model.IntakeRun;
+import org.parasol.intake.workflow.review.ReviewHandover;
 
 import io.quarkus.logging.Log;
 
