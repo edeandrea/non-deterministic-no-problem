@@ -63,7 +63,7 @@ Edit or create task files and update `## Task Plan`.
 - [x] [task-06-intake-and-interceptor-rules.md](task-06-intake-and-interceptor-rules.md): Rules 4 (app-wide) and 5, the intake AI service opt-outs and the run-creation rule
 - [x] [task-07-coding-conventions.md](task-07-coding-conventions.md): Coding-convention rules (resources, injection, executors, logging, dates)
 - [x] [task-08-gotchas-rest-config-rules.md](task-08-gotchas-rest-config-rules.md): REST and persistence, Panache method references, JSON-safe run data, config/transactions/exceptions, test naming
-- [ ] [task-09-docs-and-verification.md](task-09-docs-and-verification.md): Documentation, mutation check, verification and the PR
+- [x] [task-09-docs-and-verification.md](task-09-docs-and-verification.md): Documentation, mutation check, verification and the PR
 
 > **Branch and PR: confirm before branching.** One branch off `main` (suggested `gh232-architecture-tests`) and one PR into
 > `main`. Suggested title: *Enforce the application's module boundaries with ArchUnit*. No closing keyword in the title;
@@ -338,6 +338,24 @@ All six intake `@RegisterAiService`s set both `retrievalAugmentor = NoRetrievalA
   `QuarkusTransaction` with three named exemptions, unchecked exceptions); 51 ArchUnit rules in all, all green on the current tree (`./mvnw -B clean verify -Pollama`: 733 tests, 0 failures, 2 skipped) with no production change. Every rule was shown failing on a scratch
   violation. Facts: javac emits `PanacheEntityBase` itself as the owner of `Claim::listAll`, and the rule checks the resolved member anyway; **`noClasses().should(cond)` negates a condition that
   already reports violations** (the Panache rule silently passed until it became `classes().should(…)`); no `@Nested` test exists, so nested classes aren't judged.
+
+- **Task 09 (docs, mutation check, verification, 2026-11-16):** the docs sweep found `CLAUDE.md` already consistent after tasks 02 to 08; it only gained the
+  "a rule lives in the package it would travel with" entry under Testing, and the roadmap's #232 line was updated. No diagram changed (they name classes, not packages).
+  **The mutation check found one dead rule:** ArchUnit's own `GeneralCodingRules.NO_CLASSES_SHOULD_USE_JAVA_UTIL_LOGGING` passed with a `java.util.logging.Logger` field and
+  call present (confirmed with a probe: an explicit `dependOnClassesThat().resideInAPackage("java.util.logging..")` caught both). `NO_JAVA_UTIL_LOGGING` is now that explicit rule;
+  main code has no hit. The library's `NO_CLASSES_SHOULD_ACCESS_STANDARD_STREAMS` does fail, so it stays. **Lesson: a rule taken from a library can be vacuous too, so it needs its own failing case.**
+  One batch of ~30 scratch classes (main and test, all deleted) was run once against `*ArchTests`: **all 51 rules failed, none vacuous**. The batch covered, per rule:
+
+| Rules | Scratch violation | Failed? |
+|---|---|---|
+| `INTAKE_PACKAGES_ARE_FREE_OF_CYCLES`, `MODEL_IS_A_LEAF`, `OBSERVABILITY_IS_A_LEAF`, `WORKFLOW_STEP_PACKAGES_DO_NOT_DEPEND_ON_THE_ORCHESTRATOR` | `intake.model` and `observability` classes referencing `workflow`/`mailbox`, a `workflow.policy` class referencing `ClaimIntakeFlow` | yes |
+| `EVERY_INTAKE_AI_SERVICE_IS_STATELESS`, `EVERY_INTAKE_RUN_IS_CREATED_BY_NEW_RUN`, `RUN_DATA_IS_JSON_SAFE` | `@RegisterAiService` without opt-outs; `Flow.instance` outside `ClaimIntakeFlow`; an `Optional` field in `intake.model` | yes |
+| `NO_TEST_MOCKS_OR_SPIES_AN_INTAKE_AGENT`, `NO_TEST_INSTALLS_A_MOCK_BY_HAND` | `@InjectMock ClaimSummaryAgent`; `QuarkusMock.installMockForType` | yes |
+| `INTERCEPTOR_BOUND_METHODS_ARE_NOT_{PRIVATE,FINAL,STATIC}`, `WITH_SPAN_METHODS_ARE_NOT_{PRIVATE,FINAL,STATIC}` | one `@Transactional` and one `@WithSpan` method each, `private`, `final`, `static` | yes (6) |
+| the 14 `CodingConventionArchTests` rules | public `@Path` class and non-public endpoint; `@Inject` field; `ManagedExecutor`, JBoss `Logger`, SLF4J, JUL, `Date`, `System.out`, `QuarkusTransaction`, Lombok stand-in, `@ConfigMapping` on `quarkus.`, `@ConfigProperty("parasol.x")`, a checked exception | yes (14; JUL only after the fix above) |
+| `RestAndPersistenceArchTests` (3), `PanacheMethodReferenceArchTests`, `TestNamingArchTests` (3) | `@Entity` outside `model`; endpoint returning `Claim`; `@Path` class outside `rest`; `ClaimImage::flush`; `MutSpec`, a misnamed ArchUnit class, a `*ArchTests` without rules | yes (8) |
+| `DomainBoundaryArchTests` (9) | `chat` → `intake`, `claim.rest`, `ai.scoring` internals, OTel `Baggage`; `claim.model` → `notification`; `problem` → `claim`; `org.parasol.mystery`; an `intake` ↔ `chat` cycle; a non-chat reference to `DriftDetectionOutputGuardrail`; `ai.scoring.drift` ↔ `evaluation` | yes (9) |
+| `ScoringBoundaryArchTests`, `ConversationLayeringArchTests` (5) | the core referencing an adapter, `ScoringConfig`, `LaunchMode`, `org.parasol`; `chat` → `flow` adapter | yes (6) |
 
 ### Caveats & Problems
 - **A stale `META-INF/services` file survives in `target/classes`.** `./mvnw test` without `clean` doesn't remove a

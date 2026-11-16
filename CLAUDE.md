@@ -1123,6 +1123,14 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
     with its source line), not hand-written assertions.
   - They are plain classes, never `@QuarkusTest`, so they add no application boot. ArchUnit's own JUnit engine runs
     them under surefire next to Jupiter; each rule is a test case named after its field.
+  - **A rule lives in the package it would travel with**, found by asking where its `that()` side lives: `ai.scoring`'s own rules
+    (`ScoringBoundaryArchTests`, `ConversationLayeringArchTests`) in `ai.scoring`, the intake's internals (`IntakeArchTests`: package
+    shape and cycles, the agent opt-outs, run creation, JSON-safe run data; `IntakeTestArchTests`: no agent mocks) in `org.parasol.intake`,
+    and anything that would still apply with the intake gone (`DomainBoundaryArchTests`, `InterceptedMethodArchTests`,
+    `CodingConventionArchTests`, `RestAndPersistenceArchTests`, `PanacheMethodReferenceArchTests`, `TestNamingArchTests`) in `org.parasol.architecture`.
+    Rules 1 to 3 and the intake's package rules read main code only (`ImportOption.DoNotIncludeTests`); the test-code rules say so explicitly.
+  - A new rule is shown failing once on a scratch violation before it's kept, and an exemption is written positively
+    (`…that().areAnnotatedWith(X).should().beDeclaredInClassesThat()…`) so `failOnEmptyShould` stays on.
   - `src/test/resources/archunit.properties` keeps `archRule.failOnEmptyShould=true`: a rule whose `that()` matches no
     class (after a package rename, say) fails instead of passing with nothing checked. Don't turn it off.
   - **`noClasses()…should().x().andShould().y()` forbids `x` and forbids `y` separately**, it is not "x and y together".

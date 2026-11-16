@@ -10,7 +10,7 @@ in `github-issues/created.md`.
 
 **Status (2026-11-12): complete.** Every step is done, and the tracking issue #217 is closed. #221 (the decision-model
 spike) is now a standalone issue rather than a sub-issue of #217. What's left lives in #286 (upstream-gated
-workarounds, deferred review findings, manual checks), #221, #232 (ArchUnit) and #281 (chat bot emails in the
+workarounds, deferred review findings, manual checks), #221, #232 (ArchUnit; rules written, awaiting review and PR as of 2026-11-16) and #281 (chat bot emails in the
 correspondence).
 
 | # | Issue (GitHub title) | Plan | Depends on |

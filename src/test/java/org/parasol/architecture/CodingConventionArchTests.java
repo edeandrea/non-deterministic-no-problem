@@ -6,7 +6,6 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.fields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.GeneralCodingRules.NO_CLASSES_SHOULD_ACCESS_STANDARD_STREAMS;
-import static com.tngtech.archunit.library.GeneralCodingRules.NO_CLASSES_SHOULD_USE_JAVA_UTIL_LOGGING;
 
 import java.util.stream.Stream;
 
@@ -104,7 +103,10 @@ class CodingConventionArchTests {
 		.because("logging goes through a logger; this also covers Throwable.printStackTrace()");
 
 	@ArchTest
-	static final ArchRule NO_JAVA_UTIL_LOGGING = NO_CLASSES_SHOULD_USE_JAVA_UTIL_LOGGING
+	static final ArchRule NO_JAVA_UTIL_LOGGING = noClasses()
+		.should()
+		.dependOnClassesThat()
+		.resideInAPackage("java.util.logging..")
 		.because("the project logs through JBoss Logging");
 
 	@ArchTest
