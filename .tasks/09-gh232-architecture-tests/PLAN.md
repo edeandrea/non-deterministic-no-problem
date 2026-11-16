@@ -58,7 +58,7 @@ Edit or create task files and update `## Task Plan`.
 - [x] [task-01-conversation-id-spike.md](task-01-conversation-id-spike.md): Spike: can an `ai.scoring` Flow adapter attach the conversation id with no intake code?
 - [x] [task-02-conversation-id-adapter.md](task-02-conversation-id-adapter.md): Build the Flow adapter and take `ConversationContext` out of the intake
 - [x] [task-03-archunit-and-scoring-rules.md](task-03-archunit-and-scoring-rules.md): Add `archunit-junit6`, rule 1, and rewrite `ConversationLayeringArchTests`
-- [ ] [task-04-domain-boundaries.md](task-04-domain-boundaries.md): Rules 2 and 3, the baggage rule and the boundary hardening
+- [x] [task-04-domain-boundaries.md](task-04-domain-boundaries.md): Rules 2 and 3, the baggage rule and the boundary hardening
 - [ ] [task-05-intake-package-cycles.md](task-05-intake-package-cycles.md): Break the intake's package tangle by moving classes, then enforce it
 - [ ] [task-06-intake-and-interceptor-rules.md](task-06-intake-and-interceptor-rules.md): Rules 4 (app-wide) and 5, the intake AI service opt-outs and the run-creation rule
 - [ ] [task-07-coding-conventions.md](task-07-coding-conventions.md): Coding-convention rules (resources, injection, executors, logging, dates)
@@ -289,6 +289,12 @@ All six intake `@RegisterAiService`s set both `retrievalAugmentor = NoRetrievalA
     profile-specific.
   - `CLAUDE.md` already records the AssertJ exception, `archunit.properties` and the `andShould` trap (Testing), and the
     rewritten layering test (Conversation core). Task 09 only has to add what tasks 04–08 bring.
+
+- **Task 04 (domain boundaries, 2026-11-16):** `org.parasol.architecture.DomainBoundaryArchTests` holds nine rules (rule 2 with a
+  one-entry allow-list, a rule that only `chat` may touch `ai.scoring` at all, the baggage rule, the layered domain directions, `claim.rest`/`claim.seed`
+  reachable only from `claim`, `problem` a leaf, both top-level cycle rules, known domains), all green. Removing the allow-list entry fails rule 2 on
+  `ClaimService`'s `@OutputGuardrails` annotation member, so annotation-parameter edges are seen. `ClaimRetrievalHasNoIntakeBookkeepingTests` moved to
+  `org.parasol.intake.model` (package line and one now-redundant import only). `./mvnw -B clean verify -Pollama` is green (2026-11-16).
 
 ### Caveats & Problems
 - **A stale `META-INF/services` file survives in `target/classes`.** `./mvnw test` without `clean` doesn't remove a

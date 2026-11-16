@@ -83,9 +83,9 @@ Move `src/test/java/org/parasol/claim/rest/ClaimRetrievalHasNoIntakeBookkeepingT
 
 ## Done When
 
-- [ ] `DomainBoundaryArchTests` holds rule 2 (with its allow-list), the baggage rule, rule 3 as a layered architecture, the
+- [x] `DomainBoundaryArchTests` holds rule 2 (with its allow-list), the baggage rule, rule 3 as a layered architecture, the
       `claim.rest`/`claim.seed` rule, the `problem` rule, both cycle rules and the known-domains rule, all green.
-- [ ] Removing the allow-list entry makes rule 2 fail (shown once, reverted).
-- [ ] `ClaimRetrievalHasNoIntakeBookkeepingTests` lives in `org.parasol.intake.model` and is green.
-- [ ] `CLAUDE.md` names the new test-only package and the moved test.
-- [ ] `./mvnw -B clean verify -Pollama` is green.
+- [x] Removing the allow-list entry makes rule 2 fail (shown once, reverted).
+- [x] `ClaimRetrievalHasNoIntakeBookkeepingTests` lives in `org.parasol.intake.model` and is green.
+- [x] `CLAUDE.md` names the new test-only package and the moved test.
+- [x] `./mvnw -B clean verify -Pollama` is green.

@@ -52,7 +52,9 @@ The Java source is split into two top-level packages representing two distinct c
 
 Dependencies point one way: `chat` → `notification` → `claim`, and `intake` → `claim`. New features get their own
 domain package with the same kind of layer sub-packages. Test packages mirror main, plus the test-only `org.parasol.ui` for Playwright,
-`org.parasol.testing` for the shared test profiles, and `org.parasol.testing.mail` for the GreenMail helper.
+`org.parasol.testing` for the shared test profiles, `org.parasol.testing.mail` for the GreenMail helper, and `org.parasol.architecture` for the
+application-wide ArchUnit rules (`DomainBoundaryArchTests`: `ai.scoring`'s published API, the baggage rule, the domain directions, no cycles between top-level
+packages, every class in a known domain; main code only).
 
 Supporting docs:
 - `README.md` — build/run instructions, Ollama profiles, Langfuse integration notes
@@ -274,7 +276,7 @@ and map to DTO records with `ClaimMapper`.
   global `serialization-inclusion: non-empty`). A new `Claim` column stays out of the API until it's added to
   the DTO; `ClaimResourceTests.jsonFieldNames` pins the exact set of JSON keys. **The intake's bookkeeping isn't on
   `Claim` at all** (see *The intake's state* below), so fetching a claim neither returns nor loads it;
-  `ClaimRetrievalHasNoIntakeBookkeepingTests` measures that with Hibernate statistics.
+  `ClaimRetrievalHasNoIntakeBookkeepingTests` (in `org.parasol.intake.model`, since it's an invariant about `ClaimIntakeState`) measures that with Hibernate statistics.
 - **Errors:** domain exceptions are mapped once, by `ClaimExceptionMappings` (Quarkus `@ServerExceptionMapper`), to RFC
   9457 Problem Details (`application/problem+json`, `type: about:blank`, `instance` = request path), through the shared
   `org.parasol.problem.ProblemDetail` record (`MEDIA_TYPE` constant and `of(status, detail, uriInfo)` factory). RFC 9457
