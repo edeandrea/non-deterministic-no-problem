@@ -92,9 +92,9 @@ guarded only by a comment, into a build failure.
 
 ## Done When
 
-- [ ] `RestAndPersistenceArchTests`, `PanacheMethodReferenceArchTests` and `TestNamingArchTests` exist and are green. The
+- [x] `RestAndPersistenceArchTests`, `PanacheMethodReferenceArchTests` and `TestNamingArchTests` exist and are green. The
       JSON-safe rule and the config/transaction/exception rules are in their classes and green.
-- [ ] Each rule was shown failing once:
+- [x] Each rule was shown failing once:
   - an endpoint returning `Claim`;
   - a `List<Claim>` return;
   - `Claim::listAll` in a test;
@@ -104,5 +104,5 @@ guarded only by a comment, into a build failure.
   - a checked exception class;
   - a test class named `FooSpec`;
   - an ArchUnit class named `FooTests`, and a plain test class named `FooArchTests`.
-- [ ] `CLAUDE.md`'s matching entries name their rules.
-- [ ] `./mvnw -B clean verify -Pollama` is green.
+- [x] `CLAUDE.md`'s matching entries name their rules.
+- [x] `./mvnw -B clean verify -Pollama` is green.

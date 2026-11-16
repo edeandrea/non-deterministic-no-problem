@@ -259,7 +259,7 @@ same reason as a tooltip on those two statuses (list and detail page).
 (GreenMail from `compose-devservices.yml` in dev/test; readable in Roundcube in dev mode). On OpenShift both run
 from `src/main/kubernetes/dependencies.yml` (see OpenShift deployment).
 
-**REST:** the REST layer never serializes entities. Resources hold no queries; they call the Active Record methods
+**REST:** the REST layer never serializes entities (`RestAndPersistenceArchTests.ENDPOINTS_NEVER_EXPOSE_AN_ENTITY`). Resources hold no queries; they call the Active Record methods
 and map to DTO records with `ClaimMapper`.
 - `ClaimResource`: `GET /api/db/claims`, `GET /api/db/claims/{id}` return `ClaimDetails`. A missing claim is a
   Problem Details `404` (the resource throws `ClaimNotFoundException` when `findByIdOptional` is empty); before #214 it
@@ -704,7 +704,7 @@ One appearing is a real finding — a typo or a missing extension — not noise 
 switch: `quarkus-core` declares only `quarkus.config.fixed-at-build-time` and `quarkus.config.sources.system-only`,
 and muting the `io.quarkus.config` logger would just hide the next real typo. Four structural rules keep it true:
 
-- **Application config lives outside the `quarkus.` namespace** — `parasol.*` and `aiscoring.*`. Quarkus builds its
+- **Application config lives outside the `quarkus.` namespace** — `parasol.*` and `aiscoring.*` (enforced: `CodingConventionArchTests` requires every `@ConfigMapping` prefix to be `parasol…` in `org.parasol` and `aiscoring…` in `ai.scoring`, and forbids `@ConfigProperty` from naming a `parasol.*` or `aiscoring.*` key). Quarkus builds its
   known-key model for `quarkus.` from extension metadata (`META-INF/quarkus-config-doc/quarkus-config-model.json` in
   each `*-deployment` jar), so an application `@ConfigMapping` under `quarkus.` is always "unrecognized", however well
   it works. Don't put a new app config root there.
@@ -1116,7 +1116,8 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   `.because("…")` so a failure explains itself.
   - **An ArchUnit class is named `*ArchTests`, and no other class is.** The rules can't share a package (the `ai.scoring`
     ones stay there so they go with the library), so the suffix is the one handle for all of them:
-    `./mvnw test -Dtest='*ArchTests'` runs every rule in seconds, with no application boot.
+    `./mvnw test -Dtest='*ArchTests'` runs every rule in seconds, with no application boot. `TestNamingArchTests` enforces it both ways, and that
+    every class declaring a test ends in `Tests` (surefire's includes: a `FooSpec` or `FooIT` would silently never run).
   - **They are the one exception to the AssertJ convention:** declarative rules that fail with ArchUnit's own
     `AssertionError` (`Architecture Violation … Rule '…, because …' was violated`, then one line per offending reference
     with its source line), not hand-written assertions.
@@ -1288,7 +1289,7 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
     and deserializes, so each class keeps small JSON-level tests for that: the exact key set (`jsonFieldNames`,
     `metadataJsonFieldNames`), the category label and an omitted null `incident_time`.
   - Call Panache statics through a lambda in `assertThatThrownBy(() -> ClaimImage.flush())`: a method reference
-    (`ClaimImage::flush`) bypasses Panache's enhancement and throws "did you forget to annotate your entity with
+    (`ClaimImage::flush`; `PanacheMethodReferenceArchTests` fails the build for one, in main and test code) bypasses Panache's enhancement and throws "did you forget to annotate your entity with
     @Entity?".
 - **`ClaimReviewResourceTests`** carries the same raw-JSON wire-shape guard as the other REST DTOs: `jsonFieldNames`
   (the full `ClaimReviewState` key set, including `requested_items` only when non-empty — it's omitted under
@@ -1321,7 +1322,7 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
   which keeps a JBoss `Logger` because the conversation core may not reference `io.quarkus`. No `System.out`/`err`, `printStackTrace`, `java.util.logging`, SLF4J, Lombok or
   legacy date types (`java.util.Date`, `Calendar`, `SimpleDateFormat`, `java.sql.Date`/`Timestamp`; `MimeMessageParser` adapts Jakarta Mail's `Date`). These conventions, plus package-private
   `@Path` classes with public endpoint methods, no `@Inject` fields (bar `NotificationService`) and no `ManagedExecutor`, are enforced by `CodingConventionArchTests`
-  (`org.parasol.architecture`); each exemption is a named constant there.
+  (`org.parasol.architecture`); each exemption is a named constant there. The same class holds that `QuarkusTransaction` is used only by `NotificationService`, `IntakeCompleteToolInputGuardrail` and `DevClaimEmailSeeder`, and that no checked exception type is declared. `RestAndPersistenceArchTests` holds that `@Entity` classes live in a `..model..` package, no endpoint takes or returns an entity (type arguments included) and `@Path` classes are `*Resource`s in a `..rest..` package.
 - `@ConfigMapping` interfaces with `@WithDefault` — not `@ConfigProperty` fields.
 - Constructor injection in `ai.scoring`; `org.parasol.notification.service.NotificationService` still uses `@Inject`
   fields (legacy — prefer constructor injection for new code).
@@ -1493,7 +1494,7 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
     `ServiceConfigurationError: … QuarkusConfigFactory not a subtype of SmallRyeConfigFactory`. Tests don't reproduce it
     (their class loading is flat), so `IntakeReplySenderThreadTests` (a plain Mockito test) checks the cause instead: the
     sending thread is a virtual one carrying the caller's context class loader. It fails with `commonPool()`.
-  - **Panache statics through a method reference throw** ("did you forget to annotate your entity"): use a lambda
+  - **Panache statics through a method reference throw** ("did you forget to annotate your entity"): use a lambda (`PanacheMethodReferenceArchTests` enforces it)
     (`id -> Claim.<Claim>findById(id)`), never `Claim::<Claim>findById`.
   - **The per-sender lock covers a woken review run.** `ClaimIntakeDispatcher` (also Flow's status listener) holds the sender
     while a run works. A waiting review run that wakes for its decision holds it again until it ends, so an email that a
@@ -1547,7 +1548,7 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
   - **Every terminal `switch` branch needs an explicit `.then(FlowDirectiveEnum.END)`** — Flow doesn't
     infer "this branch ends the workflow" on its own. `ClaimIntakeFlow`'s three `switchWhenOrElse` calls
     all pass it as the else-branch directive.
-  - **Pass ids through workflow/task data, not payloads.** `IntakeRun` and `IntakeState` carry claim,
+  - **Pass ids through workflow/task data, not payloads** (enforced for `intake.model`'s run data by `IntakeArchTests.RUN_DATA_IS_JSON_SAFE`: no `Optional`, `byte[]`, `InputStream` or entity field, `ClaimIntakeState` excepted). `IntakeRun` and `IntakeState` carry claim,
     email and run ids, never photo bytes or the raw email — Flow persists every step's data to
     PostgreSQL, so a payload-carrying step bloats the run's row on every transition. `IntakeEmailReader`
     re-reads the email from the processing folder by id instead.

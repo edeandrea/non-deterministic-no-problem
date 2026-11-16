@@ -62,7 +62,7 @@ Edit or create task files and update `## Task Plan`.
 - [x] [task-05-intake-package-cycles.md](task-05-intake-package-cycles.md): Break the intake's package tangle by moving classes, then enforce it
 - [x] [task-06-intake-and-interceptor-rules.md](task-06-intake-and-interceptor-rules.md): Rules 4 (app-wide) and 5, the intake AI service opt-outs and the run-creation rule
 - [x] [task-07-coding-conventions.md](task-07-coding-conventions.md): Coding-convention rules (resources, injection, executors, logging, dates)
-- [ ] [task-08-gotchas-rest-config-rules.md](task-08-gotchas-rest-config-rules.md): REST and persistence, Panache method references, JSON-safe run data, config/transactions/exceptions, test naming
+- [x] [task-08-gotchas-rest-config-rules.md](task-08-gotchas-rest-config-rules.md): REST and persistence, Panache method references, JSON-safe run data, config/transactions/exceptions, test naming
 - [ ] [task-09-docs-and-verification.md](task-09-docs-and-verification.md): Documentation, mutation check, verification and the PR
 
 > **Branch and PR: confirm before branching.** One branch off `main` (suggested `gh232-architecture-tests`) and one PR into
@@ -332,6 +332,12 @@ All six intake `@RegisterAiService`s set both `retrievalAugmentor = NoRetrievalA
   - **Exemption rules are written positively** (`fields().that().areAnnotatedWith(Inject).should().beDeclaredInClassesThat().haveFullyQualifiedName(...)`),
     because `no…that(not exempt)` can match nothing and `failOnEmptyShould` stays on.
   - Shown failing on scratch violations, every rule. `NO_LOMBOK` needed a stand-in annotation in a scratch `lombok` package (Lombok isn't on the classpath), since the rule matches by package name.
+
+- **Task 08 (REST, Panache, JSON-safe data, config, naming, 2026-11-16):** `RestAndPersistenceArchTests` (3 rules), `PanacheMethodReferenceArchTests` (1, main and test code),
+  `TestNamingArchTests` (3), `IntakeArchTests.RUN_DATA_IS_JSON_SAFE` and five more in `CodingConventionArchTests` (`@ConfigMapping` prefixes, `@ConfigProperty` keys,
+  `QuarkusTransaction` with three named exemptions, unchecked exceptions); 51 ArchUnit rules in all, all green on the current tree (`./mvnw -B clean verify -Pollama`: 733 tests, 0 failures, 2 skipped) with no production change. Every rule was shown failing on a scratch
+  violation. Facts: javac emits `PanacheEntityBase` itself as the owner of `Claim::listAll`, and the rule checks the resolved member anyway; **`noClasses().should(cond)` negates a condition that
+  already reports violations** (the Panache rule silently passed until it became `classes().should(…)`); no `@Nested` test exists, so nested classes aren't judged.
 
 ### Caveats & Problems
 - **A stale `META-INF/services` file survives in `target/classes`.** `./mvnw test` without `clean` doesn't remove a

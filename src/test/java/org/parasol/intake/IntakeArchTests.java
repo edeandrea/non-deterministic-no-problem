@@ -8,17 +8,21 @@ import static com.tngtech.archunit.core.importer.ImportOption.DoNotIncludeTests;
 import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.name;
 import static com.tngtech.archunit.core.domain.properties.HasOwner.Predicates.With.owner;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.fields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
 import com.tngtech.archunit.core.domain.JavaAnnotation;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+
+import jakarta.persistence.Entity;
 
 import org.parasol.intake.workflow.ClaimIntakeFlow;
 
@@ -91,6 +95,34 @@ class IntakeArchTests {
 			.or(target(owner(assignableTo(WorkflowDefinition.class))).and(target(name("instance")))))
 		.because("ClaimIntakeFlow.newRun sets the run's gen_ai.conversation.id metadata, so a run created any other way carries no conversation id "
 			+ "on its spans and its claim's Langfuse session is missing a run, with no failing test (activeInstance lookups are fine)");
+
+	// Flow persists every step's data to PostgreSQL, so run data carries ids and small values. ClaimIntakeState is a JPA entity, not run data.
+	@ArchTest
+	static final ArchRule RUN_DATA_IS_JSON_SAFE = fields()
+		.that()
+		.areDeclaredInClassesThat()
+		.resideInAPackage("org.parasol.intake.model")
+		.and()
+		.areDeclaredInClassesThat()
+		.areNotAnnotatedWith(Entity.class)
+		.and()
+		.areNotStatic()
+		.should(haveNoUnsafeType())
+		.because("Flow persists every step's data: an Optional doesn't round-trip, and bytes or an entity bloat the run's row on every transition");
+
+	private static ArchCondition<JavaField> haveNoUnsafeType() {
+		return new ArchCondition<>("not be, or contain as a type argument, an Optional, byte[], InputStream or @Entity") {
+			@Override
+			public void check(JavaField field, ConditionEvents events) {
+				var unsafe = field.getType().getAllInvolvedRawTypes().stream()
+					.filter(type -> type.isEquivalentTo(java.util.Optional.class) || type.isEquivalentTo(java.io.InputStream.class) || type.getName().equals("byte[]")
+						|| type.isAnnotatedWith(Entity.class))
+					.map(JavaClass::getName)
+					.toList();
+				events.add(new SimpleConditionEvent(field, unsafe.isEmpty(), "%s %s".formatted(field.getFullName(), unsafe.isEmpty() ? "is JSON-safe" : "has the unsafe type(s) " + unsafe)));
+			}
+		};
+	}
 
 	private static ArchCondition<JavaClass> optOutOfMemoryAndRetrieval() {
 		return new ArchCondition<>("set retrievalAugmentor = NoRetrievalAugmentorSupplier and chatMemoryProviderSupplier = NoChatMemoryProviderSupplier") {

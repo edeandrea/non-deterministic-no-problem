@@ -8,15 +8,25 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.GeneralCodingRules.NO_CLASSES_SHOULD_ACCESS_STANDARD_STREAMS;
 import static com.tngtech.archunit.library.GeneralCodingRules.NO_CLASSES_SHOULD_USE_JAVA_UTIL_LOGGING;
 
+import java.util.stream.Stream;
+
+import com.tngtech.archunit.core.domain.JavaAnnotation;
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
+import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.lang.ConditionEvents;
+import com.tngtech.archunit.lang.SimpleConditionEvent;
 
 import jakarta.inject.Inject;
 import jakarta.ws.rs.HttpMethod;
 import jakarta.ws.rs.Path;
 
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
+
+import io.smallrye.config.ConfigMapping;
 
 
 /**
@@ -121,4 +131,78 @@ class CodingConventionArchTests {
 		.dependOnClassesThat()
 		.resideInAPackage("lombok..")
 		.because("builders and accessors are written by hand");
+
+	// ---- Config, transactions and exceptions
+
+	@ArchTest
+	static final ArchRule CONFIG_MAPPINGS_USE_THE_APPLICATIONS_OWN_NAMESPACES = classes()
+		.that()
+		.areAnnotatedWith(ConfigMapping.class)
+		.should(haveAnApplicationConfigPrefix())
+		.because("application config outside parasol.* and aiscoring.* is 'unrecognized' to Quarkus and warns on every boot (#290)");
+
+	@ArchTest
+	static final ArchRule CONFIG_PROPERTY_NEVER_NAMES_AN_APPLICATION_KEY = classes()
+		.should(notNameAnApplicationKeyInConfigProperty())
+		.because("application keys belong in a @ConfigMapping; @ConfigProperty is for another extension's keys, such as quarkus.mailer.*");
+
+	@ArchTest
+	static final ArchRule QUARKUS_TRANSACTION_ONLY_WHERE_TRANSACTIONAL_DOES_NOT_FIT = noClasses()
+		.that()
+		// Runs inside the AI service's invocation context (the tool call), so it joins the transaction there rather than starting one
+		.doNotHaveFullyQualifiedName("org.parasol.notification.service.NotificationService")
+		// The tool input guardrail's own read, in the same invocation context and for the same reason
+		.and()
+		.doNotHaveFullyQualifiedName("org.parasol.notification.guardrail.IntakeCompleteToolInputGuardrail")
+		// A private static helper of a startup observer, which no interceptor can bind to
+		.and()
+		.doNotHaveFullyQualifiedName("org.parasol.intake.dev.DevClaimEmailSeeder")
+		.should()
+		.dependOnClassesThat()
+		.haveFullyQualifiedName("io.quarkus.narayana.jta.QuarkusTransaction")
+		.because("@Transactional is preferred; the three exemptions are named above with their reasons");
+
+	@ArchTest
+	static final ArchRule EXCEPTIONS_ARE_UNCHECKED = classes()
+		.that()
+		.areAssignableTo(Throwable.class)
+		.should()
+		.beAssignableTo(RuntimeException.class)
+		.orShould()
+		.beAssignableTo(Error.class)
+		.because("domain exceptions are unchecked by convention");
+
+	private static ArchCondition<JavaClass> haveAnApplicationConfigPrefix() {
+		return new ArchCondition<>("have a prefix of parasol (in org.parasol) or aiscoring (in ai.scoring), never quarkus") {
+			@Override
+			public void check(JavaClass type, ConditionEvents events) {
+				var prefix = type.getAnnotationOfType(ConfigMapping.class.getName())
+					.get("prefix")
+					.map(String::valueOf)
+					.orElse("");
+				var root = type.getPackageName().startsWith("ai.scoring") ? "aiscoring" : "parasol";
+				var isValid = prefix.equals(root) || prefix.startsWith(root + ".");
+				events.add(new SimpleConditionEvent(type, isValid, "%s has @ConfigMapping prefix '%s', expected '%s' or '%s.…'".formatted(type.getName(), prefix, root, root)));
+			}
+		};
+	}
+
+	private static ArchCondition<JavaClass> notNameAnApplicationKeyInConfigProperty() {
+		return new ArchCondition<>("not name a parasol.* or aiscoring.* key in @ConfigProperty, on a field, method or constructor parameter") {
+			@Override
+			public void check(JavaClass type, ConditionEvents events) {
+				Stream.of(
+						type.getFields().stream().flatMap(field -> field.getAnnotations().stream()),
+						type.getMethods().stream().flatMap(method -> method.getAnnotations().stream()),
+						type.getMethods().stream().flatMap(method -> method.getParameters().stream()).flatMap(parameter -> parameter.getAnnotations().stream()),
+						type.getConstructors().stream().flatMap(constructor -> constructor.getParameters().stream()).flatMap(parameter -> parameter.getAnnotations().stream()))
+					.flatMap(annotations -> annotations)
+					.filter(annotation -> annotation.getRawType().isEquivalentTo(ConfigProperty.class))
+					.map(JavaAnnotation::getProperties)
+					.map(properties -> String.valueOf(properties.get("name")))
+					.filter(name -> name.startsWith("parasol.") || name.startsWith("aiscoring."))
+					.forEach(name -> events.add(SimpleConditionEvent.violated(type, "%s names the application key '%s' in @ConfigProperty".formatted(type.getName(), name))));
+			}
+		};
+	}
 }

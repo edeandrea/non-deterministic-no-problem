@@ -289,7 +289,7 @@ class IntakeTemplatesTests {
 			.render();
 	}
 
-	// A lambda, not Claim::listAll: the method reference binds to PanacheEntityBase.listAll, which Panache doesn't enhance
+	// A lambda, not Claim::listAll (PanacheMethodReferenceArchTests enforces this): the method reference binds to PanacheEntityBase.listAll, which Panache doesn't enhance
 	private static List<Claim> seededClaims() {
 		return QuarkusTransaction.requiringNew()
 			.call(() -> Claim.listAll());
