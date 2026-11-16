@@ -558,7 +558,7 @@ imports `ai.scoring`.
     `gen_ai.conversation.id`, set between `instance(…)` and `start()`. `ClaimIntakeFlow.newRun(IntakeRun)` is the one place the intake
     does that (the key is the intake's own constant, since it can't import `ai.scoring`'s), and both start paths
     (`ClaimIntakeDispatcher.startRun`, `ReviewRecoverer.handOver`) create their run through it. **A run created with `instance(…)`
-    directly silently has no id on its spans.** `IntakeRun.conversationId` stays the run's own data; the adapter doesn't read the input.
+    directly silently has no id on its spans** (`IntakeArchTests.EVERY_INTAKE_RUN_IS_CREATED_BY_NEW_RUN` fails the build: no intake class but `ClaimIntakeFlow` may call `instance`/`startInstance` on a `Flow` or `WorkflowDefinition`; `activeInstance` lookups are fine). `IntakeRun.conversationId` stays the run's own data; the adapter doesn't read the input.
   - **Three parts, public SPIs only** (documented on `FlowConversationListener`): the listener (an `@ApplicationScoped`
     `WorkflowExecutionListener`, priority 0, so it runs before Flow's OTel listener at the default 1000) records instance id →
     conversation id in `onWorkflowStarted` and forgets it on completed, failed and canceled; `FlowConversationSpanProcessor` stamps
@@ -1045,7 +1045,7 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
     (stub keys, Easy RAG ingestion off, `claim-intake`/`parasol-chat`/the default OpenAI model/embeddings on WireMock with
     their providers pinned), Hibernate statistics and the 100 ms span-export interval all live directly in the `%test`
     config profile of `application.yml` now — there is no profile class carrying them. **No test in this group may
-    `@InjectMock` an intake agent:** quarkus-langchain4j resolves and unwraps a sub-agent once, when the root agent is
+    `@InjectMock`/`@InjectSpy` an intake agent, or call `QuarkusMock.installMockForType`/`installMockForInstance`** (enforced by `IntakeTestArchTests`): quarkus-langchain4j resolves and unwraps a sub-agent once, when the root agent is
     built, so a mock installed while the root is built can stay baked into it for the rest of the application's life —
     and this group is one boot shared by every intake test class (and everything else with no `@TestProfile`, ~54 classes
     total). Today none do; every agent runs as a real bean against WireMock, which is what keeps the whole topology on the
@@ -1513,7 +1513,10 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
     LLM, IMAP or SMTP call, the transactional part is its own non-private method annotated
     `@Transactional(TxType.REQUIRES_NEW)` and called from the step: Quarkus intercepts self-invocation of non-private methods
     (so the annotation applies), and a private method or a private record in its signature would break the generated
-    subclass. `CorrespondenceRecorder`, `SupersedeStep` and `ReviewDecisionSteps` catch the exception from such a call.
+    subclass. `InterceptedMethodArchTests` (app-wide) fails the build for a `private`, `final` or `static` method carrying any interceptor binding
+    (`@Transactional`, `@MailClientSpan`, a future one) or `@WithSpan`, so the "Non-private and non-final…" comments are explanation, not the guard. `@Scheduled` isn't
+    covered: it isn't an interceptor, and Quarkus already rejects a private one at build time.
+    `CorrespondenceRecorder`, `SupersedeStep` and `ReviewDecisionSteps` catch the exception from such a call.
   - **Every intake reply carries a `Message-ID` that `IntakeReplySender` generates** (`<UUID@domain of parasol.intake.address>`; Vert.x's
     mail encoder applies user headers last, so it replaces the mailer's). The two overloads with a claim number record the reply through
     `ReplyRecorder` (`REQUIRES_NEW`) **after** the send succeeded; a failed recording only logs a WARN, since faulting the step would
@@ -1531,7 +1534,7 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
   This is deliberate (`docs/design/email-claim-intake.md` → Architecture: "They're stateless"): the
   workflow passes the claim's whole history in on every run, so an agent carrying its own memory or
   retrieval would see stale or duplicated context. **A seventh intake agent that omits either
-  annotation gets the default behavior silently** — the shared `"default"` chat memory (so it leaks
+  annotation gets the default behavior silently** (`IntakeArchTests.EVERY_INTAKE_AI_SERVICE_IS_STATELESS` now fails the build for it) — the shared `"default"` chat memory (so it leaks
   context across unrelated claims and senders) and/or the policy-PDF Easy RAG retriever (irrelevant to
   claim email) — with no build error and no failing test to catch it. Copy both annotations onto any
   new intake `@RegisterAiService`.

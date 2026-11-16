@@ -1,14 +1,30 @@
 package org.parasol.intake;
 
+import static com.tngtech.archunit.core.domain.JavaAccess.Predicates.target;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.assignableTo;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideOutsideOfPackages;
 import static com.tngtech.archunit.core.importer.ImportOption.DoNotIncludeTests;
+import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.name;
+import static com.tngtech.archunit.core.domain.properties.HasOwner.Predicates.With.owner;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
+import com.tngtech.archunit.core.domain.JavaAnnotation;
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
+import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.lang.ConditionEvents;
+import com.tngtech.archunit.lang.SimpleConditionEvent;
+
+import org.parasol.intake.workflow.ClaimIntakeFlow;
+
+import io.quarkiverse.flow.Flow;
+import io.quarkiverse.langchain4j.RegisterAiService;
+import io.serverlessworkflow.impl.WorkflowDefinition;
 
 /**
  * The shape of the email intake's packages ({@code org.parasol.intake..}), main code only. The sub-packages form a directed
@@ -52,4 +68,49 @@ class IntakeArchTests {
 		.dependOnClassesThat()
 		.resideInAPackage("org.parasol.intake.workflow")
 		.because("ClaimIntakeFlow calls the steps, so a step that reaches back up to its root makes a cycle");
+
+	@ArchTest
+	static final ArchRule EVERY_INTAKE_AI_SERVICE_IS_STATELESS = classes()
+		.that()
+		.resideInAPackage("org.parasol.intake..")
+		.and()
+		.areAnnotatedWith(RegisterAiService.class)
+		.should(optOutOfMemoryAndRetrieval())
+		.because("an intake AI service without both opt-outs silently gets the shared \"default\" chat memory, which leaks context across claims "
+			+ "and senders, and the policy-PDF retriever, which is irrelevant to claim email: no build error, no failing test");
+
+	// Not covered, on purpose: a run started through WorkflowApplication directly, or by reflection. Nothing in the intake does either.
+	@ArchTest
+	static final ArchRule EVERY_INTAKE_RUN_IS_CREATED_BY_NEW_RUN = noClasses()
+		.that()
+		.resideInAPackage("org.parasol.intake..")
+		.and()
+		.doNotBelongToAnyOf(ClaimIntakeFlow.class)
+		.should()
+		.callMethodWhere(target(owner(assignableTo(Flow.class))).and(target(name("instance").or(name("startInstance"))))
+			.or(target(owner(assignableTo(WorkflowDefinition.class))).and(target(name("instance")))))
+		.because("ClaimIntakeFlow.newRun sets the run's gen_ai.conversation.id metadata, so a run created any other way carries no conversation id "
+			+ "on its spans and its claim's Langfuse session is missing a run, with no failing test (activeInstance lookups are fine)");
+
+	private static ArchCondition<JavaClass> optOutOfMemoryAndRetrieval() {
+		return new ArchCondition<>("set retrievalAugmentor = NoRetrievalAugmentorSupplier and chatMemoryProviderSupplier = NoChatMemoryProviderSupplier") {
+			@Override
+			public void check(JavaClass type, ConditionEvents events) {
+				var annotation = type.getAnnotationOfType(RegisterAiService.class.getName());
+				var retrieval = namesClass(annotation, "retrievalAugmentor", RegisterAiService.NoRetrievalAugmentorSupplier.class);
+				var memory = namesClass(annotation, "chatMemoryProviderSupplier", RegisterAiService.NoChatMemoryProviderSupplier.class);
+				var isSatisfied = retrieval && memory;
+				events.add(new SimpleConditionEvent(type, isSatisfied,
+					"%s %s both opt-outs (retrievalAugmentor=%s, chatMemoryProviderSupplier=%s)".formatted(type.getName(), isSatisfied ? "has" : "lacks", retrieval, memory)));
+			}
+		};
+	}
+
+	private static boolean namesClass(JavaAnnotation<JavaClass> annotation, String attribute, Class<?> expected) {
+		return annotation.get(attribute)
+			.filter(JavaClass.class::isInstance)
+			.map(JavaClass.class::cast)
+			.map(value -> value.getName().equals(expected.getName()))
+			.orElse(false);
+	}
 }

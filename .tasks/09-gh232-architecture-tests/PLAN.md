@@ -60,7 +60,7 @@ Edit or create task files and update `## Task Plan`.
 - [x] [task-03-archunit-and-scoring-rules.md](task-03-archunit-and-scoring-rules.md): Add `archunit-junit6`, rule 1, and rewrite `ConversationLayeringArchTests`
 - [x] [task-04-domain-boundaries.md](task-04-domain-boundaries.md): Rules 2 and 3, the baggage rule and the boundary hardening
 - [x] [task-05-intake-package-cycles.md](task-05-intake-package-cycles.md): Break the intake's package tangle by moving classes, then enforce it
-- [ ] [task-06-intake-and-interceptor-rules.md](task-06-intake-and-interceptor-rules.md): Rules 4 (app-wide) and 5, the intake AI service opt-outs and the run-creation rule
+- [x] [task-06-intake-and-interceptor-rules.md](task-06-intake-and-interceptor-rules.md): Rules 4 (app-wide) and 5, the intake AI service opt-outs and the run-creation rule
 - [ ] [task-07-coding-conventions.md](task-07-coding-conventions.md): Coding-convention rules (resources, injection, executors, logging, dates)
 - [ ] [task-08-gotchas-rest-config-rules.md](task-08-gotchas-rest-config-rules.md): REST and persistence, Panache method references, JSON-safe run data, config/transactions/exceptions, test naming
 - [ ] [task-09-docs-and-verification.md](task-09-docs-and-verification.md): Documentation, mutation check, verification and the PR
@@ -315,6 +315,14 @@ All six intake `@RegisterAiService`s set both `retrievalAugmentor = NoRetrievalA
     `model`, `ReviewReclaimerTests` to `workflow`.
   - The diagrams and design doc name classes, never packages, so only `CLAUDE.md` needed changes; no PNG re-render was needed.
   - **BSD `sed` has no `\b`:** a scripted FQN rewrite silently did nothing until redone with `perl`.
+
+- **Task 06 (interceptor, agent-mock, opt-out and run-creation rules, 2026-11-16):** `InterceptedMethodArchTests` (six rules: interceptor-bound and `@WithSpan`
+  methods are not private/final/static), `IntakeArchTests` (+ `EVERY_INTAKE_AI_SERVICE_IS_STATELESS`, `EVERY_INTAKE_RUN_IS_CREATED_BY_NEW_RUN`) and a new
+  `IntakeTestArchTests` (`OnlyIncludeTests`: no `@InjectMock`/`@InjectSpy` of an intake agent, no `QuarkusMock.installMockFor*`) with the shared
+  `IntakeAgentTypes.INTAKE_AGENT_TYPE` predicate, which matches exactly the ten types in the table above. All were shown failing (private `@Transactional`,
+  final `@MailClientSpan`, `@InjectMock ClaimSummaryAgent`, `installMockForType`, a missing `chatMemoryProviderSupplier`, `Flow.instance` and
+  `definition().instance` in `handOver`). Decisions: Quarkus already rejects a private `@Scheduled` method (`SchedulerProcessor`), so no `@Scheduled` rule;
+  a class-level interceptor binding isn't forbidden (none exists). The "Non-private…" comments stay, the four missing ones weren't added.
 
 ### Caveats & Problems
 - **A stale `META-INF/services` file survives in `target/classes`.** `./mvnw test` without `clean` doesn't remove a
