@@ -7,7 +7,7 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.parasol.intake.observability.IntakeActivity.ReviewDecisionApplied;
-import org.parasol.intake.review.ReviewOutcome;
+import org.parasol.intake.model.ReviewOutcome;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 

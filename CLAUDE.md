@@ -36,23 +36,25 @@ The Java source is split into two top-level packages representing two distinct c
 | `org.parasol.intake.dispatch` | What happens to an inbound email before its run: `ClaimIntakeDispatcher` (`recover(email)` for what a previous instance left in `Processing`, with `ProcessingRecovery`; `submit(email)`: loop/duplicate/`Message-ID` checks, then a per-sender queue of immutable `SenderState`s; also the Flow status listener that drives the queue), `ClaimMatcher`, `CorrespondenceRecorder` and the package-private `ClaimReference` |
 | `org.parasol.intake.failure` | The failure path: `IntakeFailureHandler` (**where the email is decides what its sender hears** — see Gotchas), the `IntakeFailureListener` (`onWorkflowFailed`) and `ProcessingProblemReplySender` |
 | `org.parasol.intake.reply` | The intake's replies: `IntakeTemplates` (the fixed Qute mail templates, under `templates/IntakeTemplates/`), `IntakeReplySender` (blocking; subject prefix, `ThreadingHeaders` headers and `Auto-Submitted`; overloads with and without a claim number, no `Optional` parameters) `ReplyRecorder` (records a claim reply as an `OUTBOUND` `ClaimCorrespondence` row after it's sent) and `CustomerName` (who a reply greets) |
-| `org.parasol.intake.model` | The intake's records that Flow persists and later steps read: `IncidentDetails`, `ClaimExtraction` (JSON-safe: ISO date/time strings, no `Optional`), the sealed `IntakeOutcome`, `MatchedClaim` (`none()` rather than `null`), `EmailType`, `ClassifiedOutcome` (the root agent's return: the outcome plus the classifier's label), `ClaimResolver`'s `PendingClaim` / `ClaimResolution`, and the `ClaimIntakeState` entity (the intake's bookkeeping about a claim, kept off `Claim`) |
-| `org.parasol.intake.workflow` | `ClaimIntakeFlow` (the whole intake as one quarkus-flow workflow, `claim-intake`; the only place with side effects), the JSON-safe `IntakeRun` (input: ids only) and `IntakeState` (threaded through every step), the `EmailRequeued` event, the `AgentStep` and `ClaimMatchingSteps` steps and `CorrespondenceText` |
+| `org.parasol.intake.model` | The intake's records that Flow persists and later steps read, a leaf every other intake package builds on: `IntakeRun` (input: ids only) and `IntakeState` (threaded through every step), the `EmailRequeued` event, `CorrespondenceText`, the review decision's contract between reviewer and run (`ReviewDecided` with its `REVIEW_DECIDED` CloudEvent type, `ReviewDecision`, `ReviewOutcome`, `ReviewedFields`), `IncidentDetails`, `ClaimExtraction` (JSON-safe: ISO date/time strings, no `Optional`), the sealed `IntakeOutcome`, `MatchedClaim` (`none()` rather than `null`), `EmailType`, `ClassifiedOutcome` (the root agent's return: the outcome plus the classifier's label), `ClaimResolver`'s `PendingClaim` / `ClaimResolution`, and the `ClaimIntakeState` entity (the intake's bookkeeping about a claim, kept off `Claim`) |
+| `org.parasol.intake.workflow` | `ClaimIntakeFlow` (the whole intake as one quarkus-flow workflow, `claim-intake`; the only place with side effects; `newRun(IntakeRun)` is the one place a run is created, with its conversation id as instance metadata), the `AgentStep` and `ClaimMatchingSteps` steps, and what starts or cancels runs through the flow, next to it: `SupersedeStep`, `ReviewReclaimer` (hands every review whose run is gone to a new run on startup) and `ReviewRecoverer` (hands a faulted run's review to a new run). The records a run carries are in `intake.model` |
 | `org.parasol.intake.workflow.policy` | `PolicyCheckStep` and its package-private `SameCustomerRule` (same customer) and `PolicyNumbers` (generated `AC-` numbers) |
 | `org.parasol.intake.workflow.outcome` | `ApplyOutcomeStep` (persists a new claim or a merged reply) and its helpers `ClaimFields` and the package-private `InceptionDates` |
-| `org.parasol.intake.workflow.review` | `SupersedeStep`, `ReviewReclaimer` (hands every review whose run is gone to a new run on startup), `ReviewDecisionSteps` (the review wait's decision steps and its match check), `AfterDecision` (what the run does next: `END` or `WAIT_AGAIN`), and `ReviewRecoverer` (hands a faulted run's review to a new run) |
-| `org.parasol.intake.observability` | `IntakeActivity` (the sealed CDI events the intake fires) and `IntakeMetrics` (observes them into the `claim.intake.*` meters; tags are small fixed sets, never a claim number, `Message-ID`, address or conversation id), and the tag enums `EmailOutcome`, `MatcherResult`, `ReviewAgreement`, `MailboxLockMode`, `MatchedClaimKind`, `FailureStage` and `FailureOutcome` |
+| `org.parasol.intake.workflow.review` | `ReviewDecisionSteps` (the review wait's decision steps and its match check), `AfterDecision` (what the run does next: `END` or `WAIT_AGAIN`) and `ReviewHandover` |
+| `org.parasol.intake.observability` | `IntakeActivity` (the sealed CDI events the intake fires) and `IntakeMetrics` (observes them into the `claim.intake.*` meters; tags are small fixed sets, never a claim number, `Message-ID`, address or conversation id), and the tag enums `EmailOutcome`, `MatcherResult`, `ReviewAgreement`, `MailboxLockMode`, `MatchedClaimKind`, `SkippedAttachmentReason` (`ClaimIntakeDispatcher` maps the mailbox's `SkippedAttachment.Reason` to it, so this package never depends on `mailbox`), `FailureStage` and `FailureOutcome`. A leaf, like `model` |
 | `org.parasol.intake.workflow.mail` | `IntakeEmailReader` (re-reads a run's email from the processing folder), `ReplySteps`, `FileEmailStep` |
 | `org.parasol.intake.dev` | `DevClaimEmailSeeder`: the bean exists only with the build property `parasol.dev-seed.enabled=true` (`%dev`, and the two Ollama Maven profiles' `quarkus-maven-plugin` `systemProperties`, since they run dev as `prod`, so `@IfBuildProfile("dev")` wouldn't match), and it acts in `LaunchMode.DEVELOPMENT` only, mails two sample claims to the claims address at startup (one complete, one with no date or place) so the real intake produces a `Pending Review` and a `Pending Information` claim to look at. Needs the same model as any intake email; GreenMail is in memory, so it re-sends on every start |
-| `org.parasol.intake.review` | The reviewer's side of the wait: `ReviewOutcome`, `ReviewDecision`, the `ReviewDecided` event data, `ReviewedFields` (the values the reviewer confirmed or corrected, carried in the decision and set by the decision step), `ReviewDecisionPublisher` (publishes the CloudEvent the waiting run listens for), `ClaimReviewService` (checks the review is open at the reviewer's version and the reviewed values fit the claim, claims it under the claim's optimistic lock, confirms the run is waiting, then publishes), `ClaimSentimentReassessor` (assesses the claimant's sentiment again for a reviewer) and the package-private `ReviewGuard` (the open-review check both start with), plus its domain exceptions (`ReviewNotOpenException`, `ReviewLockLostException`, `ReviewRunNotFoundException`, `ReviewRunNotWaitingException`, `ReviewedFieldsRejectedException`, `SentimentAssessmentFailedException`) |
+| `org.parasol.intake.review` | The reviewer's side of the wait (the decision's own records, `ReviewDecided`, `ReviewDecision`, `ReviewOutcome` and `ReviewedFields`, are in `intake.model`): `ReviewDecisionPublisher` (publishes the CloudEvent the waiting run listens for), `ClaimReviewService` (checks the review is open at the reviewer's version and the reviewed values fit the claim, claims it under the claim's optimistic lock, confirms the run is waiting, then publishes), `ClaimSentimentReassessor` (assesses the claimant's sentiment again for a reviewer) and the package-private `ReviewGuard` (the open-review check both start with), plus its domain exceptions (`ReviewNotOpenException`, `ReviewLockLostException`, `ReviewRunNotFoundException`, `ReviewRunNotWaitingException`, `ReviewedFieldsRejectedException`, `SentimentAssessmentFailedException`) |
 | `org.parasol.intake.review.rest` | `ClaimReviewResource` (`GET /api/db/claims/{id}/review`, `POST /api/db/claims/{id}/review-decision`, `POST /api/db/claims/{id}/sentiment`), the `ClaimReviewState` / `ReviewDecisionRequest` (with its nested `Fields`) / `SentimentAssessmentRequest` / `SentimentAssessment` DTOs (the decision's outcome/items/fields pairing enforced by the package-private `@ValidReviewDecision` Bean Validation constraint) and `ReviewExceptionMappings` (Problem Details) |
 | `org.parasol.intake.agent` | The root `ClaimsMailboxAgent` (`@SequenceAgent`: classifier → `EmailRouter`, returning a `ClassifiedOutcome` through an `@Output` method), the `@ConditionalAgent` `EmailRouter` and its package-private `EmailRoute` rule (matched claim first, then the label) |
 | `org.parasol.intake.agent.extraction` | Everything behind `ClaimExtractionWorkflow` (`@ParallelAgent` over `ClaimSummaryAgent`, `ClaimSentimentAgent` and `IncidentDetailsAgent`): its package-private output guardrails and `IsoValues`, plus `ClaimExtractionRules.findMissingItems`. The summary is the only incident text (what `Claim.summary` stores); `IncidentDetailsAgent` only flags, as `IncidentDetails.incidentDescribed`, whether the correspondence says what happened, and anything but `true` makes `INCIDENT_DESCRIPTION` missing |
 | `org.parasol.intake.agent.triage` | `EmailClassifierAgent`, `ClaimFollowUpAgent` and its read-only `ClaimStatusTools`, the non-LLM `UnmatchedEmailAgent`, and `ClaimResolver` (a plain AI service, outside the agent topology) |
 
-Dependencies point one way: `chat` → `notification` → `claim`, and `intake` → `claim`. New features get their own
+Dependencies point one way: `chat` → `notification` → `claim`, and `intake` → `claim`. Inside `intake` the sub-packages form a directed acyclic graph (`IntakeArchTests`): `model` and `observability` are leaves everyone depends on, a step sub-package of `workflow` (`mail`, `outcome`, `policy`, `review`) never depends on `workflow`'s root, and whatever needs `ClaimIntakeFlow` itself lives in that root. New features get their own
 domain package with the same kind of layer sub-packages. Test packages mirror main, plus the test-only `org.parasol.ui` for Playwright,
-`org.parasol.testing` for the shared test profiles, and `org.parasol.testing.mail` for the GreenMail helper.
+`org.parasol.testing` for the shared test profiles, `org.parasol.testing.mail` for the GreenMail helper, and `org.parasol.architecture` for the
+application-wide ArchUnit rules (`DomainBoundaryArchTests`: `ai.scoring`'s published API, the baggage rule, the domain directions, no cycles between top-level
+packages, every class in a known domain; main code only); the intake's own package rules are `org.parasol.intake.IntakeArchTests`).
 
 Supporting docs:
 - `README.md` — build/run instructions, Ollama profiles, Langfuse integration notes
@@ -257,7 +259,7 @@ same reason as a tooltip on those two statuses (list and detail page).
 (GreenMail from `compose-devservices.yml` in dev/test; readable in Roundcube in dev mode). On OpenShift both run
 from `src/main/kubernetes/dependencies.yml` (see OpenShift deployment).
 
-**REST:** the REST layer never serializes entities. Resources hold no queries; they call the Active Record methods
+**REST:** the REST layer never serializes entities (`RestAndPersistenceArchTests.ENDPOINTS_NEVER_EXPOSE_AN_ENTITY`). Resources hold no queries; they call the Active Record methods
 and map to DTO records with `ClaimMapper`.
 - `ClaimResource`: `GET /api/db/claims`, `GET /api/db/claims/{id}` return `ClaimDetails`. A missing claim is a
   Problem Details `404` (the resource throws `ClaimNotFoundException` when `findByIdOptional` is empty); before #214 it
@@ -274,7 +276,7 @@ and map to DTO records with `ClaimMapper`.
   global `serialization-inclusion: non-empty`). A new `Claim` column stays out of the API until it's added to
   the DTO; `ClaimResourceTests.jsonFieldNames` pins the exact set of JSON keys. **The intake's bookkeeping isn't on
   `Claim` at all** (see *The intake's state* below), so fetching a claim neither returns nor loads it;
-  `ClaimRetrievalHasNoIntakeBookkeepingTests` measures that with Hibernate statistics.
+  `ClaimRetrievalHasNoIntakeBookkeepingTests` (in `org.parasol.intake.model`, since it's an invariant about `ClaimIntakeState`) measures that with Hibernate statistics.
 - **Errors:** domain exceptions are mapped once, by `ClaimExceptionMappings` (Quarkus `@ServerExceptionMapper`), to RFC
   9457 Problem Details (`application/problem+json`, `type: about:blank`, `instance` = request path), through the shared
   `org.parasol.problem.ProblemDetail` record (`MEDIA_TYPE` constant and `of(status, detail, uriInfo)` factory). RFC 9457
@@ -536,23 +538,43 @@ Which work belongs to which conversation, and what happens when one ends. Generi
 be extracted: the core depends only on the OTel API/SDK, CDI and JBoss Logging (MicroProfile Context Propagation is the
 `quarkus` sub-package's own dependency; no Quarkus,
 LangChain4j, chat-scope or Flow types). Frameworks feed it through adapters in sub-packages; consumers observe its
-events and never call an adapter.
+events and never call an adapter. The intake's only link to it is an instance metadata key on its Flow runs (below): no intake class
+imports `ai.scoring`.
 
-- **Core:** `ConversationContext` (`currentId`, `enter`, `callIn`, `runIn`; the id is OTel baggage under
+- **Core:** `ConversationContext` (`currentId`, `enter`, `callIn`; the id is OTel baggage under
   `CONVERSATION_ID_KEY` = `gen_ai.conversation.id`), `ConversationIdSpanProcessor` (copies the baggage entry onto every
   span at `onStart`, read from the parent context; the same value quarkus-langfuse's processor writes, so Tempo and the
   tests see it with Langfuse export off), `ConversationEndedEvent` and `ConversationEvents` (`fireAsync`, logging any
   observer failure).
-- **Adapters:** `chat` (`ConversationalBaggageHandler`, chat scopes). Task 11 of #216 needed no Flow or agentic one (below).
+- **Adapters:** `chat` (`ConversationalBaggageHandler`, chat scopes) and `flow` (below). The agentic sub-workflows need none.
 - **`quarkus.OtelContextLeakGuard`** — a **temporary** `ThreadContextProvider` (registered in
   `META-INF/services/org.eclipse.microprofile.context.spi.ThreadContextProvider`) working around quarkusio/quarkus#54354:
   Quarkus's OTel context-propagation provider leaves a task's context, and its conversation id, on a pool thread.
   **Delete it, and its services entry, once a Quarkus we're on ships quarkusio/quarkus#56805** (4.0, or the 3.40
   backport quarkusio/quarkus#57879); `OtelContextLeakGuardTests` passing without it is the signal. It's the one class
   touching a Quarkus type, which is why it has its own package.
-- **Task 11 needed no adapter.** Flow 1.3.0 carries the OTel context across its task threads and the agentic sub-workflows keep it
-  too (`IntakeSpanPropagationTests` pins it, including two concurrent runs), so every intake span carries its claim's
-  conversation id with no code in a step. What the intake adds:
+- **The `flow` adapter gives a Flow run its conversation id; the intake has no `ai.scoring` or OTel baggage code** (#232, task 02).
+  - **The contract is instance metadata:** a run belongs to a conversation when its instance carries the id under
+    `gen_ai.conversation.id`, set between `instance(…)` and `start()`. `ClaimIntakeFlow.newRun(IntakeRun)` is the one place the intake
+    does that (the key is the intake's own constant, since it can't import `ai.scoring`'s), and both start paths
+    (`ClaimIntakeDispatcher.startRun`, `ReviewRecoverer.handOver`) create their run through it. **A run created with `instance(…)`
+    directly silently has no id on its spans** (`IntakeArchTests.EVERY_INTAKE_RUN_IS_CREATED_BY_NEW_RUN` fails the build: no intake class but `ClaimIntakeFlow` may call `instance`/`startInstance` on a `Flow` or `WorkflowDefinition`; `activeInstance` lookups are fine). `IntakeRun.conversationId` stays the run's own data; the adapter doesn't read the input.
+  - **Three parts, public SPIs only** (documented on `FlowConversationListener`): the listener (an `@ApplicationScoped`
+    `WorkflowExecutionListener`, priority 0, so it runs before Flow's OTel listener at the default 1000) records instance id →
+    conversation id in `onWorkflowStarted` and forgets it on completed, failed and canceled; `FlowConversationSpanProcessor` stamps
+    Flow's own spans (`workflow.create`, `workflow.execute`, `task.execute`) by their `flow.workflow.instance.id`;
+    `FlowConversationTaskProxy` (a `CallableTaskProxyBuilder`, loaded by `ServiceLoader` from `META-INF/services`, not a bean) puts
+    the id in baggage around each call task's body, so the AI, JDBC and mail spans and the agentic sub-workflows started inside a step
+    carry it. **Both halves are needed:** without the proxy the spans inside a step lose the id, without the processor Flow's own do.
+  - **The proxy's priority (50) must stay below `OTelTaskSpanProxy`'s 100** (package-private in quarkus-flow-opentelemetry): the lower
+    priority is the inner proxy, and above 100 the OTel proxy's context would replace the baggage.
+    `FlowConversationAdapterTests.flowLoadsTheTaskProxyInsideItsOwnOpenTelemetryProxy` compares the two as Flow loaded them.
+  - A run without the metadata (any other workflow, the generated agentic ones) is left alone. Spans started outside a task body and
+    without Flow's instance attribute (what a listener does after a run faults) get no id, as before.
+  - `IntakeSpanPropagationTests` (two and eight concurrent runs, a woken review run, a replacement run), `IntakeTracingTests` and
+    `IntakeLangfuseDeliveryTests` are the guards on the intake side, `FlowConversationAdapterTests` on the adapter's, with a workflow of
+    its own.
+- **What else the intake's observability adds** (task 11 of #216):
   - `ai.scoring.conversation.flow.FlowSpanTypingProcessor` types the `workflow.execute` span of a workflow Flow generated for an agentic interface (named after the interface in kebab case, `flow.workflow.namespace`/`name`; the interface is looked up and must have a `@SequenceAgent`/`@ParallelAgent`/… method; the run's own `claim-intake` workflow isn't one; a stand-in for quarkiverse/quarkus-flow#1122, relying on Flow's naming) as the standard `gen_ai.operation.name=invoke_agent` plus `gen_ai.agent.name` (**a documented workaround, reflection on Flow's naming, no good for native; delete with #1122**); the Langfuse-specific part is `ai.scoring.langfuse.otel.LangfuseFlowSpanTypingProcessor`: `task.execute` (a step, usually plain Java) is a `chain` (`langfuse.observation.type` only; quarkus-langfuse 0.9.1 retains it under `AI_ONLY` without a synthetic GenAI operation name).
   - `@MailClientSpan` (an interceptor binding in `org.parasol.intake.observability`, handled by the package-private `MailClientSpanInterceptor`; a parameter marked
     `@SpanAttribute` becomes a span attribute, as the folder does) wraps `ClaimsMailbox`'s IMAP operations (`imap list|find|move|moveOldest|moveWithoutMessageId`) and `IntakeReplySender`'s `deliver`
@@ -591,8 +613,10 @@ events and never call an adapter.
     measurement) and `.review.oldest.pending` (seconds, from `ClaimIntakeState.oldestPendingReviewOpenedAt`; `0` when no review is pending). `ApplyOutcomeStep` and `ReviewDecisionSteps` publish their status, extraction,
     decision and completion activities **inside** their transaction, observed `AFTER_SUCCESS`, so a rollback counts nothing. Not built, on purpose: token usage per run (Langfuse and quarkus-langchain4j already have it), a
     separate AI-reply counter (`replies{template=status_answer}`) and loop-guard skips (`emails{outcome=skipped_auto_reply}`).
-- **Layering is enforced** by `ConversationLayeringTests` (reads the compiled classes' constant pools with
-  `java.lang.classfile`): the core references no adapter or framework, adapters never reference each other.
+- **Layering is enforced** by `ConversationLayeringArchTests` (ArchUnit, main classes only): the core references no adapter,
+  no other `ai.scoring` package, no framework and nothing in `org.parasol`, and adapters never reference each other.
+  `ai.scoring.ScoringBoundaryArchTests` holds the wider rule: nothing in `ai.scoring` depends on `org.parasol`. ArchUnit sees
+  class references in signatures, bodies and annotations, not a class named only in a string constant or in Javadoc.
 
 ### Models
 
@@ -680,7 +704,7 @@ One appearing is a real finding — a typo or a missing extension — not noise 
 switch: `quarkus-core` declares only `quarkus.config.fixed-at-build-time` and `quarkus.config.sources.system-only`,
 and muting the `io.quarkus.config` logger would just hide the next real typo. Four structural rules keep it true:
 
-- **Application config lives outside the `quarkus.` namespace** — `parasol.*` and `aiscoring.*`. Quarkus builds its
+- **Application config lives outside the `quarkus.` namespace** — `parasol.*` and `aiscoring.*` (enforced: `CodingConventionArchTests` requires every `@ConfigMapping` prefix to be `parasol…` in `org.parasol` and `aiscoring…` in `ai.scoring`, and forbids `@ConfigProperty` from naming a `parasol.*` or `aiscoring.*` key). Quarkus builds its
   known-key model for `quarkus.` from extension metadata (`META-INF/quarkus-config-doc/quarkus-config-model.json` in
   each `*-deployment` jar), so an application `@ConfigMapping` under `quarkus.` is always "unrecognized", however well
   it works. Don't put a new app config root there.
@@ -1021,7 +1045,7 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
     (stub keys, Easy RAG ingestion off, `claim-intake`/`parasol-chat`/the default OpenAI model/embeddings on WireMock with
     their providers pinned), Hibernate statistics and the 100 ms span-export interval all live directly in the `%test`
     config profile of `application.yml` now — there is no profile class carrying them. **No test in this group may
-    `@InjectMock` an intake agent:** quarkus-langchain4j resolves and unwraps a sub-agent once, when the root agent is
+    `@InjectMock`/`@InjectSpy` an intake agent, or call `QuarkusMock.installMockForType`/`installMockForInstance`** (enforced by `IntakeTestArchTests`): quarkus-langchain4j resolves and unwraps a sub-agent once, when the root agent is
     built, so a mock installed while the root is built can stay baked into it for the rest of the application's life —
     and this group is one boot shared by every intake test class (and everything else with no `@TestProfile`, ~54 classes
     total). Today none do; every agent runs as a real bean against WireMock, which is what keeps the whole topology on the
@@ -1087,6 +1111,30 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   `api().scoresV3()`) — that is test-fixture code that predates the operations layer covering those
   domains, not a gap in the layer.
 - AssertJ + Awaitility; Mockito is attached as a `-javaagent` in the surefire/failsafe config.
+- **Architecture rules are ArchUnit** (`com.tngtech.archunit:archunit-junit6`, [#232](https://github.com/edeandrea/non-deterministic-no-problem/issues/232)):
+  `@ArchTest static final ArchRule` fields in package-private `*ArchTests` classes carrying `@AnalyzeClasses`, each with a
+  `.because("…")` so a failure explains itself.
+  - **An ArchUnit class is named `*ArchTests`, and no other class is.** The rules can't share a package (the `ai.scoring`
+    ones stay there so they go with the library), so the suffix is the one handle for all of them:
+    `./mvnw test -Dtest='*ArchTests'` runs every rule in seconds, with no application boot. `TestNamingArchTests` enforces it both ways, and that
+    every class declaring a test ends in `Tests` (surefire's includes: a `FooSpec` or `FooIT` would silently never run).
+  - **They are the one exception to the AssertJ convention:** declarative rules that fail with ArchUnit's own
+    `AssertionError` (`Architecture Violation … Rule '…, because …' was violated`, then one line per offending reference
+    with its source line), not hand-written assertions.
+  - They are plain classes, never `@QuarkusTest`, so they add no application boot. ArchUnit's own JUnit engine runs
+    them under surefire next to Jupiter; each rule is a test case named after its field.
+  - **A rule lives in the package it would travel with**, found by asking where its `that()` side lives: `ai.scoring`'s own rules
+    (`ScoringBoundaryArchTests`, `ConversationLayeringArchTests`) in `ai.scoring`, the intake's internals (`IntakeArchTests`: package
+    shape and cycles, the agent opt-outs, run creation, JSON-safe run data; `IntakeTestArchTests`: no agent mocks) in `org.parasol.intake`,
+    and anything that would still apply with the intake gone (`DomainBoundaryArchTests`, `InterceptedMethodArchTests`,
+    `CodingConventionArchTests`, `RestAndPersistenceArchTests`, `PanacheMethodReferenceArchTests`, `TestNamingArchTests`) in `org.parasol.architecture`.
+    Rules 1 to 3 and the intake's package rules read main code only (`ImportOption.DoNotIncludeTests`); the test-code rules say so explicitly.
+  - A new rule is shown failing once on a scratch violation before it's kept, and an exemption is written positively
+    (`…that().areAnnotatedWith(X).should().beDeclaredInClassesThat()…`) so `failOnEmptyShould` stays on.
+  - `src/test/resources/archunit.properties` keeps `archRule.failOnEmptyShould=true`: a rule whose `that()` matches no
+    class (after a package rename, say) fails instead of passing with nothing checked. Don't turn it off.
+  - **`noClasses()…should().x().andShould().y()` forbids `x` and forbids `y` separately**, it is not "x and y together".
+    For a combined condition pass one predicate: `dependOnClassesThat(resideInAPackage("a..").and(resideOutsideOfPackage("a.b..")))`.
 - **Mail tests read the real GreenMail** from `compose-devservices.yml` (every test run starts it) through the
   injectable `org.parasol.testing.mail.GreenMailMailbox` bean. There is no mail mock.
   - **Reading is IMAP** (Angus Mail, version from the Quarkus BOM; compile scope since `ClaimsMailbox` uses it too):
@@ -1141,6 +1189,10 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
     (`IntakeRun`, `IntakeState`, `ReviewDecided` through the Quarkus `ObjectMapper`) and the helper unit tests
     (`CorrespondenceText`, `SameCustomerRule`, `PolicyNumbers`, `InceptionDates`, `ClaimReference`, `MailLoopGuard`,
     `ConversationContext`) need no LLM.
+  - `FlowConversationAdapterTests` (`ai.scoring.conversation.flow`, bare `%test` group) builds a one-task workflow through the injected
+    `WorkflowApplication` and uses no intake type. **Its observations are static:** Flow keeps the first definition of a workflow, and
+    with it the task body of the JUnit instance that built it. Checking a change to a `META-INF/services` file with `./mvnw test` needs
+    a `clean` (or deleting the copy under `target/classes`): the resources plugin never removes a stale one.
   - `TestSpans` (`org.parasol.intake`, test) is a `SpanExporter` CDI bean (Quarkus registers it on its own) with capture off by default, with
     lookups by run, trace and conversation id. `IntakeFlowTestBase` starts a fresh capture before each test and stops/clears it in teardown,
     even if cleanup fails; standalone consumers manage that lifecycle too. Appends and lifecycle changes share a monitor, without copy-on-write
@@ -1245,7 +1297,7 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
     and deserializes, so each class keeps small JSON-level tests for that: the exact key set (`jsonFieldNames`,
     `metadataJsonFieldNames`), the category label and an omitted null `incident_time`.
   - Call Panache statics through a lambda in `assertThatThrownBy(() -> ClaimImage.flush())`: a method reference
-    (`ClaimImage::flush`) bypasses Panache's enhancement and throws "did you forget to annotate your entity with
+    (`ClaimImage::flush`; `PanacheMethodReferenceArchTests` fails the build for one, in main and test code) bypasses Panache's enhancement and throws "did you forget to annotate your entity with
     @Entity?".
 - **`ClaimReviewResourceTests`** carries the same raw-JSON wire-shape guard as the other REST DTOs: `jsonFieldNames`
   (the full `ClaimReviewState` key set, including `requested_items` only when non-empty — it's omitted under
@@ -1273,7 +1325,12 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
 - **US English** everywhere: code, comments, docs, task files and commit messages ("canceled", "behavior",
   "labeled", "serialize", "organize", "color"). Identifiers from libraries keep their own spelling (e.g. Flow's
   `WorkflowStatus.CANCELLED`).
-- `io.quarkus.logging.Log` static methods (`Log.debugf`, `Log.warnf`) — no `Logger` fields.
+- **Logging:** always the simplified `io.quarkus.logging.Log` static methods (`Log.debugf`, `Log.warnf`), in beans and plain classes alike (Quarkus generates the
+  `private static final Logger` field at build time, in any application class): never a `Logger` field. The one exception is `ai.scoring.conversation.ConversationEvents`,
+  which keeps a JBoss `Logger` because the conversation core may not reference `io.quarkus`. No `System.out`/`err`, `printStackTrace`, `java.util.logging`, SLF4J, Lombok or
+  legacy date types (`java.util.Date`, `Calendar`, `SimpleDateFormat`, `java.sql.Date`/`Timestamp`; `MimeMessageParser` adapts Jakarta Mail's `Date`). These conventions, plus package-private
+  `@Path` classes with public endpoint methods, no `@Inject` fields (bar `NotificationService`) and no `ManagedExecutor`, are enforced by `CodingConventionArchTests`
+  (`org.parasol.architecture`); each exemption is a named constant there. The same class holds that `QuarkusTransaction` is used only by `NotificationService`, `IntakeCompleteToolInputGuardrail` and `DevClaimEmailSeeder`, and that no checked exception type is declared. `RestAndPersistenceArchTests` holds that `@Entity` classes live in a `..model..` package, no endpoint takes or returns an entity (type arguments included) and `@Path` classes are `*Resource`s in a `..rest..` package.
 - `@ConfigMapping` interfaces with `@WithDefault` — not `@ConfigProperty` fields.
 - Constructor injection in `ai.scoring`; `org.parasol.notification.service.NotificationService` still uses `@Inject`
   fields (legacy — prefer constructor injection for new code).
@@ -1445,7 +1502,7 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
     `ServiceConfigurationError: … QuarkusConfigFactory not a subtype of SmallRyeConfigFactory`. Tests don't reproduce it
     (their class loading is flat), so `IntakeReplySenderThreadTests` (a plain Mockito test) checks the cause instead: the
     sending thread is a virtual one carrying the caller's context class loader. It fails with `commonPool()`.
-  - **Panache statics through a method reference throw** ("did you forget to annotate your entity"): use a lambda
+  - **Panache statics through a method reference throw** ("did you forget to annotate your entity"): use a lambda (`PanacheMethodReferenceArchTests` enforces it)
     (`id -> Claim.<Claim>findById(id)`), never `Claim::<Claim>findById`.
   - **The per-sender lock covers a woken review run.** `ClaimIntakeDispatcher` (also Flow's status listener) holds the sender
     while a run works. A waiting review run that wakes for its decision holds it again until it ends, so an email that a
@@ -1470,7 +1527,10 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
     LLM, IMAP or SMTP call, the transactional part is its own non-private method annotated
     `@Transactional(TxType.REQUIRES_NEW)` and called from the step: Quarkus intercepts self-invocation of non-private methods
     (so the annotation applies), and a private method or a private record in its signature would break the generated
-    subclass. `CorrespondenceRecorder`, `SupersedeStep` and `ReviewDecisionSteps` catch the exception from such a call.
+    subclass. `InterceptedMethodArchTests` (app-wide) fails the build for a `private`, `final` or `static` method carrying any interceptor binding
+    (`@Transactional`, `@MailClientSpan`, a future one) or `@WithSpan`, so the "Non-private and non-final…" comments are explanation, not the guard. `@Scheduled` isn't
+    covered: it isn't an interceptor, and Quarkus already rejects a private one at build time.
+    `CorrespondenceRecorder`, `SupersedeStep` and `ReviewDecisionSteps` catch the exception from such a call.
   - **Every intake reply carries a `Message-ID` that `IntakeReplySender` generates** (`<UUID@domain of parasol.intake.address>`; Vert.x's
     mail encoder applies user headers last, so it replaces the mailer's). The two overloads with a claim number record the reply through
     `ReplyRecorder` (`REQUIRES_NEW`) **after** the send succeeded; a failed recording only logs a WARN, since faulting the step would
@@ -1488,7 +1548,7 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
   This is deliberate (`docs/design/email-claim-intake.md` → Architecture: "They're stateless"): the
   workflow passes the claim's whole history in on every run, so an agent carrying its own memory or
   retrieval would see stale or duplicated context. **A seventh intake agent that omits either
-  annotation gets the default behavior silently** — the shared `"default"` chat memory (so it leaks
+  annotation gets the default behavior silently** (`IntakeArchTests.EVERY_INTAKE_AI_SERVICE_IS_STATELESS` now fails the build for it) — the shared `"default"` chat memory (so it leaks
   context across unrelated claims and senders) and/or the policy-PDF Easy RAG retriever (irrelevant to
   claim email) — with no build error and no failing test to catch it. Copy both annotations onto any
   new intake `@RegisterAiService`.
@@ -1496,7 +1556,7 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
   - **Every terminal `switch` branch needs an explicit `.then(FlowDirectiveEnum.END)`** — Flow doesn't
     infer "this branch ends the workflow" on its own. `ClaimIntakeFlow`'s three `switchWhenOrElse` calls
     all pass it as the else-branch directive.
-  - **Pass ids through workflow/task data, not payloads.** `IntakeRun` and `IntakeState` carry claim,
+  - **Pass ids through workflow/task data, not payloads** (enforced for `intake.model`'s run data by `IntakeArchTests.RUN_DATA_IS_JSON_SAFE`: no `Optional`, `byte[]`, `InputStream` or entity field, `ClaimIntakeState` excepted). `IntakeRun` and `IntakeState` carry claim,
     email and run ids, never photo bytes or the raw email — Flow persists every step's data to
     PostgreSQL, so a payload-carrying step bloats the run's row on every transition. `IntakeEmailReader`
     re-reads the email from the processing folder by id instead.

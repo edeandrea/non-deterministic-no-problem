@@ -227,9 +227,9 @@ these files are 15–150 KB.
    claim number, or browse Sessions by recency.
 2. **A claim's session has several traces, not one** — one per workflow/sub-workflow run, plus the roughly 58 root
    traces Flow's own persistence emits per run (all kept and unsampled).
-   `gen_ai.conversation.id` is the shared id that ties them into one session; it's
-   entered once when the run starts and carried through the chat, Flow and the agents by the app's own
-   `ai.scoring.conversation` package (see CLAUDE.md → *Conversation core*).
+   `gen_ai.conversation.id` is the shared id that ties them into one session; the intake
+   only sets it as instance metadata when it creates a run, and the app's own `ai.scoring.conversation` package
+   carries it through the chat, Flow and the agents (see CLAUDE.md → *Conversation core*).
 3. Open one of the traces and show the `workflow.execute` / `task.execute` spans Flow generates, typed
    `invoke_agent` / `chain` for Langfuse, and the `claim-intake` model calls underneath.
 4. Note what's *not* there: no session-level sentiment score. The intake never ends a "conversation" in

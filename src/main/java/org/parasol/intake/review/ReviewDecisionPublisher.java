@@ -12,6 +12,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cloudevents.core.builder.CloudEventBuilder;
 import io.serverlessworkflow.impl.WorkflowApplication;
 
+import org.parasol.intake.model.ReviewDecided;
+
 /**
  * Publishes a reviewer's decision as the CloudEvent the waiting intake run listens for. It reaches only runs hosted in this instance (Flow's
  * publisher is in memory), which is why the intake runs as a single replica.
@@ -21,11 +23,6 @@ import io.serverlessworkflow.impl.WorkflowApplication;
  */
 @ApplicationScoped
 public class ReviewDecisionPublisher {
-	/**
-	 * The CloudEvent type the intake run waits for.
-	 */
-	public static final String REVIEW_DECIDED = "org.parasol.intake.review.decided";
-
 	private static final URI SOURCE = URI.create("/parasol/intake/review");
 	private static final Duration PUBLISH_TIMEOUT = Duration.ofSeconds(30);
 
@@ -46,7 +43,7 @@ public class ReviewDecisionPublisher {
 		var event = CloudEventBuilder.v1()
 			.withId(UUID.randomUUID().toString())
 			.withSource(SOURCE)
-			.withType(REVIEW_DECIDED)
+			.withType(ReviewDecided.REVIEW_DECIDED)
 			.withDataContentType("application/json")
 			.withData(toJson(decided))
 			.build();

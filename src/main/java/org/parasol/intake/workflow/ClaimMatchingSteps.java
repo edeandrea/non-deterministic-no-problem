@@ -18,14 +18,17 @@ import org.parasol.intake.agent.triage.ClaimResolver;
 import org.parasol.intake.config.IntakeConfig;
 import org.parasol.intake.model.ClaimExtraction;
 import org.parasol.intake.model.ClaimIntakeState;
+import org.parasol.intake.model.CorrespondenceText;
 import org.parasol.intake.model.IncidentDetails;
 import org.parasol.intake.model.IntakeOutcome.NewClaim;
 import org.parasol.intake.model.IntakeOutcome.PendingClaimUpdate;
+import org.parasol.intake.model.IntakeRun;
+import org.parasol.intake.model.IntakeState;
 import org.parasol.intake.model.PendingClaim;
 import org.parasol.intake.observability.IntakeActivities;
 import org.parasol.intake.observability.IntakeActivity.EmailMatched;
 import org.parasol.intake.observability.MatcherResult;
-import org.parasol.intake.workflow.IntakeState.Disposition;
+import org.parasol.intake.model.IntakeState.Disposition;
 import org.parasol.intake.workflow.mail.IntakeEmailReader;
 
 

@@ -11,7 +11,7 @@ import jakarta.transaction.Transactional;
 
 import org.parasol.intake.agent.extraction.ClaimSentimentAgent;
 import org.parasol.intake.config.IntakeConfig;
-import org.parasol.intake.workflow.CorrespondenceText;
+import org.parasol.intake.model.CorrespondenceText;
 
 import io.quarkus.logging.Log;
 

@@ -7,9 +7,8 @@ import java.util.Set;
 
 import org.parasol.claim.model.IntakeClaimStatus;
 import org.parasol.intake.MissingItem;
-import org.parasol.intake.mailbox.SkippedAttachment;
 import org.parasol.intake.model.EmailType;
-import org.parasol.intake.review.ReviewOutcome;
+import org.parasol.intake.model.ReviewOutcome;
 
 /**
  * Something the email intake did, fired as a CDI event so the code that did it knows nothing about metrics. Every value that
@@ -35,7 +34,7 @@ public sealed interface IntakeActivity {
 	 * @param keptImages How many image attachments were kept
 	 * @param skippedReasons Why each skipped attachment was skipped
 	 */
-	record EmailAccepted(long sizeBytes, int keptImages, List<SkippedAttachment.Reason> skippedReasons) implements IntakeActivity {
+	record EmailAccepted(long sizeBytes, int keptImages, List<SkippedAttachmentReason> skippedReasons) implements IntakeActivity {
 		public EmailAccepted {
 			skippedReasons = List.copyOf(skippedReasons);
 		}

@@ -6,7 +6,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import org.parasol.intake.workflow.ClaimIntakeFlow;
-import org.parasol.intake.workflow.IntakeRun;
+import org.parasol.intake.model.IntakeRun;
 
 import io.serverlessworkflow.impl.lifecycle.WorkflowExecutionListener;
 import io.serverlessworkflow.impl.lifecycle.WorkflowStartedEvent;

@@ -26,7 +26,7 @@ import org.parasol.intake.IntakeScenario;
 import org.parasol.intake.IntakeScenario.Mail;
 import org.parasol.intake.MissingItem;
 import org.parasol.intake.review.ClaimReviewService;
-import org.parasol.intake.review.ReviewOutcome;
+import org.parasol.intake.model.ReviewOutcome;
 import org.parasol.intake.review.rest.ReviewDecisionRequest.Fields;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
 import org.parasol.problem.ProblemDetail;

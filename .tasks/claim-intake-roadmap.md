@@ -10,7 +10,7 @@ in `github-issues/created.md`.
 
 **Status (2026-11-12): complete.** Every step is done, and the tracking issue #217 is closed. #221 (the decision-model
 spike) is now a standalone issue rather than a sub-issue of #217. What's left lives in #286 (upstream-gated
-workarounds, deferred review findings, manual checks), #221, #232 (ArchUnit) and #281 (chat bot emails in the
+workarounds, deferred review findings, manual checks), #221, #232 (ArchUnit; rules written, awaiting review and PR as of 2026-11-16) and #281 (chat bot emails in the
 correspondence).
 
 | # | Issue (GitHub title) | Plan | Depends on |
@@ -36,6 +36,12 @@ than one replica (unblocked, and independent of everything above). #284 was plan
 [`08-gh284-intake-restart-survival/PLAN.md`](08-gh284-intake-restart-survival/PLAN.md) (retitled *Make the email intake survive restarts (single replica)* on 2026-11-12) covers restart survival
 (Flyway in place of `drop-and-create`, review reclaim, Processing recovery); single replica stays the supported topology and the limitation is documented. A Kubernetes
 Lease and a database signal table were built and removed as too much for a demo.
+
+**Related, not part of the numbered order:** #232 Bring in ArchUnit (planned 2026-11-13; plan in
+[`09-gh232-architecture-tests/PLAN.md`](09-gh232-architecture-tests/PLAN.md)). It enforces the module boundaries
+(`ai.scoring` extractable as a library, the intake as a would-be separate app) and turns comment-only invariants into
+build failures. Two refactorings come first: an `ai.scoring` Flow adapter takes the conversation id out of the intake,
+and the intake's package cycles are broken by moving classes.
 
 **Related, not part of the numbered order:** #290 Triage the unrecognized configuration keys reported at startup
 (planned 2026-11-03; body in `github-issues/issue-10-unrecognized-config-keys.md`, plan in

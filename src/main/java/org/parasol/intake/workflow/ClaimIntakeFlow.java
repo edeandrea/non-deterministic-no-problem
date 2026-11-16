@@ -18,16 +18,16 @@ import java.util.function.UnaryOperator;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
-import org.parasol.intake.review.ReviewDecided;
-import org.parasol.intake.review.ReviewDecisionPublisher;
-import org.parasol.intake.review.ReviewOutcome;
+import org.parasol.intake.model.IntakeRun;
+import org.parasol.intake.model.IntakeState;
+import org.parasol.intake.model.ReviewDecided;
+import org.parasol.intake.model.ReviewOutcome;
 import org.parasol.intake.workflow.mail.FileEmailStep;
 import org.parasol.intake.workflow.mail.ReplySteps;
 import org.parasol.intake.workflow.outcome.ApplyOutcomeStep;
 import org.parasol.intake.workflow.policy.PolicyCheckStep;
 import org.parasol.intake.workflow.review.AfterDecision;
 import org.parasol.intake.workflow.review.ReviewDecisionSteps;
-import org.parasol.intake.workflow.review.SupersedeStep;
 
 import io.quarkiverse.flow.Flow;
 import io.quarkiverse.flow.dsl.FuncCallStep;
@@ -36,6 +36,7 @@ import io.quarkiverse.flow.dsl.types.ContextFunction;
 import io.serverlessworkflow.api.types.FlowDirectiveEnum;
 import io.serverlessworkflow.api.types.Workflow;
 import io.serverlessworkflow.impl.WorkflowContextData;
+import io.serverlessworkflow.impl.WorkflowInstance;
 
 /**
  * The email claim intake, start to finish. It's the only place with side effects: every step is a call into a
@@ -97,6 +98,10 @@ public class ClaimIntakeFlow extends Flow {
 	 */
 	public static final String ROUTE_DECISION = "routeDecision";
 
+	// The instance metadata key a run's conversation id is published under. Whatever attaches conversation ids to spans reads it by this
+	// name, so the intake needs no type from it. A run created any other way than newRun silently has no conversation id on its spans
+	private static final String CONVERSATION_ID_METADATA = "gen_ai.conversation.id";
+
 	private final ClaimMatchingSteps claimMatchingSteps;
 	private final AgentStep agenticRoot;
 	private final PolicyCheckStep policyCheckStep;
@@ -124,6 +129,20 @@ public class ClaimIntakeFlow extends Flow {
 		this.replySteps = replySteps;
 		this.fileEmailStep = fileEmailStep;
 		this.reviewDecisionSteps = reviewDecisionSteps;
+	}
+
+	/**
+	 * Creates a run, not yet started, that carries its conversation id as instance metadata. Every intake run is created
+	 * here, never with {@link #instance(Object)}.
+	 *
+	 * @param run The run's input
+	 * @return The instance; the caller starts it
+	 */
+	public WorkflowInstance newRun(IntakeRun run) {
+		var instance = instance(run);
+		instance.addMetadataIfAbsent(CONVERSATION_ID_METADATA, run::conversationId);
+
+		return instance;
 	}
 
 	@Override
@@ -160,7 +179,7 @@ public class ClaimIntakeFlow extends Flow {
 				// Wait for the reviewer's decision, and apply it
 				// Records that this run is about to wait, for any application instance to read: Flow's own status isn't visible outside the application instance that hosts the run
 				withContext(AWAIT_REVIEW, this::awaitReview, Object.class, Object.class),
-				listen(WAIT_REVIEW, toOne(consumed(ReviewDecisionPublisher.REVIEW_DECIDED).dataAs(ReviewDecided.class, this::isForThisRun)).first()),
+				listen(WAIT_REVIEW, toOne(consumed(ReviewDecided.REVIEW_DECIDED).dataAs(ReviewDecided.class, this::isForThisRun)).first()),
 				switchWhenOrElse(ROUTE_DECISION, ReviewDecided::isReviewReady, MARK_IN_PROCESS, MARK_PENDING_INFORMATION, ReviewDecided.class),
 
 				// A fault in the decision step puts the claim back in review, and afterDecision sends the same run back to its wait

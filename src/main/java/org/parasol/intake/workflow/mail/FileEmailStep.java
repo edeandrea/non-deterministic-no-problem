@@ -12,7 +12,7 @@ import org.parasol.intake.model.IntakeOutcome;
 import org.parasol.intake.observability.EmailOutcome;
 import org.parasol.intake.observability.IntakeActivities;
 import org.parasol.intake.observability.IntakeActivity.EmailHandled;
-import org.parasol.intake.workflow.IntakeState;
+import org.parasol.intake.model.IntakeState;
 
 import io.quarkus.logging.Log;
 

@@ -19,7 +19,7 @@ import org.parasol.intake.reply.CustomerName;
 import org.parasol.intake.reply.IntakeReplySender;
 import org.parasol.intake.reply.IntakeTemplates;
 import org.parasol.intake.reply.ThreadingHeaders;
-import org.parasol.intake.workflow.IntakeState;
+import org.parasol.intake.model.IntakeState;
 
 import io.quarkus.mailer.MailTemplate.MailTemplateInstance;
 

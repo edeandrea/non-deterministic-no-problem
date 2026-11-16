@@ -12,10 +12,9 @@ import java.util.stream.Stream;
 
 import org.parasol.claim.model.IntakeClaimStatus;
 import org.parasol.intake.MissingItem;
-import org.parasol.intake.mailbox.SkippedAttachment;
 import org.parasol.intake.model.EmailType;
 import org.parasol.intake.reply.IntakeTemplates;
-import org.parasol.intake.review.ReviewOutcome;
+import org.parasol.intake.model.ReviewOutcome;
 
 import io.quarkus.mailer.MailTemplate.MailTemplateInstance;
 
@@ -68,7 +67,7 @@ final class IntakeMeterSchema {
 			meter("claim.intake.watcher.reconnects", Map.<String, Set<String>>of()),
 			meter("claim.intake.email.latency", Map.of("outcome", Arrays.stream(EmailOutcome.values()).map(EmailOutcome::tag).collect(Collectors.toSet()))),
 			meter("claim.intake.attachments", Map.of("result", Set.of("kept", "skipped"),
-				"reason", Stream.concat(Stream.of("none"), Arrays.stream(SkippedAttachment.Reason.values()).map(reason -> reason.name().toLowerCase(Locale.ROOT))).collect(Collectors.toSet()))),
+				"reason", Stream.concat(Stream.of("none"), Arrays.stream(SkippedAttachmentReason.values()).map(reason -> reason.name().toLowerCase(Locale.ROOT))).collect(Collectors.toSet()))),
 			meter("claim.intake.email.size", Map.<String, Set<String>>of()),
 			meter("claim.intake.classifications", Map.of("email_type", Arrays.stream(EmailType.values()).map(type -> type.name().toLowerCase(Locale.ROOT)).collect(Collectors.toSet()),
 				"matched_claim", Arrays.stream(MatchedClaimKind.values()).map(MatchedClaimKind::tag).collect(Collectors.toSet()))),

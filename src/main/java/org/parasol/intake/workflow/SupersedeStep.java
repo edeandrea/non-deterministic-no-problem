@@ -1,4 +1,4 @@
-package org.parasol.intake.workflow.review;
+package org.parasol.intake.workflow;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -15,10 +15,9 @@ import org.parasol.claim.model.Claim;
 import org.parasol.claim.model.IntakeClaimStatus;
 import org.parasol.intake.model.ClaimIntakeState;
 import org.parasol.intake.model.IntakeOutcome;
-import org.parasol.intake.workflow.ClaimIntakeFlow;
-import org.parasol.intake.workflow.EmailRequeued;
-import org.parasol.intake.workflow.IntakeState.Disposition;
-import org.parasol.intake.workflow.IntakeState;
+import org.parasol.intake.model.EmailRequeued;
+import org.parasol.intake.model.IntakeState.Disposition;
+import org.parasol.intake.model.IntakeState;
 
 import io.quarkus.logging.Log;
 import io.serverlessworkflow.impl.WorkflowInstance;

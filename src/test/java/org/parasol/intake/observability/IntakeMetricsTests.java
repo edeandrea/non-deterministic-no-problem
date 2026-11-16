@@ -41,10 +41,10 @@ import org.parasol.intake.observability.IntakeActivity.NewClaimExtracted;
 import org.parasol.intake.observability.IntakeActivity.ClaimStatusChanged;
 import org.parasol.intake.observability.IntakeActivity.ReviewDecisionApplied;
 import org.parasol.intake.reply.IntakeReplySender;
-import org.parasol.intake.review.ReviewDecided;
-import org.parasol.intake.review.ReviewDecision;
-import org.parasol.intake.review.ReviewOutcome;
-import org.parasol.intake.review.ReviewedFields;
+import org.parasol.intake.model.ReviewDecided;
+import org.parasol.intake.model.ReviewDecision;
+import org.parasol.intake.model.ReviewOutcome;
+import org.parasol.intake.model.ReviewedFields;
 import org.parasol.intake.workflow.outcome.ApplyOutcomeStep;
 import org.parasol.intake.workflow.review.ReviewDecisionSteps;
 

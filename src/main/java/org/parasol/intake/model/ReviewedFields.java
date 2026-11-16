@@ -1,4 +1,4 @@
-package org.parasol.intake.review;
+package org.parasol.intake.model;
 
 import java.time.LocalDate;
 import java.time.LocalTime;

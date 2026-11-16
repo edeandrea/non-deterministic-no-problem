@@ -2,17 +2,19 @@ package org.parasol.chat.ai;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.argThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.net.URI;
+import java.time.Duration;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
@@ -51,7 +53,7 @@ class ClaimWebsocketChatBotTests {
 		when(this.claimService.chat(argThat(CHAT_SERVICE_MATCHER)))
 			.thenReturn(reply);
 
-		var messages = new ArrayList<String>();
+		var messages = new CopyOnWriteArrayList<String>();
 
 		try (var client = createClient()) {
 			var session = client.builder()
@@ -60,9 +62,11 @@ class ClaimWebsocketChatBotTests {
 
 			session.chat(Map.of("query", new ClaimBotQuery(1, CLAIM, QUERY, INCEPTION_DATE)));
 
-			assertThat(messages)
-				.singleElement()
-				.isEqualTo(reply);
+			await()
+				.atMost(Duration.ofSeconds(10))
+				.untilAsserted(() -> assertThat(messages)
+					.singleElement()
+					.isEqualTo(reply));
 		}
 
 		verify(this.claimService).chat(argThat(CHAT_SERVICE_MATCHER));

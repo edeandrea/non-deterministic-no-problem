@@ -26,7 +26,7 @@ import org.parasol.intake.IntakeScenario.Mail;
 import org.parasol.intake.StartedRuns;
 import org.parasol.intake.TestSpans;
 import org.parasol.intake.config.IntakeConfig;
-import org.parasol.intake.review.ReviewOutcome;
+import org.parasol.intake.model.ReviewOutcome;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
 import org.parasol.intake.workflow.review.ReviewDecisionSteps;
 

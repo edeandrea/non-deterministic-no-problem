@@ -1,4 +1,4 @@
-package org.parasol.intake.workflow;
+package org.parasol.intake.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -13,14 +13,7 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 import org.parasol.claim.model.ClaimCategory;
 import org.parasol.intake.MissingItem;
-import org.parasol.intake.model.ClaimExtraction;
-import org.parasol.intake.model.IncidentDetails;
-import org.parasol.intake.model.IntakeOutcome;
-import org.parasol.intake.review.ReviewDecided;
-import org.parasol.intake.review.ReviewDecision;
-import org.parasol.intake.review.ReviewOutcome;
-import org.parasol.intake.review.ReviewedFields;
-import org.parasol.intake.workflow.IntakeState.Disposition;
+import org.parasol.intake.model.IntakeState.Disposition;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.test.junit.QuarkusTest;

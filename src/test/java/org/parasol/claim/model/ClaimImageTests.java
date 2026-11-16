@@ -126,7 +126,7 @@ class ClaimImageTests {
 		var claim = newClaim();
 		ClaimImage.store(claim, ClaimImageKind.ORIGINAL, "empty.jpg", ClaimImageContentType.JPEG, new byte[0]);
 
-		// A lambda, not ClaimImage::flush: Panache only enhances direct calls to its static methods
+		// A lambda, not ClaimImage::flush (PanacheMethodReferenceArchTests enforces this): Panache only enhances direct calls to its static methods
 		assertThatThrownBy(() -> ClaimImage.flush())
 			.isInstanceOf(ConstraintViolationException.class)
 			.hasMessageContaining("data");

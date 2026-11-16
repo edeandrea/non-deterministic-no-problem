@@ -1,4 +1,4 @@
-package org.parasol.claim.rest;
+package org.parasol.intake.model;
 
 import static io.restassured.RestAssured.get;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -15,7 +15,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.parasol.claim.model.Claim;
 import org.parasol.intake.IntakeScenario;
-import org.parasol.intake.model.ClaimIntakeState;
 
 import io.quarkus.test.junit.QuarkusTest;
 
