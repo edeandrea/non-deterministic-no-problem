@@ -1316,7 +1316,12 @@ Beyond the global Java/Quarkus style rules in `CODE_STANDARDS.md`, this repo spe
 - **US English** everywhere: code, comments, docs, task files and commit messages ("canceled", "behavior",
   "labeled", "serialize", "organize", "color"). Identifiers from libraries keep their own spelling (e.g. Flow's
   `WorkflowStatus.CANCELLED`).
-- `io.quarkus.logging.Log` static methods (`Log.debugf`, `Log.warnf`) — no `Logger` fields.
+- **Logging:** always the simplified `io.quarkus.logging.Log` static methods (`Log.debugf`, `Log.warnf`), in beans and plain classes alike (Quarkus generates the
+  `private static final Logger` field at build time, in any application class): never a `Logger` field. The one exception is `ai.scoring.conversation.ConversationEvents`,
+  which keeps a JBoss `Logger` because the conversation core may not reference `io.quarkus`. No `System.out`/`err`, `printStackTrace`, `java.util.logging`, SLF4J, Lombok or
+  legacy date types (`java.util.Date`, `Calendar`, `SimpleDateFormat`, `java.sql.Date`/`Timestamp`; `MimeMessageParser` adapts Jakarta Mail's `Date`). These conventions, plus package-private
+  `@Path` classes with public endpoint methods, no `@Inject` fields (bar `NotificationService`) and no `ManagedExecutor`, are enforced by `CodingConventionArchTests`
+  (`org.parasol.architecture`); each exemption is a named constant there.
 - `@ConfigMapping` interfaces with `@WithDefault` — not `@ConfigProperty` fields.
 - Constructor injection in `ai.scoring`; `org.parasol.notification.service.NotificationService` still uses `@Inject`
   fields (legacy — prefer constructor injection for new code).

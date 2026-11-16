@@ -73,10 +73,9 @@ New `src/test/java/org/parasol/architecture/CodingConventionArchTests.java`,
 
 ## Done When
 
-- [ ] `CodingConventionArchTests` covers resources, field injection, `ManagedExecutor`, the bean/non-bean logging rule,
+- [x] `CodingConventionArchTests` covers resources, field injection, `ManagedExecutor`, the always-`Log` logging rule,
       console/JUL/SLF4J, legacy date types and Lombok, all green.
-- [ ] `InboxIdle` logs through a JBoss `Logger` field, and `DriftDetectionChatRouteExceptionHandler`'s bean status is
-      settled and recorded in `PLAN.md`.
-- [ ] Each rule was shown failing once on a deliberate violation.
-- [ ] `CLAUDE.md` → Conventions states the logging rule and names the test.
-- [ ] `./mvnw -B clean verify -Pollama` is green.
+- [x] Logging is always `Log` (decision recorded in `PLAN.md`); no production change was needed.
+- [x] Each rule was shown failing once on a deliberate violation.
+- [x] `CLAUDE.md` → Conventions states the logging rule and names the test.
+- [x] `./mvnw -B clean verify -Pollama` is green.

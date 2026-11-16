@@ -61,7 +61,7 @@ Edit or create task files and update `## Task Plan`.
 - [x] [task-04-domain-boundaries.md](task-04-domain-boundaries.md): Rules 2 and 3, the baggage rule and the boundary hardening
 - [x] [task-05-intake-package-cycles.md](task-05-intake-package-cycles.md): Break the intake's package tangle by moving classes, then enforce it
 - [x] [task-06-intake-and-interceptor-rules.md](task-06-intake-and-interceptor-rules.md): Rules 4 (app-wide) and 5, the intake AI service opt-outs and the run-creation rule
-- [ ] [task-07-coding-conventions.md](task-07-coding-conventions.md): Coding-convention rules (resources, injection, executors, logging, dates)
+- [x] [task-07-coding-conventions.md](task-07-coding-conventions.md): Coding-convention rules (resources, injection, executors, logging, dates)
 - [ ] [task-08-gotchas-rest-config-rules.md](task-08-gotchas-rest-config-rules.md): REST and persistence, Panache method references, JSON-safe run data, config/transactions/exceptions, test naming
 - [ ] [task-09-docs-and-verification.md](task-09-docs-and-verification.md): Documentation, mutation check, verification and the PR
 
@@ -323,6 +323,15 @@ All six intake `@RegisterAiService`s set both `retrievalAugmentor = NoRetrievalA
   final `@MailClientSpan`, `@InjectMock ClaimSummaryAgent`, `installMockForType`, a missing `chatMemoryProviderSupplier`, `Flow.instance` and
   `definition().instance` in `handOver`). Decisions: Quarkus already rejects a private `@Scheduled` method (`SchedulerProcessor`), so no `@Scheduled` rule;
   a class-level interceptor binding isn't forbidden (none exists). The "Non-private…" comments stay, the four missing ones weren't added.
+
+- **Task 07 (coding conventions, 2026-11-16):** `org.parasol.architecture.CodingConventionArchTests` holds 10 rules. **Logging decision (user, 2026-11-16): always the
+  simplified `io.quarkus.logging.Log` API, bean or not.** Verified empirically: a scratch unscoped class calling `Log` from a static and an instance method logged under
+  its own category and had a generated `static final org.jboss.logging.Logger` field (the guide only restricts `Log` to application classes, not dependencies or extensions).
+  So the planned bean/non-bean split was dropped, `InboxIdle` and `DriftDetectionChatRouteExceptionHandler` were left on `Log`, and one rule
+  (`LOGGING_USES_THE_SIMPLIFIED_LOG_API`) forbids any dependency on `org.jboss.logging.Logger` outside `ConversationEvents`. Facts later tasks need:
+  - **Exemption rules are written positively** (`fields().that().areAnnotatedWith(Inject).should().beDeclaredInClassesThat().haveFullyQualifiedName(...)`),
+    because `no…that(not exempt)` can match nothing and `failOnEmptyShould` stays on.
+  - Shown failing on scratch violations, every rule. `NO_LOMBOK` needed a stand-in annotation in a scratch `lombok` package (Lombok isn't on the classpath), since the rule matches by package name.
 
 ### Caveats & Problems
 - **A stale `META-INF/services` file survives in `target/classes`.** `./mvnw test` without `clean` doesn't remove a
