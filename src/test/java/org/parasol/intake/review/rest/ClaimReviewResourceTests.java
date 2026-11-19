@@ -11,6 +11,7 @@ import static org.mockito.Mockito.doAnswer;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -83,7 +84,7 @@ class ClaimReviewResourceTests extends IntakeFlowTestBase {
 
 		await()
 			.atMost(IntakeScenario.WAIT)
-			.until(() -> this.scenario.instanceRows() == 0);
+			.untilAsserted(() -> assertThat(this.scenario.instanceRows()).as("intake runs still persisted").isZero());
 
 		assertThat(run.status()).isEqualTo(WorkflowStatus.COMPLETED);
 	}
@@ -113,7 +114,7 @@ class ClaimReviewResourceTests extends IntakeFlowTestBase {
 			.satisfies(reply -> assertThat(reply.body()).contains("- location", "- category").doesNotContain("incident description", "incident date"));
 		await()
 			.atMost(IntakeScenario.WAIT)
-			.until(() -> this.scenario.instanceRows() == 0);
+			.untilAsserted(() -> assertThat(this.scenario.instanceRows()).as("intake runs still persisted").isZero());
 	}
 
 	@Test
@@ -457,16 +458,21 @@ class ClaimReviewResourceTests extends IntakeFlowTestBase {
 		assertThat(getReview(created.claim().id).version()).isNotEqualTo(review.version());
 	}
 
+	// The other side of the race, a decision that wins and a reply that then finds the claim being decided, is
+	// ClaimIntakeReviewTests.aReplyThatFindsTheClaimBeingDecidedWaitsForTheDecisionThenGetsAStatusReply
 	@Test
-	void aReplyAndADecisionRaceAndExactlyOneWins() throws Exception {
+	void aReplyThatSupersedesTheReviewBeforeTheDecisionLandsWinsAndTheDecisionIsRejected() throws Exception {
 		var created = createClaim(SENDER, COMPLETE_DETAILS);
-		this.scenario.awaitWaitingRun(created.claim().id);
+		var oldRun = this.scenario.awaitWaitingRun(created.claim().id);
 		var review = getReview(created.claim().id);
 
+		// The decision is held until the reply has superseded the review, so the reply wins the lock every time. A sleep
+		// would let either side win, depending on how long the reply's agents take
 		var entered = new CountDownLatch(1);
+		var superseded = new CountDownLatch(1);
 		doAnswer(invocation -> {
 			entered.countDown();
-			Thread.sleep(300);
+			assertThat(superseded.await(30, TimeUnit.SECONDS)).as("the reply superseded the review").isTrue();
 
 			return invocation.callRealMethod();
 		})
@@ -481,27 +487,18 @@ class ClaimReviewResourceTests extends IntakeFlowTestBase {
 
 		assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
 		var replyId = this.scenario.submit(Mail.from(SENDER).inReplyTo(created.messageId()).body("Actually Oak Avenue. " + marker));
+		await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.scenario.waitingRun(created.claim().id).filter(run -> !run.id().equals(oldRun.id())), Optional::isPresent);
+		superseded.countDown();
 		var decision = decisionResponse.get(30, TimeUnit.SECONDS);
 
-		if (decision.statusCode() == Status.ACCEPTED.getStatusCode()) {
-			// The decision won the lock: the claim moves on, and the losing reply is handled once it does (a status
-			// reply, since an In Process claim is never updated)
-			await()
-				.atMost(IntakeScenario.WAIT)
-				.until(() -> this.scenario.claim(created.claim().id).status.equals("In Process"));
-			this.scenario.awaitFiled(replyId);
-			assertThat(this.scenario.awaitReplies(SENDER, 3))
-				.last()
-				.satisfies(reply -> assertThat(reply.body()).contains(STATUS_ANSWER));
-		}
-		else {
-			// The reply won the lock: it superseded the review before the decision could claim it, so the decision loses
-			// and sends no email
-			assertThat(getProblem(decision, Status.CONFLICT).detail()).isNotBlank();
-			this.scenario.awaitFiled(replyId);
-			assertThat(this.scenario.waitingRun(created.claim().id)).isPresent();
-			assertThat(this.scenario.awaitReplies(SENDER, 2)).hasSize(2);
-		}
+		// The reply won the lock: it superseded the review before the decision could claim it, so the decision loses and
+		// sends no email
+		assertThat(getProblem(decision, Status.CONFLICT).detail()).isNotBlank();
+		this.scenario.awaitFiled(replyId);
+		assertThat(oldRun.status()).isEqualTo(WorkflowStatus.CANCELLED);
+		assertThat(this.scenario.awaitReplies(SENDER, 2)).hasSize(2);
 	}
 
 	private static ClaimReviewState getReview(long claimId) {

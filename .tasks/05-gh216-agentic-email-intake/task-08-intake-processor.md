@@ -312,7 +312,7 @@ Outcomes (agent gotchas).
 - `IntakeReplySender.sendTemplateReply(template, recipient, subject, claimNumber, inReplyTo, references)` and
   `sendTextReply(...)`, both blocking; `IntakeTemplates` (`receivedFinalReview`, `claimInProcess`, `missingInformation`,
   `stillMissingInformation`, `processingProblem`, `policyInconsistency`, `notAClaim`, `noMatchingClaim`, `whichClaim`);
-  `CustomerName.forReply(email, Optional<Claim>)`.
+  `CustomerName.forReply(email, Optional<Claim>)` (since #286: `Optional<CustomerName.ClaimOwner>`, a two-string record).
 - `IntakeConfig` (`address`, `folders`, `limits.maxBodyCharacters/maxImageSize/maxImages`), `IntakeClaimStatus`
   (labels), `MissingItem`.
 - Agents: `ClaimsMailboxAgent.process(correspondence, matchedClaim, extractedSoFar, requestedItems, sentDate,

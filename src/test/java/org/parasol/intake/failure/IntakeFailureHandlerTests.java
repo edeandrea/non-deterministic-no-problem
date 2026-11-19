@@ -26,7 +26,7 @@ class IntakeFailureHandlerTests extends IntakeFlowTestBase {
 
 		await()
 			.atMost(Duration.ofSeconds(30))
-			.until(() -> this.scenario.inFolder(MailFolder.FAILED).size() == 1);
+			.untilAsserted(() -> assertThat(this.scenario.inFolder(MailFolder.FAILED)).as("emails filed as failed").hasSize(1));
 
 		assertThat(this.scenario.awaitReplies(SENDER, 1))
 			.singleElement()

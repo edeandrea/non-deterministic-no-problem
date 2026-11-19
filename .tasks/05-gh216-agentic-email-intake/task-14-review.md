@@ -244,3 +244,23 @@ keys (637 tests, 0 failures).
 
 **Out of scope by standing decision, not findings:** `images/arch.png` (a source-less raster), no durable state across
 restarts, and the single-replica requirement ([#284](https://github.com/edeandrea/non-deterministic-no-problem/issues/284)).
+
+## Follow-up: style and test-suite findings closed in #286
+
+Done on a branch off `main` after the feature merged; the numbers refer to the lists above.
+
+| Finding | Resolution |
+|---|---|
+| CIDQ-6 | `reviewOpenedAt` is cleared explicitly in `applyReady` / `applyNeedsInformation`, after `recordDecision` reads it; `snapshot` only reads. |
+| CIDQ-8 | Imports for the inline fully-qualified names in `ClaimReference`, `ReplySteps` and `ReviewDecisionSteps`. |
+| CIDQ-9 | `CustomerName.forReply` takes `Optional<CustomerName.ClaimOwner>` (client name and address); `ClaimView.owner()` replaces `asClaim()`. |
+| CIDQ-11 | `IntakeMetrics.gauges` is `final`, assigned once. |
+| CIDQ-12 | `MailClientSpanInterceptor` builds the span attributes with a stream and applies them in a loop, and its annotation lookup is an `Optional.or` chain ending in a clear exception. `ClaimReviewService.publishUntilTaken` is a plain loop instead of `IntStream.forEach`. |
+| CIDQ-13 | `applyNeedsInformation` is package-private. `isDecisionFor`, `awaitReview` and `restoreReview` stay `public`: `ClaimIntakeFlow` (another package) calls them. |
+| AWAIT-UNTIL-MSG | Every `until(x == y)` in the intake tests is `untilAsserted` with a described AssertJ assertion. |
+| WINDOWED-NEGATIVES | The three "not yet" assertions use Awaitility `during(...)`, so they hold across the window instead of being read once at its end. |
+| NAME-VS-ASSERT | `everyEndedOrCanceledRunLeavesNoFlowRows` cancels one run (a reply) and ends another (a decision), then checks both. |
+| RACE-ONE-BRANCH | `aReplyAndADecisionRaceAndExactlyOneWins` is now `aReplyThatSupersedesTheReviewBeforeTheDecisionLandsWinsAndTheDecisionIsRejected`: a latch holds the decision until the reply has superseded the review, so it always asserts the reply-wins side. The decision-wins side is `ClaimIntakeReviewTests.aReplyThatFindsTheClaimBeingDecidedWaitsForTheDecisionThenGetsAStatusReply`. |
+| WATCHER-BOOT-PATH | `ClaimsInboxWatcherTests.enabledIntakeStartsWatchingAtBoot`; with `onStart`'s condition forced to `false` it fails. |
+| AWAIT-REPLIES-SETTLE | Not changed (open): the 500 ms settle is how `awaitReplies` shows an unexpected extra reply, and no event says "no more are coming". |
+| FLOWROWS-SCOPE | Not changed (open): the zero check stays absolute, as decided in task 14. |

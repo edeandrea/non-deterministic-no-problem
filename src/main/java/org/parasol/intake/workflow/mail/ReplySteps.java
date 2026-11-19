@@ -10,6 +10,7 @@ import jakarta.transaction.Transactional;
 import org.parasol.claim.model.Claim;
 import org.parasol.claim.model.ClaimImage;
 import org.parasol.intake.mailbox.InboundEmail;
+import org.parasol.intake.mailbox.SkippedAttachment;
 import org.parasol.intake.model.IntakeOutcome.NewClaim;
 import org.parasol.intake.model.IntakeOutcome.NoMatchingClaim;
 import org.parasol.intake.model.IntakeOutcome.NotAClaim;
@@ -44,7 +45,7 @@ public class ReplySteps {
 	public IntakeState reply(IntakeState state) {
 		var email = this.emails.require(state.messageId());
 		var claim = Optional.ofNullable(state.claimId()).flatMap(this::claimView);
-		var name = CustomerName.forReply(email, claim.map(ClaimView::asClaim));
+		var name = CustomerName.forReply(email, claim.map(ClaimView::owner));
 
 		switch (state.outcome()) {
 			case NewClaim ignored -> sendClaimReply(state, email, claim.orElseThrow(), name, false);
@@ -108,7 +109,7 @@ public class ReplySteps {
 		Optional<String> name,
 		ClaimView claim,
 		IntakeState state,
-		List<org.parasol.intake.mailbox.SkippedAttachment> skipped) {
+		List<SkippedAttachment> skipped) {
 
 		return isUpdate
 			? IntakeTemplates.stillMissingInformation(name, claim.claimNumber(), state.orderedMissingItems(), claim.hasPhotos(), skipped)
@@ -137,11 +138,8 @@ public class ReplySteps {
 	}
 
 	record ClaimView(String claimNumber, String clientName, String emailAddress, String summary, boolean hasPhotos) {
-		Claim asClaim() {
-			var claim = new Claim();
-			claim.clientName = this.clientName;
-			claim.emailAddress = this.emailAddress;
-			return claim;
+		CustomerName.ClaimOwner owner() {
+			return new CustomerName.ClaimOwner(this.clientName, this.emailAddress);
 		}
 	}
 }

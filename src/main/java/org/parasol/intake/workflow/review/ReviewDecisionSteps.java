@@ -1,8 +1,9 @@
 package org.parasol.intake.workflow.review;
 
-import java.util.HashSet;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -15,6 +16,7 @@ import org.parasol.claim.model.Claim;
 import org.parasol.claim.model.ClaimCorrespondence;
 import org.parasol.claim.model.ClaimImage;
 import org.parasol.claim.model.IntakeClaimStatus;
+import org.parasol.intake.MissingItem;
 import org.parasol.intake.model.ClaimIntakeState;
 import org.parasol.intake.observability.FailureOutcome;
 import org.parasol.intake.observability.FailureStage;
@@ -79,8 +81,8 @@ public class ReviewDecisionSteps {
 		var claim = committing(() -> applyNeedsInformation(decided, runId));
 
 		var items = decided.decision().missingItems().isEmpty()
-			? List.<org.parasol.intake.MissingItem>of()
-			: List.copyOf(java.util.EnumSet.copyOf(decided.decision().missingItems()));
+			? List.<MissingItem>of()
+			: List.copyOf(EnumSet.copyOf(decided.decision().missingItems()));
 
 		sendAfterCommit(run, claim,
 			IntakeTemplates.missingInformation(Optional.ofNullable(claim.clientName()), claim.claimNumber(), items, claim.hasPhotos(), List.of()));
@@ -101,13 +103,16 @@ public class ReviewDecisionSteps {
 
 		recordDecision(ReviewOutcome.READY, IntakeClaimStatus.IN_PROCESS, agreement, intake);
 		recordCompletion(intake.claim);
+		// After recordDecision, which reads it for the review's duration
+		intake.reviewOpenedAt = null;
 
 		return snapshot(intake);
 	}
 
-	// Non-private and non-final, so the transaction interceptor applies to the call from this class
+	// Non-private and non-final, so the transaction interceptor applies to the call from this class. Package-private: only
+	// markPendingInformation calls it
 	@Transactional(TxType.REQUIRES_NEW)
-	public Snapshot applyNeedsInformation(ReviewDecided decided, String runId) {
+	Snapshot applyNeedsInformation(ReviewDecided decided, String runId) {
 		var intake = stateBeingDecided(decided, runId);
 		decided.decision().fields().applyTo(intake.claim);
 		intake.claim.status = IntakeClaimStatus.PENDING_INFORMATION.label();
@@ -116,6 +121,8 @@ public class ReviewDecisionSteps {
 
 		// The agents judged the claim complete, so asking the customer for more disagrees with them
 		recordDecision(ReviewOutcome.NEEDS_INFORMATION, IntakeClaimStatus.PENDING_INFORMATION, ReviewAgreement.OVERRIDDEN, intake);
+		// After recordDecision, which reads it for the review's duration
+		intake.reviewOpenedAt = null;
 
 		return snapshot(intake);
 	}
@@ -202,8 +209,6 @@ public class ReviewDecisionSteps {
 
 	private static Snapshot snapshot(ClaimIntakeState intake) {
 		var claim = intake.claim;
-
-		intake.reviewOpenedAt = null;
 
 		return new Snapshot(claim.claimNumber, claim.clientName, claim.emailAddress, claim.subject, ClaimImage.count("claim", claim) > 0);
 	}

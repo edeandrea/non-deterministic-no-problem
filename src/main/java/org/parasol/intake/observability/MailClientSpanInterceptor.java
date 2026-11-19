@@ -2,6 +2,7 @@ package org.parasol.intake.observability;
 
 import java.time.Duration;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.IntStream;
 
@@ -62,10 +63,10 @@ class MailClientSpanInterceptor {
 
 	@AroundInvoke
 	Object span(InvocationContext context) throws Exception {
+		// getAnnotation returns null when absent, so each lookup is wrapped: a bare orElseGet over it could yield null
 		var binding = Optional.ofNullable(context.getMethod().getAnnotation(MailClientSpan.class))
-			.orElseGet(() -> context.getMethod()
-				.getDeclaringClass()
-				.getAnnotation(MailClientSpan.class));
+			.or(() -> Optional.ofNullable(context.getMethod().getDeclaringClass().getAnnotation(MailClientSpan.class)))
+			.orElseThrow(() -> new IllegalStateException("%s is intercepted but neither it nor its class is annotated with @MailClientSpan".formatted(context.getMethod())));
 		var imap = binding.protocol() == MailClientSpan.Protocol.IMAP;
 		var protocol = binding.protocol().name().toLowerCase(Locale.ROOT);
 		var builder = this.tracer.spanBuilder(protocol + " " + binding.operation())
@@ -75,11 +76,18 @@ class MailClientSpanInterceptor {
 			.setAttribute(SERVER_PORT, (long) (imap ? this.config.imap().port() : this.smtpPort));
 
 		var parameters = context.getMethod().getParameters();
+		var arguments = context.getParameters();
+		var attributes = IntStream.range(0, parameters.length)
+			.mapToObj(i -> Optional.ofNullable(parameters[i].getAnnotation(SpanAttribute.class))
+				.map(SpanAttribute::value)
+				.filter(name -> !name.isEmpty())
+				.map(name -> Map.entry(name, String.valueOf(arguments[i]))))
+			.flatMap(Optional::stream)
+			.toList();
 
-		IntStream.range(0, parameters.length)
-			.forEach(i -> Optional.ofNullable(parameters[i].getAnnotation(SpanAttribute.class))
-				.filter(attribute -> !attribute.value().isEmpty())
-				.ifPresent(attribute -> builder.setAttribute(attribute.value(), String.valueOf(context.getParameters()[i]))));
+		for (var attribute : attributes) {
+			builder.setAttribute(attribute.getKey(), attribute.getValue());
+		}
 
 		var span = builder.startSpan();
 		var startedAt = System.nanoTime();

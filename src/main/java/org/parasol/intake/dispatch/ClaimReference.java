@@ -1,6 +1,8 @@
 package org.parasol.intake.dispatch;
 
+import java.util.Locale;
 import java.util.Optional;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -23,7 +25,7 @@ final class ClaimReference {
 	private static Optional<String> firstClaimNumber(String text) {
 		return Optional.ofNullable(text)
 			.map(CLAIM_NUMBER::matcher)
-			.filter(java.util.regex.Matcher::find)
-			.map(matcher -> matcher.group().toUpperCase(java.util.Locale.ROOT));
+			.filter(Matcher::find)
+			.map(matcher -> matcher.group().toUpperCase(Locale.ROOT));
 	}
 }

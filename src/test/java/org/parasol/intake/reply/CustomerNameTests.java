@@ -9,7 +9,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.parasol.claim.model.Claim;
+import org.parasol.intake.reply.CustomerName.ClaimOwner;
 import org.parasol.intake.mailbox.InboundEmail;
 
 class CustomerNameTests {
@@ -75,11 +75,7 @@ class CustomerNameTests {
 			false);
 	}
 
-	private static Claim claim(String clientName) {
-		var claim = new Claim();
-		claim.clientName = clientName;
-		claim.emailAddress = CLAIM_ADDRESS;
-
-		return claim;
+	private static ClaimOwner claim(String clientName) {
+		return new ClaimOwner(clientName, CLAIM_ADDRESS);
 	}
 }
