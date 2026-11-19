@@ -110,7 +110,7 @@ class ClaimIntakeDispatcherTests extends IntakeFlowTestBase {
 
 		await()
 			.atMost(Duration.ofSeconds(30))
-			.until(() -> this.scenario.inFolder(MailFolder.PROCESSED).size() == 2);
+			.untilAsserted(() -> assertThat(this.scenario.inFolder(MailFolder.PROCESSED)).as("emails filed as processed").hasSize(2));
 
 		assertThat(this.scenario.replies(SENDER)).isEmpty();
 		assertThat(this.scenario.replies("claims@parasol.com")).isEmpty();
@@ -135,6 +135,6 @@ class ClaimIntakeDispatcherTests extends IntakeFlowTestBase {
 		this.scenario.awaitFiled(id);
 		await()
 			.atMost(IntakeScenario.WAIT)
-			.until(() -> this.starter.requeuesOf(id) == 0);
+			.untilAsserted(() -> assertThat(this.starter.requeuesOf(id)).as("requeues still remembered for %s", id).isZero());
 	}
 }

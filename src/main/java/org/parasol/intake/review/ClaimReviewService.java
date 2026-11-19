@@ -10,8 +10,8 @@ import java.util.stream.Stream;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.OptimisticLockException;
-import jakarta.transaction.Transactional.TxType;
 import jakarta.transaction.Transactional;
+import jakarta.transaction.Transactional.TxType;
 
 import org.parasol.claim.model.Claim;
 import org.parasol.intake.config.IntakeConfig;
@@ -22,6 +22,7 @@ import org.parasol.intake.model.ReviewedFields;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
 
 import io.quarkus.logging.Log;
+
 import io.serverlessworkflow.impl.WorkflowStatus;
 
 /**
@@ -120,8 +121,8 @@ public class ClaimReviewService {
 		var settings = this.config.review();
 
 		IntStream.range(0, settings.maxPublishAttempts())
-			.takeWhile(_ -> isBeingDecided(decided))
-			.forEach(_ -> publishAndWait(decided, settings.publishInterval()));
+		         .takeWhile(_ -> isBeingDecided(decided))
+		         .forEach(_ -> publishAndWait(decided, settings.publishInterval()));
 
 		if (isBeingDecided(decided)) {
 			restoreReview(decided.claimId(), decided.runId());

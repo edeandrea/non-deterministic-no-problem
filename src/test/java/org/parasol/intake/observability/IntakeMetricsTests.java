@@ -662,7 +662,7 @@ class IntakeMetricsTests extends IntakeFlowTestBase {
 		this.scenario.decide(claim.id, ReviewOutcome.READY, Set.of());
 		await()
 			.atMost(IntakeScenario.WAIT)
-			.until(() -> this.registry.get("claim.intake.review.oldest.pending").gauge().value() == 0);
+			.untilAsserted(() -> assertThat(this.registry.get("claim.intake.review.oldest.pending").gauge().value()).isZero());
 	}
 
 	@Test

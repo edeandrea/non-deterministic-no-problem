@@ -3,7 +3,6 @@ package org.parasol.intake.reply;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
-import org.parasol.claim.model.Claim;
 import org.parasol.intake.mailbox.InboundEmail;
 
 /**
@@ -26,24 +25,33 @@ public final class CustomerName {
 	}
 
 	/**
+	 * The two things about a claim that decide the greeting, so the caller needn't build a whole {@code Claim} to pass them.
+	 *
+	 * @param clientName The claim's client name, which may be blank
+	 * @param emailAddress The address the claim was filed from
+	 */
+	public record ClaimOwner(String clientName, String emailAddress) {
+	}
+
+	/**
 	 * The name to greet the customer by.
 	 *
 	 * @param email The customer's email
-	 * @param claim The claim the email resolved to, if any. Leave it empty for replies that must not disclose a claim
+	 * @param claim The owner of the claim the email resolved to, if any. Leave it empty for replies that must not disclose a claim
 	 * @return The name, or empty to fall back to the template's generic greeting
 	 */
-	public static Optional<String> forReply(InboundEmail email, Optional<Claim> claim) {
+	public static Optional<String> forReply(InboundEmail email, Optional<ClaimOwner> claim) {
 		return claim
 			.filter(resolved -> isFromClaimAddress(email, resolved))
-			.flatMap(resolved -> usable(resolved.clientName))
+			.flatMap(resolved -> usable(resolved.clientName()))
 			.or(() -> email.fromName()
 				.flatMap(CustomerName::usable)
 				.filter(name -> !EMAIL_ADDRESS.matcher(name).matches()));
 	}
 
-	private static boolean isFromClaimAddress(InboundEmail email, Claim claim) {
+	private static boolean isFromClaimAddress(InboundEmail email, ClaimOwner claim) {
 		return email.fromAddress()
-			.filter(address -> address.equalsIgnoreCase(claim.emailAddress))
+			.filter(address -> address.equalsIgnoreCase(claim.emailAddress()))
 			.isPresent();
 	}
 

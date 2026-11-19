@@ -2,6 +2,7 @@ package org.parasol.intake.mailbox;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doAnswer;
@@ -333,7 +334,7 @@ class ClaimsInboxWatcherTests {
 
 		await()
 			.atMost(WAIT)
-			.until(() -> this.meters.get("claim.intake.watcher.connected").gauge().value() == 1.0);
+			.untilAsserted(() -> assertThat(this.meters.get("claim.intake.watcher.connected").gauge().value()).isEqualTo(1.0));
 
 		watcher.stop();
 
@@ -368,6 +369,32 @@ class ClaimsInboxWatcherTests {
 		watcher.onStart(new StartupEvent());
 
 		assertThat(watcher.isRunning()).isFalse();
+	}
+
+	@Test
+	@ShouldNotPin
+	void enabledIntakeStartsWatchingAtBoot() {
+		// The application's own config, except that the intake is on: %test turns it off so the real watcher stays idle
+		var enabled = mock(IntakeConfig.class, delegatesTo(this.config));
+		when(enabled.enabled()).thenReturn(true);
+		var watcher = new ClaimsInboxWatcher(
+			enabled,
+			this.mailbox,
+			this.received,
+			Settings.from(this.config),
+			this.scheduler,
+			this.virtualThreads,
+			IntakeActivityEvents.into(this.meters)
+		);
+		this.watchers.add(watcher);
+
+		watcher.onStart(new StartupEvent());
+		var messageId = deliver("Delivered after boot");
+
+		assertThat(watcher.isRunning()).isTrue();
+		assertThat(handedOver(1))
+			.singleElement()
+			.returns(messageId, email -> email.messageId().orElseThrow());
 	}
 
 	private ClaimsInboxWatcher startWatcher(Duration idleRefresh) {

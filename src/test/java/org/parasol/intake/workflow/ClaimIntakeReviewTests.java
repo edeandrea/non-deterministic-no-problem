@@ -70,7 +70,7 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 		assertThat(this.stubs.requests()).hasSize(requestsBefore);
 		await()
 			.atMost(IntakeScenario.WAIT)
-			.until(() -> this.scenario.instanceRows() == 0);
+			.untilAsserted(() -> assertThat(this.scenario.instanceRows()).as("intake runs still persisted").isZero());
 		assertThat(run.status()).isEqualTo(WorkflowStatus.COMPLETED);
 	}
 
@@ -168,13 +168,14 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 			this.scenario.publish(new ReviewDecided(created.claim().id, "some-other-run", new ReviewDecision(ReviewOutcome.READY, Set.of(), ReviewedFields.none())));
 		}
 
+		// Held for the whole window, not read once at its end: a wake-up that comes and goes inside it still fails the test
 		await()
-			.pollDelay(Duration.ofSeconds(2))
-			.atMost(Duration.ofSeconds(5))
-			.until(() -> true);
-
-		assertThat(run.status()).isEqualTo(WorkflowStatus.WAITING);
-		assertThat(this.scenario.claim(created.claim().id).status).isEqualTo("Pending Review");
+			.during(Duration.ofSeconds(2))
+			.atMost(Duration.ofSeconds(10))
+			.untilAsserted(() -> {
+				assertThat(run.status()).isEqualTo(WorkflowStatus.WAITING);
+				assertThat(this.scenario.claim(created.claim().id).status).isEqualTo("Pending Review");
+			});
 	}
 
 	@Test
@@ -207,7 +208,9 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 		// The canceled run leaves no Flow rows, and its workflow.execute span is still exported (quarkus-flow#1058, fixed in 1.2.0)
 		await()
 			.atMost(IntakeScenario.WAIT)
-			.until(() -> (this.scenario.instanceRows(oldRunId) == 0) && (this.scenario.taskRows(oldRunId) == 0));
+			.untilAsserted(() -> assertThat(List.of(this.scenario.instanceRows(oldRunId), this.scenario.taskRows(oldRunId)))
+				.as("the canceled run's instance and task rows")
+				.containsExactly(0L, 0L));
 		await()
 			.atMost(IntakeScenario.WAIT)
 			.until(() -> this.spans.ofRun(oldRunId), Optional::isPresent);
@@ -220,7 +223,7 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 		assertThat(this.scenario.awaitReplies(SENDER, 3)).hasSize(3);
 		await()
 			.atMost(IntakeScenario.WAIT)
-			.until(() -> this.scenario.instanceRows() == 0);
+			.untilAsserted(() -> assertThat(this.scenario.instanceRows()).as("intake runs still persisted").isZero());
 	}
 
 	@Test
@@ -254,12 +257,14 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 		var id = this.scenario.submit(Mail.from(SENDER).inReplyTo(created.messageId()).body("One more thing. " + marker));
 
 		// It goes back in the queue: still in the processing folder, not filed, and no reply yet
+		// Held for the whole window: an email filed or answered early and then put back would otherwise go unseen
 		await()
-			.pollDelay(Duration.ofSeconds(1))
-			.atMost(Duration.ofSeconds(5))
-			.until(() -> true);
-		assertThat(this.scenario.inFolder(MailFolder.PROCESSING)).hasSize(1);
-		assertThat(this.scenario.replies(SENDER)).hasSize(1);
+			.during(Duration.ofSeconds(1))
+			.atMost(Duration.ofSeconds(10))
+			.untilAsserted(() -> {
+				assertThat(this.scenario.inFolder(MailFolder.PROCESSING)).hasSize(1);
+				assertThat(this.scenario.replies(SENDER)).hasSize(1);
+			});
 
 		this.scenario.publishUntilWoken(run, new ReviewDecided(created.claim().id, runId, new ReviewDecision(ReviewOutcome.READY, Set.of(), ReviewedFields.none())));
 
@@ -313,11 +318,12 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 
 		// The woken run holds the sender, so the reply hasn't started: no model call mentions it yet
 		await()
-			.pollDelay(Duration.ofSeconds(1))
-			.atMost(Duration.ofSeconds(3))
-			.until(() -> true);
-		assertThat(run.status()).isEqualTo(WorkflowStatus.RUNNING);
-		assertThat(this.stubs.countRequestsFor(marker)).isZero();
+			.during(Duration.ofSeconds(1))
+			.atMost(Duration.ofSeconds(10))
+			.untilAsserted(() -> {
+				assertThat(run.status()).isEqualTo(WorkflowStatus.RUNNING);
+				assertThat(this.stubs.countRequestsFor(marker)).isZero();
+			});
 
 		this.scenario.awaitFiled(id);
 
@@ -422,12 +428,27 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 	@Test
 	void everyEndedOrCanceledRunLeavesNoFlowRows() {
 		var created = createClaim(SENDER, COMPLETE_DETAILS);
-		var runId = this.scenario.awaitWaitingRun(created.claim().id).id();
+		var canceled = this.scenario.awaitWaitingRun(created.claim().id);
+
+		// A reply cancels the waiting run, and a new run takes over the review
+		var marker = marker();
+		stubFollowUp(marker, COMPLETE_DETAILS);
+		this.scenario.awaitFiled(this.scenario.submit(Mail.from(SENDER).inReplyTo(created.messageId()).body("One more thing. " + marker)));
+		var ended = await()
+			.atMost(IntakeScenario.WAIT)
+			.until(() -> this.scenario.waitingRun(created.claim().id).filter(run -> !run.id().equals(canceled.id())), Optional::isPresent)
+			.orElseThrow();
+
+		// A decision ends the new run
 		this.scenario.decide(created.claim().id, ReviewOutcome.READY, Set.of());
 
 		await()
 			.atMost(IntakeScenario.WAIT)
-			.until(() -> this.scenario.instanceRows() == 0);
-		assertThat(this.scenario.taskRows(runId)).isZero();
+			.untilAsserted(() -> assertThat(this.scenario.instanceRows()).as("intake runs still persisted").isZero());
+		assertThat(canceled.status()).isEqualTo(WorkflowStatus.CANCELLED);
+		assertThat(ended.status()).isEqualTo(WorkflowStatus.COMPLETED);
+		assertThat(List.of(this.scenario.taskRows(canceled.id()), this.scenario.taskRows(ended.id())))
+			.as("task rows of the canceled run and of the ended run")
+			.containsExactly(0L, 0L);
 	}
 }

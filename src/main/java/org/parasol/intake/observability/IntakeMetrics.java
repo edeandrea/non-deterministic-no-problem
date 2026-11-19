@@ -70,7 +70,7 @@ class IntakeMetrics {
 	private final AtomicInteger watcherConnected = new AtomicInteger();
 	private final AtomicInteger inboxDepth = new AtomicInteger(-1);
 	private final Counter watcherReconnects;
-	private List<Gauge> gauges = List.of();
+	private final List<Gauge> gauges;
 	private volatile boolean stopped;
 
 	IntakeMetrics(MeterRegistry registry) {
