@@ -33,7 +33,8 @@ public interface ClaimFollowUpAgent {
 	 * variable
 	 * @return the whole reply body
 	 */
-	@Agent(value = "Answers an email about an existing claim", outputKey = "statusAnswer")
+	// name: the agent's gen_ai.agent.name, the kebab-case of its class like every intake agent (quarkus-flow 1.4.0 falls back to the method name)
+	@Agent(name = "claim-follow-up-agent", value = "Answers an email about an existing claim", outputKey = "statusAnswer")
 	// On the method, not the interface: quarkus-langchain4j only reads @ModelName from the @Agent method, and
 	// ignores it on the type (the agent then silently uses the default model)
 	@ModelName("claim-intake")

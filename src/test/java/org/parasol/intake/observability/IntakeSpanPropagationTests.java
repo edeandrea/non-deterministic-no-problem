@@ -55,6 +55,10 @@ class IntakeSpanPropagationTests extends IntakeFlowTestBase {
 	private static final String INCOMPLETE_DETAILS = details(true, "2026-10-07", null, "SINGLE_VEHICLE", null, List.of());
 	// Keeps every run's model calls in flight long enough for the batch's runs to overlap
 	private static final int MODEL_DELAY_MS = 400;
+	// The leaf agents a generated workflow's task runs, by their @Agent names (UnmatchedEmailAgent and ClaimFollowUpAgent too, on other routes)
+	private static final Set<String> LEAF_AGENTS_IN_GENERATED_WORKFLOWS = Set.of("email-classifier-agent", "claim-summary-agent", "claim-sentiment-agent",
+		"incident-details-agent", "claim-follow-up-agent", "unmatched-email-agent");
+
 	private static final String OTHER_SENDER = "john.roe@example.com";
 	private static final String NOT_A_CLAIM_SENDER = "newsletter.reader@example.com";
 
@@ -326,19 +330,32 @@ class IntakeSpanPropagationTests extends IntakeFlowTestBase {
 		assertThat(census.count(Kind.JDBC_PARENTED)).as("parented JDBC spans were seen").isPositive();
 		assertThat(census.count(Kind.MAIL)).as("mail spans were seen").isPositive();
 		var spans = census.entries().stream().map(SpanCensus.Entry::span).toList();
+		// Flow types these itself (quarkiverse/quarkus-flow#1122); the agent names are the composite annotations' name attributes
 		assertThat(spans).filteredOn(span -> span.getName().startsWith("workflow.execute"))
-			.as("the run's own workflow isn't an agent, the nested agentic ones are")
-			.isNotEmpty()
-			.allSatisfy(span -> assertThat(span.getAttributes().get(GenAiIncubatingAttributes.GEN_AI_OPERATION_NAME))
-				.isEqualTo(ClaimIntakeFlow.NAME.equals(span.getAttributes().get(TestSpans.WORKFLOW_NAME)) ? null :
-                   GenAiOperationNameIncubatingValues.INVOKE_AGENT));
-		assertThat(spans).filteredOn(span -> span.getName().startsWith("task.execute"))
-			.as("task.execute spans are chains")
+			.as("the run's own workflow isn't an agent, the nested agentic ones are, named like their workflows")
 			.isNotEmpty()
 			.allSatisfy(span -> {
-				assertThat(span.getAttributes().get(LangfuseFlowSpanTypingProcessor.LANGFUSE_OBSERVATION_TYPE))
-					.isEqualTo(LangfuseFlowSpanTypingProcessor.CHAIN);
-				assertThat(span.getAttributes().get(GenAiIncubatingAttributes.GEN_AI_OPERATION_NAME)).isNull();
+				var isRunWorkflow = ClaimIntakeFlow.NAME.equals(span.getAttributes().get(TestSpans.WORKFLOW_NAME));
+
+				assertThat(span.getAttributes().get(GenAiIncubatingAttributes.GEN_AI_OPERATION_NAME))
+					.isEqualTo(isRunWorkflow ? null : GenAiOperationNameIncubatingValues.INVOKE_AGENT);
+				assertThat(span.getAttributes().get(GenAiIncubatingAttributes.GEN_AI_AGENT_NAME))
+					.isEqualTo(isRunWorkflow ? null : span.getAttributes().get(TestSpans.WORKFLOW_NAME));
+			});
+		// Flow types a task that runs a leaf agent as that agent (quarkiverse/quarkus-flow#1141); Langfuse still shows it as a chain,
+		// since langfuse.observation.type wins there (IntakeLangfuseDeliveryTests). The run's own tasks only call composite agents
+		assertThat(spans).filteredOn(span -> span.getName().startsWith("task.execute"))
+			.as("task.execute spans are chains, and only a generated workflow's leaf-agent task is also an agent")
+			.isNotEmpty()
+			.allSatisfy(span -> assertThat(span.getAttributes().get(LangfuseFlowSpanTypingProcessor.LANGFUSE_OBSERVATION_TYPE))
+				.isEqualTo(LangfuseFlowSpanTypingProcessor.CHAIN))
+			.filteredOn(span -> span.getAttributes().get(GenAiIncubatingAttributes.GEN_AI_OPERATION_NAME) != null)
+			.isNotEmpty()
+			.allSatisfy(span -> {
+				assertThat(span.getAttributes().get(GenAiIncubatingAttributes.GEN_AI_OPERATION_NAME))
+					.isEqualTo(GenAiOperationNameIncubatingValues.INVOKE_AGENT);
+				assertThat(span.getAttributes().get(GenAiIncubatingAttributes.GEN_AI_AGENT_NAME)).isIn(LEAF_AGENTS_IN_GENERATED_WORKFLOWS);
+				assertThat(span.getAttributes().get(TestSpans.WORKFLOW_NAME)).isNotEqualTo(ClaimIntakeFlow.NAME);
 			});
 	}
 

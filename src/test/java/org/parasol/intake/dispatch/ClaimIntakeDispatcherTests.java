@@ -114,7 +114,7 @@ class ClaimIntakeDispatcherTests extends IntakeFlowTestBase {
 
 		assertThat(this.scenario.replies(SENDER)).isEmpty();
 		assertThat(this.scenario.replies("claims@parasol.com")).isEmpty();
-		assertThat(this.scenario.instanceRows()).isZero();
+		assertThat(this.scenario.persistedRunCount()).isZero();
 	}
 
 	@Test

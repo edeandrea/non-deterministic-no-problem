@@ -32,7 +32,7 @@ class IntakeFailureHandlerTests extends IntakeFlowTestBase {
 			.singleElement()
 			.satisfies(reply -> assertThat(reply.firstHeader("In-Reply-To")).isEmpty())
 			.satisfies(reply -> assertThat(reply.firstHeader("References")).isEmpty());
-		assertThat(this.scenario.instanceRows()).isZero();
+		assertThat(this.scenario.persistedRunCount()).isZero();
 		assertThat(this.scenario.claimCount()).isEqualTo(6);
 	}
 

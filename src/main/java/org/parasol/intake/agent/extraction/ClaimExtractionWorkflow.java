@@ -37,7 +37,8 @@ public interface ClaimExtractionWorkflow {
 	 * @param sentDate the newest email's sent date as an ISO {@code yyyy-MM-dd} string
 	 * @return the combined extraction
 	 */
-	@ParallelAgent(outputKey = "claimExtraction", subAgents = {
+	// name: the agent's gen_ai.agent.name, the kebab-case of its class like every intake agent (quarkus-flow 1.4.0 falls back to the method name)
+	@ParallelAgent(name = "claim-extraction-workflow", outputKey = "claimExtraction", subAgents = {
 		ClaimSummaryAgent.class,
 		ClaimSentimentAgent.class,
 		IncidentDetailsAgent.class

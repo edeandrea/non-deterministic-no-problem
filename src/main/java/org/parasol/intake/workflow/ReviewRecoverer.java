@@ -92,10 +92,8 @@ public class ReviewRecoverer {
 		var instance = this.flow.get().newRun(runFor.apply(conversationId, review.claimId()));
 
 		// The instance has to exist before the claim can be taken over, because its id is what's written as the new
-		// reviewRunId. If the take-over then loses, the instance is never started and stays in Flow's in-memory
-		// activeInstances map: cancel() is a no-op on a PENDING instance and removeInstance isn't public
-		// (open-workflow-specification/sdk-java#1816). Harmless — the id was never persisted, so nothing looks it up —
-		// but it is a leaked map entry. Discard the instance here once that issue is resolved.
+		// reviewRunId. If the take-over then loses, the instance is never started and is simply dropped: only start()
+		// registers it in Flow's activeInstances (serverlessworkflow 7.35.4, open-workflow-specification/sdk-java#1816).
 		var hasTakenOver = takeOver(review.claimId(), orphanedRunId, instance.id());
 
 		if (hasTakenOver) {

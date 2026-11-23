@@ -1,27 +1,24 @@
 package org.parasol.intake;
 
+import static io.quarkiverse.flow.dsl.FlowDSL.function;
+import static io.quarkiverse.flow.dsl.FlowWorkflowBuilder.workflow;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.List;
-
 import jakarta.inject.Inject;
-import jakarta.persistence.EntityManager;
 
-import org.hibernate.Session;
 import org.junit.jupiter.api.Test;
 
 import io.quarkus.arc.Arc;
 import io.quarkus.test.junit.QuarkusTest;
 
+import io.serverlessworkflow.impl.WorkflowApplication;
 import io.serverlessworkflow.impl.persistence.PersistenceInstanceReader;
 
-// The app boots with the agentic extension and the four quarkus-flow modules, and Flow's JPA persistence is live
+// The app boots with the agentic extension and the four quarkus-flow modules, and Flow's persistence is live (read through its API only)
 @QuarkusTest
 class IntakeExtensionsTests {
-	private static final List<String> FLOW_TABLES = List.of("cloud_event_entity", "task_info_entity", "workflow_instance_entity");
-
 	@Inject
-	EntityManager entityManager;
+	WorkflowApplication application;
 
 	@Test
 	void flowPersistenceIsAvailable() {
@@ -29,18 +26,17 @@ class IntakeExtensionsTests {
 			.isTrue();
 	}
 
+	// ReviewRecoverer.handOver and ClaimIntakeDispatcher.startRun create an instance they may never start: since
+	// serverlessworkflow 7.35.4 (open-workflow-specification/sdk-java#1816) only start() registers it, so it can't leak
 	@Test
-	void flowTablesAreCreated() {
-		// Hibernate's Session, because its native queries are typed (the EntityManager's return a raw List)
-		var tables = this.entityManager.unwrap(Session.class)
-			.createNativeQuery("""
-				select table_name from information_schema.tables
-				where table_schema = current_schema() and table_name in (:names)
-				order by table_name""", String.class)
-			.setParameter("names", FLOW_TABLES)
-			.getResultList();
+	void anInstanceThatIsNeverStartedIsNotActive() {
+		var definition = this.application.workflowDefinition(workflow("intake-extensions-unstarted")
+			.tasks(function("echo", input -> input, String.class, String.class))
+			.build());
 
-		assertThat(tables)
-			.containsExactlyElementsOf(FLOW_TABLES);
+		var instance = definition.instance("never started");
+
+		assertThat(definition.activeInstance(instance.id()))
+			.isEmpty();
 	}
 }

@@ -179,7 +179,7 @@ public abstract class IntakeFlowTestBase {
 		try {
 			this.scenario.cleanUp();
 			flushSpans();
-			assertNoFlowRowsLeft();
+			assertNoFlowRunsLeft();
 		}
 		finally {
 			this.spans.stopCapture();
@@ -187,16 +187,16 @@ public abstract class IntakeFlowTestBase {
 	}
 
 	/**
-	 * Every one of Flow's three tables is empty once the test's runs are gone: the intake's own runs, the ones quarkus-flow
-	 * generated for the agent topology, their tasks, and the events a waiting run listened for. A generated run can still be
-	 * ending when the test's own assertions have passed, so this waits rather than reading once.
+	 * Flow has no run left persisted once the test's runs are gone: neither the intake's own nor the ones quarkus-flow generated for the
+	 * agent topology (their tasks go with them). A generated run can still be ending when the test's own assertions have passed, so this
+	 * waits rather than reading once.
 	 */
-	private void assertNoFlowRowsLeft() {
+	private void assertNoFlowRunsLeft() {
 		await()
 			.atMost(IntakeScenario.WAIT)
-			.untilAsserted(() -> assertThat(List.of(this.scenario.allInstanceRows(), this.scenario.taskRows(), this.scenario.cloudEventRows()))
-				.as("Flow's workflow_instance_entity, task_info_entity and cloud_event_entity rows left behind")
-				.containsExactly(0L, 0L, 0L));
+			.untilAsserted(() -> assertThat(this.scenario.allPersistedRunCount())
+				.as("Flow runs, the intake's or generated ones, left persisted")
+				.isZero());
 	}
 
 	protected static String details(Boolean described, String date, String location, String category, String policyNumber, List<String> answered) {

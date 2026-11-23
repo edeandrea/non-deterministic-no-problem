@@ -77,14 +77,12 @@ quarkus:
       auto-restore: false
     validation:
       input:
-        # quarkus-flow 1.3.0 turns this on by default (quarkiverse/quarkus-flow#1077). For a quarkus-flow-langchain4j
-        # generated agentic workflow (ClaimsMailboxAgent, ClaimExtractionWorkflow) the generated schema is
-        # unsatisfiable: it marks every field of every record in the agent topology as required, with no
-        # nullable/Optional support, including fields that are the agentic system's own not-yet-computed outputs and
-        # the InvocationParameters execution-context parameter (which langchain4j-agentic deliberately keeps out of
-        # AgenticScope.state()). There is no way to scope this flag to just the hand-authored ClaimIntakeFlow, whose
-        # own IntakeRun input is unaffected. Filed upstream as quarkiverse/quarkus-flow#1111; re-enable once it's
-        # addressed there.
+        # On by default since quarkus-flow 1.3.0 (quarkiverse/quarkus-flow#1077), and still unsatisfiable for the generated
+        # agentic workflows (ClaimsMailboxAgent, ClaimExtractionWorkflow) on 1.4.0. 1.4.0 fixed #1111 (InvocationParameters
+        # and nullable fields), but the generated schema lists an enum's constant names (JandexMethodInputJsonSchema ignores
+        # @JsonValue), while ClaimCategory and MissingItem serialize as their labels, the REST API's contract ("Single
+        # vehicle" is not "SINGLE_VEHICLE"). The flag can't be scoped to the hand-authored ClaimIntakeFlow, whose own
+        # IntakeRun input is unaffected. Re-enable once a released Flow honors @JsonValue (quarkiverse/quarkus-flow#1180, PR #1181)
         enabled: false
 
   langfuse:

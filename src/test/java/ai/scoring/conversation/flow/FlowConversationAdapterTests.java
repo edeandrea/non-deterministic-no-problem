@@ -41,6 +41,7 @@ import io.serverlessworkflow.impl.WorkflowInstance;
 class FlowConversationAdapterTests {
 	private static final AttributeKey<String> CONVERSATION_ID = AttributeKey.stringKey(ConversationContext.CONVERSATION_ID_KEY);
 	private static final AttributeKey<String> INSTANCE_ID = AttributeKey.stringKey("flow.workflow.instance.id");
+	private static final String TASK_EXECUTE = "task.execute";
 	private static final String OTEL_TASK_PROXY = "io.quarkiverse.flow.opentelemetry.runtime.OTelTaskSpanProxy";
 	private static final int CONCURRENT_RUNS = 8;
 	private static final long WAIT_SECONDS = 30;
@@ -153,7 +154,7 @@ class FlowConversationAdapterTests {
 		OBSERVATIONS.put(label, new Observation(
 			this.conversationContext.currentId(),
 			conversationIdOf(ownSpan),
-			spanOf(taskSpan).getName().startsWith(FlowSpanTypingProcessor.TASK_EXECUTE) && (spanOf(taskSpan).getAttribute(INSTANCE_ID) != null),
+			spanOf(taskSpan).getName().startsWith(TASK_EXECUTE) && (spanOf(taskSpan).getAttribute(INSTANCE_ID) != null),
 			conversationIdOf(taskSpan)));
 
 		return label;

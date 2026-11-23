@@ -24,9 +24,6 @@ import org.parasol.intake.mailbox.MailFolder;
 import org.parasol.intake.model.EmailType;
 
 import io.quarkus.test.junit.QuarkusTest;
-import io.serverlessworkflow.impl.WorkflowInstance;
-import io.serverlessworkflow.impl.WorkflowStatus;
-import io.serverlessworkflow.impl.persistence.PersistenceInstanceReader;
 
 /**
  * New claims, end to end against the Compose GreenMail and a stubbed model.
@@ -35,12 +32,6 @@ import io.serverlessworkflow.impl.persistence.PersistenceInstanceReader;
 class ClaimIntakeNewClaimTests extends IntakeFlowTestBase {
 	@Inject
 	IntakeConfig config;
-
-	@Inject
-	ClaimIntakeFlow flow;
-
-	@Inject
-	PersistenceInstanceReader persistedRuns;
 
 	@Test
 	void aCompleteNewClaimWaitsForReviewAndGetsOneReceivedEmail() {
@@ -53,10 +44,12 @@ class ClaimIntakeNewClaimTests extends IntakeFlowTestBase {
 		var claim = this.scenario.awaitClaimOf(SENDER);
 		var run = this.scenario.awaitWaitingRun(claim.id);
 
-		// Persisted as waiting, not only waiting in memory: what the review endpoint (task 10) reads
-		assertThat(this.persistedRuns.find(this.flow.definition(), run.id()))
+		// The claim names the run as the one waiting for its review: what the review endpoint reads, since Flow is a black
+		// box (Flow persists no WAITING status of its own: it writes a status only when a run is suspended)
+		assertThat(this.scenario.intake(claim.id))
 			.get()
-			.returns(WorkflowStatus.WAITING, WorkflowInstance::status);
+			.returns(run.id(), state -> state.reviewRunId)
+			.returns(run.id(), state -> state.reviewWaitingRunId);
 
 		assertThat(this.scenario.claim(claim.id))
 			.returns("Pending Review", c -> c.status)

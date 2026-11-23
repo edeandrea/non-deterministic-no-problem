@@ -330,7 +330,7 @@ and map to DTO records with `ClaimMapper`.
   - **A decision is published directly after the claiming transaction commits, and republished until the run takes it** (#284):
     `ClaimReviewService.submit` first claims the review (`claimReview`, `REQUIRES_NEW`: the open-review, version and fit checks, then the
     run must be ready **and** hosted here: `isReadyForDecision` is `ClaimIntakeState.isReadyForDecision()` and `activeInstance(runId)` is
-    `WAITING` in this instance, else `409` `ReviewRunNotWaitingException`; a `PENDING` instance is a stand-in Flow leaves behind, not a run). Then it
+    `WAITING` in this instance, else `409` `ReviewRunNotWaitingException`). Then it
     publishes through `ReviewDecisionPublisher` every `parasol.intake.review.publish-interval` (default `250ms`) up to
     `parasol.intake.review.max-publish-attempts` (default `20`) times, until the claim's `decidingRunId` no longer names the run (the decision steps
     clear it on success, and on a fault that puts the claim back in review). That republish-until-taken is what closes F2b (a run's `WAITING`
@@ -338,13 +338,20 @@ and map to DTO records with `ClaimMapper`.
     harmless, since `isForThisRun` checks the run id and the claim's state again. A decision nobody takes puts the review back to open
     (`restoreReview`, only while `decidingRunId` still names the run) and is a `409`, so the reviewer decides again. Flow's publisher is in
     memory, so this only reaches runs in this instance: the reason the intake is single replica (see Gotchas).
-  - **Flow is a black box: the app never reads or writes its tables.** "Is the run waiting?" is the app's own
+  - **Flow is a black box: neither the app nor its tests read or write its tables** (`FlowBoundaryArchTests`, over main *and* test code:
+    nothing depends on Flow's JPA layer, `io.quarkiverse.flow.persistence..`, and native SQL or raw JDBC is allowed only in
+    `org.parasol.claim..`, which owns its tables; ArchUnit can't read a table name in an SQL string, so that's the proxy). Tests read Flow's
+    persisted runs through its public `PersistenceInstanceReader` (`PersistedRuns`, test-only, used by `IntakeScenario`). "Is the run waiting?" is the app's own
     `ClaimIntakeState.reviewWaitingRunId`, set by the `awaitReview` task (`ReviewDecisionSteps.awaitReview`) that sits just before
     `waitReview` on every path into it (first arrival, a resumed review, wait-again after a decision fault). The review is ready
     (`isReadyForDecision`) when it equals `reviewRunId`; a new run id or a cleared `reviewRunId` makes the old value harmless, so
     nothing clears it. After a restart the claim names a run nobody hosts, so a decision is a `409` until `ReviewReclaimer` gives the claim a
-    new run. `PersistenceInstanceReader.find` is never used for an intake run (it leaves a `PENDING` stand-in in `activeInstances`,
-    and throws for a run that has waited more than twice).
+    new run. `PersistenceInstanceReader.find` is never used for an intake run, not even in tests: since serverlessworkflow 7.35.4 (quarkus-flow
+    1.4.0) it returns a new, unstarted instance whose status is always `PENDING`, and Flow persists a status only for a suspended run
+    (never `WAITING`). Before 1.4.0 it returned the live instance when there was one, and left a `PENDING` stand-in in `activeInstances`
+    when there wasn't. Only `start()` registers an instance now (open-workflow-specification/sdk-java#1816), so an instance created and never
+    started (a lost take-over in `ReviewRecoverer.handOver`, a `start()` that threw in `ClaimIntakeDispatcher.startRun`) leaves nothing behind;
+    `IntakeExtensionsTests.anInstanceThatIsNeverStartedIsNotActive` pins that.
 
 **The `Claim` entity** (`org.parasol.claim.model`, table `claims`; serialized only through `ClaimDetails`):
 - **`id`** is the Panache numeric primary key (`claims_seq`). REST paths, UI routes, `ClaimBotQuery.claimId`
@@ -575,7 +582,7 @@ imports `ai.scoring`.
     `IntakeLangfuseDeliveryTests` are the guards on the intake side, `FlowConversationAdapterTests` on the adapter's, with a workflow of
     its own.
 - **What else the intake's observability adds** (task 11 of #216):
-  - `ai.scoring.conversation.flow.FlowSpanTypingProcessor` types the `workflow.execute` span of a workflow Flow generated for an agentic interface (named after the interface in kebab case, `flow.workflow.namespace`/`name`; the interface is looked up and must have a `@SequenceAgent`/`@ParallelAgent`/… method; the run's own `claim-intake` workflow isn't one; a stand-in for quarkiverse/quarkus-flow#1122, relying on Flow's naming) as the standard `gen_ai.operation.name=invoke_agent` plus `gen_ai.agent.name` (**a documented workaround, reflection on Flow's naming, no good for native; delete with #1122**); the Langfuse-specific part is `ai.scoring.langfuse.otel.LangfuseFlowSpanTypingProcessor`: `task.execute` (a step, usually plain Java) is a `chain` (`langfuse.observation.type` only; quarkus-langfuse 0.9.1 retains it under `AI_ONLY` without a synthetic GenAI operation name).
+  - **Flow types its own agent spans since quarkus-flow 1.4.0** (quarkiverse/quarkus-flow#1122, which replaced this app's reflective `FlowSpanTypingProcessor`): the `workflow.execute` span of a generated agentic workflow is `gen_ai.operation.name=invoke_agent` with `gen_ai.agent.name` from the composite annotation's `name` (falling back to the method name), and the run's own `claim-intake` workflow isn't typed. **The three composite agents' names** (`claims-mailbox-agent`, `claim-extraction-workflow`, `email-router`) are what the agent names were before 1.4.0 and match `flow.workflow.name`; `IntakeSpanPropagationTests` pins that. Flow also types, at runtime (#1141, `quarkus.flow.otel.genai.detect-agent-calls`, on by default), the `task.execute` span of a generated workflow's task that runs a leaf agent (`classifyEmail-0`, …; task names are the `@Agent` method names) as that agent. **Every intake agent, composite and leaf, sets its annotation's `name` to the kebab-case of its class** (`email-classifier-agent`, `claim-summary-agent`, …), so `gen_ai.agent.name` follows one rule; `IntakeArchTests.EVERY_INTAKE_AGENT_IS_NAMED_AFTER_ITS_CLASS` enforces it, and the name changes no task, span or dataset name. The Langfuse-specific part is `ai.scoring.langfuse.otel.LangfuseFlowSpanTypingProcessor`: every `task.execute` (a step, usually plain Java) is a `chain` (`langfuse.observation.type` only; quarkus-langfuse 0.9.1 retains it under `AI_ONLY` without a synthetic GenAI operation name). A leaf-agent task therefore carries both, and **Langfuse shows it as a `CHAIN`**, since the explicit `langfuse.observation.type` wins (`IntakeLangfuseDeliveryTests`); the stamp is made at `onStart`, before Flow's runtime typing, and deciding later would need the SDK's `internal` `ExtendedSpanProcessor.onEnding`.
   - `@MailClientSpan` (an interceptor binding in `org.parasol.intake.observability`, handled by the package-private `MailClientSpanInterceptor`; a parameter marked
     `@SpanAttribute` becomes a span attribute, as the folder does) wraps `ClaimsMailbox`'s IMAP operations (`imap list|find|move|moveOldest|moveWithoutMessageId`) and `IntakeReplySender`'s `deliver`
     (`smtp send`, the one place the four public send methods hand their send to, so recording the reply isn't inside the span or `claim.intake.mail.client.duration`) in `CLIENT` spans with `messaging.system`, `server.address`, `server.port` and the folder, plus, on a send, `claim.intake.reply.template` (a fixed set, set by `IntakeSpanAttributes` from `ReplySent`, so the sender has no tracing code), never an address or `Message-ID` (a failure
@@ -1126,9 +1133,10 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   - **A rule lives in the package it would travel with**, found by asking where its `that()` side lives: `ai.scoring`'s own rules
     (`ScoringBoundaryArchTests`, `ConversationLayeringArchTests`) in `ai.scoring`, the intake's internals (`IntakeArchTests`: package
     shape and cycles, the agent opt-outs, run creation, JSON-safe run data; `IntakeTestArchTests`: no agent mocks) in `org.parasol.intake`,
-    and anything that would still apply with the intake gone (`DomainBoundaryArchTests`, `InterceptedMethodArchTests`,
+    and anything that would still apply with the intake gone (`DomainBoundaryArchTests`, `FlowBoundaryArchTests`, `InterceptedMethodArchTests`,
     `CodingConventionArchTests`, `RestAndPersistenceArchTests`, `PanacheMethodReferenceArchTests`, `TestNamingArchTests`) in `org.parasol.architecture`.
-    Rules 1 to 3 and the intake's package rules read main code only (`ImportOption.DoNotIncludeTests`); the test-code rules say so explicitly.
+    Rules 1 to 3 and the intake's package rules read main code only (`ImportOption.DoNotIncludeTests`); the test-code rules say so explicitly,
+    and `FlowBoundaryArchTests` reads both.
   - A new rule is shown failing once on a scratch violation before it's kept, and an exemption is written positively
     (`…that().areAnnotatedWith(X).should().beDeclaredInClassesThat()…`) so `failOnEmptyShould` stays on.
   - `src/test/resources/archunit.properties` keeps `archRule.failOnEmptyShould=true`: a rule whose `that()` matches no
@@ -1160,8 +1168,8 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
   Jakarta Mail (the app's `Mailer` can't build multipart/alternative or set arbitrary headers) and reads them back
   through `ClaimsMailbox`: plain text, HTML-only, alternative, image and skipped attachments, auto-reply, bounce and list headers, quoted
   text, find by `Message-ID` and moving between folders. `QuotedTextTests` and `HtmlTextTests` are plain unit tests.
-  `IntakeExtensionsTests` checks the app boots with the agentic and quarkus-flow extensions and Flow's six tables
-  exist. They share the bare `%test` group (stub keys, Easy RAG ingestion off).
+  `IntakeExtensionsTests` checks the app boots with the agentic and quarkus-flow extensions, Flow's persistence is available, and
+  an instance that's never started isn't active. They share the bare `%test` group (stub keys, Easy RAG ingestion off).
 - **Inbox watcher tests** (`ClaimsInboxWatcherTests`, `org.parasol.intake.mailbox`): each test builds its own `ClaimsInboxWatcher` with short timings and a mocked `Event<EmailReceived>`. It can't be `@InjectMock ClaimIntakeDispatcher`: `@InjectMock` disables the observers declared on the mocked bean (quarkusio/quarkus#11122; `@InjectSpy` keeps them, since #51790), so the mock would never be notified. Network faults (connection dropped, silent, unreachable) come from a **Toxiproxy** Testcontainers container, because WireMock only speaks HTTP: `ToxiproxyTestResource` (a `QuarkusTestResourceLifecycleManager`, registered globally by `org.parasol.testing.GlobalTestResources`, so it starts once for the whole run) starts it, and `org.parasol.testing.mail.Toxiproxy` drives it. Its upstream is GreenMail's mapped IMAP port through `host.testcontainers.internal`, since GreenMail is a Compose container. Only the watcher's IDLE session goes through the proxy. Track [quarkus-network-faults#14](https://github.com/quarkiverse/quarkus-network-faults/issues/14) (IMAP support): it may replace this.
 - **Intake workflow tests** (`ClaimIntake*Tests` in `org.parasol.intake.workflow` and its sub-packages, `dispatch` and `failure`; tests sit in the package of what they test) run the real `ClaimIntakeFlow`
   against the Compose GreenMail and a WireMock model, one test per rule: new claims, pending claims and replies, the
@@ -1177,7 +1185,15 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
     and puts the claim back in review can be back in `waitReview` between two polls, and a republish would then hand it a
     second decision, which is how `aFaultInTheDecisionStepPutsTheClaimBackAndTheSameRunWaitsAgain` failed on slow CI
     runners. Callers claim the review first), and cleans up (every Flow run canceled, claims beyond the six seeded ones,
-    recorded emails and intake state). It also owns the tests' database reads and fixtures, as `@Transactional(REQUIRES_NEW)`
+    recorded emails and intake state). Its persisted-run checks (`persistedRunCount`, `isPersisted`, `allPersistedRunCount`,
+    `agenticRunIds`) go through `PersistedRuns`, which reads Flow's `PersistenceInstanceReader.scanAll`/`find` over
+    `WorkflowApplication.workflowDefinitions()`: the database, so a leaked run no live instance points at still shows. Usable since
+    quarkus-flow 1.4.0 (#1155: it threw for a run whose task ran twice; sdk-java#1816: reading left `PENDING` stand-ins). It replaced
+    `FlowRows`' native SQL; task rows go with their instance and the intake stores no events, so neither is counted. Two races to know:
+    `scanAll` must run outside any transaction (it begins its own, which needs a request context: `PersistedRuns` is
+    `@ActivateRequestContext`), and a run that ends mid-scan makes Flow's JPA reader throw a `NullPointerException` (its row is gone
+    before the lazy read of its input), so a scan is retried. Cleanup cancels `definition().activeInstances()` from memory instead of scanning.
+    `IntakeFlowTestBase` asserts after every test that no run of any workflow is left persisted. It also owns the tests' database reads and fixtures, as `@Transactional(REQUIRES_NEW)`
     methods, so the test classes need no `QuarkusTransaction`.
   - `IntakeFlowTestBase` (`org.parasol.intake`, public with `protected` members so every intake test package can extend it: `createClaim`, `stubNewClaim`, `stubFollowUp`) and `ChatStubs.answerWhenAll`: a stub matches the
     last message on **two** texts, a phrase from the agent's prompt and a per-test marker in the email, so each test
@@ -1279,9 +1295,14 @@ Test layout mirrors main: `src/test/java/org/parasol/...` and `src/test/java/ai/
     `InvocationParameters` (which `langchain4j-agentic` deliberately keeps out of `AgenticScope.state()`, so it's
     never actually present to validate against). There is no per-workflow scoping for the flag, so turning it off is
     app-wide; `ClaimIntakeFlow`'s own `IntakeRun` input is unaffected either way. Filed upstream as
-    [quarkiverse/quarkus-flow#1111](https://github.com/quarkiverse/quarkus-flow/issues/1111), which is closed for
-    milestone 1.4.0. 1.4.0 is not released, and the project's bar is "fixed means released", so the flag stays off until
-    a Flow we can move to carries the fix.
+    [quarkiverse/quarkus-flow#1111](https://github.com/quarkiverse/quarkus-flow/issues/1111), fixed in 1.4.0
+    (#1115, #1134). **It stays off on 1.4.0 for a second reason** (found 2026-11-23): the generated schema lists an
+    enum's constant names (`JandexMethodInputJsonSchema` ignores `@JsonValue`), while `ClaimCategory` and `MissingItem`
+    serialize as their labels (the REST contract), so `ClaimsMailboxAgentTests` and `ClaimExtractionWorkflowTests` fail
+    with `does not have a value in the enumeration ["MULTIPLE_VEHICLE", …]`. Don't change the enums' JSON to suit it;
+    re-enable once a released Flow honors `@JsonValue`
+    ([quarkiverse/quarkus-flow#1180](https://github.com/quarkiverse/quarkus-flow/issues/1180), PR
+    [#1181](https://github.com/quarkiverse/quarkus-flow/pull/1181)).
 - **Claim image tests:** `ClaimImageTests` (entity, `@TestTransaction`; plus the email link), `ClaimImageResourceTests` (REST and Problem
   Details), `ClaimCorrespondenceResourceTests` (the transcript endpoint), `ClaimMapperTests` (the mapper called directly on hand-built entities in a `@QuarkusTest`, nothing persisted), `ClaimImageContentTypeTests` (allow-list, no Quarkus), `ClaimImageSeederTests` and the Playwright
   `ClaimImagesPageTests`.

@@ -103,12 +103,12 @@ class RoundcubeClaimIntakeE2ETests extends PlaywrightTests {
 		try {
 			this.watcher.stop();
 
-			// Every scenario ends with the claim in process, so its runs have ended and Flow has removed their rows
+			// Every scenario ends with the claim in process, so its runs have ended and Flow no longer persists them
 			await()
 				.atMost(IntakeScenario.WAIT)
-				.untilAsserted(() -> assertThat(List.of(this.scenario.instanceRows(), this.scenario.taskRows()))
-					.as("Flow instance and task rows of the intake runs")
-					.containsOnly(0L));
+				.untilAsserted(() -> assertThat(this.scenario.persistedRunCount())
+					.as("persisted intake runs")
+					.isZero());
 		}
 		finally {
 			this.scenario.cleanUp();

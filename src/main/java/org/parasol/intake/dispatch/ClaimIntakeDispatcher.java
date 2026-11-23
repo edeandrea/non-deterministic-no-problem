@@ -292,9 +292,8 @@ public class ClaimIntakeDispatcher implements WorkflowExecutionListener {
 		}
 		catch (RuntimeException e) {
 			// A run that threw on the way up never reaches a WorkflowStatus, so the status listener will never release it.
-			// If it threw from start(), the instance also stays in Flow's in-memory activeInstances map — cancel() is a
-			// no-op on a PENDING instance and removeInstance isn't public (open-workflow-specification/sdk-java#1816).
-			// Harmless, since its id was never persisted and nothing looks it up, but it is a leaked map entry.
+			// Flow itself keeps nothing of an instance that never started: only start() registers it in activeInstances
+			// (serverlessworkflow 7.35.4, open-workflow-specification/sdk-java#1816).
 			var failedHolder = holder;
 
 			this.runs.remove(failedHolder);

@@ -70,7 +70,7 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 		assertThat(this.stubs.requests()).hasSize(requestsBefore);
 		await()
 			.atMost(IntakeScenario.WAIT)
-			.untilAsserted(() -> assertThat(this.scenario.instanceRows()).as("intake runs still persisted").isZero());
+			.untilAsserted(() -> assertThat(this.scenario.persistedRunCount()).as("intake runs still persisted").isZero());
 		assertThat(run.status()).isEqualTo(WorkflowStatus.COMPLETED);
 	}
 
@@ -208,9 +208,9 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 		// The canceled run leaves no Flow rows, and its workflow.execute span is still exported (quarkus-flow#1058, fixed in 1.2.0)
 		await()
 			.atMost(IntakeScenario.WAIT)
-			.untilAsserted(() -> assertThat(List.of(this.scenario.instanceRows(oldRunId), this.scenario.taskRows(oldRunId)))
-				.as("the canceled run's instance and task rows")
-				.containsExactly(0L, 0L));
+			.untilAsserted(() -> assertThat(this.scenario.isPersisted(oldRunId))
+				.as("the canceled run is still persisted")
+				.isFalse());
 		await()
 			.atMost(IntakeScenario.WAIT)
 			.until(() -> this.spans.ofRun(oldRunId), Optional::isPresent);
@@ -223,7 +223,7 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 		assertThat(this.scenario.awaitReplies(SENDER, 3)).hasSize(3);
 		await()
 			.atMost(IntakeScenario.WAIT)
-			.untilAsserted(() -> assertThat(this.scenario.instanceRows()).as("intake runs still persisted").isZero());
+			.untilAsserted(() -> assertThat(this.scenario.persistedRunCount()).as("intake runs still persisted").isZero());
 	}
 
 	@Test
@@ -444,11 +444,11 @@ class ClaimIntakeReviewTests extends IntakeFlowTestBase {
 
 		await()
 			.atMost(IntakeScenario.WAIT)
-			.untilAsserted(() -> assertThat(this.scenario.instanceRows()).as("intake runs still persisted").isZero());
+			.untilAsserted(() -> assertThat(this.scenario.persistedRunCount()).as("intake runs still persisted").isZero());
 		assertThat(canceled.status()).isEqualTo(WorkflowStatus.CANCELLED);
 		assertThat(ended.status()).isEqualTo(WorkflowStatus.COMPLETED);
-		assertThat(List.of(this.scenario.taskRows(canceled.id()), this.scenario.taskRows(ended.id())))
-			.as("task rows of the canceled run and of the ended run")
-			.containsExactly(0L, 0L);
+		assertThat(List.of(this.scenario.isPersisted(canceled.id()), this.scenario.isPersisted(ended.id())))
+			.as("the canceled run and the ended run are still persisted")
+			.containsExactly(false, false);
 	}
 }

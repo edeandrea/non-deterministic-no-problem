@@ -84,7 +84,7 @@ class ClaimReviewResourceTests extends IntakeFlowTestBase {
 
 		await()
 			.atMost(IntakeScenario.WAIT)
-			.untilAsserted(() -> assertThat(this.scenario.instanceRows()).as("intake runs still persisted").isZero());
+			.untilAsserted(() -> assertThat(this.scenario.persistedRunCount()).as("intake runs still persisted").isZero());
 
 		assertThat(run.status()).isEqualTo(WorkflowStatus.COMPLETED);
 	}
@@ -114,7 +114,7 @@ class ClaimReviewResourceTests extends IntakeFlowTestBase {
 			.satisfies(reply -> assertThat(reply.body()).contains("- location", "- category").doesNotContain("incident description", "incident date"));
 		await()
 			.atMost(IntakeScenario.WAIT)
-			.untilAsserted(() -> assertThat(this.scenario.instanceRows()).as("intake runs still persisted").isZero());
+			.untilAsserted(() -> assertThat(this.scenario.persistedRunCount()).as("intake runs still persisted").isZero());
 	}
 
 	@Test

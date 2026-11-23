@@ -69,18 +69,19 @@ Find the next incomplete task, and read the key decisions, spike results and not
 ### 2. Understand Your Task
 Read your task file in `.tasks/05-gh216-agentic-email-intake/task-XX-*.md`: Goal, Key Points, Done When.
 
-### 2a. Check for a platform that pins quarkus-flow 1.3.0 or later (every task, while the override stays)
+### 2a. Check for a platform that pins quarkus-flow 1.4.0 or later (every task, while the override stays)
 *History: until 2026-10-09 this step waited for quarkus-flow 1.2.0 itself. It was released that day, the reproducers
 passed against it, and task 06b overrides the platform's Flow 1.1.3 with it (user decision; see Caveats →
 quarkus-flow 1.2.0). 2026-10-26: task 09b moves the override to 1.3.0, so this step now watches for a platform that
-pins Flow ≥ 1.3.0 (see Caveats → quarkus-flow 1.3.0).*
+pins Flow ≥ 1.3.0 (see Caveats → quarkus-flow 1.3.0). 2026-11-23: task 09c moves the override to 1.4.0, and the floor
+with it: on 1.3.x the generated agentic workflows' spans would go untyped, since `FlowSpanTypingProcessor` is gone.*
 
 Before starting any task:
 1. Check which Flow version the newest Quarkus platform's `quarkus-flow-bom` pins:
    `curl -s https://repo1.maven.org/maven2/io/quarkus/platform/quarkus-flow-bom/maven-metadata.xml | grep -E '<latest>|<release>'`,
    then grep that version's `quarkus-flow-bom-<v>.pom` for `<artifactId>quarkus-flow</artifactId>`. The platform side is
    tracked in quarkusio/quarkus-platform (`gh search prs --repo quarkusio/quarkus-platform "Quarkus Flow"`).
-2. **If a platform we can move to pins Flow 1.3.0 or later**, say so in the findings: dropping the override (the
+2. **If a platform we can move to pins Flow 1.4.0 or later**, say so in the findings: dropping the override (the
    `io.quarkiverse.flow:quarkus-flow-bom` import and `quarkus.flow.version` in `pom.xml`) is a decision for the user,
    usually taken together with that platform upgrade.
 3. Otherwise say so in one line in the findings and carry on.
@@ -90,8 +91,13 @@ Before starting any task:
    test bootstrap, which then runs the old Flow (found on 2026-10-09). Check what ran with
    `strings -n 8 target/quarkus/bootstrap/test-app-model.dat | grep -oE 'io.quarkiverse.flow:quarkus-flow[a-z-]*::jar:[0-9.A-Z]+' | sort | uniq -c`.
 
-### 2b. Check the status of quarkus-flow#1111 (every task, while `quarkus.flow.validation.input.enabled` stays off)
-*Added by task 09b (2026-10-26): see Caveats → quarkus-flow 1.3.0 for the full writeup.*
+### 2b. Check whether a released Flow lets `quarkus.flow.validation.input.enabled` back on (every task, while it stays off)
+*Added by task 09b (2026-10-26): see Caveats → quarkus-flow 1.3.0 for the full writeup. 2026-11-23 (task 09c): #1111 is
+fixed in 1.4.0, but re-enabling the flag still fails `ClaimsMailboxAgentTests` and `ClaimExtractionWorkflowTests` for a
+second reason: the generated schema lists an enum's constant names (`JandexMethodInputJsonSchema` ignores `@JsonValue`),
+while `ClaimCategory` and `MissingItem` serialize as their labels. That's
+[quarkiverse/quarkus-flow#1180](https://github.com/quarkiverse/quarkus-flow/issues/1180) (the user's PR
+[#1181](https://github.com/quarkiverse/quarkus-flow/pull/1181)), so step 1 now checks #1180 the same way; #1111 itself is done.*
 
 1. Check [quarkiverse/quarkus-flow#1111](https://github.com/quarkiverse/quarkus-flow/issues/1111): `gh issue view 1111
    --repo quarkiverse/quarkus-flow`.
@@ -134,10 +140,15 @@ Before starting any task, check each of these. **"Fixed" means released**, not m
 3. **[quarkiverse/quarkus-network-faults#14](https://github.com/quarkiverse/quarkus-network-faults/issues/14)** (IMAP
    support) — it could replace the Toxiproxy test harness `ClaimsInboxWatcherTests` uses
    (`task-09-imap-idle-watcher.md`). `gh issue view 14 --repo quarkiverse/quarkus-network-faults`.
+   *2026-11-23:* 0.3.0 is built on Quarkus 4.0.0.Beta1, and its mailer support (#15) covers the Quarkus Mailer (SMTP), not
+   the IMAP IDLE session the Toxiproxy harness proxies, so this waits for the Quarkus 4 move (#301).
    **If it's released with IMAP support and the extension targets a Quarkus version we're on:** say so in the findings
    — replacing `ToxiproxyTestResource` and `org.parasol.testing.mail.Toxiproxy` is a decision for the user, not an
    automatic swap.
-4. **[quarkiverse/quarkus-flow#1122](https://github.com/quarkiverse/quarkus-flow/issues/1122)** — Flow's
+4. **Resolved 2026-11-23 (task 09c), in quarkus-flow 1.4.0:** `FlowSpanTypingProcessor` is deleted, the three composite
+   agents set `name` so `gen_ai.agent.name` keeps its kebab-case values, and `IntakeSpanPropagationTests` asserts Flow's
+   own typing. Kept for the record:
+   **[quarkiverse/quarkus-flow#1122](https://github.com/quarkiverse/quarkus-flow/issues/1122)** — Flow's
    `workflow.execute` spans carry no `gen_ai.*` type, so `FlowSpanTypingProcessor` stamps `invoke_agent` itself, on the
    `workflow.execute` span of a workflow generated for an agentic interface (a stand-in that relies on Flow's
    kebab-case naming; see
@@ -180,9 +191,22 @@ Before starting any task, check each of these. **"Fixed" means released**, not m
    the issue. No database row is involved and neither id is ever persisted, so the impact is a leaked map entry, not
    a stuck run. `gh issue view 1816 --repo open-workflow-specification/sdk-java`.
    **If it ships in an sdk-java (and so a Flow) we can move to:** discard the unstarted instance at both sites and
-   drop the two comments.
+   drop the two comments. **Resolved 2026-11-23 (task 09c):** the 7.x backport,
+   [sdk-java#1828](https://github.com/open-workflow-specification/sdk-java/pull/1828), is in 7.35.4.Final, which Flow 1.4.0 uses. Only
+   `start()` registers an instance now, so neither site needs code: the comments say so, and
+   `IntakeExtensionsTests.anInstanceThatIsNeverStartedIsNotActive` pins it.
 
 **Findings log (most recent check first; drop an item once it's resolved):**
+- **2026-11-23, task 09c (#286):** **quarkus-flow 1.4.0 (2026-11-20) adopted.** 2a — platform 3.40.1.2 still pins 1.1.3;
+  [quarkus-platform#2281](https://github.com/quarkusio/quarkus-platform/pull/2281) closed unmerged,
+  [#2331](https://github.com/quarkusio/quarkus-platform/pull/2331) (Flow 1.4.0) open; the floor is now 1.4.0. 2b — #1111 fixed
+  in 1.4.0, but the flag stays off for the `@JsonValue` enum reason above. 2c.1 — 3.40.2 (with #57879) not released.
+  2c.3 — not before Quarkus 4. 2c.4 — resolved. 2c.6 — langchain4j 1.24.0 is released, but no quarkus-langchain4j 1.x is
+  on it (1.15.1 uses 1.23.0; 2.0.0.CR1 is for Quarkus 4), so `MonitoredAgent` stays commented out. 2c.7 — resolved: the backport
+  (#1828) is in 7.35.4.Final. It also changed `PersistenceInstanceReader.find` (always a new, unstarted instance), which broke
+  `ClaimIntakeNewClaimTests`' "persisted as waiting" assertion: it had been reading the live instance all along, and Flow never
+  persists `WAITING`. The test now asserts the app's own `reviewRunId`/`reviewWaitingRunId`.
+  The reproducers in edeandrea/quarkus-flow-reproducers still need a re-run on 1.4.0 (left to the user).
 - **2026-11-02, before task 14 (the final verification):** no change, every workaround stays. 2a — the newest platform
   `quarkus-flow-bom` is still 3.40.1 (Flow 1.1.3); [quarkus-platform#2281](https://github.com/quarkusio/quarkus-platform/pull/2281)
   "Update Quarkus Flow to 1.3.0" is still open; Flow 1.3.0 is still the latest release, so the `pom.xml` override stays and

@@ -20,7 +20,8 @@ import io.quarkiverse.langchain4j.RegisterAiService.NoRetrievalAugmentorSupplier
 	chatMemoryProviderSupplier = NoChatMemoryProviderSupplier.class
 )
 public interface ClaimSummaryAgent {
-	@Agent(value = "Summarizes the claim correspondence", outputKey = "summary")
+	// name: the agent's gen_ai.agent.name, the kebab-case of its class like every intake agent (quarkus-flow 1.4.0 falls back to the method name)
+	@Agent(name = "claim-summary-agent", value = "Summarizes the claim correspondence", outputKey = "summary")
 	// On the method, not the interface: quarkus-langchain4j only reads @ModelName from the @Agent method, and
 	// ignores it on the type (the agent then silently uses the default model)
 	@ModelName("claim-intake")
