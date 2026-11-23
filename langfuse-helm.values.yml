@@ -16,7 +16,7 @@ langfuse:
   # ~50s in, which kills golang-migrate mid-statement and leaves the ClickHouse `schema_migrations`
   # table marked dirty ("Dirty database version 47. Fix and force version."), after which every
   # subsequent boot refuses outright. Recovering from that needs a manual `migrate force` - see the
-  # OpenShift deployment section of CLAUDE.md. Chart 2.1.6 has no startupProbe for the web pod, so
+  # OpenShift deployment section of CLAUDE.md. Chart 2.2.6 has no startupProbe for the web pod, so
   # the grace period has to come from failureThreshold: 20s + 60*10s = ~10 minutes.
   web:
     livenessProbe:

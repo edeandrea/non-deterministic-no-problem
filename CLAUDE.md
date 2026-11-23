@@ -821,7 +821,7 @@ deploys the app with `-Dquarkus.profile=openshift`. It ends by printing the Roun
   `error: Dirty database version N. Fix and force version.` — a crash loop that no restart, redeploy or chart/operator
   upgrade clears.
   - `langfuse-helm.values.yml` therefore overrides `langfuse.web.livenessProbe.failureThreshold` (and the readiness
-    one) to `60`, giving ~10 minutes of boot grace. Chart 2.1.6 exposes **no `startupProbe`** for the web pod, so
+    one) to `60`, giving ~10 minutes of boot grace. Chart 2.2.6 exposes **no `startupProbe`** for the web pod, so
     `failureThreshold` is the only lever. The cost is that a genuinely hung *running* web pod also takes ~10 minutes
     to be restarted.
   - **Recovering a dirty marker is manual.** golang-migrate's ClickHouse driver reads

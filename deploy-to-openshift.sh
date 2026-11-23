@@ -65,7 +65,7 @@ oc secrets link default dockerhub-auth --for=pull
 helm repo add langfuse https://langfuse.github.io/langfuse-k8s
 helm repo update langfuse
 helm upgrade --install langfuse langfuse/langfuse \
-  --version 2.1.6 \
+  --version 2.2.6 \
   -f langfuse-helm.values.yml
 
 # Fail loudly instead of deploying the app against a half-migrated Langfuse. langfuse-web runs the
