@@ -12,6 +12,7 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import jakarta.activation.DataHandler;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -27,23 +28,23 @@ import jakarta.transaction.Transactional;
 import jakarta.transaction.Transactional.TxType;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.parasol.intake.config.IntakeConfig;
 import org.parasol.claim.model.Claim;
 import org.parasol.claim.model.ClaimCategory;
 import org.parasol.claim.model.ClaimCorrespondence;
 import org.parasol.claim.model.ClaimImage;
 import org.parasol.claim.model.CorrespondenceDirection;
+import org.parasol.intake.config.IntakeConfig;
 import org.parasol.intake.dispatch.ClaimIntakeDispatcher;
 import org.parasol.intake.mailbox.ClaimsMailbox;
 import org.parasol.intake.mailbox.InboundEmail;
 import org.parasol.intake.mailbox.MailFolder;
 import org.parasol.intake.model.ClaimIntakeState;
-import org.parasol.intake.review.ClaimReviewService;
 import org.parasol.intake.model.ReviewDecided;
 import org.parasol.intake.model.ReviewDecision;
-import org.parasol.intake.model.ReviewedFields;
-import org.parasol.intake.review.ReviewDecisionPublisher;
 import org.parasol.intake.model.ReviewOutcome;
+import org.parasol.intake.model.ReviewedFields;
+import org.parasol.intake.review.ClaimReviewService;
+import org.parasol.intake.review.ReviewDecisionPublisher;
 import org.parasol.intake.workflow.ClaimIntakeFlow;
 import org.parasol.testing.mail.GreenMailMailbox;
 import org.parasol.testing.mail.ReceivedEmail;
@@ -67,7 +68,7 @@ public class IntakeScenario {
 	private final ClaimIntakeFlow flow;
 	private final ReviewDecisionPublisher publisher;
 	private final IntakeConfig config;
-	private final FlowRows flowRows;
+	private final PersistedRuns persistedRuns;
 	private final String smtpHost;
 	private final int smtpPort;
 
@@ -78,7 +79,7 @@ public class IntakeScenario {
 		ClaimIntakeFlow flow,
 		ReviewDecisionPublisher publisher,
 		IntakeConfig config,
-		FlowRows flowRows,
+		PersistedRuns persistedRuns,
 		@ConfigProperty(name = "quarkus.mailer.host") String smtpHost,
 		@ConfigProperty(name = "quarkus.mailer.port") int smtpPort) {
 
@@ -88,7 +89,7 @@ public class IntakeScenario {
 		this.flow = flow;
 		this.publisher = publisher;
 		this.config = config;
-		this.flowRows = flowRows;
+		this.persistedRuns = persistedRuns;
 		this.smtpHost = smtpHost;
 		this.smtpPort = smtpPort;
 	}
@@ -170,17 +171,14 @@ public class IntakeScenario {
 	}
 
 	/**
-	 * Cancels every Flow run and deletes the claims, recorded emails and Flow rows the test created.
+	 * Cancels every Flow run and deletes the claims, recorded emails and intake state the test created.
 	 */
 	// The flow's definition is shared: it must not be closed
 	@SuppressWarnings("resource")
 	public void cleanUp() {
-		runIds().forEach(id -> this.flow.definition().activeInstance(id).ifPresent(WorkflowInstance::cancel));
+		// The live runs, from memory: a persisted run that isn't live has nothing to cancel. Copied, since canceling one removes it
+		List.copyOf(this.flow.definition().activeInstances()).forEach(WorkflowInstance::cancel);
 		deleteCreatedData();
-	}
-
-	List<String> runIds() {
-		return this.flowRows.intakeRunIds();
 	}
 
 	@Transactional(TxType.REQUIRES_NEW)
@@ -416,44 +414,25 @@ public class IntakeScenario {
 	}
 
 	/**
-	 * How many Flow task rows a run has left.
+	 * Whether Flow still has a run persisted (its tasks go with it).
 	 */
-	public long taskRows(String runId) {
-		return this.flowRows.tasks(runId);
+	public boolean isPersisted(String runId) {
+		return this.persistedRuns.isPersisted(runId);
 	}
 
 	/**
-	 * How many Flow instance rows a run has left.
+	 * How many runs Flow has persisted, of <em>every</em> workflow: the intake's own runs and the ones quarkus-flow generated for an
+	 * agentic system alike. {@link #persistedRunCount()} counts only the intake's, so it can't see a leaked generated run.
 	 */
-	public long instanceRows(String runId) {
-		return this.flowRows.instances(runId);
-	}
-
-	public long taskRows() {
-		return this.flowRows.allTasks();
-	}
-
-	/**
-	 * How many Flow instance rows there are, of <em>every</em> workflow: the intake's own runs and the ones quarkus-flow
-	 * generated for an agentic system alike. {@link #instanceRows()} counts only the intake's, so it can't see a leaked
-	 * generated run.
-	 */
-	long allInstanceRows() {
-		return this.flowRows.allInstances();
-	}
-
-	/**
-	 * How many rows there are in Flow's third table, the one that holds the events a waiting run listens for.
-	 */
-	long cloudEventRows() {
-		return this.flowRows.cloudEvents();
+	long allPersistedRunCount() {
+		return this.persistedRuns.allRuns();
 	}
 
 	/**
 	 * The ids of every persisted Flow run that quarkus-flow generated for an agentic system: every workflow but the intake's own.
 	 */
 	public Set<String> agenticRunIds() {
-		return this.flowRows.generatedRunIds();
+		return this.persistedRuns.generatedRunIds();
 	}
 
 	/**
@@ -663,8 +642,11 @@ public class IntakeScenario {
 			.orElseThrow();
 	}
 
-	public long instanceRows() {
-		return this.flowRows.intakeInstances();
+	/**
+	 * How many of the intake's own runs Flow has persisted.
+	 */
+	public long persistedRunCount() {
+		return this.persistedRuns.intakeRunIds().size();
 	}
 
 	private MimeMessage toMessage(Mail mail) throws MessagingException, java.io.UnsupportedEncodingException {

@@ -52,7 +52,8 @@ public interface ClaimsMailboxAgent /* extends MonitoredAgent */ {
 	 * @param sentDate the newest email's sent date as an ISO {@code yyyy-MM-dd} string
 	 * @return the outcome, with the label the classifier gave the email
 	 */
-	@SequenceAgent(outputKey = "classifiedOutcome", subAgents = {
+	// name: the agent's gen_ai.agent.name, the kebab-case of its class like every intake agent (quarkus-flow 1.4.0 falls back to the method name)
+	@SequenceAgent(name = "claims-mailbox-agent", outputKey = "classifiedOutcome", subAgents = {
 		EmailClassifierAgent.class,
 		EmailRouter.class
 	})

@@ -37,7 +37,8 @@ public interface IncidentDetailsAgent {
 	 * @param sentDate the newest email's sent date as an ISO {@code yyyy-MM-dd} string
 	 * @return the extracted details
 	 */
-	@Agent(value = "Extracts incident details", outputKey = "details")
+	// name: the agent's gen_ai.agent.name, the kebab-case of its class like every intake agent (quarkus-flow 1.4.0 falls back to the method name)
+	@Agent(name = "incident-details-agent", value = "Extracts incident details", outputKey = "details")
 	// On the method, not the interface: quarkus-langchain4j only reads @ModelName from the @Agent method, and
 	// ignores it on the type (the agent then silently uses the default model)
 	@ModelName("claim-intake")

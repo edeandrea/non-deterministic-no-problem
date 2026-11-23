@@ -21,7 +21,8 @@ public final class UnmatchedEmailAgent {
 	 * @param emailType the classifier's label
 	 * @return {@link NoMatchingClaim} or {@link NotAClaim}
 	 */
-	@Agent(value = "Decides the outcome of an unmatched email that isn't a new claim", outputKey = "unmatchedOutcome")
+	// name: the agent's gen_ai.agent.name, the kebab-case of its class like every intake agent (quarkus-flow 1.4.0 falls back to the method name)
+	@Agent(name = "unmatched-email-agent", value = "Decides the outcome of an unmatched email that isn't a new claim", outputKey = "unmatchedOutcome")
 	public static IntakeOutcome decideUnmatchedOutcome(EmailType emailType) {
 		return (emailType == EmailType.CLAIM_FOLLOW_UP) ?
 		       new NoMatchingClaim() :

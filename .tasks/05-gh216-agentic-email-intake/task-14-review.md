@@ -68,7 +68,9 @@ findings are P3 and are accepted or deferred, with reasons.
   **Fix:** folded into `aSeededClaimWithNoStoredConversationGetsANewRandomUuid`, keeping only the load-bearing UUID
   assertion with a comment saying why the shape alone settles the no-PII question.
 
-- [x] **R6 / FLOWROWS — the "no leaked Flow rows" check was weaker than it read.** `IntakeScenario.instanceRows()`
+- [x] **R6 / FLOWROWS — the "no leaked Flow rows" check was weaker than it read.** *(2026-11-23, task 09c: `FlowRows` is
+  replaced by `PersistedRuns`, which reads the same persisted runs through Flow's `PersistenceInstanceReader`, usable since
+  quarkus-flow 1.4.0; `FlowBoundaryArchTests` keeps every class off Flow's tables.)* `IntakeScenario.instanceRows()`
   filters to `workflow_name = ClaimIntakeFlow.NAME`, so a leaked *generated* agentic run was invisible to every zero
   check, and `cloud_event_entity` was never counted.
   **Fix:** a new test-only `FlowRows` bean owns all eight queries against Flow's three tables (and is now the only

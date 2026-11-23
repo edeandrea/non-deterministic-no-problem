@@ -2,7 +2,6 @@ package ai.scoring.langfuse.otel;
 
 import jakarta.inject.Singleton;
 
-import ai.scoring.conversation.flow.FlowSpanTypingProcessor;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.sdk.common.CompletableResultCode;
@@ -17,12 +16,16 @@ import io.opentelemetry.sdk.trace.SpanProcessor;
  */
 @Singleton
 public class LangfuseFlowSpanTypingProcessor implements SpanProcessor {
+	/**
+	 * The name Flow gives the span of a workflow task; a task's span name starts with it.
+	 */
+	public static final String TASK_EXECUTE = "task.execute";
 	public static final AttributeKey<String> LANGFUSE_OBSERVATION_TYPE = AttributeKey.stringKey("langfuse.observation.type");
 	public static final String CHAIN = "chain";
 
 	@Override
 	public void onStart(Context parentContext, ReadWriteSpan span) {
-		if (span.getName().startsWith(FlowSpanTypingProcessor.TASK_EXECUTE)) {
+		if (span.getName().startsWith(TASK_EXECUTE)) {
 			span.setAttribute(LANGFUSE_OBSERVATION_TYPE, CHAIN);
 		}
 	}

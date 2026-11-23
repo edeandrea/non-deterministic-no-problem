@@ -37,7 +37,8 @@ public interface EmailRouter {
 	 * @param emailType the classifier's label
 	 * @return the outcome
 	 */
-	@ConditionalAgent(outputKey = "intakeOutcome", subAgents = {
+	// name: the agent's gen_ai.agent.name, the kebab-case of its class like every intake agent (quarkus-flow 1.4.0 falls back to the method name)
+	@ConditionalAgent(name = "email-router", outputKey = "intakeOutcome", subAgents = {
 		ClaimExtractionWorkflow.class,
 		ClaimFollowUpAgent.class,
 		UnmatchedEmailAgent.class
