@@ -355,7 +355,7 @@ class BaselineSpikeTests {
 		<ol>
 			<li><strong>Build the PR</strong> into your local Maven repository: fetch <code>pull/3227/head</code> and install the <code>testing/evaluation</code> modules (<code>-am</code>, tests skipped).</li>
 			<li><strong>Start the app in dev mode against Ollama</strong> (<code>./mvnw -Pollama quarkus:dev</code>, with <code>granite4:micro</code>, <code>qwen3:4b</code> and <code>snowflake-arctic-embed</code> pulled). Dev Services start Langfuse and the rest of the stack.</li>
-			<li><strong>Record live samples</strong> by holding a few chat sessions, in the app's UI or with the JBang client in <code>scripts/ChatSession.java</code>. Each session that ends adds items to the <code>langchain4j.aiservices.ClaimService.chat</code> dataset.</li>
+			<li><strong>Record live samples</strong> by holding a few chat sessions, in the app's UI or with the spike's JBang websocket client, <a href="https://github.com/edeandrea/non-deterministic-no-problem/blob/spike/eval-baseline/.tasks/spike-qlc4j-3227-eval-baselines/scripts/ChatSession.java"><code>.tasks/spike-qlc4j-3227-eval-baselines/scripts/ChatSession.java</code></a> (one session per run). Each session that ends adds items to the <code>langchain4j.aiservices.ClaimService.chat</code> dataset.</li>
 			<li><strong>Run the test</strong> against that Langfuse: <code>LF_URL=… LF_SECRET=… SPIKE_DATASET_VERSION=… ./mvnw -Pollama test -Dtest=BaselineSpikeTests</code>. The README says where the URL and key come from. Leave the version empty to read the latest data.</li>
 			<li><strong>Review the pending result</strong> with the PR's CLI (<code>java -jar …/quarkus-langchain4j-eval-cli-999-SNAPSHOT-runner.jar review</code>), accept it, and run again.</li>
 		</ol>
