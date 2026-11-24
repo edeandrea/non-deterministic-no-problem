@@ -162,7 +162,7 @@ footer { border-top: 1px solid var(--rule); padding-top: 20px; font-size: 14px; 
 				</ul>
 			</div>
 		</div>
-		<p>They meet at seams that already exist: <code>@SampleLocation</code> resolves through the <code>SampleLoader</code> SPI, and the baseline doesn't care where samples come from. The prototype needed one loader change and one test class.</p>
+		<p>They meet at seams that already exist: <code>@SampleLocation</code> resolves through the <code>SampleLoader</code> SPI, and the baseline doesn't care where samples come from. The prototype needed one <a href="https://github.com/edeandrea/non-deterministic-no-problem/blob/spike/eval-baseline/src/main/java/ai/scoring/langfuse/evaluation/LangfuseDatasetSampleLoader.java">loader change</a> and one <a href="https://github.com/edeandrea/non-deterministic-no-problem/blob/spike/eval-baseline/src/test/java/ai/scoring/it/BaselineSpikeTests.java">test class</a>.</p>
 		<p><strong>Two qualifications.</strong> The PR's gate assumes a stable, curated sample set, and live data pushes on that: a small dataset made the mean-based gate fail on noise, the baseline doesn't record which data version it was measured on, and accepting replaces everything. Those are the <a href="#suggestions">suggestions</a> below. On my side, recorded samples hold model prompts rather than AI service calls, so replaying them meant parsing text. I'm fixing that in <a href="https://github.com/edeandrea/non-deterministic-no-problem/issues/314">#314</a>.</p>
 	</section>
 
@@ -203,7 +203,7 @@ footer { border-top: 1px solid var(--rule); padding-top: 20px; font-size: 14px; 
 				<div class="what">Dataset <code>langchain4j.aiservices.ClaimService.chat</code></div>
 				<div class="how">Versioned on every change. Items can be corrected or archived in the UI.</div>
 			</li>
-			<li class="edge"><span><code>@SampleLocation</code> → <code>LangfuseDatasetSampleLoader</code>, pinned to a dataset version</span></li>
+			<li class="edge"><span><code>@SampleLocation</code> → <a href="https://github.com/edeandrea/non-deterministic-no-problem/blob/spike/eval-baseline/src/main/java/ai/scoring/langfuse/evaluation/LangfuseDatasetSampleLoader.java"><code>LangfuseDatasetSampleLoader</code></a>, pinned to a dataset version</span></li>
 			<li class="step">
 				<div class="where">Test</div>
 				<div class="what"><code>Scorer</code> replays each sample through the real app</div>
@@ -226,7 +226,7 @@ footer { border-top: 1px solid var(--rule); padding-top: 20px; font-size: 14px; 
 			</li>
 		</ol>
 		<p class="legend"><span class="swatch live"></span> live in Langfuse <span class="swatch pr"></span> provided by the PR</p>
-		<p class="prose">The test I ran is small. The only app-specific part is the replay function.</p>
+		<p class="prose">The test I ran is small. The only app-specific part is the replay function. Full source: <a href="https://github.com/edeandrea/non-deterministic-no-problem/blob/spike/eval-baseline/src/test/java/ai/scoring/it/BaselineSpikeTests.java"><code>BaselineSpikeTests</code></a>.</p>
 		<pre class="code">@QuarkusTest
 @Evaluate
 class BaselineSpikeTests {
@@ -351,7 +351,7 @@ class BaselineSpikeTests {
 
 	<section class="prose" id="try-it">
 		<h2>Try it yourself</h2>
-		<p>The prototype is on the <a href="https://github.com/edeandrea/non-deterministic-no-problem/tree/spike/eval-baseline"><code>spike/eval-baseline</code></a> branch of non-deterministic-no-problem. It's a spike, not something to merge: its <code>pom.xml</code> points the evaluation artifacts at your PR built locally as <code>999-SNAPSHOT</code>. The code is <code>BaselineSpikeTests</code> and the modified <code>LangfuseDatasetSampleLoader</code>. Everything else (scripts, screenshots, CLI transcripts and this page) is under <a href="https://github.com/edeandrea/non-deterministic-no-problem/tree/spike/eval-baseline/.tasks/spike-qlc4j-3227-eval-baselines"><code>.tasks/spike-qlc4j-3227-eval-baselines</code></a>, whose README has the full steps. In short:</p>
+		<p>The prototype is on the <a href="https://github.com/edeandrea/non-deterministic-no-problem/tree/spike/eval-baseline"><code>spike/eval-baseline</code></a> branch of non-deterministic-no-problem. It's a spike, not something to merge: its <code>pom.xml</code> points the evaluation artifacts at your PR built locally as <code>999-SNAPSHOT</code>. The code is <a href="https://github.com/edeandrea/non-deterministic-no-problem/blob/spike/eval-baseline/src/test/java/ai/scoring/it/BaselineSpikeTests.java"><code>BaselineSpikeTests</code></a> and the modified <a href="https://github.com/edeandrea/non-deterministic-no-problem/blob/spike/eval-baseline/src/main/java/ai/scoring/langfuse/evaluation/LangfuseDatasetSampleLoader.java"><code>LangfuseDatasetSampleLoader</code></a> (<a href="https://github.com/edeandrea/non-deterministic-no-problem/commit/65a96e7">diff against <code>main</code></a>). Everything else (scripts, screenshots, CLI transcripts and this page) is under <a href="https://github.com/edeandrea/non-deterministic-no-problem/tree/spike/eval-baseline/.tasks/spike-qlc4j-3227-eval-baselines"><code>.tasks/spike-qlc4j-3227-eval-baselines</code></a>, whose README has the full steps. In short:</p>
 		<ol>
 			<li><strong>Build the PR</strong> into your local Maven repository: fetch <code>pull/3227/head</code> and install the <code>testing/evaluation</code> modules (<code>-am</code>, tests skipped).</li>
 			<li><strong>Start the app in dev mode against Ollama</strong> (<code>./mvnw -Pollama quarkus:dev</code>, with <code>granite4:micro</code>, <code>qwen3:4b</code> and <code>snowflake-arctic-embed</code> pulled). Dev Services start Langfuse and the rest of the stack.</li>
