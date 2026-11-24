@@ -95,6 +95,10 @@ td.num { font-variant-numeric: tabular-nums; font-family: var(--font-mono); whit
 .asks > li > h3::before { counter-increment: ask; content: counter(ask) ". "; color: var(--accent); }
 .asks p { font-size: 15px; }
 .evidence { font-size: 13px; color: var(--muted); }
+.tldr { background: var(--accent-soft); border: 1px solid var(--rule); border-radius: 10px; padding: 20px 22px; display: grid; gap: 14px; }
+.tldr > p { max-width: 74ch; }
+.tldr-lead { font-size: 18px; font-weight: 500; }
+.tldr .panel ul { font-size: 15px; }
 .tiers { display: grid; gap: 12px; }
 .tier { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 18px; display: grid; gap: 6px; min-width: 0; }
 .tier h3 { font-size: 18px; }
@@ -138,6 +142,29 @@ footer { border-top: 1px solid var(--rule); padding-top: 20px; font-size: 14px; 
 			<span>2026-11-24</span>
 		</div>
 	</header>
+
+	<section class="tldr" aria-labelledby="tldr-title">
+		<h2 id="tldr-title">TL;DR</h2>
+		<p class="tldr-lead">My app and your PR are complementary. My app supplies live samples and watches behavior at runtime; your PR supplies the regression gate and the human decision. Together they cover what either one alone would miss.</p>
+		<div class="two">
+			<div class="panel">
+				<div class="label">My app brings</div>
+				<ul>
+					<li>Live samples from real usage, recorded into Langfuse automatically, versioned and editable by a person.</li>
+					<li>Runtime monitoring and session-level scoring, which the PR doesn't cover.</li>
+				</ul>
+			</div>
+			<div class="panel">
+				<div class="label">Your PR brings</div>
+				<ul>
+					<li>A test-time gate that replays samples and compares each with its own accepted result. My design called for one, but I hadn't built it.</li>
+					<li>The pending, review and accept workflow, and the blocking/advisory split.</li>
+				</ul>
+			</div>
+		</div>
+		<p>They meet at seams that already exist: <code>@SampleLocation</code> resolves through the <code>SampleLoader</code> SPI, and the baseline doesn't care where samples come from. The prototype needed one loader change and one test class.</p>
+		<p><strong>Two qualifications.</strong> The PR's gate assumes a stable, curated sample set, and live data pushes on that: a small dataset made the mean-based gate fail on noise, the baseline doesn't record which data version it was measured on, and accepting replaces everything. Those are the <a href="#suggestions">suggestions</a> below. On my side, recorded samples hold model prompts rather than AI service calls, so replaying them meant parsing text. I'm fixing that.</p>
+	</section>
 
 	<section class="prose">
 		<h2>Why I tried it</h2>
@@ -283,7 +310,7 @@ class BaselineSpikeTests {
 	</section>
 
 	<section>
-		<h2 class="prose">Suggestions</h2>
+		<h2 class="prose" id="suggestions">Suggestions</h2>
 		<ol class="asks prose">
 			<li>
 				<h3>Make the gate aware of sample size</h3>
