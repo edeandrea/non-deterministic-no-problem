@@ -17,7 +17,7 @@
 		<quarkus.flow.version>1.4.0</quarkus.flow.version>
 		<quarkus.langchain4j.version>1.15.1</quarkus.langchain4j.version>
 		<quarkus.playwright.version>4.0.0</quarkus.playwright.version>
-		<quarkus.quinoa.version>2.9.3</quarkus.quinoa.version>
+		<quarkus.quinoa.version>4.0.0</quarkus.quinoa.version>
 		<quarkus.wiremock.version>1.8.1</quarkus.wiremock.version>
 		<quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
 		<quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
