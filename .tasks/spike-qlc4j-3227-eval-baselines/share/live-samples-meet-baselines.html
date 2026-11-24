@@ -69,7 +69,16 @@ pre.code { font: 13px/1.55 var(--font-mono); background: var(--code-bg); padding
 .panel p, .panel li { font-size: 15px; }
 .label { font: 500 11px/1.3 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 figure { margin: 0; display: grid; gap: 8px; min-width: 0; }
-figure img { width: 100%; height: auto; border: 1px solid var(--rule); border-radius: 6px; display: block; background: var(--surface); }
+figure img { width: 100%; height: auto; border: 1px solid var(--rule); border-radius: 6px; display: block; background: var(--surface); cursor: zoom-in; transition: border-color .15s; }
+figure img:hover { border-color: var(--accent); }
+figure img:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+#lightbox { border: none; padding: 0; background: transparent; max-width: 100vw; max-height: 100vh; width: 100vw; height: 100vh; overflow: auto; }
+#lightbox[open] { display: grid; place-items: center; align-content: center; gap: 10px; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); box-sizing: border-box; }
+#lightbox::backdrop { background: rgb(10 14 13 / .96); }
+#lightbox img { max-width: min(1600px, 100%); max-height: calc(100vh - 96px); width: auto; height: auto; border-radius: 6px; background: #fff; cursor: zoom-out; box-shadow: 0 10px 40px rgb(0 0 0 / .45); }
+.lb-caption { color: #e3ebe8; font-size: 14px; max-width: 90ch; text-align: center; margin: 0; }
+.lb-close { position: fixed; top: max(12px, env(safe-area-inset-top, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); width: 40px; height: 40px; border-radius: 999px; border: 1px solid rgb(255 255 255 / .3); background: rgb(0 0 0 / .4); color: #fff; font-size: 24px; line-height: 1; cursor: pointer; }
+.lb-close:focus-visible { outline: 2px solid #5cc2ad; outline-offset: 2px; }
 figcaption { font-size: 14px; color: var(--muted); max-width: 80ch; }
 .table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); }
 table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 640px; }
@@ -232,6 +241,7 @@ class BaselineSpikeTests {
 
 	<section>
 		<h2 class="prose">Five runs</h2>
+		<p class="prose evidence">Click any screenshot to enlarge it.</p>
 		<p class="prose">Four live samples recorded from real chat sessions (one of them hand-corrected in Langfuse), 2 trials each, a blocking similarity check (0.80) plus my LLM judge as an advisory strategy. Chat model <code>granite4:micro</code> and embeddings <code>snowflake-arctic-embed</code>, both on local Ollama. PR artifacts built from <code>pr-3227</code>; the rest of quarkus-langchain4j on 1.15.1.</p>
 		<div class="table-wrap">
 			<table>
@@ -316,3 +326,56 @@ class BaselineSpikeTests {
 		<p>A throwaway prototype, run locally on 2026-11-24: Quarkus 3.40.1.2, quarkus-langchain4j 1.15.1 with the PR's evaluation modules at <code>999-SNAPSHOT</code> (branch <code>eval-baseline</code>, <code>1ec36ce</code>), quarkus-langfuse 0.9.1, Langfuse 4.70.1 (Dev Service), Ollama. Nothing here is committed to either project.</p>
 	</footer>
 </div>
+
+<dialog id="lightbox" aria-label="Enlarged screenshot">
+	<button type="button" class="lb-close" aria-label="Close">×</button>
+	<img alt="">
+	<p class="lb-caption"></p>
+</dialog>
+
+<script>
+(() => {
+	const dialog = document.getElementById("lightbox");
+	const big = dialog.querySelector("img");
+	const caption = dialog.querySelector(".lb-caption");
+	const open = (img) => {
+		big.src = img.currentSrc || img.src;
+		big.alt = img.alt;
+		const text = img.closest("figure")?.querySelector("figcaption")?.textContent ?? "";
+		caption.textContent = text;
+		caption.hidden = !text;
+		if (typeof dialog.showModal === "function") {
+			dialog.showModal();
+		}
+		else {
+			dialog.setAttribute("open", "");
+		}
+	};
+	const close = () => {
+		if (typeof dialog.close === "function") {
+			dialog.close();
+		}
+		else {
+			dialog.removeAttribute("open");
+		}
+	};
+	document.querySelectorAll("figure img").forEach((img) => {
+		img.tabIndex = 0;
+		img.setAttribute("role", "button");
+		img.setAttribute("aria-label", "Enlarge: " + img.alt);
+		img.addEventListener("click", () => open(img));
+		img.addEventListener("keydown", (e) => {
+			if ((e.key === "Enter") || (e.key === " ")) {
+				e.preventDefault();
+				open(img);
+			}
+		});
+	});
+	dialog.addEventListener("click", (e) => {
+		if (e.target !== big) {
+			close();
+		}
+	});
+	dialog.querySelector(".lb-close").addEventListener("click", close);
+})();
+</script>
