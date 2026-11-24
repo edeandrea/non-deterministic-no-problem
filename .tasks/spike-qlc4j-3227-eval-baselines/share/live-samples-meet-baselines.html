@@ -349,8 +349,20 @@ class BaselineSpikeTests {
 		</ul>
 	</section>
 
+	<section class="prose" id="try-it">
+		<h2>Try it yourself</h2>
+		<p>The prototype is on the <a href="https://github.com/edeandrea/non-deterministic-no-problem/tree/spike/eval-baseline"><code>spike/eval-baseline</code></a> branch of non-deterministic-no-problem. It's a spike, not something to merge: its <code>pom.xml</code> points the evaluation artifacts at your PR built locally as <code>999-SNAPSHOT</code>. The code is <code>BaselineSpikeTests</code> and the modified <code>LangfuseDatasetSampleLoader</code>. Everything else (scripts, screenshots, CLI transcripts and this page) is under <a href="https://github.com/edeandrea/non-deterministic-no-problem/tree/spike/eval-baseline/.tasks/spike-qlc4j-3227-eval-baselines"><code>.tasks/spike-qlc4j-3227-eval-baselines</code></a>, whose README has the full steps. In short:</p>
+		<ol>
+			<li><strong>Build the PR</strong> into your local Maven repository: fetch <code>pull/3227/head</code> and install the <code>testing/evaluation</code> modules (<code>-am</code>, tests skipped).</li>
+			<li><strong>Start the app in dev mode against Ollama</strong> (<code>./mvnw -Pollama quarkus:dev</code>, with <code>granite4:micro</code>, <code>qwen3:4b</code> and <code>snowflake-arctic-embed</code> pulled). Dev Services start Langfuse and the rest of the stack.</li>
+			<li><strong>Record live samples</strong> by holding a few chat sessions, in the app's UI or with the JBang client in <code>scripts/ChatSession.java</code>. Each session that ends adds items to the <code>langchain4j.aiservices.ClaimService.chat</code> dataset.</li>
+			<li><strong>Run the test</strong> against that Langfuse: <code>LF_URL=… LF_SECRET=… SPIKE_DATASET_VERSION=… ./mvnw -Pollama test -Dtest=BaselineSpikeTests</code>. The README says where the URL and key come from. Leave the version empty to read the latest data.</li>
+			<li><strong>Review the pending result</strong> with the PR's CLI (<code>java -jar …/quarkus-langchain4j-eval-cli-999-SNAPSHOT-runner.jar review</code>), accept it, and run again.</li>
+		</ol>
+	</section>
+
 	<footer>
-		<p>A throwaway prototype, run locally on 2026-11-24: Quarkus 3.40.1.2, quarkus-langchain4j 1.15.1 with the PR's evaluation modules at <code>999-SNAPSHOT</code> (branch <code>eval-baseline</code>, <code>1ec36ce</code>), quarkus-langfuse 0.9.1, Langfuse 4.70.1 (Dev Service), Ollama. Nothing here is committed to either project.</p>
+		<p>A throwaway prototype, run locally on 2026-11-24: Quarkus 3.40.1.2, quarkus-langchain4j 1.15.1 with the PR's evaluation modules at <code>999-SNAPSHOT</code> (branch <code>eval-baseline</code>, <code>1ec36ce</code>), quarkus-langfuse 0.9.1, Langfuse 4.70.1 (Dev Service), Ollama. The prototype is kept on the <code>spike/eval-baseline</code> branch of non-deterministic-no-problem (see <a href="#try-it">Try it yourself</a>); nothing has been merged into either project.</p>
 	</footer>
 </div>
 
