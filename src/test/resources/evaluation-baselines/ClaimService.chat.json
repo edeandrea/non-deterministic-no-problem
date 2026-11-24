@@ -1,0 +1,50 @@
+{
+  "formatVersion" : 1,
+  "trials" : 2,
+  "strategies" : [ "SemanticSimilarityStrategy", "Evaluator_ClientProxy (advisory)" ],
+  "samples" : [ {
+    "name" : "180eddc1-6d49-4d96-b77a-74b491008ea4",
+    "tags" : [ ],
+    "blocking" : {
+      "passed" : 2,
+      "total" : 2
+    },
+    "advisory" : {
+      "passed" : 1,
+      "total" : 2
+    }
+  }, {
+    "name" : "bf280bac-f4ad-46f0-b038-df0ebb428ab2",
+    "tags" : [ ],
+    "blocking" : {
+      "passed" : 2,
+      "total" : 2
+    },
+    "advisory" : {
+      "passed" : 2,
+      "total" : 2
+    }
+  }, {
+    "name" : "c1fe48ac-2241-42fa-af2c-e4f1c2a86783",
+    "tags" : [ ],
+    "blocking" : {
+      "passed" : 2,
+      "total" : 2
+    },
+    "advisory" : {
+      "passed" : 2,
+      "total" : 2
+    }
+  }, {
+    "name" : "f8d75090-2f6c-4b40-9266-f83c09355bad",
+    "tags" : [ ],
+    "blocking" : {
+      "passed" : 2,
+      "total" : 2
+    },
+    "advisory" : {
+      "passed" : 2,
+      "total" : 2
+    }
+  } ]
+}

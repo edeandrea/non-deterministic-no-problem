@@ -1,0 +1,15 @@
+
+ClaimService.chat  failed  1 of 1
+4 compared, 1 new, 0 removed
+                                                    blocking              advisory
+  sample                                 baseline   received   baseline   received
+  180eddc1-6d49-4d96-b77a-74b491008ea4    100.00%    100.00%     50.00%     50.00%
+  bf280bac-f4ad-46f0-b038-df0ebb428ab2    100.00%    100.00%    100.00%    100.00%
+  c1fe48ac-2241-42fa-af2c-e4f1c2a86783    100.00%     50.00%    100.00%    100.00%  regressed
+  f8d75090-2f6c-4b40-9266-f83c09355bad    100.00%    100.00%    100.00%    100.00%
+  2e171969-6b1d-4474-917d-1081a382990d        new    100.00%        new    100.00%
+mean difference -12.50 points (95% CI -37.00 to 12.00), tolerance 5.00
+advisory difference 0.00 points, not checked against the tolerance
+[a] accept  [r] reject  [d] show responses  [s] skip  [q] quit
+> r
+Rejected ClaimService.chat

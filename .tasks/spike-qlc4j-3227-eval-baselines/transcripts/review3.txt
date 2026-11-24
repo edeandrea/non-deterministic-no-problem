@@ -1,0 +1,47 @@
+
+ClaimService.chat  failed  1 of 1
+4 compared, 0 new, 0 removed
+                                                    blocking              advisory
+  sample                                 baseline   received   baseline   received
+  180eddc1-6d49-4d96-b77a-74b491008ea4    100.00%      0.00%     50.00%      0.00%  regressed
+  bf280bac-f4ad-46f0-b038-df0ebb428ab2    100.00%      0.00%    100.00%    100.00%  regressed
+  c1fe48ac-2241-42fa-af2c-e4f1c2a86783    100.00%      0.00%    100.00%    100.00%  regressed
+  f8d75090-2f6c-4b40-9266-f83c09355bad    100.00%      0.00%    100.00%    100.00%  regressed
+mean difference -100.00 points (95% CI -100.00 to -100.00), tolerance 5.00
+advisory difference -12.50 points, not checked against the tolerance
+[a] accept  [r] reject  [d] show responses  [s] skip  [q] quit
+> d
+180eddc1-6d49-4d96-b77a-74b491008ea4
+  expected: Dominic Toretto's claim is about collision damage, not theft: nothing was stolen. The question doesn't apply to this claim.
+  trial 1: Nothing
+    failed  SemanticSimilarityStrategy: Similarity 0.7599 below threshold 0.8000
+    failed  Evaluator_ClientProxy (advisory): The response does not confirm that anything was stolen, which is the key detail in the expected output. It simply states 'Nothing' without providing any analysis or confirmation of the claim details.
+  trial 2: Nothing
+    failed  SemanticSimilarityStrategy: Similarity 0.7599 below threshold 0.8000
+    failed  Evaluator_ClientProxy (advisory): The response does not confirm that nothing was stolen, which is the key detail in the expected output. It simply states 'Nothing' without providing any analysis or confirmation of the claim details.
+bf280bac-f4ad-46f0-b038-df0ebb428ab2
+  expected: The customer, John T. Anderson, is complaining about the poor communication and delayed response from Parasol Insurances regarding an unresolved car insurance claim, #XYZ789. The incident occurred on January 15, 2024, when his vehicle was hit by another driver, Samantha Reynolds, who ran a red light. Anderson has requested an explanation for the delay, transparency, and urgency in handling his claim, threatening to escalate the matter to regulatory authorities and consider legal action if his concerns are not addressed promptly. He also requests a comprehensive update on the status of his claim within the next 48 hours.
+  trial 1: Poor communication and delayed response from Parasol Insurances.
+    failed  SemanticSimilarityStrategy: Similarity 0.6673 below threshold 0.8000
+    passed  Evaluator_ClientProxy (advisory): The response accurately identifies the customer's complaint about poor communication and delayed response from Parasol Insurances regarding an unresolved car insurance claim. It also includes the key details of the incident, the customer's requests for explanation, transparency, urgency, and a comprehensive update on the claim status. The response is concise and directly addresses the question.
+  trial 2: Poor communication and delayed response from Parasol Insurances
+    failed  SemanticSimilarityStrategy: Similarity 0.6863 below threshold 0.8000
+    passed  Evaluator_ClientProxy (advisory): The response accurately identifies the customer's complaint about poor communication and delayed response from Parasol Insurances regarding an unresolved car insurance claim. It also includes the key details of the incident, the customer's requests for explanation, transparency, urgency, and a comprehensive update on the claim status. The response is concise and directly addresses the question.
+c1fe48ac-2241-42fa-af2c-e4f1c2a86783
+  expected: Yes, the damage to the DeLorean is covered by the policy. The policy includes Collision coverage, which covers damage to the insured vehicle resulting from a collision with another vehicle or object. Since the accident occurred at the intersection of Colima Road and Azusa Avenue, the damage to Marty's Delorean DMC-12 would be covered under the Collision coverage.
+  trial 1: Yes
+    failed  SemanticSimilarityStrategy: Similarity 0.3824 below threshold 0.8000
+    passed  Evaluator_ClientProxy (advisory): The response correctly identifies that the damage to the DeLorean is covered by the policy, specifically under Collision coverage. It provides a clear explanation of why the damage would be covered based on the accident occurring at the intersection of Colima Road and Azusa Avenue. The response is concise and directly addresses the question.
+  trial 2: Yes
+    failed  SemanticSimilarityStrategy: Similarity 0.3824 below threshold 0.8000
+    passed  Evaluator_ClientProxy (advisory): The response correctly identifies that the damage to the DeLorean is covered by the policy, specifically under Collision coverage. It provides a clear explanation of why the damage would be covered based on the accident occurring at the intersection of Colima Road and Azusa Avenue. The response is concise and directly addresses the question.
+f8d75090-2f6c-4b40-9266-f83c09355bad
+  expected: Based on the information provided, Biff Tanner is at fault for the car accident. The policy clearly states that the driver who fails to stop at a red traffic signal is responsible for any resulting damages. Since Biff failed to stop at the red signal on Asuza Avenue, he is considered at fault for the collision with Marty McFly's vehicle.
+  trial 1: Biff Tanner
+    failed  SemanticSimilarityStrategy: Similarity 0.5974 below threshold 0.8000
+    passed  Evaluator_ClientProxy (advisory): The response correctly identifies Biff Tanner as the at fault party in the car accident based on the policy's exclusion of responsibility for damages when a driver fails to stop at a red traffic signal. It provides a clear explanation of why Biff is considered at fault and directly addresses the question.
+  trial 2: Marty McFly
+    failed  SemanticSimilarityStrategy: Similarity 0.5976 below threshold 0.8000
+    passed  Evaluator_ClientProxy (advisory): The response correctly identifies Biff Tanner as the at fault party in the car accident based on the policy's exclusion of responsibility for damages when a driver fails to stop at a red traffic signal. It provides a clear explanation of why Biff is considered at fault and directly addresses the question.
+> r
+Rejected ClaimService.chat

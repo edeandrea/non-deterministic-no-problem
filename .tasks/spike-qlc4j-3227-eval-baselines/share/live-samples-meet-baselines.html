@@ -1,0 +1,273 @@
+<title>Live Samples Meet Baselines</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&display=swap">
+<style>
+/* Layout: a single reading column (~70ch) for an engineering field report; wide figures and tables break out to 960px. */
+:root {
+	--bg: #f6f7f6;
+	--surface: #ffffff;
+	--fg: #1b2321;
+	--muted: #5a6763;
+	--rule: #d9dfdc;
+	--accent: #0f6b5c;
+	--accent-soft: #e3f0ec;
+	--ok: #1d7a3e;
+	--fail: #b4372a;
+	--warn: #9a6a00;
+	--code-bg: #eef1ef;
+	--font-display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+	--font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+	--font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) {
+		--bg: #121816; --surface: #1a2220; --fg: #e3ebe8; --muted: #9aa8a3; --rule: #2d3935;
+		--accent: #5cc2ad; --accent-soft: #1d332e; --ok: #63c387; --fail: #f08a7c; --warn: #e0b54f; --code-bg: #212b28;
+		color-scheme: dark;
+	}
+}
+:root[data-theme="dark"] {
+	--bg: #121816; --surface: #1a2220; --fg: #e3ebe8; --muted: #9aa8a3; --rule: #2d3935;
+	--accent: #5cc2ad; --accent-soft: #1d332e; --ok: #63c387; --fail: #f08a7c; --warn: #e0b54f; --code-bg: #212b28;
+	color-scheme: dark;
+}
+body {
+	background: var(--bg);
+	color: var(--fg);
+	font: 16px/1.6 var(--font-body);
+}
+.page {
+	max-width: 960px;
+	margin: 0 auto;
+	padding-left: max(16px, env(safe-area-inset-left, 0px));
+	padding-right: max(16px, env(safe-area-inset-right, 0px));
+	padding-block: 40px 72px;
+	display: grid;
+	gap: 44px;
+}
+.prose { max-width: 70ch; }
+header { display: grid; gap: 12px; border-bottom: 1px solid var(--rule); padding-bottom: 28px; }
+.eyebrow { font: 500 12px/1.4 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; line-height: 1.15; margin: 0; }
+h1 { font-size: clamp(32px, 6vw, 46px); font-weight: 700; letter-spacing: -.01em; }
+h2 { font-size: 26px; font-weight: 700; }
+h3 { font-size: 18px; font-weight: 600; }
+.lede { font-size: 18px; color: var(--muted); max-width: 66ch; margin: 0; }
+section { display: grid; gap: 16px; min-width: 0; }
+p, ul, ol { margin: 0; }
+ul, ol { padding-left: 1.3em; display: grid; gap: 6px; }
+a { color: var(--accent); text-underline-offset: 2px; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+code { font: .88em var(--font-mono); background: var(--code-bg); padding: .1em .35em; border-radius: 4px; overflow-wrap: anywhere; }
+pre.code { font: 13px/1.55 var(--font-mono); background: var(--code-bg); padding: 14px 16px; border-radius: 6px; overflow-x: auto; margin: 0; }
+.meta { font: 13px/1.5 var(--font-mono); color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 16px 18px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.panel h3 { font-size: 16px; }
+.panel p, .panel li { font-size: 15px; }
+.label { font: 500 11px/1.3 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+figure { margin: 0; display: grid; gap: 8px; min-width: 0; }
+figure img { width: 100%; height: auto; border: 1px solid var(--rule); border-radius: 6px; display: block; background: var(--surface); }
+figcaption { font-size: 14px; color: var(--muted); max-width: 80ch; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 640px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+th { font: 500 12px/1.3 var(--font-mono); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+td.num { font-variant-numeric: tabular-nums; font-family: var(--font-mono); white-space: nowrap; }
+.pill { display: inline-block; font: 500 12px/1 var(--font-mono); padding: 4px 8px; border-radius: 999px; white-space: nowrap; border: 1px solid currentColor; }
+.pill.pass { color: var(--ok); }
+.pill.fail { color: var(--fail); }
+.pill.noise { color: var(--warn); }
+.asks { counter-reset: ask; list-style: none; padding: 0; display: grid; gap: 14px; }
+.asks > li { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 18px; display: grid; gap: 6px; }
+.asks > li > h3::before { counter-increment: ask; content: counter(ask) ". "; color: var(--accent); }
+.asks p { font-size: 15px; }
+.evidence { font-size: 13px; color: var(--muted); }
+.tiers { display: grid; gap: 12px; }
+.tier { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 18px; display: grid; gap: 6px; min-width: 0; }
+.tier h3 { font-size: 18px; }
+.tier h3 a { color: inherit; text-decoration-color: var(--accent); }
+.tier p { font-size: 15px; }
+.callout { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 12px 16px; border-radius: 0 6px 6px 0; }
+pre.mermaid { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 16px; overflow-x: auto; margin: 0; }
+footer { border-top: 1px solid var(--rule); padding-top: 20px; font-size: 14px; color: var(--muted); display: grid; gap: 6px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<div class="page">
+	<header>
+		<div class="eyebrow">Feedback on quarkiverse/quarkus-langchain4j#3227</div>
+		<h1>Live samples meet baselines</h1>
+		<p class="lede">I ran your baseline comparison and review workflow against evaluation samples that a real application recorded in Langfuse, rather than hand-written YAML. It composed cleanly. Below: why I tried it, what happened in five runs, and a short list of suggestions.</p>
+		<div class="meta">
+			<span>PR <a href="https://github.com/quarkiverse/quarkus-langchain4j/pull/3227">#3227</a> at <code>1ec36ce</code></span>
+			<span>App: <a href="https://github.com/edeandrea/non-deterministic-no-problem">non-deterministic-no-problem</a></span>
+			<span>Langfuse 4.70.1 · Ollama</span>
+			<span>2026-11-24</span>
+		</div>
+	</header>
+
+	<section class="prose">
+		<h2>Why I tried it</h2>
+		<p>My demo app (Parasol, an insurance claims app on Quarkus and quarkus-langchain4j) evaluates itself in three tiers, all against Langfuse. The design, including what Langfuse does and doesn't support for each tier, is in <a href="https://github.com/edeandrea/non-deterministic-no-problem/blob/main/langfuse-evaluation.md"><code>langfuse-evaluation.md</code></a>.</p>
+		<div class="tiers">
+			<div class="tier">
+				<div class="label">Tier 1 · as each interaction happens</div>
+				<h3><a href="https://github.com/edeandrea/non-deterministic-no-problem/blob/main/langfuse-evaluation.md#tier-1-per-trace-scoring">Per-trace scoring</a></h3>
+				<p>Each LLM response is scored for quality by Langfuse's own LLM-as-a-judge, at ingest time. The app sets the evaluator and its rule up through the Langfuse API at startup, and filters out the judge's own traces so it never scores itself.</p>
+			</div>
+			<div class="tier">
+				<div class="label">Tier 2 · when a conversation ends</div>
+				<h3><a href="https://github.com/edeandrea/non-deterministic-no-problem/blob/main/langfuse-evaluation.md#tier-2-session-level-scoring">Session-level scoring</a></h3>
+				<p>Langfuse can't evaluate a session, so the app does it: when a chat session ends, it reads the session's observations back from Langfuse, has an LLM judge the whole conversation's sentiment, and posts the score. It also <strong>records each exchange as a Langfuse dataset item</strong> (the input, with the answer as the expected output). Those datasets are the live samples used below.</p>
+			</div>
+			<div class="tier">
+				<div class="label">Tier 3 · after a change</div>
+				<h3><a href="https://github.com/edeandrea/non-deterministic-no-problem/blob/main/langfuse-evaluation.md#tier-3-drift-detection-in-cicd">Drift detection</a></h3>
+				<p>New answers are compared against the recorded datasets to catch regressions. Today an output guardrail does it at runtime, through the quarkus-langchain4j evaluation framework: a custom <code>SampleLoader</code> backed by Langfuse, plus an LLM-judge <code>EvaluationStrategy</code>. The design also calls for replaying the recorded inputs in CI, which I hadn't built.</p>
+			</div>
+		</div>
+		<p>Your PR asks the question my tier 3 was meant to answer: <em>did this change make things worse?</em> The difference was where the truth comes from. Your sample uses curated samples in a file. I wanted samples that come from real usage, and I did not want hand-crafted inputs in the source tree. Your PR adds the two parts I was missing: comparing each sample against its own accepted result, and a human accepting that result.</p>
+		<p class="callout">The combination I wanted to test: <strong>the samples stay live in Langfuse, and the accepted result is the PR's reviewed baseline.</strong> Your PR keeps the YAML file only as its default sample source; <code>@SampleLocation</code> resolves through the <code>SampleLoader</code> SPI, so a Langfuse-backed loader slots straight in.</p>
+	</section>
+
+	<section>
+		<h2 class="prose">How the pieces fit</h2>
+		<pre class="mermaid">
+flowchart LR
+  A["Real chat sessions"] --> B["Langfuse dataset<br/>(versioned, curated in UI)"]
+  B -->|"@SampleLocation → LangfuseDatasetSampleLoader<br/>pinned to a dataset version"| C["Scorer replays each sample<br/>through the real app"]
+  C --> D["isNotWorseThanBaseline()"]
+  D --> E["Pending result<br/>target/evaluation-baselines"]
+  E -->|"review → accept"| F["Accepted baseline<br/>src/test/resources"]
+  F -.->|"next run compares against"| D
+		</pre>
+		<p class="prose">The test I ran is small. The only app-specific part is the replay function.</p>
+		<pre class="code">@QuarkusTest
+@Evaluate
+class BaselineSpikeTests {
+  @Inject Evaluator evaluator;          // my LLM judge (EvaluationStrategy bean)
+  @Inject EmbeddingModel embeddingModel; // the app's own (snowflake-arctic-embed on Ollama)
+
+  @Test
+  void claimChatIsNotWorseThanBaseline(
+      @ScorerConfiguration(concurrency = 1, trials = 2) Scorer scorer,
+      @SampleLocation("langchain4j.aiservices.ClaimService.chat") Samples&lt;String&gt; samples) {  // a Langfuse dataset
+
+    var report = scorer.evaluate(samples,
+        this::replay,                                            // over the app's chat websocket
+        new SemanticSimilarityStrategy(embeddingModel, 0.80),    // blocking
+        EvaluationStrategy.toAdvisory(evaluator));               // advisory
+
+    assertThat(report).isNotWorseThanBaseline("ClaimService.chat");
+  }
+}</pre>
+	</section>
+
+	<section>
+		<h2 class="prose">First, what Langfuse does with baselines</h2>
+		<div class="two">
+			<div class="panel">
+				<div class="label">Stores</div>
+				<p><strong>Dataset versions.</strong> Every add, edit or archive of an item creates a version. <code>GET /dataset-items?version=&lt;timestamp&gt;</code> returns the dataset as it was then (quarkus-langfuse: <code>DatasetItemFilter.version(…)</code>). An edited item keeps its id.</p>
+			</div>
+			<div class="panel">
+				<div class="label">Does not store</div>
+				<p><strong>A baseline.</strong> The compare view's baseline is a URL parameter (<code>?baseline=&lt;id&gt;&amp;c=&lt;id&gt;</code>). The experiments API returned identical data before and after I picked one, and Langfuse's CI guidance says the approved baseline and the gate belong in your repository.</p>
+			</div>
+		</div>
+		<figure>
+			<img src="img/06-compare-baseline-A.png" alt="Langfuse experiment comparison: run A marked baseline, run B as comparison, per-item correct scores with deltas; summary 1.00 versus 0.50, two items down." loading="lazy" width="1600" height="1000">
+			<figcaption>Langfuse's compare view pairs dataset items across two runs and shows per-item score deltas (summary: 1.00 vs 0.50, 2 down). It shows the same idea as your report, but nothing it shows is stored as a gate. That supports keeping the accepted result in the repo, as the PR does.</figcaption>
+		</figure>
+	</section>
+
+	<section>
+		<h2 class="prose">Five runs</h2>
+		<p class="prose">Four live samples recorded from real chat sessions (one of them hand-corrected in Langfuse), 2 trials each, a blocking similarity check (0.80) plus my LLM judge as an advisory strategy. Chat model <code>granite4:micro</code> and embeddings <code>snowflake-arctic-embed</code>, both on local Ollama. PR artifacts built from <code>pr-3227</code>; the rest of quarkus-langchain4j on 1.15.1.</p>
+		<div class="table-wrap">
+			<table>
+				<thead><tr><th>Run</th><th>What changed</th><th>Outcome</th><th>Detail</th></tr></thead>
+				<tbody>
+					<tr><td class="num">1</td><td>No baseline yet</td><td><span class="pill fail">failed</span></td><td>"No baseline yet for ClaimService.chat, 4 samples pending review". Reviewed in the CLI, accepted.</td></tr>
+					<tr><td class="num">2</td><td>Nothing</td><td><span class="pill pass">unchanged</span></td><td>Mean difference 0.0. Even the judge's 1-of-2 split on the corrected item reproduced.</td></tr>
+					<tr><td class="num">3</td><td>Prompt degraded to one-word answers</td><td><span class="pill fail">failed</span></td><td>−100 points, all 4 regressed. The advisory judge dropped only 12.5. Rejected.</td></tr>
+					<tr><td class="num">4a</td><td>A 5th live sample recorded; dataset read at the old version</td><td><span class="pill pass">unchanged</span></td><td>Still 4 samples: the pin kept new data out of the comparison.</td></tr>
+					<tr><td class="num">4b</td><td>Same app, dataset read at the latest version</td><td><span class="pill noise">failed on noise</span></td><td>New sample reported as new. One trial scored 0.7898 against the 0.80 threshold: −12.5 points, 95% CI −37.0 to +12.0.</td></tr>
+				</tbody>
+			</table>
+		</div>
+		<div class="two">
+			<figure>
+				<img src="img/07-cli-review-accept.png" alt="CLI review of the first run: four new samples, blocking 100% each, advisory 50% on one; accepted." loading="lazy" width="1400" height="600">
+				<figcaption>Run 1 in the review CLI (run as the runner jar). Samples are Langfuse item ids.</figcaption>
+			</figure>
+			<figure>
+				<img src="img/08-cli-review-regression-reject.png" alt="CLI review of the degraded run: all four samples regressed from 100% to 0% blocking; advisory mostly unchanged; rejected." loading="lazy" width="1400" height="600">
+				<figcaption>Run 3: similarity caught the regression. The small judge passed most one-word answers.</figcaption>
+			</figure>
+		</div>
+		<figure>
+			<img src="img/09-cli-review-noise.png" alt="CLI review of run 4b: one sample at 50% blocking, one new sample, mean difference minus 12.5 with a confidence interval from minus 37 to plus 12." loading="lazy" width="1400" height="600">
+			<figcaption>Run 4b: the application didn't change. One trial on one sample fell just under the similarity threshold, and with 4 samples × 2 trials that's enough to fail the gate.</figcaption>
+		</figure>
+	</section>
+
+	<section>
+		<h2 class="prose">What worked well</h2>
+		<ul class="prose">
+			<li><code>@SampleLocation</code> plus a custom <code>SampleLoader</code> made a live Langfuse dataset a first-class sample source, with no changes to the PR.</li>
+			<li>Pending vs. accepted, with tests never writing to <code>src/test/resources</code>, fits samples that change between runs: the decision stays with a person.</li>
+			<li>New samples are reported and kept out of the paired comparison, so a growing dataset doesn't break the gate.</li>
+			<li>The blocking/advisory split put a weak, cheap judge exactly where it belongs.</li>
+			<li>The review CLI's <code>d</code> (responses with each strategy's verdict) was the most useful part of reviewing.</li>
+		</ul>
+	</section>
+
+	<section>
+		<h2 class="prose">Suggestions</h2>
+		<ol class="asks prose">
+			<li>
+				<h3>Make the gate aware of sample size</h3>
+				<p>With pass/fail scoring, one flipped trial moves the mean by 100 / (samples × trials) points: 12.5 here, against a default tolerance of 5. Run 4b failed with a 95% CI of −37 to +12, which includes zero. Possible options: fail only when the CI's upper bound is below −tolerance, warn when the sample count can't support the tolerance, or compare a strategy's continuous score (for example the similarity value) instead of pass rates.</p>
+				<p class="evidence">Evidence: run 4b, sample <code>c1fe48ac</code>, similarity 0.7898 vs 0.80 in trial 1, passed in trial 2.</p>
+			</li>
+			<li>
+				<h3>Let the baseline record where its samples came from</h3>
+				<p>For samples loaded from a live store, the baseline needs to say which version of the data it was measured on, for example an optional source and version supplied by the <code>SampleLoader</code>. A mismatch could then be reported like the existing trials/strategies <code>INCOMPATIBLE</code> check. Without it, a change in the data and a change in the app look the same.</p>
+				<p class="evidence">Evidence: runs 4a and 4b used the same baseline file and differed only by dataset version.</p>
+			</li>
+			<li>
+				<h3>Give strategies a stable name</h3>
+				<p>Strategy names come from the runtime class, so a CDI bean is recorded as <code>Evaluator_ClientProxy (advisory)</code>. A rename or a change in proxy naming would make every baseline incompatible. An overridable <code>EvaluationStrategy.name()</code>, or unwrapping client proxies, would avoid it.</p>
+			</li>
+			<li>
+				<h3>Allow accepting part of a result</h3>
+				<p>With live data most runs are <code>changed</code> because new samples keep arriving, and accepting replaces the whole baseline. Accepting only the new samples (or only selected ones) would keep review focused on what's new.</p>
+			</li>
+			<li>
+				<h3>Consider pairwise strategies</h3>
+				<p>For open-ended answers the most useful judge question is "is the new answer better, equivalent or worse than the accepted one?" Today a strategy only sees the sample and the new output. Giving strategies the baseline's output would make pairwise comparison possible. That would need the pending or accepted result to keep responses, which the summary baseline drops today.</p>
+			</li>
+			<li>
+				<h3>Check whether <code>BaselineStore</code> can be implemented outside the PR's modules</h3>
+				<p>I'd like a store that keeps results somewhere other than files, for example as Langfuse experiment runs, so they show up in its compare view. <code>receive(…)</code> takes the review module's <code>Comparison</code>, so an implementation depends on that module. I didn't build one; this comes from reading the code.</p>
+			</li>
+		</ol>
+	</section>
+
+	<section class="prose">
+		<h2>Things on my side, not the PR's</h2>
+		<ul>
+			<li>My Langfuse loader named every sample with the dataset id, so all samples shared one name. Your duplicate-name check caught it immediately. Fixed by using the item id.</li>
+			<li>My recorded items hold the whole model prompt rather than the AI service's arguments, so replaying meant parsing the question back out of it. I'll record the service's own input instead.</li>
+		</ul>
+	</section>
+
+	<footer>
+		<p>A throwaway prototype, run locally on 2026-11-24: Quarkus 3.40.1.2, quarkus-langchain4j 1.15.1 with the PR's evaluation modules at <code>999-SNAPSHOT</code> (branch <code>eval-baseline</code>, <code>1ec36ce</code>), quarkus-langfuse 0.9.1, Langfuse 4.70.1 (Dev Service), Ollama. Nothing here is committed to either project.</p>
+	</footer>
+</div>
