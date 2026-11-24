@@ -92,7 +92,27 @@ td.num { font-variant-numeric: tabular-nums; font-family: var(--font-mono); whit
 .tier h3 a { color: inherit; text-decoration-color: var(--accent); }
 .tier p { font-size: 15px; }
 .callout { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 12px 16px; border-radius: 0 6px 6px 0; }
-pre.mermaid { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 16px; overflow-x: auto; margin: 0; }
+.flow { list-style: none; padding: 0; margin: 0; display: grid; gap: 0; max-width: 640px; }
+.flow .step { background: var(--surface); border: 1px solid var(--rule); border-left: 4px solid var(--rule); border-radius: 6px; padding: 12px 16px; display: grid; gap: 2px; min-width: 0; }
+.flow .step.live { border-left-color: var(--accent); }
+.flow .step.pr { border-left-color: var(--warn); }
+.flow .step + .step, .flow .edge + .step { margin-top: 0; }
+.flow .step::after { content: none; }
+.flow > li:not(:last-child).step { position: relative; margin-bottom: 26px; }
+.flow > li.step:not(:last-child)::after { content: "↓"; position: absolute; left: 22px; bottom: -24px; color: var(--muted); font-size: 18px; line-height: 22px; }
+.flow > li.step:has(+ .edge) { margin-bottom: 0; }
+.flow > li.step:has(+ .edge)::after { content: none; }
+.flow .edge { padding: 6px 0 6px 22px; margin: 0; border-left: 2px dashed var(--rule); margin-left: 26px; font-size: 14px; color: var(--muted); }
+.flow .edge span::before { content: "↓ "; color: var(--muted); }
+.flow .edge { margin-bottom: 0; }
+.flow .edge + .step { margin-top: 0; }
+.flow .where { font: 500 11px/1.3 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.flow .what { font-weight: 600; font-size: 16px; overflow-wrap: anywhere; }
+.flow .how { font-size: 14px; color: var(--muted); }
+.legend { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -1px; margin-right: 4px; }
+.swatch.live { background: var(--accent); }
+.swatch.pr { background: var(--warn); }
 footer { border-top: 1px solid var(--rule); padding-top: 20px; font-size: 14px; color: var(--muted); display: grid; gap: 6px; }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
 </style>
@@ -136,15 +156,40 @@ footer { border-top: 1px solid var(--rule); padding-top: 20px; font-size: 14px; 
 
 	<section>
 		<h2 class="prose">How the pieces fit</h2>
-		<pre class="mermaid">
-flowchart LR
-  A["Real chat sessions"] --> B["Langfuse dataset<br/>(versioned, curated in UI)"]
-  B -->|"@SampleLocation → LangfuseDatasetSampleLoader<br/>pinned to a dataset version"| C["Scorer replays each sample<br/>through the real app"]
-  C --> D["isNotWorseThanBaseline()"]
-  D --> E["Pending result<br/>target/evaluation-baselines"]
-  E -->|"review → accept"| F["Accepted baseline<br/>src/test/resources"]
-  F -.->|"next run compares against"| D
-		</pre>
+		<ol class="flow" aria-label="How live samples flow into the PR's baseline workflow">
+			<li class="step">
+				<div class="where">Production traffic</div>
+				<div class="what">Real chat sessions</div>
+				<div class="how">Tier 2 records each exchange when a session ends.</div>
+			</li>
+			<li class="step live">
+				<div class="where">Langfuse</div>
+				<div class="what">Dataset <code>langchain4j.aiservices.ClaimService.chat</code></div>
+				<div class="how">Versioned on every change. Items can be corrected or archived in the UI.</div>
+			</li>
+			<li class="edge"><span><code>@SampleLocation</code> → <code>LangfuseDatasetSampleLoader</code>, pinned to a dataset version</span></li>
+			<li class="step">
+				<div class="where">Test</div>
+				<div class="what"><code>Scorer</code> replays each sample through the real app</div>
+				<div class="how">Blocking similarity check, advisory LLM judge, 2 trials.</div>
+			</li>
+			<li class="step pr">
+				<div class="where">PR #3227</div>
+				<div class="what"><code>isNotWorseThanBaseline()</code></div>
+				<div class="how">Pairs each sample with the accepted baseline.</div>
+			</li>
+			<li class="step pr">
+				<div class="where">Build directory</div>
+				<div class="what">Pending result in <code>target/evaluation-baselines</code></div>
+			</li>
+			<li class="edge"><span>A person reviews it with the CLI, then accepts or rejects</span></li>
+			<li class="step pr">
+				<div class="where">Source tree</div>
+				<div class="what">Accepted baseline in <code>src/test/resources/evaluation-baselines</code></div>
+				<div class="how">The next run compares against it.</div>
+			</li>
+		</ol>
+		<p class="legend"><span class="swatch live"></span> live in Langfuse <span class="swatch pr"></span> provided by the PR</p>
 		<p class="prose">The test I ran is small. The only app-specific part is the replay function.</p>
 		<pre class="code">@QuarkusTest
 @Evaluate
