@@ -262,7 +262,7 @@ class BaselineSpikeTests {
 		</div>
 		<figure>
 			<img src="img/03-experiments.png" alt="Langfuse Experiments list for the ClaimService.chat dataset: run-A-recorded and run-B-degraded, 4 items each, with a chart of the correct score dropping from 1.0 to 0.5." loading="lazy" width="1600" height="1000">
-			<figcaption>Two experiments over the same four live dataset items: run A replays the recorded answers, and run B deliberately degrades two of them. Langfuse 4.70 runs in its v4 “events only” mode, where an experiment can only be created from OpenTelemetry spans carrying <code>langfuse.experiment.*</code> attributes. The REST API can list experiments but not create them.</figcaption>
+			<figcaption>Two experiments over the same four live dataset items: run A replays the recorded answers, and run B deliberately degrades two of them.</figcaption>
 		</figure>
 		<figure>
 			<img src="img/06-compare-baseline-A.png" alt="Langfuse experiment comparison: run A marked baseline, run B as comparison, per-item correct scores with deltas; summary 1.00 versus 0.50, two items down." loading="lazy" width="1600" height="1000">
@@ -340,7 +340,7 @@ class BaselineSpikeTests {
 			</li>
 			<li>
 				<h3>Check whether <code>BaselineStore</code> can be implemented outside the PR's modules</h3>
-				<p>I'd like a store that keeps results somewhere other than files, for example as Langfuse experiment runs, so they show up in its compare view. <code>receive(…)</code> takes the review module's <code>Comparison</code>, so an implementation depends on that module. I didn't build one; this comes from reading the code.</p>
+				<p>I'd like a store that keeps results somewhere other than files, for example as Langfuse experiment runs (which Langfuse v4 only creates from OpenTelemetry spans), so they show up in its compare view. <code>receive(…)</code> takes the review module's <code>Comparison</code>, so an implementation depends on that module. I didn't build one; this comes from reading the code.</p>
 			</li>
 		</ol>
 	</section>
