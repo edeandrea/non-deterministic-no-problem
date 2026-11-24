@@ -163,7 +163,7 @@ footer { border-top: 1px solid var(--rule); padding-top: 20px; font-size: 14px; 
 			</div>
 		</div>
 		<p>They meet at seams that already exist: <code>@SampleLocation</code> resolves through the <code>SampleLoader</code> SPI, and the baseline doesn't care where samples come from. The prototype needed one loader change and one test class.</p>
-		<p><strong>Two qualifications.</strong> The PR's gate assumes a stable, curated sample set, and live data pushes on that: a small dataset made the mean-based gate fail on noise, the baseline doesn't record which data version it was measured on, and accepting replaces everything. Those are the <a href="#suggestions">suggestions</a> below. On my side, recorded samples hold model prompts rather than AI service calls, so replaying them meant parsing text. I'm fixing that.</p>
+		<p><strong>Two qualifications.</strong> The PR's gate assumes a stable, curated sample set, and live data pushes on that: a small dataset made the mean-based gate fail on noise, the baseline doesn't record which data version it was measured on, and accepting replaces everything. Those are the <a href="#suggestions">suggestions</a> below. On my side, recorded samples hold model prompts rather than AI service calls, so replaying them meant parsing text. I'm fixing that in <a href="https://github.com/edeandrea/non-deterministic-no-problem/issues/314">#314</a>.</p>
 	</section>
 
 	<section class="prose">
@@ -345,7 +345,7 @@ class BaselineSpikeTests {
 		<h2>Things on my side, not the PR's</h2>
 		<ul>
 			<li>My Langfuse loader named every sample with the dataset id, so all samples shared one name. Your duplicate-name check caught it immediately. Fixed by using the item id.</li>
-			<li>My recorded items hold the whole model prompt rather than the AI service's arguments, so replaying meant parsing the question back out of it. I'll record the service's own input instead.</li>
+			<li>My recorded items hold the whole model prompt rather than the AI service's arguments, so replaying meant parsing the question back out of it. I'll record the service's own input instead (<a href="https://github.com/edeandrea/non-deterministic-no-problem/issues/314">#314</a>).</li>
 		</ul>
 	</section>
 

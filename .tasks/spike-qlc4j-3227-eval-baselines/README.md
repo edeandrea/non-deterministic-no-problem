@@ -36,7 +36,7 @@ accepted result is the PR's reviewed baseline.**
    `langchain4j.aiservices.ClaimService.chat`, with `score-session` off (`createDatasets` runs before that filter).
 2. **An item's input is the whole generation prompt,** not the AI service call: system message, rendered user message, then
    the RAG excerpt, as one string. Replaying through `ClaimService` needs the `ClaimBotQuery` parsed back out. (Now
-   Key Decision 8 of #310.)
+   Key Decision 8 of #310, tracked as [#314](https://github.com/edeandrea/non-deterministic-no-problem/issues/314).)
 3. **Dataset versioning works.**
    - `GET /api/public/dataset-items?datasetName=…&version=<ISO>` returns the dataset as it was then.
    - An edit keeps the item id and stamps a new per-item `version`.
