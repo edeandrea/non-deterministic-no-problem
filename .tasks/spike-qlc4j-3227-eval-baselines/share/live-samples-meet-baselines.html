@@ -261,6 +261,10 @@ class BaselineSpikeTests {
 			</div>
 		</div>
 		<figure>
+			<img src="img/03-experiments.png" alt="Langfuse Experiments list for the ClaimService.chat dataset: run-A-recorded and run-B-degraded, 4 items each, with a chart of the correct score dropping from 1.0 to 0.5." loading="lazy" width="1600" height="1000">
+			<figcaption>Two experiments over the same four live dataset items: run A replays the recorded answers, and run B deliberately degrades two of them. Langfuse 4.70 runs in its v4 “events only” mode, where an experiment can only be created from OpenTelemetry spans carrying <code>langfuse.experiment.*</code> attributes. The REST API can list experiments but not create them.</figcaption>
+		</figure>
+		<figure>
 			<img src="img/06-compare-baseline-A.png" alt="Langfuse experiment comparison: run A marked baseline, run B as comparison, per-item correct scores with deltas; summary 1.00 versus 0.50, two items down." loading="lazy" width="1600" height="1000">
 			<figcaption>Langfuse's compare view pairs dataset items across two runs and shows per-item score deltas (summary: 1.00 vs 0.50, 2 down). It shows the same idea as your report, but nothing it shows is stored as a gate. That supports keeping the accepted result in the repo, as the PR does.</figcaption>
 		</figure>
